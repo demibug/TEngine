@@ -74,6 +74,12 @@ crashlytics-build.properties
 [Aa]ssets/StreamingAssets/
 [Aa]ssets/StreamingAssets.meta
 
+
+#UserSetting
+[Uu]serSettings/Layouts/
+[Uu]serSettings/Search.index
+[Uu]serSettings/Search.settings
+
 #Rider
 /.idea/
 
