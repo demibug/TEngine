@@ -99,3 +99,8 @@ package/
 yoo/
 [Aa]ssets/TEngine/AssetSetting/Resources/BuiltinFileManifest.asset
 [Aa]ssets/TEngine/AssetSetting/Resources/BuiltinFileManifest.asset.meta
+
+# UserSettings
+[Uu]serSettings/Layouts/
+[Uu]serSettings/Search.index
+[Uu]serSettings/Search.settings
