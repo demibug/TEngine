@@ -313,35 +313,12 @@ namespace TEngine.Editor.UI
             }
         }
 
-        public class GeneratorHelper : EditorWindow
+        public class GeneratorHelper 
         {
             [MenuItem("GameObject/ScriptGenerator/About", priority = 49)]
             public static void About()
             {
-                var window = GetWindow<GeneratorHelper>();
-                window.titleContent = new GUIContent("About", EditorGUIUtility.IconContent("_Help").image);
-                window.minSize = new Vector2(400, 400);
-            }
-
-            public void Awake()
-            {
-                minSize = new Vector2(400, 600);
-            }
-
-            protected void OnGUI()
-            {
-                GUILayout.BeginVertical();
-
-                foreach (var rule in ScriptGeneratorSetting.GetScriptGenerateRule())
-                {
-                    GUILayout.BeginHorizontal();
-                    GUILayout.Label(rule.uiElementRegex, GUILayout.Width(150));
-                    GUILayout.Label("<=>", GUILayout.Width(50));
-                    GUILayout.Label(rule.componentName.ToString(), GUILayout.Width(150));
-                    GUILayout.EndHorizontal();
-                }
-
-                GUILayout.EndVertical();
+                TEngineUISettingsProvider.OpenSettings();
             }
         }
     }

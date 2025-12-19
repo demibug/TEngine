@@ -377,7 +377,7 @@ namespace TEngine
             var package = string.IsNullOrEmpty(customPackageName)
                 ? YooAssets.GetPackage(DefaultPackageName)
                 : YooAssets.GetPackage(customPackageName);
-            return package.ClearCacheFilesAsync(EFileClearMode.ClearUnusedBundleFiles);
+            return package.ClearCacheFilesAsync(clearMode);
         }
 
         /// <summary>
@@ -385,12 +385,7 @@ namespace TEngine
         /// </summary>
         /// <param name="customPackageName">指定资源包的名称。不传使用默认资源包</param>
         public void ClearAllBundleFiles(string customPackageName = "")
-        {
-            var package = string.IsNullOrEmpty(customPackageName)
-                ? YooAssets.GetPackage(DefaultPackageName)
-                : YooAssets.GetPackage(customPackageName);
-            package.ClearCacheFilesAsync(EFileClearMode.ClearAllBundleFiles);
-        }
+            => ClearCacheFilesAsync(EFileClearMode.ClearAllBundleFiles, customPackageName);
 
         #region 资源回收
 

@@ -29,12 +29,14 @@ public class MainToolbarSceneLauncherButton
     [MainToolbarElement("TEngine/Scene Launcher Button", defaultDockIndex = -10, defaultDockPosition = MainToolbarDockPosition.Middle)]
     private static MainToolbarElement ProjectSettingsButton()
     {
-        // var onIcon = EditorGUIUtility.IconContent("PlayButton").image as Texture2D;
-        // var offIcon = EditorGUIUtility.IconContent("StopButton").image as Texture2D;
-        var icon = EditorGUIUtility.IconContent("PlayButton").image as Texture2D;
+        var onIcon = EditorGUIUtility.IconContent("PlayButton").image as Texture2D;
+        var offIcon = EditorGUIUtility.IconContent("StopButton").image as Texture2D;
+        var icon = !EditorApplication.isPlaying ? onIcon : offIcon;
         var content = new MainToolbarContent("Launcher", icon, "");
-        var launcherBtn = new MainToolbarButton(content, () => { SceneHelper.StartScene(SceneMain); });
-        launcherBtn.displayed = true;
+        var launcherBtn = new MainToolbarButton(content, () => { SceneHelper.StartScene(SceneMain); })
+        {
+            displayed = true
+        };
         return launcherBtn;
     }
 
@@ -49,6 +51,7 @@ public class MainToolbarSceneLauncherButton
     private static void OnPlayModeStateChanged(PlayModeStateChange state)
     {
         ProjectSettingsButton();
+        MainToolbar.Refresh("TEngine/Scene Launcher Button");
         if (state == PlayModeStateChange.EnteredEditMode)
         {
             // 从 EditorPrefs 读取之前的场景路径 并恢复之前的场景
@@ -333,7 +336,10 @@ public class MainToolbarDropdownPlayMode
     public static MainToolbarElement CreateExampleDropdown()
     {
         var content = new MainToolbarContent(_resourceModeNames[ResourceModeIndex]);
-        m_btn = new MainToolbarDropdown(content, ShowDropdownMenu);
+        m_btn = new MainToolbarDropdown(content, ShowDropdownMenu)
+        {
+            enabled = !EditorApplication.isPlaying
+        };
         _resourceModeIndex = EditorPrefs.GetInt("EditorPlayMode");
         return m_btn;
     }
@@ -348,9 +354,8 @@ public class MainToolbarDropdownPlayMode
     }
     private static void OnPlayModeStateChanged(PlayModeStateChange state)
     {
-        m_btn.enabled = !EditorApplication.isPlayingOrWillChangePlaymode;
+        CreateExampleDropdown();
         MainToolbar.Refresh(kElementPath);
-        // CreateExampleDropdown();
     }
 
     static void ShowDropdownMenu(Rect dropDownRect)
