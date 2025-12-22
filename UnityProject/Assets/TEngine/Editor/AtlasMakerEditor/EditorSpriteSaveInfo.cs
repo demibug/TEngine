@@ -105,36 +105,58 @@
         public static void ForceGenerateAll(bool isClearAll)
         {
             _isInScanExistingSprites = true;
-            if (isClearAll)
+            try
             {
-                _atlasPathMap.Clear();
-                ClearCache();
-                ClearAllAtlas();
-            }
-            _atlasMap.Clear();
-            ScanExistingSprites();
+                EditorUtility.DisplayProgressBar("生成图集", "正在初始化...", 0f);
 
-            if (_isBuildChange)
-            {
-                foreach (var item in _atlasMap)
+                if (isClearAll)
                 {
-                    if (GetLatestAtlasTime(item.Key) >= GetLatestSpriteTime(item.Key))
+                    EditorUtility.DisplayProgressBar("生成图集", "清理缓存...", 0.1f);
+                    _atlasPathMap.Clear();
+                    ClearCache();
+                    ClearAllAtlas();
+                }
+
+                _atlasMap.Clear();
+                EditorUtility.DisplayProgressBar("生成图集", "扫描现有精灵...", 0.2f);
+                ScanExistingSprites();
+
+                EditorUtility.DisplayProgressBar("生成图集", "分析变更...", 0.4f);
+                if (_isBuildChange)
+                {
+                    int current = 0;
+                    int total = _atlasMap.Count;
+                    foreach (var item in _atlasMap)
                     {
-                        continue;
-                    }
-                    else
-                    {
-                        _dirtyAtlasNamesNeedCreateNew.Add(item.Key);
+                        current++;
+                        if (total > 0)
+                        {
+                            EditorUtility.DisplayProgressBar("生成图集", $"检查图集时间戳 ({current}/{total})...", 0.4f + 0.2f * current / total);
+                        }
+
+                        if (GetLatestAtlasTime(item.Key) >= GetLatestSpriteTime(item.Key))
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            _dirtyAtlasNamesNeedCreateNew.Add(item.Key);
+                        }
                     }
                 }
-            }
-            else
-            {
-                _dirtyAtlasNamesNeedCreateNew.UnionWith(_atlasMap.Keys);
-            }
+                else
+                {
+                    _dirtyAtlasNamesNeedCreateNew.UnionWith(_atlasMap.Keys);
+                }
 
-            ProcessDirtyAtlases(true);
-            _isInScanExistingSprites = false;
+                EditorUtility.DisplayProgressBar("生成图集", "生成图集文件...", 0.6f);
+                ProcessDirtyAtlases(true);
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+                _isInScanExistingSprites = false;
+            }
         }
 
         private static void ClearAllAtlas()
@@ -206,6 +228,10 @@
 
         private static void ProcessDirtyAtlases(bool force = false)
         {
+            int totalCount = _dirtyAtlasNames.Count + _dirtyAtlasNamesNeedCreateNew.Count;
+            int processedCount = 0;
+            bool showProgress = totalCount > 3 && _isInScanExistingSprites;
+
             try
             {
                 AssetDatabase.StartAssetEditing();
@@ -213,6 +239,12 @@
                 while (_dirtyAtlasNames.Count > 0)
                 {
                     var atlasName = _dirtyAtlasNames.First();
+                    if (showProgress)
+                    {
+                        processedCount++;
+                        EditorUtility.DisplayProgressBar("生成图集", $"更新图集: {atlasName} ({processedCount}/{totalCount})", 0.6f + 0.4f * processedCount / totalCount);
+                    }
+
                     if (force || ShouldUpdateAtlas(atlasName))
                     {
                         GenerateAtlas(atlasName, false);
@@ -223,6 +255,12 @@
                 while (_dirtyAtlasNamesNeedCreateNew.Count > 0)
                 {
                     var atlasName = _dirtyAtlasNamesNeedCreateNew.First();
+                    if (showProgress)
+                    {
+                        processedCount++;
+                        EditorUtility.DisplayProgressBar("生成图集", $"创建图集: {atlasName} ({processedCount}/{totalCount})", 0.6f + 0.4f * processedCount / totalCount);
+                    }
+
                     if (force || ShouldUpdateAtlas(atlasName))
                     {
                         GenerateAtlas(atlasName, true);
@@ -265,7 +303,7 @@
                 DeleteAtlas(deletePath);
                 return;
             }
-            AssetDatabase.Refresh();
+            // 延迟调用生成图集，避免在 AssetEditing 块中调用
             EditorApplication.delayCall += () => { InternalGenerateAtlas(atlasName, sprites, outputPath); };
         }
 
@@ -302,18 +340,22 @@
             {
                 spriteAtlasAsset?.Add(sprites.ToArray());
                 SpriteAtlasAsset.Save(spriteAtlasAsset, outputPath);
-                AssetDatabase.Refresh();
+                AssetDatabase.ImportAsset(outputPath, ImportAssetOptions.ForceUpdate);
                 EditorApplication.delayCall += () =>
                 {
 #if UNITY_2022_1_OR_NEWER
                     SpriteAtlasImporter sai = (SpriteAtlasImporter)AssetImporter.GetAtPath(outputPath);
-                    ConfigureAtlasV2Settings(sai);
+                    if (sai != null)
+                    {
+                        ConfigureAtlasV2Settings(sai);
+                        AssetDatabase.WriteImportSettingsIfDirty(outputPath);
+                        AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+                    }
 #else
                     ConfigureAtlasV2Settings(spriteAtlasAsset);
                     SpriteAtlasAsset.Save(spriteAtlasAsset, outputPath);
+                    AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
 #endif
-                    AssetDatabase.WriteImportSettingsIfDirty(outputPath);
-                    AssetDatabase.Refresh();
                 };
             }
             else
@@ -340,9 +382,12 @@
                     AssetDatabase.CreateAsset(atlas, outputPath);
                 }
             }
-            EditorUtility.SetDirty(atlas);
+            if (atlas != null)
+            {
+                EditorUtility.SetDirty(atlas);
+            }
             AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
             if (File.Exists(outputPath))
             {
                 _atlasPathMap[atlasName] = outputPath;
@@ -538,19 +583,25 @@
         {
             if (_atlasMap.TryGetValue(atlasName, out List<string> list))
             {
-                return list
-                    .Select(p => new FileInfo(p).LastWriteTime)
-                    .DefaultIfEmpty()
-                    .Max();
+                DateTime maxTime = DateTime.MinValue;
+                foreach (var path in list)
+                {
+                    if (File.Exists(path))
+                    {
+                        var time = File.GetLastWriteTime(path);
+                        if (time > maxTime) maxTime = time;
+                    }
+                }
+                return maxTime;
             }
             return DateTime.MinValue;
         }
 
         private static DateTime GetLatestAtlasTime(string atlasName)
         {
-            if (_atlasPathMap.TryGetValue(atlasName, out var atlasPath))
+            if (_atlasPathMap.TryGetValue(atlasName, out var atlasPath) && File.Exists(atlasPath))
             {
-                return new FileInfo(atlasPath).LastWriteTime;
+                return File.GetLastWriteTime(atlasPath);
             }
             return DateTime.MinValue;
         }
@@ -562,7 +613,6 @@
                 AssetDatabase.DeleteAsset(path);
                 if (Config.enableLogging)
                     Debug.Log($"Deleted empty atlas: {Path.GetFileName(path)}");
-                AssetDatabase.Refresh();
             }
         }
 
@@ -571,7 +621,6 @@
             if (!Directory.Exists(Config.outputAtlasDir))
             {
                 Directory.CreateDirectory(Config.outputAtlasDir);
-                AssetDatabase.Refresh();
             }
         }
 
