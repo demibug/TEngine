@@ -120,6 +120,11 @@ namespace TEngine.Editor.UI
             strVar.AppendLine($"\t\tprivate UIBindComponent m_bindComponent;");
 
             strBind.AppendLine($"\t\t\tm_bindComponent = gameObject.GetComponent<UIBindComponent>();");
+            strBind.AppendLine($"\t\t\tif(m_bindComponent == null)");
+            strBind.AppendLine($"\t\t\t{{");
+            strBind.AppendLine($"\t\t\t\tLog.Error($\"根物体: {{gameObject.name}} 缺少组件 UIBindComponent, 请检查！！！\");");
+            strBind.AppendLine($"\t\t\t\treturn;");
+            strBind.AppendLine($"\t\t\t}}");
             m_bindIndex = 0;
             AutoErgodic(root, root, ref strVar, ref strBind, ref strOnCreate, ref strCallback, isUniTask);
             StringBuilder strFile = new StringBuilder();
@@ -515,7 +520,7 @@ namespace TEngine.Editor.UI
             bool isInPrefabMode = IsInPrefabMode(root.gameObject);
 
             CheckVariableNames();
-            var uiComponent = AddComponent3Window();
+            var uiComponent = AddComponent2Window();
 
             if (uiComponent == null)
             {
@@ -662,7 +667,7 @@ namespace TEngine.Editor.UI
             };
         }
 
-        private static UIBindComponent AddComponent3Window()
+        private static UIBindComponent AddComponent2Window()
         {
             var root = Selection.activeTransform;
 

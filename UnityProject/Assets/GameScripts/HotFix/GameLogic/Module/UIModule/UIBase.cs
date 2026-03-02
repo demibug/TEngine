@@ -3,12 +3,18 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using TEngine;
 using UnityEngine;
+#if ENABLE_OBFUZ
+using Obfuz;
+#endif
 
 namespace GameLogic
 {
     /// <summary>
     /// UI基类。
     /// </summary>
+#if ENABLE_OBFUZ
+    [ObfuzIgnore(ObfuzScope.TypeName, ApplyToChildTypes = true)]
+#endif
     public class UIBase
     {
         /// <summary>

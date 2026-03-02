@@ -223,7 +223,7 @@ namespace TEngine
             buildParameters.FileNameStyle =  EFileNameStyle.BundleName_HashName;
             buildParameters.BuildinFileCopyOption = EBuildinFileCopyOption.ClearAndCopyAll;
             buildParameters.BuildinFileCopyParams = string.Empty;
-            buildParameters.EncryptionServices = CreateEncryptionInstance("DefaultPackage",buildPipeline);
+            buildParameters.EncryptionServices = GetEncryptionFromResourceModuleDriver();
             buildParameters.ClearBuildCacheFiles = false; //不清理构建缓存，启用增量构建，可以提高打包速度！
             buildParameters.UseAssetDependencyDB = true; //使用资源依赖关系数据库，可以提高打包速度！
 
@@ -247,6 +247,45 @@ namespace TEngine
             var uniqueBundleName = AssetBundleCollectorSettingData.Setting.UniqueBundleName;
             var packRuleResult = DefaultPackRule.CreateShadersPackRuleResult();
             return packRuleResult.GetBundleName(packageName, uniqueBundleName);
+        }
+
+        /// <summary>
+        /// 根据 ResourceModuleDriver 的 encryptionType 获取对应的加密服务
+        /// </summary>
+        private static IEncryptionServices GetEncryptionFromResourceModuleDriver()
+        {
+            // 通过名字查找 GameEntry 预制体
+            var guids = AssetDatabase.FindAssets("t:Prefab GameEntry");
+            if (guids.Length == 0)
+            {
+                Debug.LogWarning("[BuildInternal] Failed to find GameEntry.prefab");
+                return null;
+            }
+
+            var gameEntryPath = AssetDatabase.GUIDToAssetPath(guids[0]);
+            var gameEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(gameEntryPath);
+            if (gameEntryPrefab == null)
+            {
+                Debug.LogWarning("[BuildInternal] Failed to load GameEntry.prefab");
+                return null;
+            }
+
+            var resourceModuleDriver = gameEntryPrefab.GetComponentInChildren<ResourceModuleDriver>();
+            if (resourceModuleDriver == null)
+            {
+                Debug.LogWarning("[BuildInternal] ResourceModuleDriver not found in GameEntry.prefab");
+                return null;
+            }
+
+            var encryptionType = resourceModuleDriver.EncryptionType;
+            Debug.Log($"[BuildInternal] Use EncryptionType from ResourceModuleDriver: {encryptionType}");
+
+            return encryptionType switch
+            {
+                EncryptionType.FileOffSet => new FileOffsetEncryption(),
+                EncryptionType.FileStream => new FileStreamEncryption(),
+                _ => null // EncryptionType.None
+            };
         }
         
         /// <summary>
