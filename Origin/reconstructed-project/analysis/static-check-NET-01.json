@@ -1,0 +1,49 @@
+{
+  "moduleId": "NET-01",
+  "status": "PASS",
+  "originalBundleSha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+  "decodedBundleSha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+  "syntax": {
+    "src/core/SingletonBase.js": [],
+    "src/network/HttpClient.js": [],
+    "src/network/index.js": [],
+    "tests/mocks/LayaHttpMock.js": [],
+    "tests/mocks/NetworkMock.js": [],
+    "tests/unit/HttpClient.test.js": [],
+    "tests/behavior/NET-01.behavior.test.js": []
+  },
+  "commonJsExports": [
+    "HttpClient",
+    "configureHttpClientDependencies",
+    "resetHttpClientDependenciesForTests"
+  ],
+  "sourceGraph": {
+    "src/network/index.js": [
+      "src/network/HttpClient.js"
+    ],
+    "src/network/HttpClient.js": [
+      "src/core/SingletonBase.js"
+    ],
+    "src/core/SingletonBase.js": []
+  },
+  "circularDependencies": [],
+  "endpointsVerified": [
+    "sys/user/login",
+    "sys/user/data",
+    "sys/user/info",
+    "sys/server/time",
+    "zyyad/game/start",
+    "zyyad/game/end?star=",
+    "zyyad/game/country/list?type=",
+    "zyyad/game/province/detail/list?type=",
+    "sys/oa/point/add/new",
+    "sys/oa/errorUpload/add",
+    "bestRank"
+  ],
+  "methodCoverageSummary": {
+    "originalFunctionsFound": 22,
+    "functionsReconstructed": 22,
+    "unresolvedFunctions": 0
+  },
+  "failures": []
+}

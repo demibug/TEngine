@@ -1,0 +1,41 @@
+'use strict';
+
+/**
+ * Skill metadata recovered from bundle.strings-decoded.js:12034-12142 and
+ * 38497,45655-46279. Detailed VFX are deliberately separated from the core
+ * activation/cooldown contract.
+ */
+const SkillCategory = Object.freeze({ ACTIVE: 'active', PASSIVE: 'passive', BOSS: 'boss' });
+
+const SKILL_DEFINITIONS = Object.freeze([
+  { key: 'LeapSlash', name: '跳斩', category: SkillCategory.ACTIVE, description: '接下来数次攻击为跳斩，每次攻击对周围造成50％溅射伤害', source: '38497' },
+  { key: 'SevenInSevenOut', name: '七进七出', category: SkillCategory.ACTIVE, description: '释放一个幻象冲进敌群，以乱刺状态来回突进七次', source: '45655' },
+  { key: 'BattleShout', name: '大喝', category: SkillCategory.ACTIVE, description: '大喝一声，砸晕一圈敌人，晕眩2秒', source: '45659' },
+  { key: 'HolySword', name: '圣剑', category: SkillCategory.ACTIVE, description: '释放一柄圣剑，造成范围伤害并击倒敌人', source: '45902' },
+  { key: 'ArrowRain', name: '箭雨', category: SkillCategory.ACTIVE, description: '射出大量箭雨', source: '46141' },
+  { key: 'FireArrowBarrage', name: '火箭烈', category: SkillCategory.ACTIVE, description: '射出大量火箭轰炸敌人', source: '46145' },
+  { key: 'StunPassive', name: '晕眩', category: SkillCategory.PASSIVE, description: '每次攻击概率造成敌人眩晕', source: '46279' },
+  { key: 'SoulCapture', name: '摄魂', category: SkillCategory.BOSS, description: '使我方小兵陷入混乱，无法攻击', healthMultiplier: 7, speed: 10, rangeTiles: 2, cooldownSeconds: 8, source: '12054' },
+  { key: 'SoulSummon', name: '招魂', category: SkillCategory.BOSS, description: '做法复活死亡的小兵', healthMultiplier: 10, speed: 10, rangeTiles: 3, cooldownSeconds: 8, source: '12062' },
+  { key: 'Inspire', name: '鼓舞', category: SkillCategory.BOSS, description: '激励身边单位，大幅提升血量和移速', healthMultiplier: 15, speed: 10, rangeTiles: 2, cooldownSeconds: 10, source: '12070', confidence: 'INFERRED_HEALTH_MULTIPLIER' },
+  { key: 'Demolition', name: '拆迁', category: SkillCategory.BOSS, description: '将空白地块转化为不可用', healthMultiplier: 7, speed: 10, rangeTiles: 10, cooldownSeconds: 10, source: '12078' },
+  { key: 'RainStorm', name: '巫山云雨', category: SkillCategory.BOSS, description: '战场下雨，降低所有单位攻速，升级可驱除', healthMultiplier: 10, speed: 10, rangeTiles: 10, cooldownSeconds: 3, source: '12086' },
+  { key: 'Enthrall', name: '裙下之臣', category: SkillCategory.BOSS, description: '将最低等级的小兵纳入麾下', healthMultiplier: 15, speed: 10, rangeTiles: 10, cooldownSeconds: 10, source: '12094', confidence: 'INFERRED_HEALTH_MULTIPLIER' },
+  { key: 'CavalryOrder', name: '铁骑号令', category: SkillCategory.BOSS, description: '召唤西凉骑兵', healthMultiplier: 7, speed: 10, rangeTiles: 0, cooldownSeconds: 8, source: '12102' },
+  { key: 'FangTianHalberd', name: '方天画戟', category: SkillCategory.BOSS, description: '挥动武器，大幅降低小兵等级并禁止合成', healthMultiplier: 10, speed: 10, rangeTiles: 2.5, cooldownSeconds: 10, source: '12110' },
+  { key: 'Devour', name: '饕餮', category: SkillCategory.BOSS, description: '吞噬范围内小兵，获得血量加成并膨胀', healthMultiplier: 15, speed: 10, rangeTiles: 1.5, cooldownSeconds: 10, source: '12118', confidence: 'INFERRED_HEALTH_MULTIPLIER' },
+  { key: 'Madness', name: '彻底疯狂', category: SkillCategory.BOSS, description: '冲阵击倒小兵，使其无法动弹，升级解除', healthMultiplier: 7, speed: 10, rangeTiles: 2, cooldownSeconds: 12, source: '12126', confidence: 'INFERRED_COOLDOWN' },
+  { key: 'DevourEyes', name: '噬目', category: SkillCategory.BOSS, description: '视野变暗，难以看清局势', healthMultiplier: 10, speed: 10, rangeTiles: 2, cooldownSeconds: 8, source: '12134' },
+  { key: 'WarlordSeal', name: '一代枭雄', category: SkillCategory.BOSS, description: '封印最高等级小兵，升级解除', healthMultiplier: 15, speed: 10, rangeTiles: 10, cooldownSeconds: 12, source: '12142', confidence: 'INFERRED_HEALTH_AND_COOLDOWN' },
+]);
+
+const byKey = new Map(SKILL_DEFINITIONS.map(item => [item.key, Object.freeze({ ...item })]));
+const byName = new Map(SKILL_DEFINITIONS.map(item => [item.name, byKey.get(item.key)]));
+
+function getSkillDefinition(keyOrName) {
+  const definition = byKey.get(keyOrName) || byName.get(keyOrName);
+  if (!definition) throw new Error(`Unknown skill definition: ${keyOrName}`);
+  return definition;
+}
+
+module.exports = { SkillCategory, SKILL_DEFINITIONS, getSkillDefinition };

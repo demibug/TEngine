@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "status": "FAIL",
+  "commands": [
+    "dev:battle",
+    "dev:boot",
+    "dev:bow-soldier",
+    "dev:core-content",
+    "dev:friendly-unit",
+    "dev:friendly-unit-simulation",
+    "dev:micro-battle",
+    "dev:mob0-simulation",
+    "dev:projectile",
+    "dev:ranged-battle",
+    "dev:single-game",
+    "dev:skill-gameover"
+  ],
+  "results": [
+    {
+      "command": "npm run dev:battle",
+      "status": null,
+      "signal": null,
+      "elapsedMs": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "realNetworkRequests": 0,
+  "nativePlatformCalls": 0
+}

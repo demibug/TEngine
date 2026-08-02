@@ -1,0 +1,248 @@
+{
+  "module": "ENEMY-RUNTIME-01",
+  "status": "COMPLETE_FOR_MOB0_RUNTIME",
+  "symbols": [
+    {
+      "originalSymbol": "qE",
+      "newSymbol": "EnemyEventProxy",
+      "kind": "class",
+      "sourceRange": "19600-19684",
+      "confidence": "HIGH",
+      "reason": "全部方法为事件代理，gameOver 发出 onDestroy"
+    },
+    {
+      "originalSymbol": "ro",
+      "newSymbol": "EnemyBase",
+      "kind": "class",
+      "sourceRange": "19685-20858",
+      "confidence": "HIGH",
+      "reason": "包含敌人状态、路径、伤害、接触攻击和回收"
+    },
+    {
+      "originalSymbol": "pe",
+      "newSymbol": "NormalEnemyBase",
+      "kind": "class",
+      "sourceRange": "31262-31482",
+      "confidence": "HIGH",
+      "reason": "继承 ro 并实现普通敌人数值、动画及死亡淡出"
+    },
+    {
+      "originalSymbol": "st",
+      "newSymbol": "Mob0Enemy",
+      "kind": "class",
+      "sourceRange": "31062-31114",
+      "confidence": "HIGH",
+      "reason": "固定资源 mob_0.png，使用 mob 池键"
+    },
+    {
+      "originalSymbol": "vi",
+      "newSymbol": "EnemyManager",
+      "kind": "class",
+      "sourceRange": "32939-33696",
+      "confidence": "HIGH",
+      "reason": "管理敌人 Map、更新快照和空间索引"
+    },
+    {
+      "originalSymbol": "s4",
+      "newSymbol": "MapData",
+      "kind": "class",
+      "sourceRange": "12483-12847",
+      "confidence": "HIGH",
+      "reason": "嵌入地图和双方路径"
+    },
+    {
+      "originalSymbol": "tl",
+      "newSymbol": "AStarPathfinder",
+      "kind": "class",
+      "sourceRange": "12194-12382",
+      "confidence": "HIGH",
+      "reason": "执行 A* 搜索"
+    },
+    {
+      "originalSymbol": "ru",
+      "newSymbol": "AStarNode",
+      "kind": "class",
+      "sourceRange": "12382-12388",
+      "confidence": "HIGH",
+      "reason": "A* 节点结构"
+    },
+    {
+      "originalSymbol": "oS",
+      "newSymbol": "AStarGrid",
+      "kind": "class",
+      "sourceRange": "12388-12482",
+      "confidence": "HIGH",
+      "reason": "A* 网格和可走性"
+    },
+    {
+      "originalSymbol": "s0",
+      "newSymbol": "EnemyFactory",
+      "kind": "class",
+      "sourceRange": "19184-19226",
+      "confidence": "HIGH",
+      "reason": "类型注册、创建和按类回收"
+    },
+    {
+      "originalSymbol": "ss.NL[0]",
+      "newSymbol": "ENEMY_TYPE_KEYS[0] / Mob0",
+      "kind": "factory-key",
+      "sourceRange": "19227-19242",
+      "confidence": "HIGH",
+      "reason": "原注册表第一项为 Mob0"
+    },
+    {
+      "originalSymbol": "nm",
+      "newSymbol": "isPlayerLane",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "用于路线、阵营过滤和阿斗目标选择"
+    },
+    {
+      "originalSymbol": "rm",
+      "newSymbol": "targetable",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "cw 查询明确过滤该值"
+    },
+    {
+      "originalSymbol": "Lm",
+      "newSymbol": "currentPathIndex",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "EL/Mw 按路径点推进"
+    },
+    {
+      "originalSymbol": "Bm",
+      "newSymbol": "remainingPathDistance",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "qx 查询返回 DTO 的 Bm"
+    },
+    {
+      "originalSymbol": "Zi / mi",
+      "newSymbol": "health / currentHealth",
+      "kind": "field/getter-setter",
+      "confidence": "HIGH",
+      "reason": "hit 扣减并更新 Qm"
+    },
+    {
+      "originalSymbol": "Km / Zm",
+      "newSymbol": "maxHealthBase / maxHealth",
+      "kind": "field/getter",
+      "confidence": "HIGH",
+      "reason": "生命条比例和属性修正"
+    },
+    {
+      "originalSymbol": "Sm / On",
+      "newSymbol": "baseMoveSpeed / moveSpeed",
+      "kind": "field/getter",
+      "confidence": "HIGH",
+      "reason": "EL 使用 On * delta / 1000"
+    },
+    {
+      "originalSymbol": "Wm",
+      "newSymbol": "lastAttackTime",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "attack 500ms 冷却"
+    },
+    {
+      "originalSymbol": "Cm",
+      "newSymbol": "deathStarted",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "Lw/gameOver 防止重复死亡"
+    },
+    {
+      "originalSymbol": "Hw",
+      "newSymbol": "presentation.playSpawn",
+      "kind": "method-port",
+      "confidence": "HIGH",
+      "reason": "原 1100ms 出生 Tween 链由表现端保留"
+    },
+    {
+      "originalSymbol": "EL",
+      "newSymbol": "_advanceAlongPath",
+      "kind": "method",
+      "confidence": "HIGH",
+      "reason": "真实路径位移公式"
+    },
+    {
+      "originalSymbol": "Mw",
+      "newSymbol": "_handlePathIndexChanged",
+      "kind": "method",
+      "confidence": "HIGH",
+      "reason": "临近终点、攻击、离场分支"
+    },
+    {
+      "originalSymbol": "attack",
+      "newSymbol": "attackBattleTarget",
+      "kind": "method",
+      "confidence": "HIGH",
+      "reason": "500ms 冷却、50ms 后固定 1 点接触伤害"
+    },
+    {
+      "originalSymbol": "hit",
+      "newSymbol": "hit / takeDamage",
+      "kind": "method",
+      "confidence": "HIGH",
+      "reason": "直接扣血、事件和死亡切换"
+    },
+    {
+      "originalSymbol": "Lw",
+      "newSymbol": "beginDeath / _beginDeath",
+      "kind": "method",
+      "confidence": "HIGH",
+      "reason": "死亡一次性边界和奖励入口"
+    },
+    {
+      "originalSymbol": "gameOver",
+      "newSymbol": "gameOver",
+      "kind": "method",
+      "confidence": "HIGH",
+      "reason": "注销、清理和双池回收"
+    },
+    {
+      "originalSymbol": "JS",
+      "newSymbol": "enemies",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "id→enemy Map"
+    },
+    {
+      "originalSymbol": "mB",
+      "newSymbol": "cellToEnemyIds",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "cell key→Set"
+    },
+    {
+      "originalSymbol": "wB",
+      "newSymbol": "enemyIdToCell",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "enemy id→cell key"
+    },
+    {
+      "originalSymbol": "qx",
+      "newSymbol": "queryTargets",
+      "kind": "method",
+      "confidence": "HIGH",
+      "reason": "空间候选、阵营和圆矩形相交过滤"
+    },
+    {
+      "originalSymbol": "Le",
+      "newSymbol": "playerRoute",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "玩家侧 A* 路径"
+    },
+    {
+      "originalSymbol": "me",
+      "newSymbol": "opponentRoute",
+      "kind": "field",
+      "confidence": "HIGH",
+      "reason": "对手侧 A* 路径"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "description": "Preservation mapping for files present in prior delivered archives but superseded or absent from the active cumulative tree.",
+  "historicalArchives": [
+    {
+      "round": 1,
+      "archive": "reconstructed-project-round-01.zip",
+      "sha256": "5566ffaedbf98e2af70d9d8aebbe42631b7ea64e541528fe254467de74eb4986",
+      "sizeBytes": 3730121
+    },
+    {
+      "round": 2,
+      "archive": "reconstructed-project-round-02.zip",
+      "sha256": "04d7a124426f9fa557ed1658f523e9611c569c40a8dbb1fa9deb35a931600af0",
+      "sizeBytes": 3797842
+    },
+    {
+      "round": 3,
+      "archive": "reconstructed-project-round-03.zip",
+      "sha256": "fc80072854153c007667bbb6d00bafe354eaeb9a590a40c4899aa76a2681c5f7",
+      "sizeBytes": 3961537
+    },
+    {
+      "round": 4,
+      "archive": "reconstructed-project-round-04.zip",
+      "sha256": "e0d2b3459004b565780fc017122a00379a1a543e3fd1d3d89cfd59e491da3ebe",
+      "sizeBytes": 4339999
+    },
+    {
+      "round": 5,
+      "archive": "reconstructed-project-round-05.zip",
+      "sha256": "1c565d7bb0bd536bb01efe12381bd4666d69a9bc4f34b602f8b6d797f081d5c8",
+      "sizeBytes": 4449128
+    }
+  ],
+  "restoredToActiveTree": [
+    "analysis/modules/NET-01-method-coverage.json",
+    "analysis/round-02-artifacts.json",
+    "analysis/static-checks-round-02.json",
+    "work/extracts/NET-01-requested-5087-6037.js",
+    "work/extracts/context-iife-1014-1695.js",
+    "work/extracts/context-pre-net-3763-5086.js",
+    "work/round-05-extracts/BaseUnitCreators-24380-24980.js",
+    "work/round-05-extracts/BaseUnitFactory-24443-24834.js",
+    "work/round-05-extracts/BattleAttackLoop-50390-50550.js",
+    "work/round-05-extracts/BattleAttackLoop-50443-50519.js",
+    "work/round-05-extracts/BowAndHitArea-ok-r6-26093-26428.js",
+    "work/round-05-extracts/BulletBase-qY-27874-28120.js",
+    "work/round-05-extracts/BulletManager-vA-37209-37320.js",
+    "work/round-05-extracts/Candidate-ok-26040-26540.js",
+    "work/round-05-extracts/EventProxy-qE-19600-19684.js",
+    "work/round-05-extracts/FriendlyUnitConfig-11060-11370.js",
+    "work/round-05-extracts/KnifeHitAndDrag-24840-24930.js",
+    "work/round-05-extracts/SoldierBase-td-23112-23437.js",
+    "work/round-05-extracts/TargetStrategy-tc-24936-25270.js",
+    "work/round-05-extracts/UnitCore-rc-22550-23480.js",
+    "work/round-05-extracts/UnitRegistry-vc-29440-30520.js"
+  ],
+  "preservedUnderHistory": [
+    "history/superseded/round-02/src/package.json",
+    "history/superseded/round-02/tools/run-net01-tests.js",
+    "history/superseded/round-02/tools/verify-net01.js",
+    "history/superseded/round-05/src/combat/KnifeHitAreaAttack.js",
+    "history/superseded/round-05/src/combat/dev/DevelopmentAttackTimeline.js",
+    "history/superseded/round-05/src/combat/index.js",
+    "history/superseded/round-05/src/data/FriendlyUnitData.js",
+    "history/superseded/round-05/src/units/DragEventBase.js",
+    "history/superseded/round-05/tests/mocks/createFriendlyCombatHarness.js",
+    "history/superseded/round-05/tests/mocks/friendlyCombatAssertions.js",
+    "history/superseded/round-05/tools/run-friendly-unit.js",
+    "history/superseded/round-05/tools/run-micro-battle.js"
+  ],
+  "filenameNormalizations": [
+    {
+      "historicalArchivePath": "original/reference/σÅéΦÇâµ╕╕µêÅσêåµ₧É.md",
+      "currentPath": "original/reference/参考游戏分析.md",
+      "reason": "ZIP filename encoding artifact; content preserved under the correct UTF-8 filename."
+    }
+  ],
+  "activeImplementationPolicy": "Current src/tests/tools remain authoritative; superseded code is retained only under history/."
+}

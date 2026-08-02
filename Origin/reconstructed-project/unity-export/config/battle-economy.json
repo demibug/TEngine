@@ -1,0 +1,7 @@
+{
+  "initialGold": 20,
+  "refreshCostStart": 10,
+  "refreshCostIncrement": 2,
+  "unitBaseCost": 1,
+  "handSize": 5
+}

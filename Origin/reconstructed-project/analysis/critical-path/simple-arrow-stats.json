@@ -1,0 +1,144 @@
+{
+  "projectile": "SimpleDynamicArrow",
+  "originalSymbol": "rd",
+  "stats": [
+    {
+      "field": "projectileTypeKey",
+      "value": "SimpleDynamicArrow",
+      "originalSymbol": "rd registration",
+      "sourceRange": "26698-26845; 27578 nearby",
+      "calculation": "正式注册键",
+      "unit": "string",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "appearanceLabel",
+      "value": "弓箭小兵箭矢",
+      "originalSymbol": "appearance config",
+      "sourceRange": "26093-26264",
+      "calculation": "弓兵创建参数",
+      "unit": "string",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "appearanceResource",
+      "value": "resources/img/weapon/arrow_0.png",
+      "originalSymbol": "RS",
+      "sourceRange": "26093-26264",
+      "calculation": "表现配置字面量",
+      "unit": "path",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "compositePoolKey",
+      "value": "bullet_pool_SimpleDynamicArrow_弓箭小兵箭矢",
+      "originalSymbol": "factory pool key",
+      "sourceRange": "33698-33780",
+      "calculation": "bullet_pool_ + type + _ + appearance label",
+      "unit": "string",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "renderWidth",
+      "value": 22,
+      "originalSymbol": "A_ size",
+      "sourceRange": "26698-26845",
+      "calculation": "字面量",
+      "unit": "px",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "renderHeight",
+      "value": 72,
+      "originalSymbol": "A_ size",
+      "sourceRange": "26698-26845",
+      "calculation": "字面量",
+      "unit": "px",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "anchor",
+      "value": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "originalSymbol": "anchorX/anchorY",
+      "sourceRange": "26698-26845",
+      "calculation": "字面量",
+      "unit": "normalized",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "progressDelta",
+      "value": "deltaMs * movementRate * projectileSpeedScale / 500",
+      "originalSymbol": "on.Tk",
+      "sourceRange": "27558-27873",
+      "calculation": "原公式",
+      "unit": "normalized progress per step",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "distanceScale",
+      "value": "sqrt(max(0.1,currentDistance/originalDistance))",
+      "originalSymbol": "on.Tk",
+      "sourceRange": "27558-27873",
+      "calculation": "原公式，启用 distanceScaling 时乘到 progressDelta",
+      "unit": "multiplier",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "hitEnableProgress",
+      "value": 0.8,
+      "originalSymbol": "on.Tk",
+      "sourceRange": "27558-27873",
+      "calculation": "progress >= 0.8",
+      "unit": "normalized progress",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "hitRadius",
+      "value": 48,
+      "originalSymbol": "height / 1.5",
+      "sourceRange": "27558-27873",
+      "calculation": "72 / 1.5",
+      "unit": "px",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "trajectory",
+      "value": "quadratic Bezier with moving target endpoint",
+      "originalSymbol": "on / np",
+      "sourceRange": "2698-2798; 27558-27873",
+      "calculation": "B(t)=(1-t)^2P0+2(1-t)tP1+t^2P2",
+      "unit": "position",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "rotation",
+      "value": "initial tangent + 90; subsequent display angle from last to current position",
+      "originalSymbol": "np angle helpers / on",
+      "sourceRange": "2698-2798; 27558-27873",
+      "calculation": "atan2-based degrees",
+      "unit": "degrees",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "damage",
+      "value": "snapshot of BowSoldier.attackDamage at STOPPED",
+      "originalSymbol": "qY.sS / Bow launch config",
+      "sourceRange": "26093-26264; 27874-28290",
+      "calculation": "explicit damage argument stored at projectile reset",
+      "unit": "hp",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "fixedLifetime",
+      "value": null,
+      "originalSymbol": "none confirmed",
+      "sourceRange": "26698-28290",
+      "calculation": "移除由到达/命中/目标失效/gameOver 驱动，未确认独立固定寿命",
+      "unit": "UNKNOWN",
+      "confidence": "HIGH"
+    }
+  ]
+}

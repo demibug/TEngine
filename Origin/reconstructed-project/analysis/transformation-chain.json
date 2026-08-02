@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "chain": [
+    {
+      "stage": "original",
+      "path": "original/bundle.js",
+      "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "transformation": "none"
+    },
+    {
+      "stage": "formatted",
+      "path": "work/bundle.formatted.js",
+      "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "transformation": "identity-copy; formatting intentionally skipped to preserve source coordinates",
+      "byteIdenticalToPrevious": true
+    },
+    {
+      "stage": "strings-decoded",
+      "path": "work/bundle.strings-decoded.js",
+      "sha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "transformationTool": "tools/decode-strings.js",
+      "transformationToolSha256": "9bfe5cdf3a478bf0bf48235273905bcf450fa3f9ee47d1f5a5d3b40f97926c2a",
+      "inputSha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+    },
+    {
+      "stage": "critical-path-reconstruction-round-03",
+      "name": "BOOT-TO-BATTLE",
+      "inputPath": "work/bundle.strings-decoded.js",
+      "inputSha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "additionalInput": {
+        "path": "original/index.js",
+        "sha256": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+      },
+      "outputs": [
+        "src/bootstrap/",
+        "src/core/",
+        "src/scenes/",
+        "src/battle/",
+        "src/data/",
+        "src/entities/",
+        "src/platform/dev/",
+        "src/network/dev/"
+      ],
+      "transformation": "traceable semantic extraction of the minimum boot-to-battle dependency closure; original and decoded inputs remain byte-identical",
+      "methodCoverageReport": "analysis/critical-path/boot-to-battle-method-coverage.json",
+      "callgraph": "analysis/critical-path/boot-to-battle-callgraph.json",
+      "verification": "analysis/test-results-round-03.json",
+      "status": "COMPLETE_FOR_DEFINED_BATTLE_ENTRY_BOUNDARY"
+    },
+    {
+      "stage": "enemy-runtime-reconstruction-round-04",
+      "name": "ENEMY-RUNTIME-01",
+      "inputPath": "work/bundle.strings-decoded.js",
+      "inputSha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "sourceRanges": [
+        "bundle.strings-decoded.js:11561-12175",
+        "bundle.strings-decoded.js:12194-12847",
+        "bundle.strings-decoded.js:13380-14360",
+        "bundle.strings-decoded.js:19184-19260",
+        "bundle.strings-decoded.js:19600-20858",
+        "bundle.strings-decoded.js:31062-31114",
+        "bundle.strings-decoded.js:31262-31482",
+        "bundle.strings-decoded.js:32939-33696",
+        "bundle.strings-decoded.js:57007-59129"
+      ],
+      "outputs": [
+        "src/entities/EnemyEventProxy.js",
+        "src/entities/EnemyBase.js",
+        "src/entities/NormalEnemyBase.js",
+        "src/entities/Mob0Enemy.js",
+        "src/entities/BattleTarget.js",
+        "src/battle/MapData.js",
+        "src/battle/EnemyManager.js",
+        "src/battle/EnemyFactory.js",
+        "src/core/ObjectPool.js",
+        "src/battle/dev/DevelopmentCombatServices.js"
+      ],
+      "transformation": "traceable semantic extraction of the Mob0 enemy lifecycle, four-direction A* routes, fixed-step movement, contact damage, health/death state, spatial index and two-level pooling; original and decoded inputs remain byte-identical",
+      "classGraph": "analysis/critical-path/enemy-runtime-classgraph.json",
+      "symbolMap": "analysis/mappings/ENEMY-RUNTIME-01-symbol-map.json",
+      "methodCoverageReport": "analysis/modules/ENEMY-RUNTIME-01-method-coverage.json",
+      "verification": "analysis/test-results-round-04.json",
+      "staticChecks": "analysis/static-checks-round-04.json",
+      "status": "COMPLETE_FOR_MOB0_RUNTIME"
+    },
+    {
+      "stage": "friendly-unit-combat-reconstruction-round-05",
+      "name": "FRIENDLY-UNIT-COMBAT-01",
+      "inputPath": "work/bundle.strings-decoded.js",
+      "inputSha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "sourceRanges": [
+        "bundle.strings-decoded.js:3163-3297",
+        "bundle.strings-decoded.js:11069-11352",
+        "bundle.strings-decoded.js:11770-11795",
+        "bundle.strings-decoded.js:19600-19684",
+        "bundle.strings-decoded.js:22656-23437",
+        "bundle.strings-decoded.js:24443-24983",
+        "bundle.strings-decoded.js:26093-26428",
+        "bundle.strings-decoded.js:29460-30476",
+        "bundle.strings-decoded.js:37209-37465",
+        "bundle.strings-decoded.js:50456-50519"
+      ],
+      "outputs": [
+        "src/core/GameObjectEventProxy.js",
+        "src/units/",
+        "src/combat/KnifeAttackTimeline.js",
+        "src/battle/dev/DevelopmentUnitSpawner.js",
+        "src/battle/dev/DevelopmentUnitServices.js"
+      ],
+      "transformation": "traceable extraction of the first formal friendly attacker: knife factory registration, UnitRegistry lifecycle, fixed-position spatial target selection, cooldown, delayed damage settlement, Mob0 kill/retarget and two-level pooling; original and decoded inputs remain byte-identical",
+      "classGraph": "analysis/critical-path/friendly-unit-classgraph.json",
+      "symbolMap": "analysis/mappings/FRIENDLY-UNIT-COMBAT-01-symbol-map.json",
+      "methodCoverageReport": "analysis/modules/FRIENDLY-UNIT-COMBAT-01-method-coverage.json",
+      "verification": "analysis/test-results-round-05.json",
+      "staticChecks": "analysis/static-checks-round-05.json",
+      "status": "COMPLETE_FOR_FIRST_FORMAL_FRIENDLY_ATTACKER"
+    },
+    {
+      "stage": "cumulative-snapshot-hardening-round-05",
+      "name": "CUMULATIVE-ROUNDS-01-05",
+      "input": "current reconstructed-project after FRIENDLY-UNIT-COMBAT-01",
+      "outputs": [
+        "tools/verify-all.js",
+        "tools/build-cumulative-manifest.js",
+        "vendor/typescript-5.8.3.tgz",
+        "package-lock.json",
+        ".npmrc",
+        "analysis/test-results-all.json",
+        "analysis/cumulative-verification-report.md",
+        "analysis/cumulative-file-manifest.json",
+        "analysis/cumulative-file-list.txt"
+      ],
+      "transformation": "packaging and reproducibility hardening only; no recovered gameplay or NET-01 behavior changed",
+      "verification": "analysis/fresh-install-verification.json; npm install; npm run verify:all",
+      "status": "VERIFIED_IN_BRAND_NEW_INSTALL_DIRECTORY"
+    },
+    {
+      "stage": "cumulative-packaging-round-05",
+      "name": "CUMULATIVE-SNAPSHOT-ROUNDS-01-05",
+      "input": "current cumulative reconstructed-project workspace",
+      "outputs": [
+        "package-lock.json",
+        "vendor/typescript-5.8.3.tgz",
+        "tools/verify-all.js",
+        "tools/build-cumulative-manifest.js",
+        "analysis/test-results-all.json",
+        "analysis/cumulative-file-manifest.json",
+        "analysis/cumulative-file-list.txt",
+        "analysis/cumulative-snapshot-report.md"
+      ],
+      "transformation": "packaging and verification hardening only; no production behavior changes; preserves all round 01-05 artifacts in one cumulative snapshot",
+      "verificationCommand": "npm install --offline && npm run verify:all",
+      "status": "VERIFIED_IN_FRESH_EXTRACTION"
+    },
+    {
+      "stage": "round05-plan-compliance-v0.5.2",
+      "name": "FRIENDLY-UNIT-COMBAT-01-PLAN-COMPLIANCE",
+      "input": "cumulative reconstructed-project rounds 01-05 v0.5.1",
+      "outputs": [
+        "package.json",
+        "tools/run-friendly-unit.js",
+        "tools/run-micro-battle.js",
+        "tools/run-friendly-unit-simulation.js",
+        "tests/behavior/MicroBattleCli.test.js",
+        "analysis/behavior/unit-registry.md",
+        "analysis/round-05-plan-compliance.md",
+        "analysis/round-05-plan-compliance.json"
+      ],
+      "transformation": "add exact plan command aliases, complete micro-battle observability, UnitRegistry behavior specification, and deterministic CLI validation without changing recovered gameplay behavior",
+      "behaviorRisk": "low",
+      "immutableInputsModified": false,
+      "verification": "npm run verify:round05 && npm run verify:all",
+      "status": "VERIFIED"
+    },
+    {
+      "stage": "round06-bow-projectile-combat",
+      "name": "BOW-PROJECTILE-COMBAT-01",
+      "input": "cumulative reconstructed-project rounds 01-05 v0.5.2",
+      "outputs": [
+        "src/units/BowSoldier.js",
+        "src/projectiles/ProjectileBase.js",
+        "src/projectiles/SimpleDynamicArrow.js",
+        "src/projectiles/ProjectileFactory.js",
+        "src/projectiles/ProjectileManager.js",
+        "src/projectiles/TargetEnemyBezierMovement.js",
+        "src/combat/dev/DevelopmentAnimationDriver.js",
+        "analysis/round-06-report.md",
+        "analysis/test-results-round-06.json"
+      ],
+      "transformation": "recover formal BowSoldier STOPPED event, SimpleDynamicArrow target-tracking quadratic Bezier flight, projectile manager/factory registration, hit, cleanup and pooling; retain all prior behavior",
+      "immutableInputsModified": false,
+      "verification": "npm run verify:round06 && npm run verify:all && npm run dev:ranged-battle",
+      "status": "VERIFIED"
+    },
+    {
+      "stage": "buff-system-reconstruction-round-07k",
+      "name": "ROUND-07K-BUFF-SYSTEM",
+      "inputPath": "work/bundle.strings-decoded.js",
+      "inputSha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "outputs": [
+        "src/buffs/",
+        "src/weapons/support/WeaponBuffPort.js",
+        "src/units/UnitBase.js",
+        "src/entities/EnemyBase.js",
+        "src/bootstrap/DevelopmentBootstrap.js"
+      ],
+      "transformation": "semantic extraction of Buff types 0-19, handler factory, stacking/conflict/duration lifecycle, target contracts and bow-weapon Buff integration; immutable inputs remain unchanged",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS",
+      "staticCheck": "tools/check-round07k-buff-system.js"
+    }
+  ],
+  "nextPlannedStage": {
+    "name": "ROUND-07L-BOW-EFFECT-CLOSURE",
+    "status": "RECOMMENDED",
+    "reason": "Close the remaining IronBow, FireDragon, ricochet and ZhugeCrossbow timed effect dependencies before expanding other weapon categories."
+  },
+  "stages": [
+    {
+      "stage": "cumulative-packaging-round-06",
+      "name": "CUMULATIVE-SNAPSHOT-ROUNDS-01-06",
+      "input": "current cumulative reconstructed-project after BOW-PROJECTILE-COMBAT-01",
+      "outputs": [
+        "analysis/fresh-install-verification-round-06.json",
+        "analysis/fresh-install-verification-round-06.md",
+        "analysis/deliverable-manifest-round-06.json",
+        "analysis/deliverable-manifest-cumulative-round-06.json",
+        "analysis/complete-file-list.txt",
+        "analysis/complete-file-list.json"
+      ],
+      "transformation": "packaging, complete-history audit and reproducibility hardening only; no gameplay or NET-01 behavior changed",
+      "verificationCommands": [
+        "npm install",
+        "npm run verify:all",
+        "npm run verify:round06",
+        "npm run dev:ranged-battle"
+      ],
+      "status": "CANDIDATE_FRESH_EXTRACTION_VERIFIED; EXACT_FINAL_ARCHIVE_VERIFICATION_RECORDED_EXTERNALLY"
+    }
+  ]
+}

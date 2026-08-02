@@ -1,0 +1,228 @@
+{
+  "round": 3,
+  "implementation": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION",
+  "fields": [
+    {
+      "field": "player.stamina",
+      "originalSymbol": "tY stamina / p0.jW,zW",
+      "readBy": [
+        "MainSceneController.startGame"
+      ],
+      "writtenBy": [
+        "StaminaServiceCore.consumeForBattle"
+      ],
+      "defaultSource": "正式：本地存档；开发：DEVELOPMENT_SAMPLE=30",
+      "requiredBeforeBattle": true,
+      "requiredModes": [
+        "normal-main-flow"
+      ],
+      "confidence": "HIGH"
+    },
+    {
+      "field": "player.lastRecoverStaminaTime",
+      "originalSymbol": "tY lastRecoverStaminaTime",
+      "readBy": [],
+      "writtenBy": [
+        "StaminaServiceCore.consumeForBattle when stamina was full"
+      ],
+      "defaultSource": "正式：本地存档；开发：0",
+      "requiredBeforeBattle": false,
+      "confidence": "MEDIUM"
+    },
+    {
+      "field": "player.mapIndex",
+      "originalSymbol": "tY mapIndex",
+      "readBy": [
+        "GameDataCore.init/startGame",
+        "BattleSceneController.onOpened"
+      ],
+      "writtenBy": [],
+      "defaultSource": "正式：本地存档；开发：0",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "player.win + player.lose",
+      "originalSymbol": "tY round getter",
+      "readBy": [
+        "MatchSceneController.enterBattle tutorial branch"
+      ],
+      "writtenBy": [
+        "PlayerDataCore.gameOver"
+      ],
+      "defaultSource": "正式：本地存档；开发：0+0",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "player.winDay / loseDay",
+      "originalSymbol": "tY winDay / loseDay",
+      "readBy": [
+        "MatchSceneController.initializeMatchDisplay"
+      ],
+      "writtenBy": [
+        "PlayerDataCore.gameOver"
+      ],
+      "defaultSource": "正式：本地存档；开发：0",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "rank.current.rank",
+      "originalSymbol": "rank data contract",
+      "readBy": [
+        "MatchSceneController.initializeMatchDisplay"
+      ],
+      "writtenBy": [],
+      "defaultSource": "PARTIAL local default 军士.壹",
+      "requiredBeforeBattle": true,
+      "confidence": "LOW"
+    },
+    {
+      "field": "props displayed arrays",
+      "originalSymbol": "vb active/passive props contracts",
+      "readBy": [
+        "MatchSceneController.completeMatch"
+      ],
+      "writtenBy": [
+        "deferred props preparation"
+      ],
+      "defaultSource": "开发模式显式空数组",
+      "requiredBeforeBattle": true,
+      "confidence": "MEDIUM"
+    },
+    {
+      "field": "map.mapIndex",
+      "originalSymbol": "s4 mapIndex",
+      "readBy": [
+        "BattleSceneController.onOpened",
+        "EnemyManager.prepareWave"
+      ],
+      "writtenBy": [
+        "MapDataCore.changeMap"
+      ],
+      "defaultSource": "player.mapIndex",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "map.enemyTypeIndex",
+      "originalSymbol": "s4.oe",
+      "readBy": [
+        "BattleManager._spawnPairWhenDue"
+      ],
+      "writtenBy": [
+        "MapDataCore.changeMap"
+      ],
+      "defaultSource": "原始四张地图配置；map0=0",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "map.playerEntry / opponentEntry",
+      "originalSymbol": "s4 entry points",
+      "readBy": [
+        "Mob0Enemy._applyConfirmedEntryPosition"
+      ],
+      "writtenBy": [
+        "MapDataCore.changeMap"
+      ],
+      "defaultSource": "原始地图配置；map0=(0,9)/(7,0)",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "battle.currentRound",
+      "originalSymbol": "uo.li",
+      "readBy": [
+        "BattleManager",
+        "BattleSceneController"
+      ],
+      "writtenBy": [
+        "BattleManager._beginWave",
+        "BattleState.gameOver"
+      ],
+      "defaultSource": "原代码 0",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "battle.delayTime",
+      "originalSymbol": "uo delayTime",
+      "readBy": [
+        "BattleManager._updateSpawnState"
+      ],
+      "writtenBy": [
+        "BattleState.startGame",
+        "DevelopmentBattleTimingOverride"
+      ],
+      "defaultSource": "正式 10000ms；开发可显式覆盖",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "battle.playerPlacementComplete / opponentPlacementComplete",
+      "originalSymbol": "uo.Yi / Xi",
+      "readBy": [
+        "BattleManager._updateSpawnState"
+      ],
+      "writtenBy": [
+        "deferred placement system",
+        "BattleState.gameOver"
+      ],
+      "defaultSource": "原代码 false",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "battle.gold / initialGold",
+      "originalSymbol": "uo gold / yi",
+      "readBy": [
+        "Battle UI and recruitment contracts"
+      ],
+      "writtenBy": [
+        "BattleManager.startGame"
+      ],
+      "defaultSource": "0 + initialGold 20",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "battle.playerRecruitCost",
+      "originalSymbol": "uo.fi",
+      "readBy": [
+        "BattleSceneController.onOpened"
+      ],
+      "writtenBy": [
+        "deferred recruitment system"
+      ],
+      "defaultSource": "原代码 10",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "battle.endlessMode / maxRounds",
+      "originalSymbol": "uo.ci / ui",
+      "readBy": [
+        "BattleManager wave progression"
+      ],
+      "writtenBy": [],
+      "defaultSource": "false / 20",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    },
+    {
+      "field": "battle.spawnStrategy",
+      "originalSymbol": "uo.pi",
+      "readBy": [
+        "deferred enemy stat scaling"
+      ],
+      "writtenBy": [
+        "BattleManager.startGame weighted selection"
+      ],
+      "defaultSource": "EnemyDataCore original weights and tables",
+      "requiredBeforeBattle": true,
+      "confidence": "HIGH"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+# 赵云救阿斗核心战斗重建 Handoff
+
+BASE_VERSION=0.8.0
+CURRENT_VERSION=0.8.1
+CURRENT_ROUND=ROUND-08A-UNITY-CORE-COMBAT-DOCUMENTATION
+INCLUDES_ROUNDS=01-08
+
+## 完成的核心单局
+
+MainScene → MatchScene → BattleScene → 正式牌组/经济 → 玩家购买放置 → 合成升级 → 正式武器 → AI 同路径部署 → 普通波/Boss 波 → Unit/Enemy/Boss/Projectile/Weapon/Buff/Skill → 阿斗死亡 → 自动 BATTLE_FINISHED → BattleResult → GameOver → MainScene。
+
+单局不再依赖 DevelopmentUnitSpawner，也不需要手工调用 gameOver。
+
+## Unity 迁移
+
+- `unity-handoff/`：流程、状态机、类映射、Port 和扩展文档
+- `unity-export/config/`：单位、武将、敌人、Boss、武器、投射物、Buff、Skill、波次、地图、经济和结算 JSON
+- 固定战斗步长：80ms；最大累计：500ms
+- 核心规则应迁移为普通 C# 类，配置迁移为 ScriptableObject/JSON，表现迁移为 MonoBehaviour/Spine-Unity。
+
+## 已知准确缺口
+
+1. 原始汉字碎片合成为武将的完整创建链和正式 General 战斗组件仍为 PARTIAL；12 名武将及武器类型已导出。
+2. AI 已恢复为使用正式牌组、经济、放置和 Factory 的最小对局策略；原始全部高级策略未完全闭合。
+3. 非核心微信平台、广告、分享、排行、商店、设置和云存档未迁移。
+4. origin_project 缺少声明的 music/sound 实际音频子包。
+
+## 不可修改基线
+
+- original/bundle.js
+- work/bundle.strings-decoded.js
+- original/index.js
+- src/network/HttpClient.js
+
+
+## Unity 核心战斗文档
+
+- `unity-handoff/README.md`：文档总入口
+- `unity-handoff/reference/`：架构、时序、Tick、Manager、配置、迁移与风险
+- `unity-handoff/csharp-reference/`：C# Port、Tick、Command、DTO 与组合根参考骨架
+- `unity-handoff/CORE_COMBAT_REFERENCE.json`：机器可读的 Tick、生命周期和命令摘要
+
+本版本只增加 Unity 接入参考文档，不改变核心战斗行为。

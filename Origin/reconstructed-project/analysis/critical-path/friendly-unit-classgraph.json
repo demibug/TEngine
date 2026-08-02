@@ -1,0 +1,293 @@
+{
+  "module": "FRIENDLY-UNIT-COMBAT-01",
+  "nodes": [
+    {
+      "originalSymbol": "qE",
+      "newSymbol": "GameObjectEventProxy",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:19600-19684",
+      "extends": null,
+      "composes": [
+        "Laya event target returned by am()"
+      ],
+      "createdBy": [],
+      "registeredWith": [],
+      "updatedBy": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "once/on/off/event/offAllCaller/offAll delegate to am()",
+        "gameOver emits onDestroy"
+      ]
+    },
+    {
+      "originalSymbol": "rb",
+      "newSymbol": "UnitDragBase",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:24863-24930",
+      "extends": "qE / GameObjectEventProxy",
+      "composes": [
+        "Laya.Point s_"
+      ],
+      "createdBy": [],
+      "registeredWith": [],
+      "updatedBy": [
+        "Laya pointer events"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "class b extends qE",
+        "onMouseDown/onMouseMove/onMouseUp implement threshold-based drag detection",
+        "i_ and h_ are explicit empty hooks"
+      ]
+    },
+    {
+      "originalSymbol": "ri",
+      "newSymbol": "UnitDragBaseAlias",
+      "kind": "alias",
+      "sourceRange": "bundle.strings-decoded.js:22656",
+      "extends": null,
+      "composes": [],
+      "createdBy": [],
+      "registeredWith": [],
+      "updatedBy": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "ri = rb immediately before rc definition"
+      ]
+    },
+    {
+      "originalSymbol": "rc",
+      "newSymbol": "UnitBase",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:22694-23112",
+      "extends": "ri → rb → qE",
+      "composes": [
+        "soldier visual pool key",
+        "placement points",
+        "state and level fields"
+      ],
+      "createdBy": [
+        "sc class pool via UnitFactory"
+      ],
+      "registeredWith": [
+        "GameLoop",
+        "UnitRegistry"
+      ],
+      "updatedBy": [
+        "GameLoop registration keyed by visual name"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "class extends ri",
+        "init obtains rw.getItem('soldier')",
+        "init calls nx.La(name,this,update)",
+        "gameOver unregisters, clears timers/events, recovers visual and logic object"
+      ]
+    },
+    {
+      "originalSymbol": "td",
+      "newSymbol": "SoldierBase",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:23114-23437",
+      "extends": "rc / UnitBase",
+      "composes": [
+        "unit configuration",
+        "animation object",
+        "EnemyManager query results"
+      ],
+      "createdBy": [
+        "tb.zx constructors through sc"
+      ],
+      "registeredWith": [
+        "UnitRegistry.PA"
+      ],
+      "updatedBy": [
+        "GameLoop for idle/state; BattleManager.wH for attacks"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "class extends rc",
+        "_p/wp/z_ getters expose damage/range/interval",
+        "opponent damage is multiplied by uq.au.xi",
+        "no health or receive-damage member exists"
+      ]
+    },
+    {
+      "originalSymbol": "tb.zx[0] anonymous class",
+      "newSymbol": "KnifeSoldier",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:24443-24551",
+      "extends": "td / SoldierBase",
+      "composes": [
+        "KnifeAttackTimeline-compatible tO effect descriptor"
+      ],
+      "createdBy": [
+        "UnitFactory key 0 / text 刀"
+      ],
+      "registeredWith": [
+        "UnitRegistry.PA"
+      ],
+      "updatedBy": [
+        "BattleManager.wH"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "Q_ = knife",
+        "attack calls Nx",
+        "Nx re-queries vi.qx",
+        "effect tS is knifeSoliderAttack",
+        "audio key knife_attack"
+      ]
+    },
+    {
+      "originalSymbol": "ok",
+      "newSymbol": "BowSoldierCandidateDeferred",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:26093-26263",
+      "extends": "td / SoldierBase",
+      "composes": [
+        "arrow projectile config",
+        "target point resolver",
+        "Tween rotation",
+        "vA effect manager"
+      ],
+      "createdBy": [
+        "tb.zx[1]"
+      ],
+      "registeredWith": [
+        "UnitRegistry.PA"
+      ],
+      "updatedBy": [
+        "BattleManager.wH"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "Q_ = bow",
+        "config contains arrow sprite resource",
+        "attack/yx create projectile/effect strategy"
+      ],
+      "status": "DEFERRED_DEPENDENCY_TOO_LARGE"
+    },
+    {
+      "originalSymbol": "sc",
+      "newSymbol": "UnitClassPoolAdapter",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:22656-22691",
+      "extends": "oW → qU",
+      "composes": [
+        "Laya.Pool"
+      ],
+      "createdBy": [
+        "singleton access"
+      ],
+      "registeredWith": [],
+      "updatedBy": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "produce calls Laya.Pool.createByClass",
+        "recover calls Laya.Pool.recoverByClass"
+      ]
+    },
+    {
+      "originalSymbol": "vc",
+      "newSymbol": "UnitRegistry",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:29460-30476",
+      "extends": "qU singleton base",
+      "composes": [
+        "PA, AA, BM, EA, BA Maps",
+        "DA array"
+      ],
+      "createdBy": [
+        "singleton access"
+      ],
+      "registeredWith": [
+        "event center in addEvent"
+      ],
+      "updatedBy": [
+        "BattleManager reads PA and BM"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "WA resolves base soldier index then tb.zx[index]",
+        "jA performs placement then init",
+        "zA registers td in PA",
+        "WP unregisters and calls gameOver",
+        "gameOver copies IDs before removals"
+      ]
+    },
+    {
+      "originalSymbol": "vU.wH",
+      "newSymbol": "BattleManager._updateUnitAttacks",
+      "kind": "method",
+      "sourceRange": "bundle.strings-decoded.js:50456-50519",
+      "extends": null,
+      "composes": [
+        "vc.PA",
+        "vc.BM",
+        "vi.qx"
+      ],
+      "createdBy": [],
+      "registeredWith": [
+        "BattleManager fixed update"
+      ],
+      "updatedBy": [
+        "GameLoop"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "iterates PA Map values in order",
+        "transitions to UnitAttack after cooldown",
+        "re-queries before attack",
+        "returns to idle when target list is empty"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "KnifeSoldier",
+      "to": "SoldierBase",
+      "type": "extends"
+    },
+    {
+      "from": "SoldierBase",
+      "to": "UnitBase",
+      "type": "extends"
+    },
+    {
+      "from": "UnitBase",
+      "to": "UnitDragBase",
+      "type": "extends-via-ri"
+    },
+    {
+      "from": "UnitDragBase",
+      "to": "GameObjectEventProxy",
+      "type": "extends"
+    },
+    {
+      "from": "UnitFactory",
+      "to": "KnifeSoldier",
+      "type": "creates-from-tb.zx[0]"
+    },
+    {
+      "from": "UnitRegistry",
+      "to": "UnitFactory",
+      "type": "creates-through"
+    },
+    {
+      "from": "BattleManager._updateUnitAttacks",
+      "to": "UnitRegistry.PA",
+      "type": "iterates"
+    },
+    {
+      "from": "KnifeSoldier",
+      "to": "EnemyManager.queryTargets",
+      "type": "queries"
+    },
+    {
+      "from": "KnifeAttackTimeline",
+      "to": "EnemyBase.hit",
+      "type": "delayed-damage"
+    }
+  ]
+}

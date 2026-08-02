@@ -1,0 +1,49 @@
+{
+  "confirmed": {
+    "SimpleDynamicArrow": "rd"
+  },
+  "candidates": [
+    {
+      "typeKey": "EagleArrow",
+      "symbol": "unresolved-near-33988",
+      "resource": "resources/img/weapon/bullet/eagleArrow_01.png",
+      "movement": "source-specific",
+      "hit": "single"
+    },
+    {
+      "typeKey": "FireArrow",
+      "symbol": "unresolved-near-34663",
+      "resource": "resources/img/weapon/bullet/fireArrowEff_01.jpg",
+      "movement": "source-specific",
+      "hit": "single"
+    },
+    {
+      "typeKey": "HuoFengHuang",
+      "symbol": "unresolved-near-35080",
+      "resource": "resources/img/weapon/bullet/huoFengHuang_01.png",
+      "movement": "source-specific",
+      "hit": "area/unknown"
+    },
+    {
+      "typeKey": "PikeSnakeBullet",
+      "symbol": "unresolved-near-36828",
+      "resource": "resources/img/weapon/bullet/lingShe_1.png",
+      "movement": "source-specific",
+      "hit": "unknown"
+    },
+    {
+      "typeKey": "LightningChain",
+      "symbol": "unresolved-near-36130",
+      "resource": "resources/img/weapon/bullet/lightningChain_01.png",
+      "movement": "fixed/chain",
+      "hit": "chain"
+    },
+    {
+      "typeKey": "ShenBiPunch",
+      "symbol": "unresolved-near-36584",
+      "resource": "resources/img/weapon/bullet/shenBiPunch.png",
+      "movement": "source-specific",
+      "hit": "unknown"
+    }
+  ]
+}

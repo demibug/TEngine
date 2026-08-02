@@ -1,0 +1,174 @@
+{
+  "unit": "BowSoldier",
+  "originalSymbol": "ok",
+  "stats": [
+    {
+      "field": "formalUnitKey",
+      "value": "弓",
+      "originalSymbol": "Lp[1] / el",
+      "sourceRange": "11069-11352",
+      "calculation": "正式基础兵种数组索引 1",
+      "unit": "string",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "factoryIndex",
+      "value": 1,
+      "originalSymbol": "tb.zx[1]",
+      "sourceRange": "Unit factory registration around 24443-26428",
+      "calculation": "正式构造器数组索引",
+      "unit": "index",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "configIndex",
+      "value": 1,
+      "originalSymbol": "mp[1]",
+      "sourceRange": "11069-11352",
+      "calculation": "兵种文字键在 Lp 中的索引",
+      "unit": "index",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackDamageLevel1",
+      "value": 2,
+      "originalSymbol": "mp[1]._p",
+      "sourceRange": "11069-11352",
+      "calculation": "2 × levelDamageMultiplier[0](1)",
+      "unit": "hp",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackRangeCells",
+      "value": 3.5,
+      "originalSymbol": "mp[1].wp",
+      "sourceRange": "11069-11352",
+      "calculation": "配置字面量",
+      "unit": "grid cells",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackRangePixels",
+      "value": 280,
+      "originalSymbol": "wp",
+      "sourceRange": "11069-11352; SoldierBase",
+      "calculation": "3.5 × 80",
+      "unit": "px",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackIntervalSeconds",
+      "value": 0.8,
+      "originalSymbol": "mp[1].kp",
+      "sourceRange": "11069-11352",
+      "calculation": "配置字面量",
+      "unit": "s",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackIntervalMilliseconds",
+      "value": 800,
+      "originalSymbol": "kp",
+      "sourceRange": "SoldierBase",
+      "calculation": "0.8 × 1000",
+      "unit": "ms",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "targetPolicy",
+      "value": "closest_end / minimum Bm",
+      "originalSymbol": "mp[1].xp",
+      "sourceRange": "11069-11352; 26093-26264",
+      "calculation": "遍历候选并取 Bm 最小值",
+      "unit": "policy",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "animationKey",
+      "value": "bow",
+      "originalSymbol": "Q_",
+      "sourceRange": "26093-26264",
+      "calculation": "类字面量",
+      "unit": "string",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackSoundKey",
+      "value": "bow_attack",
+      "originalSymbol": "playSound argument",
+      "sourceRange": "26093-26264",
+      "calculation": "类字面量",
+      "unit": "string",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "initialAnimationPlaybackRate",
+      "value": 1.25,
+      "originalSymbol": "animation init rate",
+      "sourceRange": "26093-26264",
+      "calculation": "字面量",
+      "unit": "multiplier",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackReleaseSegmentEnd",
+      "value": 650,
+      "originalSymbol": "play segment end",
+      "sourceRange": "26093-26264",
+      "calculation": "字面量",
+      "unit": "animation ms",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "developmentStoppedDelay",
+      "value": 520,
+      "originalSymbol": "650 / 1.25",
+      "sourceRange": "26093-26264",
+      "calculation": "动画片段长度 / 初始播放倍率",
+      "unit": "logical ms",
+      "confidence": "MEDIUM"
+    },
+    {
+      "field": "attackAnimationEnd",
+      "value": 1000,
+      "originalSymbol": "second play segment end",
+      "sourceRange": "26093-26264",
+      "calculation": "字面量",
+      "unit": "animation ms",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "projectileSpeedScale",
+      "value": 1.75,
+      "originalSymbol": "speed argument",
+      "sourceRange": "26093-26264",
+      "calculation": "字面量",
+      "unit": "multiplier",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "curveHeight",
+      "value": 120,
+      "originalSymbol": "TargetEnemyBezierMovement.create argument",
+      "sourceRange": "26093-26264",
+      "calculation": "字面量",
+      "unit": "px",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "levelDamageMultipliers",
+      "value": [
+        1,
+        1.5,
+        2.1,
+        2.73,
+        3.4125
+      ],
+      "originalSymbol": "fp",
+      "sourceRange": "11069-11352",
+      "calculation": "从增量 [0,.5,.4,.3,.25] 累乘",
+      "unit": "multiplier",
+      "confidence": "HIGH"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "fixedStepMs": 80,
+  "maxAccumulatedMs": 500,
+  "startOrder": [
+    "economy",
+    "deckManager",
+    "battleManager",
+    "enemyManager",
+    "unitManager",
+    "weaponManager",
+    "projectileManager",
+    "buffManager",
+    "skillManager",
+    "bossManager",
+    "waveManager",
+    "inputController",
+    "aiController"
+  ],
+  "cleanupOrder": [
+    "aiController",
+    "inputController",
+    "deckManager",
+    "waveManager",
+    "battleManager",
+    "bossManager",
+    "enemyManager",
+    "unitManager",
+    "weaponManager",
+    "projectileManager",
+    "skillManager",
+    "buffManager"
+  ],
+  "commands": [
+    "PurchaseAndPlace",
+    "BeginDrag",
+    "MoveDrag",
+    "CommitPlacement",
+    "CancelDrag",
+    "MoveUnit",
+    "MergeUnits",
+    "Refresh"
+  ],
+  "smokeReport": "analysis/smoke/single-game-flow.json",
+  "configRoot": "unity-export/config",
+  "knownGaps": [
+    "formal general glyph merge and full general combat component",
+    "advanced original AI strategy",
+    "some advanced weapon effects",
+    "non-core platform/UI"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "status": "CORE_COMPLETE",
+  "maxLevel": 5,
+  "damageLevelMultipliers": [
+    1,
+    1.5,
+    2.0999999999999996,
+    2.7299999999999995,
+    3.4124999999999996
+  ],
+  "attackSpeedLevelMultipliers": [
+    1,
+    1.5,
+    2.0999999999999996,
+    2.7299999999999995,
+    3.4124999999999996
+  ],
+  "units": [
+    {
+      "index": 0,
+      "text": "刀",
+      "animationKey": "knife",
+      "rangeCells": 1.5,
+      "attackDamage": 3,
+      "attackIntervalSeconds": 0.8,
+      "damageMode": "单体",
+      "targetPolicy": "nearest"
+    },
+    {
+      "index": 1,
+      "text": "弓",
+      "animationKey": "bow",
+      "rangeCells": 3.5,
+      "attackDamage": 2,
+      "attackIntervalSeconds": 0.8,
+      "damageMode": "单体",
+      "targetPolicy": "closest_end"
+    },
+    {
+      "index": 2,
+      "text": "枪",
+      "animationKey": "pike",
+      "rangeCells": 2.5,
+      "attackDamage": 2,
+      "attackIntervalSeconds": 0.8,
+      "damageMode": "近战枪击",
+      "targetPolicy": "nearest"
+    },
+    {
+      "index": 3,
+      "text": "骑",
+      "animationKey": "cavalry",
+      "rangeCells": 2,
+      "attackDamage": 2,
+      "attackIntervalSeconds": 0.8,
+      "damageMode": "范围",
+      "targetPolicy": "nearest"
+    }
+  ]
+}

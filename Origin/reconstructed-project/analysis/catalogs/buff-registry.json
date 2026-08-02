@@ -1,0 +1,185 @@
+{
+  "count": 20,
+  "entries": [
+    {
+      "typeId": 0,
+      "formalName": "attPower",
+      "label": "攻击力",
+      "originalSymbol": "uM",
+      "handlerClass": "NumberBuffHandler",
+      "definitionKind": "number",
+      "status": "COMPLETE"
+    },
+    {
+      "typeId": 1,
+      "formalName": "attSpeed",
+      "label": "攻击速度",
+      "originalSymbol": "uM",
+      "handlerClass": "NumberBuffHandler",
+      "definitionKind": "number",
+      "status": "COMPLETE"
+    },
+    {
+      "typeId": 2,
+      "formalName": "attRange",
+      "label": "攻击范围",
+      "originalSymbol": "uM",
+      "handlerClass": "NumberBuffHandler",
+      "definitionKind": "number",
+      "status": "COMPLETE"
+    },
+    {
+      "typeId": 3,
+      "formalName": "moveSpeed",
+      "label": "移动速度",
+      "originalSymbol": "uM",
+      "handlerClass": "NumberBuffHandler",
+      "definitionKind": "number",
+      "status": "COMPLETE"
+    },
+    {
+      "typeId": 4,
+      "formalName": "maxHp",
+      "label": "最大生命",
+      "originalSymbol": "uM",
+      "handlerClass": "NumberBuffHandler",
+      "definitionKind": "number",
+      "status": "COMPLETE"
+    },
+    {
+      "typeId": 5,
+      "formalName": "hp",
+      "label": "生命",
+      "originalSymbol": "uM",
+      "handlerClass": "NumberBuffHandler",
+      "definitionKind": "number",
+      "status": "COMPLETE"
+    },
+    {
+      "typeId": 6,
+      "formalName": "scale",
+      "label": "缩放",
+      "originalSymbol": "uM",
+      "handlerClass": "NumberBuffHandler",
+      "definitionKind": "number",
+      "status": "COMPLETE"
+    },
+    {
+      "typeId": 7,
+      "formalName": "custom",
+      "label": "自定义",
+      "originalSymbol": "uS",
+      "handlerClass": "CustomBuffHandler",
+      "definitionKind": "custom",
+      "status": "COMPLETE"
+    },
+    {
+      "typeId": 8,
+      "formalName": "stun",
+      "label": "晕眩",
+      "originalSymbol": "uO",
+      "handlerClass": "StunBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 9,
+      "formalName": "fall",
+      "label": "跌倒",
+      "originalSymbol": "uU",
+      "handlerClass": "FallBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 10,
+      "formalName": "pierce",
+      "label": "穿刺",
+      "originalSymbol": "uW",
+      "handlerClass": "PierceBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 11,
+      "formalName": "electrocute",
+      "label": "电击",
+      "originalSymbol": "u4",
+      "handlerClass": "ElectrocuteBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 12,
+      "formalName": "knockback",
+      "label": "击退",
+      "originalSymbol": "uQ",
+      "handlerClass": "KnockbackBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 13,
+      "formalName": "chaos",
+      "label": "混乱",
+      "originalSymbol": "uP",
+      "handlerClass": "ChaosBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 14,
+      "formalName": "burnStatic",
+      "label": "火焰灼烧",
+      "originalSymbol": "uR",
+      "handlerClass": "BurnStaticBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 15,
+      "formalName": "limit",
+      "label": "限制",
+      "originalSymbol": "u0",
+      "handlerClass": "LimitBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 16,
+      "formalName": "lock",
+      "label": "封锁",
+      "originalSymbol": "uT",
+      "handlerClass": "LockBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 17,
+      "formalName": "knockdown",
+      "label": "击倒",
+      "originalSymbol": "uY",
+      "handlerClass": "KnockdownBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 18,
+      "formalName": "suppression",
+      "label": "压制",
+      "originalSymbol": "uZ",
+      "handlerClass": "SuppressionBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "typeId": 19,
+      "formalName": "charm",
+      "label": "魅惑",
+      "originalSymbol": "u1",
+      "handlerClass": "CharmBuffHandler",
+      "definitionKind": "state",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    }
+  ]
+}

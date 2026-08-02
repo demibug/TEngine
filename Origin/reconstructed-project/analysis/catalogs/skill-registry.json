@@ -1,0 +1,8 @@
+{
+  "status": "COMPLETE_FOR_CORE_RUNTIME_EFFECTS_DEFERRED",
+  "sourceRanges": ["12034-12142", "38497", "44380-46279"],
+  "count": 19,
+  "categories": { "generalActive": 6, "generalPassive": 1, "boss": 12 },
+  "keys": ["LeapSlash","SevenInSevenOut","BattleShout","HolySword","ArrowRain","FireArrowBarrage","StunPassive","SoulCapture","SoulSummon","Inspire","Demolition","RainStorm","Enthrall","CavalryOrder","FangTianHalberd","Devour","Madness","DevourEyes","WarlordSeal"],
+  "deferred": "Complex VFX and map/UI-specific effects are routed through SkillEffectPort."
+}

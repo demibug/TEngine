@@ -1,0 +1,74 @@
+[
+  {
+    "name": "铁胎弓",
+    "type": 0,
+    "index": "5",
+    "projectile": "SimpleDynamicArrow",
+    "status": "DEFERRED_EFFECT_DEPENDENCY",
+    "buffDependency": "NONE"
+  },
+  {
+    "name": "长弓",
+    "type": 0,
+    "index": "1",
+    "projectile": "SimpleDynamicArrow",
+    "status": "COMPLETE_FOR_LOGIC_NO_ASSETS",
+    "buffDependency": "RESOLVED"
+  },
+  {
+    "name": "霸王弓",
+    "type": 0,
+    "index": "7",
+    "projectile": "EagleArrow",
+    "status": "PARTIAL_WITH_EXACT_GAPS",
+    "buffDependency": "NONE"
+  },
+  {
+    "name": "角弓",
+    "type": 0,
+    "index": "3",
+    "projectile": "SimpleDynamicArrow",
+    "status": "COMPLETE_FOR_LOGIC_NO_ASSETS",
+    "buffDependency": "RESOLVED"
+  },
+  {
+    "name": "落日弓",
+    "type": 0,
+    "index": "8",
+    "projectile": "FireArrow",
+    "status": "PARTIAL_WITH_EXACT_GAPS",
+    "buffDependency": "RESOLVED"
+  },
+  {
+    "name": "神臂弓",
+    "type": 0,
+    "index": "6",
+    "projectile": "ShenBiPunch",
+    "status": "COMPLETE_FOR_LOGIC_NO_ASSETS",
+    "buffDependency": "RESOLVED"
+  },
+  {
+    "name": "铁弓",
+    "type": 0,
+    "index": "2",
+    "projectile": "SimpleDynamicArrow",
+    "status": "DEFERRED_EFFECT_DEPENDENCY",
+    "buffDependency": "NONE"
+  },
+  {
+    "name": "诸葛连弩",
+    "type": 0,
+    "index": "9",
+    "projectile": "PikeSnakeBullet",
+    "status": "PARTIAL_WITH_EXACT_GAPS",
+    "buffDependency": "NONE"
+  },
+  {
+    "name": "射雕弓",
+    "type": 0,
+    "index": "4",
+    "projectile": "EagleArrow",
+    "status": "COMPLETE_FOR_LOGIC_NO_ASSETS",
+    "buffDependency": "NONE"
+  }
+]

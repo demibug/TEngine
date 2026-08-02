@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "status": "PASS",
+  "artifactStage": "pre-final cumulative candidate",
+  "candidateZip": "reconstructed-project-round-05-complete-v0.5.2-candidate.zip",
+  "candidateZipSha256": "87dac66b5e4c6acfb2b2f4c7c07f3e40cf7554483458bede44957af2ca9474bf",
+  "candidateZipBytes": 8669881,
+  "verificationContext": "exact candidate ZIP extracted into a brand-new directory; node_modules absent before npm install",
+  "verifiedDirectory": "/mnt/data/fresh-round05-v052-candidate/reconstructed-project",
+  "finishedAt": "2026-07-24T09:40:12+00:00",
+  "commands": [
+    {
+      "command": "npm install",
+      "status": 0,
+      "logSha256": "253b45497c976195e6ff379428063e1c28726649e6c9ea2795cffac281b89b2c",
+      "logTail": "\nadded 1 package in 345ms"
+    },
+    {
+      "command": "npm run verify:all",
+      "status": 0,
+      "logSha256": "62030cb1c8ec79e1c8391e5c2fddaa5ab64c1aa0df239b9e38d401a0c18ed84b",
+      "logTail": "        \"amount\": 1,\n        \"before\": 3,\n        \"after\": 2,\n        \"sourceEnemyId\": 1\n      }\n    ],\n    \"opponentDamageLog\": [\n      {\n        \"amount\": 1,\n        \"before\": 3,\n        \"after\": 2,\n        \"sourceEnemyId\": 2\n      }\n    ]\n  },\n  \"pools\": {\n    \"Mob0Class\": 2,\n    \"mobVisual\": 2\n  },\n  \"serviceCalls\": {\n    \"audio\": 2,\n    \"effects\": 2,\n    \"rewards\": 0\n  },\n  \"networkRequests\": 0,\n  \"nativePlatformCalls\": 0\n}\nAll development commands PASS (6/6).\nCumulative snapshot audit PASS (19/19; 350 listed files).\nFull cumulative verification PASS: rounds 01-05, all static checks, all development commands, and cumulative audit."
+    },
+    {
+      "command": "npm run dev:micro-battle",
+      "status": 0,
+      "logSha256": "c302f6c7bdf80e66d4b4d498d4801b3cc1b528bf9adc64dfe49153b2cbeac568",
+      "logTail": "      \"unitState\": \"UnitAttack\",\n      \"targetIds\": [\n        3\n      ],\n      \"lastAttackTime\": 3280,\n      \"firstHealth\": 0,\n      \"secondHealth\": 3,\n      \"enemies\": 1,\n      \"spatialCells\": 1,\n      \"attacksStarted\": 4,\n      \"attacksSettled\": 3\n    },\n    {\n      \"elapsedMs\": 4000,\n      \"unitState\": \"UnitAttack\",\n      \"targetIds\": [\n        3\n      ],\n      \"lastAttackTime\": 3280,\n      \"firstHealth\": 0,\n      \"secondHealth\": 0,\n      \"enemies\": 0,\n      \"spatialCells\": 0,\n      \"attacksStarted\": 4,\n      \"attacksSettled\": 4\n    }\n  ],\n  \"networkRequests\": 0,\n  \"nativePlatformCalls\": 0\n}"
+    },
+    {
+      "command": "npm run test:friendly-unit",
+      "status": 0,
+      "logSha256": "54aa67e93a1a6cf61c6d0c76f44f9d0b2314ec7fd1b6a51cffe07db28b8b8ced",
+      "logTail": "  duration_ms: 14.15862\n  type: 'test'\n  ...\n# Subtest: Mob0 leaving range before the attack pass makes the fixed knife return to idle without firing\nok 7 - Mob0 leaving range before the attack pass makes the fixed knife return to idle without firing\n  ---\n  duration_ms: 9.416303\n  type: 'test'\n  ...\n# Subtest: multiple friendly units may attack the same Mob0; no reservation limiter is applied\nok 8 - multiple friendly units may attack the same Mob0; no reservation limiter is applied\n  ---\n  duration_ms: 11.575097\n  type: 'test'\n  ...\n# Subtest: old delayed attack cannot leak into the reused knife soldier lifecycle\nok 9 - old delayed attack cannot leak into the reused knife soldier lifecycle\n  ---\n  duration_ms: 7.987703\n  type: 'test'\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 9\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 188.710781"
+    }
+  ],
+  "nodeVersion": "v22.16.0",
+  "npmVersion": "10.9.2",
+  "localDependency": "vendor/typescript-5.8.3.tgz",
+  "typescriptVersion": "5.8.3",
+  "nodeModulesAbsentBeforeInstall": true,
+  "containsRounds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "round05": {
+    "tests": {
+      "pass": 25,
+      "fail": 0
+    },
+    "staticChecks": {
+      "pass": 74,
+      "fail": 0
+    }
+  },
+  "cumulativeAudit": {
+    "pass": 19,
+    "fail": 0
+  },
+  "realNetworkTestCalls": 0,
+  "nativePlatformCalls": 0,
+  "scopeCleanupAfterCandidate": "Removed exploratory work/extracts/round06 only; no recovered Round-01..05 runtime source was removed. Final ZIP is independently revalidated."
+}

@@ -1,0 +1,167 @@
+{
+  "status": "CORE_COMPLETE",
+  "buffs": [
+    {
+      "type": 0,
+      "name": "attPower",
+      "kind": 0,
+      "channels": []
+    },
+    {
+      "type": 1,
+      "name": "attSpeed",
+      "kind": 0,
+      "channels": []
+    },
+    {
+      "type": 2,
+      "name": "attRange",
+      "kind": 0,
+      "channels": []
+    },
+    {
+      "type": 3,
+      "name": "moveSpeed",
+      "kind": 0,
+      "channels": []
+    },
+    {
+      "type": 4,
+      "name": "maxHp",
+      "kind": 0,
+      "channels": []
+    },
+    {
+      "type": 5,
+      "name": "hp",
+      "kind": 0,
+      "channels": []
+    },
+    {
+      "type": 6,
+      "name": "scale",
+      "kind": 0,
+      "channels": []
+    },
+    {
+      "type": 7,
+      "name": "custom",
+      "kind": 2,
+      "channels": []
+    },
+    {
+      "type": 8,
+      "name": "stun",
+      "label": "晕眩",
+      "kind": 1,
+      "channels": [
+        1,
+        0
+      ]
+    },
+    {
+      "type": 9,
+      "name": "fall",
+      "label": "跌倒",
+      "kind": 1,
+      "channels": [
+        0
+      ]
+    },
+    {
+      "type": 10,
+      "name": "pierce",
+      "label": "穿刺",
+      "kind": 1,
+      "channels": [
+        0
+      ]
+    },
+    {
+      "type": 11,
+      "name": "electrocute",
+      "label": "电击",
+      "kind": 1,
+      "channels": [
+        1,
+        0
+      ]
+    },
+    {
+      "type": 12,
+      "name": "knockback",
+      "label": "击退",
+      "kind": 1,
+      "channels": [
+        5
+      ]
+    },
+    {
+      "type": 13,
+      "name": "chaos",
+      "label": "混乱",
+      "kind": 1,
+      "channels": [
+        1,
+        0,
+        2
+      ]
+    },
+    {
+      "type": 14,
+      "name": "burnStatic",
+      "label": "火焰灼烧",
+      "kind": 1,
+      "channels": [
+        4
+      ]
+    },
+    {
+      "type": 15,
+      "name": "limit",
+      "label": "",
+      "kind": 1,
+      "channels": [
+        6
+      ]
+    },
+    {
+      "type": 16,
+      "name": "lock",
+      "label": "封锁",
+      "kind": 1,
+      "channels": [
+        1,
+        2
+      ]
+    },
+    {
+      "type": 17,
+      "name": "knockdown",
+      "label": "跌倒",
+      "kind": 1,
+      "channels": [
+        1
+      ]
+    },
+    {
+      "type": 18,
+      "name": "suppression",
+      "label": "压制",
+      "kind": 1,
+      "channels": [
+        3
+      ]
+    },
+    {
+      "type": 19,
+      "name": "charm",
+      "label": "魅惑",
+      "kind": 1,
+      "channels": [
+        2,
+        3
+      ]
+    }
+  ]
+}

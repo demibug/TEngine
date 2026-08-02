@@ -1,0 +1,14 @@
+{
+  "status": "COMPLETE_FOR_CORE_RUNTIME_NO_ASSETS",
+  "sourceRanges": ["19184-19260", "31062-32939", "32939-33696"],
+  "count": 7,
+  "types": [
+    {"key":"Mob0","symbol":"st","status":"COMPLETE"},
+    {"key":"Mob1","symbol":"pm","resource":"resources/img/gameObject/enemy/mob_1.png"},
+    {"key":"Mob2","symbol":"qa","resource":"resources/img/gameObject/enemy/mob_2.png"},
+    {"key":"Mob3","symbol":"q6","resource":"resources/img/gameObject/enemy/mob_3.png"},
+    {"key":"Zombie","symbol":"sQ","resource":"resources/img/gameObject/enemy/zombie.png","deferred":"bubble VFX"},
+    {"key":"Cavalry","symbol":"qT","resource":"resources/img/gameObject/soldier/soldier_3.png","deferred":"yellow-circle VFX"},
+    {"key":"Puppet","symbol":"oo","resource":"resources/img/gameObject/soldier/soldier_{skin}.png","levelMultipliers":[1,1.2,1.4,1.6,1.8]}
+  ]
+}

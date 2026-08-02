@@ -1,0 +1,281 @@
+{
+  "weapons": [
+    {
+      "symbol": "o5",
+      "name": "虎啸战刀",
+      "type": 2,
+      "index": "hY"
+    },
+    {
+      "symbol": "qM",
+      "name": "短刀",
+      "type": 2,
+      "index": "hB"
+    },
+    {
+      "symbol": "p1",
+      "name": "短剑",
+      "type": 3,
+      "index": "h1"
+    },
+    {
+      "symbol": "ou",
+      "name": "铁胎弓",
+      "type": 0,
+      "index": "5",
+      "status": "DEFERRED_EFFECT_DEPENDENCY"
+    },
+    {
+      "symbol": "qq",
+      "name": "梨花枪",
+      "type": 1,
+      "index": "hx"
+    },
+    {
+      "symbol": "ni",
+      "name": "青龙偃月刀",
+      "type": 2,
+      "index": "h0"
+    },
+    {
+      "symbol": "rI",
+      "name": "虎头湛金枪",
+      "type": 1,
+      "index": "hy"
+    },
+    {
+      "symbol": "sM",
+      "name": "长弓",
+      "type": 0,
+      "index": "1",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS",
+      "buffDependency": "RESOLVED"
+    },
+    {
+      "symbol": "tr",
+      "name": "霸王弓",
+      "type": 0,
+      "index": "7",
+      "status": "PARTIAL_WITH_EXACT_GAPS"
+    },
+    {
+      "symbol": "sN",
+      "name": "铁剑",
+      "type": 3,
+      "index": "hN"
+    },
+    {
+      "symbol": "qF",
+      "name": "龙渊剑",
+      "type": 3,
+      "index": "h8"
+    },
+    {
+      "symbol": "tC",
+      "name": "莫邪",
+      "type": 3,
+      "index": "hJ"
+    },
+    {
+      "symbol": "sg",
+      "name": "角弓",
+      "type": 0,
+      "index": "3",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS",
+      "buffDependency": "RESOLVED"
+    },
+    {
+      "symbol": "o2",
+      "name": "长剑",
+      "type": 3,
+      "index": "h2"
+    },
+    {
+      "symbol": "oy",
+      "name": "钩镰枪",
+      "type": 1,
+      "index": "hv"
+    },
+    {
+      "symbol": "pd",
+      "name": "三尖刀",
+      "type": 2,
+      "index": "hF"
+    },
+    {
+      "symbol": "sx",
+      "name": "古锭刀",
+      "type": 2,
+      "index": "hV"
+    },
+    {
+      "symbol": "oM",
+      "name": "七星剑",
+      "type": 3,
+      "index": "ib"
+    },
+    {
+      "symbol": "tU",
+      "name": "丈八蛇矛",
+      "type": 1,
+      "index": "hz"
+    },
+    {
+      "symbol": "pL",
+      "name": "方天画戟",
+      "type": 2,
+      "index": "hL"
+    },
+    {
+      "symbol": "oD",
+      "name": "巨阙剑",
+      "type": 3,
+      "index": "h3"
+    },
+    {
+      "symbol": "o6",
+      "name": "大戟",
+      "type": 1,
+      "index": "hs"
+    },
+    {
+      "symbol": "pK",
+      "name": "狼牙棒",
+      "type": 2,
+      "index": "hE"
+    },
+    {
+      "symbol": "qQ",
+      "name": "铁刀",
+      "type": 2,
+      "index": "hD"
+    },
+    {
+      "symbol": "rq",
+      "name": "轩辕剑",
+      "type": 3,
+      "index": "ie"
+    },
+    {
+      "symbol": "pO",
+      "name": "落日弓",
+      "type": 0,
+      "index": "8",
+      "status": "PARTIAL_WITH_EXACT_GAPS",
+      "buffDependency": "RESOLVED"
+    },
+    {
+      "symbol": "sT",
+      "name": "青钢剑",
+      "type": 3,
+      "index": "ia"
+    },
+    {
+      "symbol": "qp",
+      "name": "龙泉剑",
+      "type": 3,
+      "index": "h4"
+    },
+    {
+      "symbol": "rQ",
+      "name": "神臂弓",
+      "type": 0,
+      "index": "6",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS",
+      "buffDependency": "RESOLVED"
+    },
+    {
+      "symbol": "pq",
+      "name": "七星刀",
+      "type": 2,
+      "index": "hZ"
+    },
+    {
+      "symbol": "rL",
+      "name": "双股剑",
+      "type": 3,
+      "index": "h9"
+    },
+    {
+      "symbol": "n3",
+      "name": "铁枪",
+      "type": 1,
+      "index": "hq"
+    },
+    {
+      "symbol": "su",
+      "name": "木刀",
+      "type": 2,
+      "index": "-1"
+    },
+    {
+      "symbol": "pz",
+      "name": "龙胆亮银枪",
+      "type": 1,
+      "index": "hA"
+    },
+    {
+      "symbol": "oB",
+      "name": "长刀",
+      "type": 2,
+      "index": "hC"
+    },
+    {
+      "symbol": "nl",
+      "name": "长枪",
+      "type": 1,
+      "index": "hp"
+    },
+    {
+      "symbol": "pr",
+      "name": "铁弓",
+      "type": 0,
+      "index": "2",
+      "status": "DEFERRED_EFFECT_DEPENDENCY"
+    },
+    {
+      "symbol": "pY",
+      "name": "点钢枪",
+      "type": 1,
+      "index": "hw"
+    },
+    {
+      "symbol": "pv",
+      "name": "倚天剑",
+      "type": 3,
+      "index": "ic"
+    },
+    {
+      "symbol": "oV",
+      "name": "铁蒺藜骨朵",
+      "type": 2,
+      "index": "hU"
+    },
+    {
+      "symbol": "qG",
+      "name": "诸葛连弩",
+      "type": 0,
+      "index": "9",
+      "status": "PARTIAL_WITH_EXACT_GAPS"
+    },
+    {
+      "symbol": "pg",
+      "name": "干将",
+      "type": 3,
+      "index": "id"
+    },
+    {
+      "symbol": "rG",
+      "name": "射雕弓",
+      "type": 0,
+      "index": "4",
+      "status": "COMPLETE_FOR_LOGIC_NO_ASSETS"
+    },
+    {
+      "symbol": "tt",
+      "name": "短枪",
+      "type": 1,
+      "index": "10"
+    }
+  ]
+}

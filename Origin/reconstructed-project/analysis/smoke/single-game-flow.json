@@ -1,0 +1,104 @@
+{
+  "status": "PASS",
+  "sceneOrder": [
+    "MainScene",
+    "MatchScene",
+    "BattleScene",
+    "GameOverScene",
+    "MainScene"
+  ],
+  "purchase": {
+    "card": "弓",
+    "cost": 1,
+    "unitId": 4,
+    "weapon": "LongBow"
+  },
+  "merge": {
+    "sourceId": 2,
+    "targetId": 3,
+    "resultLevel": 2
+  },
+  "playerGoldAfterPurchase": 17,
+  "ai": {
+    "started": false,
+    "deployed": 1,
+    "actions": [
+      {
+        "type": "deploy",
+        "unitId": 1,
+        "text": "刀",
+        "placement": {
+          "x": 4,
+          "y": 8,
+          "minD2": 10
+        }
+      }
+    ]
+  },
+  "wavePlans": [
+    {
+      "round": 1,
+      "normalCount": 10,
+      "normalTypeIndex": 0,
+      "boss": false,
+      "bossIndex": null,
+      "bossKey": null,
+      "bossSpawned": false
+    },
+    {
+      "round": 2,
+      "normalCount": 11,
+      "normalTypeIndex": 0,
+      "boss": true,
+      "bossIndex": 0,
+      "bossKey": "ZhangLiang",
+      "bossSpawned": true
+    }
+  ],
+  "bossCreations": [
+    {
+      "key": "ZhangLiang",
+      "playerLane": true,
+      "id": 25
+    },
+    {
+      "key": "ZhangLiang",
+      "playerLane": false,
+      "id": 26
+    }
+  ],
+  "battleResult": {
+    "isWin": true,
+    "star": 1,
+    "gold": 23,
+    "battleDuration": 29320,
+    "round": 2,
+    "playerTargetHealth": 1,
+    "opponentTargetHealth": 0,
+    "weaponFragments": [],
+    "killCount": 6,
+    "bossKillCount": 0,
+    "endlessRound": 0,
+    "gameMode": "normal",
+    "resultState": "WIN",
+    "bj": false,
+    "raw": {
+      "sceneName": "BattleScene"
+    }
+  },
+  "automaticGameOver": true,
+  "returnedToMain": true,
+  "managersAfterCleanup": {
+    "units": 0,
+    "enemies": 0,
+    "bosses": 0,
+    "projectiles": 0,
+    "weapons": 0,
+    "buffs": 0,
+    "skills": 0
+  },
+  "developmentNetworkCalls": 7,
+  "realNetworkCalls": 0,
+  "nativePlatformCalls": 0,
+  "simulatedMs": 28880
+}

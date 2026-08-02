@@ -1,0 +1,466 @@
+{
+  "round": 4,
+  "name": "ENEMY-RUNTIME-01",
+  "status": "COMPLETE_FOR_MOB0_RUNTIME",
+  "source": {
+    "originalBundleSha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+    "decodedBundleSha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+    "originalIndexSha256": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+    "httpClientSha256": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+  },
+  "requestedRanges": [
+    "19685-20858",
+    "31062-31114",
+    "31262-31482",
+    "32939-33696",
+    "12483-12847"
+  ],
+  "actualRanges": [
+    "bundle.strings-decoded.js:11561-12175",
+    "bundle.strings-decoded.js:12194-12847",
+    "bundle.strings-decoded.js:13380-14360",
+    "bundle.strings-decoded.js:19184-19260",
+    "bundle.strings-decoded.js:19600-20858",
+    "bundle.strings-decoded.js:31062-31114",
+    "bundle.strings-decoded.js:31262-31482",
+    "bundle.strings-decoded.js:32939-33696",
+    "bundle.strings-decoded.js:57007-59129"
+  ],
+  "primarySourceOutputs": [
+    {
+      "path": "src/core/ObjectPool.js",
+      "sizeBytes": 4320,
+      "sha256": "c64eb1101aed7a7fbf1863b75e66c7c0c255619a242a55386b247dd8fcaae3fb"
+    },
+    {
+      "path": "src/battle/MapData.js",
+      "sizeBytes": 12756,
+      "sha256": "48748acc88568ffb2300640450d13ea12629a93d92f3cca7a142a80ba1e0068f"
+    },
+    {
+      "path": "src/battle/EnemyFactory.js",
+      "sizeBytes": 2813,
+      "sha256": "890c287acd040e6e6474699636150347280b507189c79ae80251a7e9dd71cd0e"
+    },
+    {
+      "path": "src/battle/EnemyManager.js",
+      "sizeBytes": 11234,
+      "sha256": "84b8d9a770c1b2fe239b86cb84337096b556c00fa590c600036fbff37e182e33"
+    },
+    {
+      "path": "src/battle/BattleManager.js",
+      "sizeBytes": 7170,
+      "sha256": "b7c8eef5d7442c6c731f479082f16adad3b1bdb0360c6978c70c0976ec312fce"
+    },
+    {
+      "path": "src/battle/BattleState.js",
+      "sizeBytes": 3314,
+      "sha256": "cf7086ae548333524f73f3398482f6664c9d68db7def2a454608facb9e5f95ed"
+    },
+    {
+      "path": "src/battle/dev/DevelopmentCombatServices.js",
+      "sizeBytes": 5868,
+      "sha256": "9d27dac3665430dd3fb5ef32d03b84df0b6526bee0ecc41e2b342dfed9757370"
+    },
+    {
+      "path": "src/entities/EnemyEventProxy.js",
+      "sizeBytes": 1015,
+      "sha256": "37a086ff55569999cfcd84a182ee2761a2cb69faf76a7df277ed037316f7471d"
+    },
+    {
+      "path": "src/entities/EnemyBase.js",
+      "sizeBytes": 23987,
+      "sha256": "55cb664baac101e13804ebce7083fec510d84a0554facb8f0740b5aea70ecd0a"
+    },
+    {
+      "path": "src/entities/NormalEnemyBase.js",
+      "sizeBytes": 3622,
+      "sha256": "e2fd699e05c5b4c48383f52653c0e93c5f26cd868d9a35debfd811bc48bd70a6"
+    },
+    {
+      "path": "src/entities/Mob0Enemy.js",
+      "sizeBytes": 1870,
+      "sha256": "7cc7ca92296c8afe80905c52127266b015088172d716c2ddec98828f117d5d43"
+    },
+    {
+      "path": "src/entities/BattleTarget.js",
+      "sizeBytes": 2987,
+      "sha256": "3b8a0a183ceb93fe0967fc1fcaeda127bd1819f56b440cabfa5c41d12a553ebc"
+    },
+    {
+      "path": "src/entities/index.js",
+      "sizeBytes": 196,
+      "sha256": "2c1f7d23b9ead6e906533e2b8e6a55c629490be47f3c8dc5785cafeb4bd1f6e1"
+    },
+    {
+      "path": "src/battle/index.js",
+      "sizeBytes": 260,
+      "sha256": "c9a140591fa534cdb0f42865c74b4365cb6e92447eb3549dd005293900d88962"
+    },
+    {
+      "path": "src/data/BattleDataCore.js",
+      "sizeBytes": 3388,
+      "sha256": "1b0838ab542feb13b9703574f3b89bf275f0bbb8da46c0f4d38c242ccdd93732"
+    },
+    {
+      "path": "src/data/CriticalGameState.js",
+      "sizeBytes": 3816,
+      "sha256": "7bf27d61c998dc3095a545df4b93ad33053efa5e91c2d50c8c6a41c596c8e81d"
+    },
+    {
+      "path": "src/core/EventBus.js",
+      "sizeBytes": 3152,
+      "sha256": "a06ad9bbc44f481244bf2ffb6dbd48045d0ba5f1731c55db51cce05de66552ce"
+    },
+    {
+      "path": "src/scenes/BattleSceneController.js",
+      "sizeBytes": 7602,
+      "sha256": "5b7e389b4f5bb11dfaba5477b6f3f1c11851081c14b5883f3b30d09e01a280b8"
+    },
+    {
+      "path": "src/config/DevelopmentConfig.js",
+      "sizeBytes": 1791,
+      "sha256": "8ad5c18c04c5f86a279595048a28ae32705db084082c112fb7e9769c736f5592"
+    },
+    {
+      "path": "src/bootstrap/DevelopmentBootstrap.js",
+      "sizeBytes": 15764,
+      "sha256": "59688a4a2a72f0a229d3a9df7c18da4af438fa1fa45b2810fbdb87b378eb1925"
+    }
+  ],
+  "analysisOutputs": [
+    {
+      "path": "analysis/critical-path/enemy-runtime-classgraph.md",
+      "sizeBytes": 1237,
+      "sha256": "524de1a06c2dc5abd2bff0e15a1ff757037164b8e61ba984b4df653a186b1331"
+    },
+    {
+      "path": "analysis/critical-path/enemy-runtime-classgraph.json",
+      "sizeBytes": 8268,
+      "sha256": "39d72b555c65b7d4cf427f000bc5528259a3d2239deb699f472ec36c6b0da252"
+    },
+    {
+      "path": "analysis/critical-path/enemy-runtime-dependency-closure.json",
+      "sizeBytes": 1984,
+      "sha256": "26dd3148af422278bd83fb161f3f9a5e7c995f303fb0d3c88ccf5eb175d3ddd0"
+    },
+    {
+      "path": "analysis/mappings/ENEMY-RUNTIME-01-symbol-map.json",
+      "sizeBytes": 6595,
+      "sha256": "f93ee410191b8676ef522c21ad589f30f3cd40b0c5a5147e4828b78258a2c6d2"
+    },
+    {
+      "path": "analysis/modules/ENEMY-RUNTIME-01.json",
+      "sizeBytes": 3052,
+      "sha256": "663a79c172a4d5403df3b61fb4ed6e1aee9565c676e4b44e07776e9d9aaf089d"
+    },
+    {
+      "path": "analysis/modules/ENEMY-RUNTIME-01-method-coverage.json",
+      "sizeBytes": 3490,
+      "sha256": "86dd139cc8a0c8401c60bfae97bef2c3af5fe2a4f17c7cd84d12ba7c8690429b"
+    },
+    {
+      "path": "analysis/behavior/ENEMY-RUNTIME-01.md",
+      "sizeBytes": 1368,
+      "sha256": "2de5eecfb2846a8a14db6ccb7e8acddd30820b8c07b705051e9617483c6792b1"
+    },
+    {
+      "path": "analysis/behavior/enemy-state-machine.md",
+      "sizeBytes": 1104,
+      "sha256": "acd5a9b480cadd743d19cb1991254fef1d923afc1f53b83b9d14b0bc2e4b6bcf"
+    },
+    {
+      "path": "analysis/behavior/enemy-lifecycle.md",
+      "sizeBytes": 1218,
+      "sha256": "bc788d393aaa9a74b4fc238609e7e780ecc6566d6e1c807d283f14379cd3ad4c"
+    },
+    {
+      "path": "analysis/behavior/enemy-pool-reset-contract.md",
+      "sizeBytes": 1038,
+      "sha256": "4b2334df9b8f17dd86815ef6cb60d50b272286223870cd78f178aaacb98ee32f"
+    },
+    {
+      "path": "analysis/behavior/enemy-target-selection.md",
+      "sizeBytes": 763,
+      "sha256": "153d28dd69d99d03a8d9359986e48ffba058da437c7fd08fdf5c5e8b19c182f3"
+    },
+    {
+      "path": "analysis/behavior/enemy-spatial-index.md",
+      "sizeBytes": 935,
+      "sha256": "2b5be4d0060f152ea34fa58a4d84cb065b5c40e0ee75b3e5bcb53cd160ae363f"
+    },
+    {
+      "path": "analysis/behavior-diff-round-04.md",
+      "sizeBytes": 772,
+      "sha256": "931e299e5edf7223e07414fad4607b1518f12ba11dc6608dd9a8676ff56d2fd6"
+    },
+    {
+      "path": "analysis/round-04-report.md",
+      "sizeBytes": 5014,
+      "sha256": "e545eff7d43a37cd9705b3e3ac9b759582a0afad7180b82e3f00bd94cb1b20ff"
+    },
+    {
+      "path": "analysis/static-checks-round-04.json",
+      "sizeBytes": 15953,
+      "sha256": "73533dea6f32898d9e9ccaaa1e128cfd4e2d93fd9eb230d8ad5c83f544a98c12"
+    },
+    {
+      "path": "analysis/test-results-round-04.json",
+      "sizeBytes": 5894,
+      "sha256": "6761b034125d8402cbd398ebd1d69006575d2549e7692dc88c4691a7818519f3"
+    },
+    {
+      "path": "analysis/dependency-map.md",
+      "sizeBytes": 5151,
+      "sha256": "d4b5781023a0d3f2a2fbf12f201a8add2ac475fa53cfc82eabccfdc80bb6a273"
+    },
+    {
+      "path": "analysis/unresolved-items.md",
+      "sizeBytes": 6118,
+      "sha256": "c0c15640bdb63c28ad3f0a006594426fe474e0380b0a518c7b2770429dfad18d"
+    },
+    {
+      "path": "analysis/reconstruction-log.md",
+      "sizeBytes": 12309,
+      "sha256": "8b65cade1d1359f5c5213156aaac8061941fded49ddcfbda2845468fa35a2077"
+    },
+    {
+      "path": "analysis/transformation-chain.json",
+      "sizeBytes": 4504,
+      "sha256": "02a9049b04b5944dc4d8b92d1250a377237e9301372159d694d2ac6e0b437fed"
+    }
+  ],
+  "testOutputs": [
+    {
+      "path": "tests/mocks/createEnemyRuntimeHarness.js",
+      "sizeBytes": 5751,
+      "sha256": "b055f9a5a2cb9788de7f08587c37de957fb9b94b60ba71fdd08229aa9752f495"
+    },
+    {
+      "path": "tests/mocks/LayaSceneMock.js",
+      "sizeBytes": 8738,
+      "sha256": "cc18f8f763e656f5653190c1f8c9bb039e998e0f28beca46485ec1d006e344c5"
+    },
+    {
+      "path": "tests/unit/MapPath.test.js",
+      "sizeBytes": 1399,
+      "sha256": "f5be1517037b253d132e1d9d7baa0358999615d5f49fc4f752ad1091d9802882"
+    },
+    {
+      "path": "tests/unit/EnemyMovement.test.js",
+      "sizeBytes": 1706,
+      "sha256": "542e64c292cfc2acc24ac6dbd72bf0a01ec2e2ce93aedf1ee23727cfd9772ceb"
+    },
+    {
+      "path": "tests/unit/EnemySpatialIndex.test.js",
+      "sizeBytes": 1416,
+      "sha256": "2fcd6241ae5eb3c4f49406457def0f6ed64053fb3a0288841b359f113a09269d"
+    },
+    {
+      "path": "tests/unit/EnemyTargetSelection.test.js",
+      "sizeBytes": 1523,
+      "sha256": "86ed90d53f9b157a324a02f7d3ecaa755385bc462c14f3497c88a6595c72417c"
+    },
+    {
+      "path": "tests/unit/EnemyAttack.test.js",
+      "sizeBytes": 1389,
+      "sha256": "fe1d625ac479ce3368f9d2e2f59bd3830c1d41c8125d81163e6acd47c123da3c"
+    },
+    {
+      "path": "tests/unit/EnemyDamage.test.js",
+      "sizeBytes": 1215,
+      "sha256": "1858d11becf295159706e1e1faf3fb8145df45e5918fe8f4608ce72fdfd94489"
+    },
+    {
+      "path": "tests/unit/EnemyDeath.test.js",
+      "sizeBytes": 1423,
+      "sha256": "105fa4600c23a4cb0dfa6dfd312745609d04f06dca2b5b90aafaa087bed1265d"
+    },
+    {
+      "path": "tests/unit/EnemyPoolReset.test.js",
+      "sizeBytes": 1598,
+      "sha256": "4151c628ca52b0eeebaacfb8ba39547c139f054ce77986e00f93622bb02c2076"
+    },
+    {
+      "path": "tests/behavior/Mob0PathToTarget.test.js",
+      "sizeBytes": 1160,
+      "sha256": "0253c42a3ae7931c73da48daa6f6dbcb4995ecd19e255cb1ca30929d09fa719f"
+    },
+    {
+      "path": "tests/behavior/Mob0AttackBattleTarget.test.js",
+      "sizeBytes": 870,
+      "sha256": "bcd1125ff38ce6c5948c544a2f98df445f86524083c631e2f1438dc7d80c7b1c"
+    },
+    {
+      "path": "tests/behavior/Mob0KilledBeforeArrival.test.js",
+      "sizeBytes": 742,
+      "sha256": "14a7ed9250e9259a8ceb8822755e2f4b826e581b1399bfc8b26588133441dff1"
+    },
+    {
+      "path": "tests/behavior/Mob0PairBattle.test.js",
+      "sizeBytes": 1037,
+      "sha256": "64be4fc3cc61ee46525c37a1ad4dbb047f8c8896af581403b60acddfd1ea0c01"
+    },
+    {
+      "path": "tests/behavior/BattleTargetDestroyed.test.js",
+      "sizeBytes": 855,
+      "sha256": "201b2282d9bba80e989f381acb8251e8227db8d4872d125b44a0273a47b3d604"
+    },
+    {
+      "path": "tests/behavior/EnemyCleanupAfterBattle.test.js",
+      "sizeBytes": 836,
+      "sha256": "9fc30ba2980902fae38c5d2fa7e925c6dfa93d546b6c5732525c5bee14f3e169"
+    },
+    {
+      "path": "tests/behavior/ReusedMob0HasCleanState.test.js",
+      "sizeBytes": 886,
+      "sha256": "36f8d4153d50a89b29e2b03129469a8e6ba020ac10da036abcc41579423d694e"
+    },
+    {
+      "path": "tests/behavior/BattleFirstFrame.test.js",
+      "sizeBytes": 2297,
+      "sha256": "ca66b4c3a51c1be0e072562ad817712f64231eef0c5554bb6dd19de48b6513fd"
+    }
+  ],
+  "toolOutputs": [
+    {
+      "path": "tools/run-mob0-simulation.js",
+      "sizeBytes": 2200,
+      "sha256": "38f53f5169c5c987f47184e7618850d084221b520679b5eadcb119821906123e"
+    },
+    {
+      "path": "tools/check-round04.js",
+      "sizeBytes": 19725,
+      "sha256": "c64a3b165789a7af1d436ed5dde1f37ba6443f6f840020f99fc870284067c311"
+    },
+    {
+      "path": "tools/verify-round04.js",
+      "sizeBytes": 10559,
+      "sha256": "9e974ce862b241f12e380c81e9575ad6af1528741235c1055a014d06c09f9360"
+    },
+    {
+      "path": "tools/check-round03.js",
+      "sizeBytes": 8459,
+      "sha256": "df7a3467c40468eab76a0219bae243667d3cbe83b9d478584bb92e8f03d10523"
+    }
+  ],
+  "sourceExtracts": [
+    {
+      "path": "work/round-04-extracts/EnemyBase-ro-19685-20858.js",
+      "sizeBytes": 52963,
+      "sha256": "01a2ac0dbe4c4987c62ddcf9b4865ab4fff5fdf3229c2e649b94da49c6002d5d"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyData-sD-11994-12175.js",
+      "sizeBytes": 6694,
+      "sha256": "7cc7244a003cb0756d226dad802b5e7e84ebe046338538c9bb29f785514b74a1"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyEventBase-19600-19684.js",
+      "sizeBytes": 2716,
+      "sha256": "bb305afdddc32a760ab63a98b03e7bbb12e9a6d25d5784a6961f489cdad9d7bf"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyFactory-19184-19260.js",
+      "sizeBytes": 2617,
+      "sha256": "abc76feaa32d0ae8e932a2a478fb7723005f901d22f08b3f86ff7b7594efcdf8"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyManager-vi-32939-33696.js",
+      "sizeBytes": 26582,
+      "sha256": "09804e5e2a2d215dc8fd7f82a22d90553ca19da020aab881530545c57d174059"
+    },
+    {
+      "path": "work/round-04-extracts/GenericPool-uu-13380-14360.js",
+      "sizeBytes": 35389,
+      "sha256": "f99bd7ca171777ed1b4c922872132a175e2cf30d26da03e3b14778d7f3fbcc60"
+    },
+    {
+      "path": "work/round-04-extracts/MapData-AStar-12194-12847.js",
+      "sizeBytes": 25132,
+      "sha256": "4b426a2c2ed0473365eace77846387bf398a86394cbe7f343931b3d6016eaf0f"
+    },
+    {
+      "path": "work/round-04-extracts/Mob0-st-31062-31114.js",
+      "sizeBytes": 1682,
+      "sha256": "806bd88bfe999bf469dad99b6e7c91adaa62ff44d2bd25845cd6d0bb5758d427"
+    },
+    {
+      "path": "work/round-04-extracts/NormalEnemy-pe-31262-31482.js",
+      "sizeBytes": 9156,
+      "sha256": "383ed574940ff3859cb6896f7a5810c2d6ec4849405f411201a0bcb3de1d4022"
+    }
+  ],
+  "verification": {
+    "round04FirstRun": {
+      "tests": 24,
+      "suites": 0,
+      "pass": 24,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "round04SecondRun": {
+      "tests": 24,
+      "suites": 0,
+      "pass": 24,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "staticChecks": {
+      "firstRunStatus": 0,
+      "secondRunStatus": 0,
+      "checksPassed": 78,
+      "checksFailed": 0,
+      "sourceFilesChecked": 96,
+      "reportHashFirst": "73533dea6f32898d9e9ccaaa1e128cfd4e2d93fd9eb230d8ad5c83f544a98c12",
+      "reportHashSecond": "73533dea6f32898d9e9ccaaa1e128cfd4e2d93fd9eb230d8ad5c83f544a98c12",
+      "deterministic": true
+    },
+    "round03Regression": {
+      "tests": 15,
+      "suites": 0,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "net01Regression": {
+      "tests": 32,
+      "suites": 0,
+      "pass": 32,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "mob0Simulation": {
+      "parseError": null,
+      "mode": "DEVELOPMENT_ENEMY_RUNTIME_SIMULATION",
+      "elapsedMs": 29360,
+      "completed": true,
+      "pathTransitionCount": 32,
+      "playerHealth": 2,
+      "opponentHealth": 2,
+      "mob0ClassPool": 2,
+      "mobVisualPool": 2,
+      "networkRequests": 0,
+      "nativePlatformCalls": 0
+    },
+    "realNetworkRequests": 0,
+    "nativePlatformCalls": 0
+  },
+  "nextRecommendedRanges": [
+    "bundle.strings-decoded.js:24863-24930",
+    "bundle.strings-decoded.js:22694-23112",
+    "bundle.strings-decoded.js:23114-23437",
+    "bundle.strings-decoded.js:24443-24834",
+    "bundle.strings-decoded.js:26093-26506",
+    "bundle.strings-decoded.js:29460-30476",
+    "bundle.strings-decoded.js:50471-50519"
+  ]
+}

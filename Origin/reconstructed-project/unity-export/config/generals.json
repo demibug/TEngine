@@ -1,0 +1,78 @@
+{
+  "status": "PARTIAL_CORE_CONFIG",
+  "gap": "glyph merge and formal general battle component not fully reconstructed",
+  "generals": [
+    {
+      "index": 0,
+      "name": "赵云",
+      "weaponType": 1,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 1,
+      "name": "张飞",
+      "weaponType": 1,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 2,
+      "name": "马超",
+      "weaponType": 1,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 3,
+      "name": "关羽",
+      "weaponType": 2,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 4,
+      "name": "黄忠",
+      "weaponType": 0,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 5,
+      "name": "关平",
+      "weaponType": 2,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 6,
+      "name": "关兴",
+      "weaponType": 2,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 7,
+      "name": "张苞",
+      "weaponType": 1,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 8,
+      "name": "张翼",
+      "weaponType": 3,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 9,
+      "name": "黄盖",
+      "weaponType": 3,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 10,
+      "name": "刘备",
+      "weaponType": 3,
+      "status": "PARTIAL_CORE_CONFIG"
+    },
+    {
+      "index": 11,
+      "name": "黄祖",
+      "weaponType": 0,
+      "status": "PARTIAL_CORE_CONFIG"
+    }
+  ]
+}

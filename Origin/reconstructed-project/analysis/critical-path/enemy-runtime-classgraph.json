@@ -1,0 +1,324 @@
+{
+  "module": "ENEMY-RUNTIME-01",
+  "requestedRanges": [
+    "19685-20858",
+    "31062-31114",
+    "31262-31482",
+    "32939-33696",
+    "12483-12847"
+  ],
+  "actualRanges": [
+    "bundle.strings-decoded.js:11561-12175",
+    "bundle.strings-decoded.js:12194-12847",
+    "bundle.strings-decoded.js:13380-14360",
+    "bundle.strings-decoded.js:19184-19260",
+    "bundle.strings-decoded.js:19600-20858",
+    "bundle.strings-decoded.js:31062-31114",
+    "bundle.strings-decoded.js:31262-31482",
+    "bundle.strings-decoded.js:32939-33696",
+    "bundle.strings-decoded.js:57007-59129"
+  ],
+  "extensionReasons": [
+    {
+      "range": "19600-19684",
+      "reason": "qE 是 ro 的直接父类，定义事件代理和 onDestroy 边界。"
+    },
+    {
+      "range": "12194-12482",
+      "reason": "s4 通过 tl/ru/oS 执行真实四方向 A*；只读取 s4 本体无法恢复路径。"
+    },
+    {
+      "range": "11994-12175",
+      "reason": "Mob0 初始化通过 GameData.Dy 读取首波生命值和速度。"
+    },
+    {
+      "range": "13380-14360",
+      "reason": "st 同时使用字符串键表现池 rw，敌人逻辑实体使用 Laya 类池。"
+    },
+    {
+      "range": "19184-19260",
+      "reason": "s0/ss 是 Mob0 创建、注册和类池回收的直接工厂。"
+    },
+    {
+      "range": "57007-59129",
+      "reason": "BattleScene 创建并持有双方 aDou 目标，敌人接触伤害必须核对目标契约。"
+    }
+  ],
+  "nodes": [
+    {
+      "originalSymbol": "qE",
+      "suggestedName": "EnemyEventProxy",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:19600-19684",
+      "extends": null,
+      "composes": [
+        "Laya event-capable visual node through am()"
+      ],
+      "createdBy": [
+        "ro constructor chain"
+      ],
+      "registeredWith": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "once/on/off/event/offAllCaller/offAll 全部转发到 am()",
+        "gameOver 触发 onDestroy"
+      ]
+    },
+    {
+      "originalSymbol": "ro",
+      "suggestedName": "EnemyBase",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:19685-20858",
+      "extends": "qE / EnemyEventProxy",
+      "composes": [
+        "enemy visual node",
+        "path array",
+        "health bar nodes",
+        "state fields",
+        "timer callbacks"
+      ],
+      "createdBy": [
+        "s0 EnemyFactory class pool"
+      ],
+      "registeredWith": [
+        "vi EnemyManager",
+        "nx GameLoop indirectly through vi"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "包含 init/move/attack/hit/Lw/gameOver",
+        "持有 path、生命、阵营、路径索引和表现节点"
+      ]
+    },
+    {
+      "originalSymbol": "pe",
+      "suggestedName": "NormalEnemyBase",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:31262-31482",
+      "extends": "ro / EnemyBase",
+      "composes": [
+        "ve animation wrapper",
+        "death fade presentation"
+      ],
+      "createdBy": [
+        "subclass constructors"
+      ],
+      "registeredWith": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "class extends ro",
+        "init 调用 super 后设置普通敌人数值和动画",
+        "Lw 在 100ms alpha Tween 完成后 gameOver"
+      ]
+    },
+    {
+      "originalSymbol": "st",
+      "suggestedName": "Mob0Enemy",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:31062-31114",
+      "extends": "pe / NormalEnemyBase",
+      "composes": [
+        "mob visual from rw key pool"
+      ],
+      "createdBy": [
+        "ss.jL(\"Mob0\") → s0.WL(\"Mob0\")"
+      ],
+      "registeredWith": [
+        "vi EnemyManager"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "资源路径 mob_0.png",
+        "init 从 key=mob 的池获取表现节点",
+        "gameOver 回收到同一 key"
+      ]
+    },
+    {
+      "originalSymbol": "vi",
+      "suggestedName": "EnemyManager",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:32939-33696",
+      "extends": "singleton pattern",
+      "composes": [
+        "JS enemy Map",
+        "mB cell→ID Set",
+        "wB ID→cell Map",
+        "snapshot update buffer"
+      ],
+      "createdBy": [
+        "vi.instance()"
+      ],
+      "registeredWith": [
+        "nx GameLoop key enemyMgr",
+        "oc EventBus enemy events"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "kB/SB 注册注销",
+        "PB/AB/xB 空间索引",
+        "bB 快照更新",
+        "qx 空间查询"
+      ]
+    },
+    {
+      "originalSymbol": "s4",
+      "suggestedName": "MapData",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:12483-12847",
+      "extends": null,
+      "composes": [
+        "tl A*",
+        "oS grid",
+        "four embedded map blocks"
+      ],
+      "createdBy": [
+        "uq/GameData lazy property"
+      ],
+      "registeredWith": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "changeMap 计算 Le/me",
+        "De 只把 0_0 和 0_1 标记为可走",
+        "ye/gridHei 均为80"
+      ]
+    },
+    {
+      "originalSymbol": "tl",
+      "suggestedName": "AStarPathfinder",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:12194-12382",
+      "extends": null,
+      "composes": [
+        "open/closed node arrays"
+      ],
+      "createdBy": [
+        "s4.De"
+      ],
+      "registeredWith": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "搜索条件排除对角邻居",
+        "稳定交换排序后 shift 最小 f"
+      ]
+    },
+    {
+      "originalSymbol": "ru",
+      "suggestedName": "AStarNode",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:12382-12388",
+      "extends": null,
+      "composes": [],
+      "createdBy": [
+        "oS grid constructor"
+      ],
+      "registeredWith": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "保存 x/y/f/g/h/parent/walkable"
+      ]
+    },
+    {
+      "originalSymbol": "oS",
+      "suggestedName": "AStarGrid",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:12388-12482",
+      "extends": null,
+      "composes": [
+        "ru node matrix"
+      ],
+      "createdBy": [
+        "s4.De"
+      ],
+      "registeredWith": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "设置起点、终点和 walkable"
+      ]
+    },
+    {
+      "originalSymbol": "s0 / ss",
+      "suggestedName": "EnemyFactory / enemy type registry",
+      "kind": "factory-and-registry",
+      "sourceRange": "bundle.strings-decoded.js:19184-19260",
+      "extends": "singleton pattern for s0",
+      "composes": [
+        "type→creator Map",
+        "Laya class pool"
+      ],
+      "createdBy": [
+        "static instance()"
+      ],
+      "registeredWith": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "WL 按字符串类型创建",
+        "produce/recover 使用 Laya.Pool class API",
+        "ss.NL 首项为 Mob0"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "st",
+      "to": "pe",
+      "type": "extends"
+    },
+    {
+      "from": "pe",
+      "to": "ro",
+      "type": "extends"
+    },
+    {
+      "from": "ro",
+      "to": "qE",
+      "type": "extends"
+    },
+    {
+      "from": "s0 / ss",
+      "to": "st",
+      "type": "creates"
+    },
+    {
+      "from": "st",
+      "to": "rw key pool",
+      "type": "takes-and-recovers visual key mob"
+    },
+    {
+      "from": "ro",
+      "to": "vi",
+      "type": "registers and unregisters through events"
+    },
+    {
+      "from": "vi",
+      "to": "ro",
+      "type": "fixed-update snapshot"
+    },
+    {
+      "from": "ro",
+      "to": "s4",
+      "type": "reads side path and grid dimensions"
+    },
+    {
+      "from": "s4",
+      "to": "tl",
+      "type": "pathfinding"
+    },
+    {
+      "from": "ro",
+      "to": "BattleTarget",
+      "type": "50ms delayed receiveEnemyContact(1)"
+    },
+    {
+      "from": "vi",
+      "to": "friendly unit attacks",
+      "type": "spatial query DTOs"
+    }
+  ],
+  "conclusions": {
+    "peIsMovementComponent": false,
+    "logicalEntityAndVisualAreSameObject": false,
+    "enemyCreationUsesClassPool": true,
+    "mobVisualUsesStringKeyPool": true,
+    "spatialIndexOwner": "vi / EnemyManager"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "round": 3,
+  "name": "BOOT-TO-BATTLE",
+  "status": "COMPLETE_FOR_DEFINED_BATTLE_ENTRY_BOUNDARY",
+  "source": {
+    "originalBundleSha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+    "decodedBundleSha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+    "originalIndexSha256": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+  },
+  "primarySourceOutputs": [
+    "src/bootstrap/GameBootstrap.js",
+    "src/bootstrap/DevelopmentBootstrap.js",
+    "src/core/GameLoop.js",
+    "src/core/SceneManager.js",
+    "src/core/AnimationEntityPool.js",
+    "src/scenes/LoadSceneController.js",
+    "src/scenes/MainSceneController.js",
+    "src/scenes/MatchSceneController.js",
+    "src/scenes/BattleSceneController.js",
+    "src/battle/BattleFlowCoordinator.js",
+    "src/battle/BattleManager.js",
+    "src/battle/EnemyManager.js",
+    "src/battle/EnemyFactory.js",
+    "src/data/PlayerDataCore.js",
+    "src/data/BattleDataCore.js",
+    "src/entities/BattleTarget.js",
+    "src/entities/Mob0Enemy.js",
+    "src/platform/dev/DevelopmentPlatform.js",
+    "src/network/dev/DevelopmentNetworkData.js"
+  ],
+  "analysisOutputs": [
+    "analysis/critical-path/boot-to-battle-callgraph.md",
+    "analysis/critical-path/boot-to-battle-callgraph.json",
+    "analysis/critical-path/boot-to-battle-symbols.json",
+    "analysis/critical-path/minimum-player-state.json",
+    "analysis/critical-path/battle-entry-definition.md",
+    "analysis/critical-path/deferred-modules.md",
+    "analysis/critical-path/boot-to-battle-method-coverage.json",
+    "analysis/mappings/BOOT-TO-BATTLE-symbol-map.json",
+    "analysis/behavior/BOOT-TO-BATTLE.md",
+    "analysis/round-03-report.md",
+    "analysis/test-results-round-03.json",
+    "analysis/static-checks-round-03.json"
+  ],
+  "tests": {
+    "round03FirstRun": { "passed": 15, "failed": 0 },
+    "round03DeterminismRun": { "passed": 15, "failed": 0 },
+    "round02Regression": { "passed": 32, "failed": 0 },
+    "staticChecks": { "passed": 52, "failed": 0 },
+    "realNetworkRequests": 0,
+    "nativePlatformCalls": 0
+  },
+  "nextRecommendedRanges": [
+    "bundle.strings-decoded.js:12194-12482",
+    "bundle.strings-decoded.js:19600-20858",
+    "bundle.strings-decoded.js:31262-31482",
+    "bundle.strings-decoded.js:56574-57000"
+  ]
+}

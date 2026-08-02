@@ -1,0 +1,339 @@
+{
+  "moduleId": "NET-01",
+  "sourceFile": "work/bundle.strings-decoded.js",
+  "outputFile": "src/network/HttpClient.js",
+  "classMappings": [
+    {
+      "originalSymbol": "tn",
+      "runtimeAlias": "qK",
+      "newSymbol": "HttpClient",
+      "kind": "class",
+      "sourceRanges": [
+        "5087-5392",
+        "5395 (qK = tn)"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "内部创建 Laya.HttpRequest",
+        "维护正式/调试基础 URL",
+        "包含登录、云存档、服务端时间、对局上报、埋点和错误上传接口",
+        "运行时 qK 被赋值为 tn"
+      ]
+    },
+    {
+      "originalSymbol": "qU",
+      "newSymbol": "SingletonBase",
+      "kind": "class",
+      "sourceRanges": [
+        "3763-3768"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "提供继承式静态 instance()",
+        "首次调用 new this 并写入 this.Instance"
+      ]
+    }
+  ],
+  "fields": [
+    {
+      "originalSymbol": "xa",
+      "newSymbol": "loginCloudSaveRaw",
+      "kind": "instance-field",
+      "confidence": "HIGH",
+      "reason": "仅保存登录响应 data.userData，随后由云存档解析器消费。"
+    },
+    {
+      "originalSymbol": "path",
+      "newSymbol": "productionBaseUrl",
+      "kind": "instance-field",
+      "confidence": "HIGH",
+      "reason": "值为正式环境基础 URL。"
+    },
+    {
+      "originalSymbol": "ba",
+      "newSymbol": "useDebugServer",
+      "kind": "instance-field",
+      "confidence": "HIGH",
+      "reason": "url getter 为真时切换调试基础 URL。"
+    },
+    {
+      "originalSymbol": "authentication",
+      "newSymbol": "authentication",
+      "kind": "instance-field",
+      "confidence": "HIGH",
+      "reason": "直接作为 authentication 请求头值。"
+    },
+    {
+      "originalSymbol": "Ma",
+      "newSymbol": "userId",
+      "kind": "instance-field",
+      "confidence": "HIGH",
+      "reason": "来自登录响应 data.userId，并由 Aa 返回。"
+    },
+    {
+      "originalSymbol": "userType",
+      "newSymbol": "userType",
+      "kind": "instance-field",
+      "confidence": "HIGH",
+      "reason": "来自登录响应 data.userType，并由 Ea 返回。"
+    },
+    {
+      "originalSymbol": "Pa",
+      "newSymbol": "rankingType",
+      "kind": "instance-field",
+      "confidence": "MEDIUM",
+      "reason": "仅用于 country/province 接口 type 查询参数，默认 3。"
+    },
+    {
+      "originalSymbol": "channelAppId",
+      "newSymbol": "channelAppId",
+      "kind": "instance-field",
+      "confidence": "HIGH",
+      "reason": "由 init 写入；NET-01 内未再次读取。"
+    },
+    {
+      "originalSymbol": "Ba",
+      "newSymbol": "DEFAULT_TIMEOUT_MS",
+      "kind": "static-field",
+      "confidence": "HIGH",
+      "reason": "数值索引 d[101] 已确认等于 5000。"
+    },
+    {
+      "originalSymbol": "ja",
+      "newSymbol": "CLOUD_SAVE_UPLOAD_COUNT_KEY",
+      "kind": "static-field",
+      "confidence": "HIGH",
+      "reason": "值为 playGameCount，用于 Laya.LocalStorage。"
+    },
+    {
+      "originalSymbol": "qa",
+      "newSymbol": "LEGACY_CODE_1201",
+      "kind": "static-field",
+      "confidence": "LOW",
+      "reason": "数值 1201；全 bundle 无读取，语义 UNKNOWN。"
+    },
+    {
+      "originalSymbol": "$a",
+      "newSymbol": "LEGACY_CODE_1203",
+      "kind": "static-field",
+      "confidence": "LOW",
+      "reason": "数值 1203；全 bundle 无读取，语义 UNKNOWN。"
+    },
+    {
+      "originalSymbol": "Instance",
+      "newSymbol": "Instance",
+      "kind": "inherited-static-field",
+      "confidence": "HIGH",
+      "reason": "由 qU.instance() 在具体子类首次访问时延迟创建。"
+    }
+  ],
+  "methods": [
+    {
+      "originalSymbol": "constructor",
+      "newSymbol": "constructor",
+      "kind": "class-constructor",
+      "sourceRange": "bundle.strings-decoded.js:5087-5099",
+      "confidence": "HIGH",
+      "reason": "初始化基础地址、鉴权、用户标识、排行类型与云存档缓存。"
+    },
+    {
+      "originalSymbol": "init",
+      "newSymbol": "initializeChannel",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5100-5102",
+      "confidence": "HIGH",
+      "reason": "唯一副作用是写入 channelAppId。"
+    },
+    {
+      "originalSymbol": "request",
+      "newSymbol": "request",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5103-5121",
+      "confidence": "HIGH",
+      "reason": "创建 Laya.HttpRequest，设置 timeout，发送 JSON 请求并监听 COMPLETE/ERROR。"
+    },
+    {
+      "originalSymbol": "Da",
+      "newSymbol": "requestAsPromise",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5122-5139",
+      "confidence": "HIGH",
+      "reason": "把 request 的 success/fail 回调桥接为 Promise resolve/reject。"
+    },
+    {
+      "originalSymbol": "Ia",
+      "newSymbol": "waitForPromiseWithinTimeout",
+      "kind": "static-method",
+      "sourceRange": "bundle.strings-decoded.js:5140-5152",
+      "confidence": "HIGH",
+      "reason": "Laya.timer.once 与 Promise.then 竞速，返回布尔值。"
+    },
+    {
+      "originalSymbol": "Ca",
+      "newSymbol": "login",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5153-5164",
+      "confidence": "HIGH",
+      "reason": "POST sys/user/login；成功应用响应，失败返回 null。"
+    },
+    {
+      "originalSymbol": "Ta",
+      "newSymbol": "applyLoginResponse",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5165-5191",
+      "confidence": "HIGH",
+      "reason": "读取 authentication/userId/userType/userData/attach.province。"
+    },
+    {
+      "originalSymbol": "Ra",
+      "newSymbol": "synchronizeCloudSaveAfterLogin",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5192-5202",
+      "confidence": "HIGH",
+      "reason": "登录后选择云端存档或强制回传本地存档。"
+    },
+    {
+      "originalSymbol": "Oa",
+      "newSymbol": "reportGameStart",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5203-5206",
+      "confidence": "HIGH",
+      "reason": "GET zyyad/game/start。"
+    },
+    {
+      "originalSymbol": "Ya",
+      "newSymbol": "reportGameEnd",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5207-5223",
+      "confidence": "HIGH",
+      "reason": "GET zyyad/game/end，查询参数含 star/win，请求体固定 skin=1。"
+    },
+    {
+      "originalSymbol": "Xa",
+      "newSymbol": "requestCountryRanking",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5224-5227",
+      "confidence": "HIGH",
+      "reason": "GET country/list?type=3。"
+    },
+    {
+      "originalSymbol": "Ga",
+      "newSymbol": "requestProvinceRanking",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5228-5231",
+      "confidence": "HIGH",
+      "reason": "GET province/detail/list?type=3。"
+    },
+    {
+      "originalSymbol": "Ha",
+      "newSymbol": "requestCountryRankingAlias",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5232-5234",
+      "confidence": "HIGH",
+      "reason": "仅转调 Xa，保留独立入口。"
+    },
+    {
+      "originalSymbol": "getTime",
+      "newSymbol": "requestServerTime",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5235-5238",
+      "confidence": "HIGH",
+      "reason": "GET sys/server/time。"
+    },
+    {
+      "originalSymbol": "Wa",
+      "newSymbol": "requestBestRankIfDue",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5239-5258",
+      "confidence": "MEDIUM",
+      "reason": "跨自然日时请求 bestRank；业务命名由字段和路径共同推断。"
+    },
+    {
+      "originalSymbol": "Fa",
+      "newSymbol": "uploadCloudSave",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5259-5290",
+      "confidence": "HIGH",
+      "reason": "首局和每 5 局 POST sys/user/data；force 绕过节流。"
+    },
+    {
+      "originalSymbol": "za",
+      "newSymbol": "uploadUserInfo",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5291-5312",
+      "confidence": "HIGH",
+      "reason": "POST sys/user/info。"
+    },
+    {
+      "originalSymbol": "track",
+      "newSymbol": "track",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5313-5332",
+      "confidence": "HIGH",
+      "reason": "POST sys/oa/point/add/new；空 payload/length=0 跳过。"
+    },
+    {
+      "originalSymbol": "Na",
+      "newSymbol": "uploadErrorLog",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5333-5354",
+      "confidence": "HIGH",
+      "reason": "POST sys/oa/errorUpload/add。"
+    },
+    {
+      "originalSymbol": "url",
+      "newSymbol": "baseUrl",
+      "kind": "getter",
+      "sourceRange": "bundle.strings-decoded.js:5366-5373",
+      "confidence": "HIGH",
+      "reason": "根据 debug 标志返回正式或调试基础地址。"
+    },
+    {
+      "originalSymbol": "Aa",
+      "newSymbol": "getUserId",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5374-5381",
+      "confidence": "HIGH",
+      "reason": "返回 Ma 字段。"
+    },
+    {
+      "originalSymbol": "Ea",
+      "newSymbol": "getUserType",
+      "kind": "instance-method",
+      "sourceRange": "bundle.strings-decoded.js:5382-5389",
+      "confidence": "HIGH",
+      "reason": "返回 userType 字段。"
+    }
+  ],
+  "protocolValues": [
+    {
+      "name": "productionBaseUrl",
+      "value": "https://api01.mihuangame.com/api/v2/",
+      "confidence": "HIGH"
+    },
+    {
+      "name": "debugBaseUrl",
+      "value": "https://debug.mihuangame.com/api/v2/",
+      "confidence": "HIGH"
+    },
+    {
+      "name": "contentType",
+      "value": "application/json",
+      "confidence": "HIGH"
+    },
+    {
+      "name": "authenticationHeader",
+      "value": "authentication",
+      "confidence": "HIGH"
+    },
+    {
+      "name": "responseType",
+      "value": "json",
+      "confidence": "HIGH"
+    }
+  ],
+  "unresolvedSymbols": [
+    "qa",
+    "$a"
+  ]
+}

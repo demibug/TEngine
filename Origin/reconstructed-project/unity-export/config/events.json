@@ -1,0 +1,23 @@
+{
+  "BATTLE_FINISHED": "l",
+  "ROUND_STARTED": "Ft",
+  "ROUND_SPAWN_PREPARED": "Jt",
+  "BATTLE_SCENE_GAME_OVER": "It",
+  "BATTLE_RESULT_READY": "o",
+  "HEALTH_CHANGED": "Ct",
+  "GOLD_CHANGED": "Dt",
+  "ENEMY_CREATED": "Ht",
+  "ENEMY_REGISTERED": "nt",
+  "ENEMY_REMOVED": "ot",
+  "ENEMY_GRID_LEFT": "ft",
+  "ENEMY_VISUAL_ADDED": "bt",
+  "ENEMY_GRID_ENTERED": "vt",
+  "ENEMY_GRID_ENTITY_ENTERED": "_t",
+  "ENEMY_KILLED_BY": "ht",
+  "ENEMY_APPROACH_WARNING": "kt",
+  "ENEMY_FINAL_WARNING": "wt",
+  "SKILL_EFFECT_REQUESTED": "skill:effect:requested",
+  "BOSS_SPAWNED": "boss:spawned",
+  "BOSS_REMOVED": "boss:removed",
+  "WAVE_PLANNED": "wave:planned"
+}

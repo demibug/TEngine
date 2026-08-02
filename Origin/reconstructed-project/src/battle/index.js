@@ -1,0 +1,21 @@
+'use strict';
+module.exports = {
+  ...require('./BattleEconomy'),
+  ...require('./CombatServices'),
+  ...require('./CombatLifecycle'),
+  ...require('./CoreCombatRuntime'),
+  ...require('./DeadEntityRegistry'),
+  ...require('./MapTileManager'),
+  ...require('./BattleResult'),
+  ...require('../bosses'),
+  ...require('../skills'),
+  ...require('./WaveManager'),
+  ...require('../buffs'),
+  ...require('./BattleState'),
+  ...require('./MapData'),
+  ...require('./BattleManager'),
+  ...require('./BattleFlowManager'),
+  ...require('./EnemyFactory'),
+  ...require('./EnemyManager'),
+  ...require('./UnitRegistry'),
+};

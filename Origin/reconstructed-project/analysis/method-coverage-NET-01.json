@@ -1,0 +1,348 @@
+{
+  "moduleId": "NET-01",
+  "source": "work/bundle.strings-decoded.js",
+  "requestedRange": "5087-6037",
+  "actualSourceRanges": [
+    "3316",
+    "3763-3768",
+    "5087-5395"
+  ],
+  "originalFunctionsFound": 22,
+  "functionsReconstructed": 22,
+  "internalHelpersReconstructed": 0,
+  "contextFunctionsReconstructed": 1,
+  "unreachableObfuscationFunctions": 0,
+  "unresolvedFunctions": 0,
+  "mappings": [
+    {
+      "original": "constructor",
+      "reconstructed": "constructor",
+      "sourceRange": "bundle.strings-decoded.js:5093-5099",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: singleton、默认字段、静态常量和调试地址保持原始语义"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: resetInstanceForTests 后创建新实例"
+        ]
+      }
+    },
+    {
+      "original": "init",
+      "reconstructed": "initializeChannel",
+      "sourceRange": "bundle.strings-decoded.js:5100-5102",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: initializeChannel(31415)"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: initializeChannel(undefined)"
+        ]
+      }
+    },
+    {
+      "original": "request",
+      "reconstructed": "request",
+      "sourceRange": "bundle.strings-decoded.js:5103-5121",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: request COMPLETE"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: request ERROR 与同步 send 异常"
+        ]
+      }
+    },
+    {
+      "original": "Da",
+      "reconstructed": "requestAsPromise",
+      "sourceRange": "bundle.strings-decoded.js:5122-5139",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: requestAsPromise COMPLETE"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: requestAsPromise ERROR 与同步异常"
+        ]
+      }
+    },
+    {
+      "original": "Ia",
+      "reconstructed": "waitForPromiseWithinTimeout",
+      "sourceRange": "bundle.strings-decoded.js:5140-5152",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: fulfilled before timeout"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: rejected 与 timeout"
+        ]
+      }
+    },
+    {
+      "original": "Ca",
+      "reconstructed": "login",
+      "sourceRange": "bundle.strings-decoded.js:5153-5164",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: login 成功"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: login 网络失败与空 code"
+        ]
+      }
+    },
+    {
+      "original": "Ta",
+      "reconstructed": "applyLoginResponse",
+      "sourceRange": "bundle.strings-decoded.js:5165-5191",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: login 成功应用完整响应"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: applyLoginResponse 缺失字段"
+        ]
+      }
+    },
+    {
+      "original": "Ra",
+      "reconstructed": "synchronizeCloudSaveAfterLogin",
+      "sourceRange": "bundle.strings-decoded.js:5192-5202",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: 采用云端存档"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: 未登录、无云存档、回传本地"
+        ]
+      }
+    },
+    {
+      "original": "Oa",
+      "reconstructed": "reportGameStart",
+      "sourceRange": "bundle.strings-decoded.js:5203-5206",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: reportGameStart success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: reportGameStart failure"
+        ]
+      }
+    },
+    {
+      "original": "Ya",
+      "reconstructed": "reportGameEnd",
+      "sourceRange": "bundle.strings-decoded.js:5207-5223",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: reportGameEnd(win) success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: reportGameEnd failure 与 win=0"
+        ]
+      }
+    },
+    {
+      "original": "Xa",
+      "reconstructed": "requestCountryRanking",
+      "sourceRange": "bundle.strings-decoded.js:5224-5227",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: requestCountryRanking success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: requestCountryRanking failure"
+        ]
+      }
+    },
+    {
+      "original": "Ga",
+      "reconstructed": "requestProvinceRanking",
+      "sourceRange": "bundle.strings-decoded.js:5228-5231",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: requestProvinceRanking success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: requestProvinceRanking failure"
+        ]
+      }
+    },
+    {
+      "original": "Ha",
+      "reconstructed": "requestCountryRankingAlias",
+      "sourceRange": "bundle.strings-decoded.js:5232-5234",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: requestCountryRankingAlias success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: requestCountryRankingAlias failure"
+        ]
+      }
+    },
+    {
+      "original": "getTime",
+      "reconstructed": "requestServerTime",
+      "sourceRange": "bundle.strings-decoded.js:5235-5238",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: requestServerTime success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: requestServerTime failure"
+        ]
+      }
+    },
+    {
+      "original": "Wa",
+      "reconstructed": "requestBestRankIfDue",
+      "sourceRange": "bundle.strings-decoded.js:5239-5258",
+      "confidence": "MEDIUM",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: server time 后请求 bestRank"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: 未跨日与 server time ERROR"
+        ]
+      }
+    },
+    {
+      "original": "Fa",
+      "reconstructed": "uploadCloudSave",
+      "sourceRange": "bundle.strings-decoded.js:5259-5290",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: 首局、第五局和 force 上传"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: 未登录、节流、失败和 NaN 计数"
+        ]
+      }
+    },
+    {
+      "original": "za",
+      "reconstructed": "uploadUserInfo",
+      "sourceRange": "bundle.strings-decoded.js:5291-5312",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: uploadUserInfo success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: uploadUserInfo failure"
+        ]
+      }
+    },
+    {
+      "original": "track",
+      "reconstructed": "track",
+      "sourceRange": "bundle.strings-decoded.js:5313-5332",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: track success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: track failure、空值和无 length 对象"
+        ]
+      }
+    },
+    {
+      "original": "Na",
+      "reconstructed": "uploadErrorLog",
+      "sourceRange": "bundle.strings-decoded.js:5333-5354",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/behavior/NET-01.behavior.test.js: uploadErrorLog success"
+        ],
+        "boundary": [
+          "tests/behavior/NET-01.behavior.test.js: uploadErrorLog failure"
+        ]
+      }
+    },
+    {
+      "original": "url",
+      "reconstructed": "baseUrl",
+      "sourceRange": "bundle.strings-decoded.js:5366-5373",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: 正式 baseUrl"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: 调试 baseUrl"
+        ]
+      }
+    },
+    {
+      "original": "Aa",
+      "reconstructed": "getUserId",
+      "sourceRange": "bundle.strings-decoded.js:5374-5381",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: login 后 getUserId"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: 默认 getUserId=0"
+        ]
+      }
+    },
+    {
+      "original": "Ea",
+      "reconstructed": "getUserType",
+      "sourceRange": "bundle.strings-decoded.js:5382-5389",
+      "confidence": "HIGH",
+      "status": "RECONSTRUCTED",
+      "tests": {
+        "success": [
+          "tests/unit/HttpClient.test.js: login 后 getUserType"
+        ],
+        "boundary": [
+          "tests/unit/HttpClient.test.js: 默认 getUserType=0"
+        ]
+      }
+    }
+  ]
+}

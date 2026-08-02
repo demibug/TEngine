@@ -1,0 +1,643 @@
+{
+  "scope": "Only functions selected by the BOOT-TO-BATTLE dependency closure; large scene classes contain additional deferred methods.",
+  "criticalFunctionsFound": 79,
+  "criticalFunctionsReconstructed": 79,
+  "internalHelpersReconstructed": 7,
+  "unreachableObfuscationFunctions": 0,
+  "unresolvedCriticalFunctions": 0,
+  "deferredNonCriticalFunctions": "RECORDED_IN_deferred-modules.md",
+  "records": [
+    {
+      "moduleId": "BOOT-INDEX-01",
+      "originalClassOrFunction": "GameBootstrap",
+      "originalRange": "original/index.js:1-68",
+      "reconstructedMethod": "applyConfiguration",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BOOT-INDEX-01",
+      "originalClassOrFunction": "GameBootstrap",
+      "originalRange": "original/index.js:1-68",
+      "reconstructedMethod": "configurePackages",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BOOT-INDEX-01",
+      "originalClassOrFunction": "GameBootstrap",
+      "originalRange": "original/index.js:1-68",
+      "reconstructedMethod": "start",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "GAME-LOOP-01",
+      "originalClassOrFunction": "GameLoop",
+      "originalRange": "bundle.strings-decoded.js:3769-3874",
+      "reconstructedMethod": "register",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "GAME-LOOP-01",
+      "originalClassOrFunction": "GameLoop",
+      "originalRange": "bundle.strings-decoded.js:3769-3874",
+      "reconstructedMethod": "unregister",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "GAME-LOOP-01",
+      "originalClassOrFunction": "GameLoop",
+      "originalRange": "bundle.strings-decoded.js:3769-3874",
+      "reconstructedMethod": "update",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "GAME-LOOP-01",
+      "originalClassOrFunction": "GameLoop",
+      "originalRange": "bundle.strings-decoded.js:3769-3874",
+      "reconstructedMethod": "pause",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "GAME-LOOP-01",
+      "originalClassOrFunction": "GameLoop",
+      "originalRange": "bundle.strings-decoded.js:3769-3874",
+      "reconstructedMethod": "init",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "GAME-LOOP-01",
+      "originalClassOrFunction": "GameLoop",
+      "originalRange": "bundle.strings-decoded.js:3769-3874",
+      "reconstructedMethod": "resume",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MGR-01",
+      "originalClassOrFunction": "SceneManager",
+      "originalRange": "bundle.strings-decoded.js:5715-5869",
+      "reconstructedMethod": "init",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MGR-01",
+      "originalClassOrFunction": "SceneManager",
+      "originalRange": "bundle.strings-decoded.js:5715-5869",
+      "reconstructedMethod": "closeOtherMajorScenes",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MGR-01",
+      "originalClassOrFunction": "SceneManager",
+      "originalRange": "bundle.strings-decoded.js:5715-5869",
+      "reconstructedMethod": "openScene",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MGR-01",
+      "originalClassOrFunction": "SceneManager",
+      "originalRange": "bundle.strings-decoded.js:5715-5869",
+      "reconstructedMethod": "closeScene",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MGR-01",
+      "originalClassOrFunction": "SceneManager",
+      "originalRange": "bundle.strings-decoded.js:5715-5869",
+      "reconstructedMethod": "getScene",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MGR-01",
+      "originalClassOrFunction": "SceneManager",
+      "originalRange": "bundle.strings-decoded.js:5715-5869",
+      "reconstructedMethod": "openDialog",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MGR-01",
+      "originalClassOrFunction": "SceneManager",
+      "originalRange": "bundle.strings-decoded.js:5715-5869",
+      "reconstructedMethod": "closeDialog",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MGR-01",
+      "originalClassOrFunction": "SceneManager",
+      "originalRange": "bundle.strings-decoded.js:5715-5869",
+      "reconstructedMethod": "closeSceneDialogs",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "onAwake",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "startLoadFlow",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "initializePlatformAndData",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "loginOrContinue",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "synchronizeGameData",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "onComplete",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "updatePlatformProgress",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "updateResourceProgress",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "startStatusDots",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "updateStatusText",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "drawProgress",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-LOAD-01",
+      "originalClassOrFunction": "LoadSceneController",
+      "originalRange": "bundle.strings-decoded.js:50996-51270",
+      "reconstructedMethod": "onClosed",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MAIN-01",
+      "originalClassOrFunction": "MainSceneController",
+      "originalRange": "bundle.strings-decoded.js:64782-65947",
+      "reconstructedMethod": "onAwake",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MAIN-01",
+      "originalClassOrFunction": "MainSceneController",
+      "originalRange": "bundle.strings-decoded.js:64782-65947",
+      "reconstructedMethod": "onOpened",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MAIN-01",
+      "originalClassOrFunction": "MainSceneController",
+      "originalRange": "bundle.strings-decoded.js:64782-65947",
+      "reconstructedMethod": "startGame",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MAIN-01",
+      "originalClassOrFunction": "MainSceneController",
+      "originalRange": "bundle.strings-decoded.js:64782-65947",
+      "reconstructedMethod": "onClosed",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "onAwake",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "onOpened",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "initializeMatchDisplay",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "completeMatch",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "update",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "enterBattle",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "closeMatch",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "resetVisualState",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-MATCH-01",
+      "originalClassOrFunction": "MatchSceneController",
+      "originalRange": "bundle.strings-decoded.js:60834-61284",
+      "reconstructedMethod": "onClosed",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-FLOW-01",
+      "originalClassOrFunction": "BattleFlowCoordinator",
+      "originalRange": "bundle.strings-decoded.js:55027-55229",
+      "reconstructedMethod": "init",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-FLOW-01",
+      "originalClassOrFunction": "BattleFlowCoordinator",
+      "originalRange": "bundle.strings-decoded.js:55027-55229",
+      "reconstructedMethod": "startTutorialBattle",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-FLOW-01",
+      "originalClassOrFunction": "BattleFlowCoordinator",
+      "originalRange": "bundle.strings-decoded.js:55027-55229",
+      "reconstructedMethod": "startBattle",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-FLOW-01",
+      "originalClassOrFunction": "BattleFlowCoordinator",
+      "originalRange": "bundle.strings-decoded.js:55027-55229",
+      "reconstructedMethod": "cleanupBattle",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "init",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "startGame",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "update",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "_updateSpawnState",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "_beginWave",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "_spawnPairWhenDue",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "_chooseSpecialSpawnIndex",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "_updateUnitAttacks",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "_updateAttackUnit",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "BATTLE-MGR-01",
+      "originalClassOrFunction": "BattleManager",
+      "originalRange": "bundle.strings-decoded.js:50323-50534",
+      "reconstructedMethod": "gameOver",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ANIMATION-POOL-01",
+      "originalClassOrFunction": "AnimationEntityPool",
+      "originalRange": "bundle.strings-decoded.js:18534-18608",
+      "reconstructedMethod": "init",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ANIMATION-POOL-01",
+      "originalClassOrFunction": "AnimationEntityPool",
+      "originalRange": "bundle.strings-decoded.js:18534-18608",
+      "reconstructedMethod": "create",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ANIMATION-POOL-01",
+      "originalClassOrFunction": "AnimationEntityPool",
+      "originalRange": "bundle.strings-decoded.js:18534-18608",
+      "reconstructedMethod": "createBossByIndex",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ANIMATION-POOL-01",
+      "originalClassOrFunction": "AnimationEntityPool",
+      "originalRange": "bundle.strings-decoded.js:18534-18608",
+      "reconstructedMethod": "resolveBossAnimationId",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ANIMATION-POOL-01",
+      "originalClassOrFunction": "AnimationEntityPool",
+      "originalRange": "bundle.strings-decoded.js:18534-18608",
+      "reconstructedMethod": "recover",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-BATTLE-01",
+      "originalClassOrFunction": "BattleSceneController",
+      "originalRange": "bundle.strings-decoded.js:57007-59129",
+      "reconstructedMethod": "onAwake",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-BATTLE-01",
+      "originalClassOrFunction": "BattleSceneController",
+      "originalRange": "bundle.strings-decoded.js:57007-59129",
+      "reconstructedMethod": "_createBattleTargets",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-BATTLE-01",
+      "originalClassOrFunction": "BattleSceneController",
+      "originalRange": "bundle.strings-decoded.js:57007-59129",
+      "reconstructedMethod": "onOpened",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-BATTLE-01",
+      "originalClassOrFunction": "BattleSceneController",
+      "originalRange": "bundle.strings-decoded.js:57007-59129",
+      "reconstructedMethod": "update",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-BATTLE-01",
+      "originalClassOrFunction": "BattleSceneController",
+      "originalRange": "bundle.strings-decoded.js:57007-59129",
+      "reconstructedMethod": "onRoundStarted",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-BATTLE-01",
+      "originalClassOrFunction": "BattleSceneController",
+      "originalRange": "bundle.strings-decoded.js:57007-59129",
+      "reconstructedMethod": "pause",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-BATTLE-01",
+      "originalClassOrFunction": "BattleSceneController",
+      "originalRange": "bundle.strings-decoded.js:57007-59129",
+      "reconstructedMethod": "gameOver",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "SCENE-BATTLE-01",
+      "originalClassOrFunction": "BattleSceneController",
+      "originalRange": "bundle.strings-decoded.js:57007-59129",
+      "reconstructedMethod": "onClosed",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ENEMY-MGR-CP-01",
+      "originalClassOrFunction": "EnemyManager",
+      "originalRange": "bundle.strings-decoded.js:32939-33696",
+      "reconstructedMethod": "init",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ENEMY-MGR-CP-01",
+      "originalClassOrFunction": "EnemyManager",
+      "originalRange": "bundle.strings-decoded.js:32939-33696",
+      "reconstructedMethod": "startGame",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ENEMY-MGR-CP-01",
+      "originalClassOrFunction": "EnemyManager",
+      "originalRange": "bundle.strings-decoded.js:32939-33696",
+      "reconstructedMethod": "update",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ENEMY-MGR-CP-01",
+      "originalClassOrFunction": "EnemyManager",
+      "originalRange": "bundle.strings-decoded.js:32939-33696",
+      "reconstructedMethod": "spawn",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ENEMY-MGR-CP-01",
+      "originalClassOrFunction": "EnemyManager",
+      "originalRange": "bundle.strings-decoded.js:32939-33696",
+      "reconstructedMethod": "prepareWave",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ENEMY-MGR-CP-01",
+      "originalClassOrFunction": "EnemyManager",
+      "originalRange": "bundle.strings-decoded.js:32939-33696",
+      "reconstructedMethod": "queryTargets",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "ENEMY-MGR-CP-01",
+      "originalClassOrFunction": "EnemyManager",
+      "originalRange": "bundle.strings-decoded.js:32939-33696",
+      "reconstructedMethod": "gameOver",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "MOB0-CP-01",
+      "originalClassOrFunction": "Mob0Enemy",
+      "originalRange": "bundle.strings-decoded.js:31062-31114",
+      "reconstructedMethod": "init",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "MOB0-CP-01",
+      "originalClassOrFunction": "Mob0Enemy",
+      "originalRange": "bundle.strings-decoded.js:31062-31114",
+      "reconstructedMethod": "update",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    },
+    {
+      "moduleId": "MOB0-CP-01",
+      "originalClassOrFunction": "Mob0Enemy",
+      "originalRange": "bundle.strings-decoded.js:31062-31114",
+      "reconstructedMethod": "gameOver",
+      "classification": "reconstructed-critical-path",
+      "status": "MIGRATED"
+    }
+  ]
+}

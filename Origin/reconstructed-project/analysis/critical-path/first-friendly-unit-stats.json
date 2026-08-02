@@ -1,0 +1,119 @@
+{
+  "selectedUnit": "KnifeSoldier",
+  "stats": [
+    {
+      "field": "factoryIndex",
+      "value": 0,
+      "originalSymbol": "tb.zx[0] / uq.Oc.op index",
+      "sourceRange": "bundle.strings-decoded.js:11095,24443-24551",
+      "calculation": "indexOf('刀') = 0",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "text",
+      "value": "刀",
+      "originalSymbol": "op[0]",
+      "sourceRange": "bundle.strings-decoded.js:11095",
+      "calculation": "literal",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "animationKey",
+      "value": "knife",
+      "originalSymbol": "Q_",
+      "sourceRange": "bundle.strings-decoded.js:24458,24465",
+      "calculation": "literal",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackRangeCells",
+      "value": 1.5,
+      "originalSymbol": "mp[0].wp",
+      "sourceRange": "bundle.strings-decoded.js:11144-11150",
+      "calculation": "literal",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "gridCellWidthPx",
+      "value": 80,
+      "originalSymbol": "s4.ye / hu[65]",
+      "sourceRange": "bundle.strings-decoded.js:12492,12695",
+      "calculation": "decoded hu[65]",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackRangePx",
+      "value": 120,
+      "originalSymbol": "td.wp",
+      "sourceRange": "bundle.strings-decoded.js:23280-23291",
+      "calculation": "1.5 × 80",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackDamageLevel1",
+      "value": 3,
+      "originalSymbol": "mp[0]._p / td._p",
+      "sourceRange": "bundle.strings-decoded.js:11144-11150,23252-23266",
+      "calculation": "3 × level damage multiplier 1",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "attackIntervalSecondsLevel1",
+      "value": 0.8,
+      "originalSymbol": "mp[0].kp / td.z_",
+      "sourceRange": "bundle.strings-decoded.js:11144-11150,23292-23308",
+      "calculation": "0.8 / level speed multiplier 1",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "firstAttackEligibilityMs",
+      "value": 800,
+      "originalSymbol": "1000 * z_",
+      "sourceRange": "bundle.strings-decoded.js:50471-50519",
+      "calculation": "1000 × 0.8",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "damageSettlementBaseDelayMs",
+      "value": 500,
+      "originalSymbol": "hu[176] / j_",
+      "sourceRange": "bundle.strings-decoded.js:24535-24545",
+      "calculation": "500 / animationPlaybackRate; level 1 rate is 1",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "level2Damage",
+      "value": 4.5,
+      "originalSymbol": "gp[1]",
+      "sourceRange": "bundle.strings-decoded.js:11095,11348-11350",
+      "calculation": "3 × (1 + 0.5)",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "level2AttackIntervalSeconds",
+      "value": 0.5333333333333333,
+      "originalSymbol": "fp[1]",
+      "sourceRange": "bundle.strings-decoded.js:11095,11349",
+      "calculation": "0.8 / (1 + 0.5)",
+      "confidence": "HIGH"
+    },
+    {
+      "field": "health",
+      "value": null,
+      "originalSymbol": null,
+      "sourceRange": "bundle.strings-decoded.js:22694-23437,24443-24551",
+      "calculation": "no health/maxHealth/takeDamage/death member exists in selected unit hierarchy",
+      "confidence": "HIGH",
+      "status": "UNKNOWN_NOT_PRESENT_IN_SOURCE"
+    },
+    {
+      "field": "movementSpeed",
+      "value": null,
+      "originalSymbol": null,
+      "sourceRange": "bundle.strings-decoded.js:22694-23437,24443-24551",
+      "calculation": "selected knife is fixed-position; no combat pursuit speed exists",
+      "confidence": "HIGH",
+      "status": "NOT_APPLICABLE"
+    }
+  ]
+}

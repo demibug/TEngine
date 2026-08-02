@@ -1,0 +1,286 @@
+'use strict';
+
+// Generated from origin_project. Do not edit by hand; regenerate from tools/generate-origin-resource-catalog.js.
+const SPINE_CATALOG=Object.freeze({
+  "aDou": {
+    "path": "resources/anim/aDou/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/aDou/skeleton.json",
+    "atlasPath": "resources/anim/aDou/skeleton.atlas",
+    "texturePath": "resources/anim/aDou/skeleton.png",
+    "animations": [
+      "attack",
+      "dakai",
+      "dou",
+      "hejiu",
+      "pao",
+      "tu",
+      "zhan",
+      "zhan2"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "boss0": {
+    "path": "resources/anim/boss0/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/boss0/skeleton.json",
+    "atlasPath": "resources/anim/boss0/skeleton.atlas",
+    "texturePath": "resources/anim/boss0/skeleton.png",
+    "animations": [
+      "attackbao",
+      "attackjiao",
+      "attackliang",
+      "gobao",
+      "gojiao",
+      "goliang"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "boss1": {
+    "path": "resources/anim/boss1/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/boss1/skeleton.json",
+    "atlasPath": "resources/anim/boss1/skeleton.atlas",
+    "texturePath": "resources/anim/boss1/skeleton.png",
+    "animations": [
+      "attackdiao",
+      "attackxiang",
+      "attackzhen",
+      "godiao",
+      "goxiang",
+      "gozhen"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "boss2": {
+    "path": "resources/anim/boss2/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/boss2/skeleton.json",
+    "atlasPath": "resources/anim/boss2/skeleton.atlas",
+    "texturePath": "resources/anim/boss2/skeleton.png",
+    "animations": [
+      "attackcao",
+      "attackdian",
+      "attackdun",
+      "gocao",
+      "godian",
+      "godian2",
+      "goxia"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "dancer": {
+    "path": "resources/anim/dancer/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/dancer/skeleton.json",
+    "atlasPath": "resources/anim/dancer/skeleton.atlas",
+    "texturePath": "resources/anim/dancer/skeleton.png",
+    "animations": [
+      "1",
+      "wu"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "dongZhuo": {
+    "path": "resources/anim/dongZhuo/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/dongZhuo/skeleton.json",
+    "atlasPath": "resources/anim/dongZhuo/skeleton.atlas",
+    "texturePath": "resources/anim/dongZhuo/skeleton.png",
+    "animations": [
+      "attack2dz",
+      "attackdz",
+      "godz"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "flag": {
+    "path": "resources/anim/flag/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/flag/skeleton.json",
+    "atlasPath": "resources/anim/flag/skeleton.atlas",
+    "texturePath": "resources/anim/flag/skeleton.png",
+    "animations": [
+      "zhang",
+      "zhang2",
+      "zhang3",
+      "zhao",
+      "zhao2",
+      "zhao3"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "grass": {
+    "path": "resources/anim/grass/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/grass/skeleton.json",
+    "atlasPath": "resources/anim/grass/skeleton.atlas",
+    "texturePath": "resources/anim/grass/skeleton.png",
+    "animations": [
+      "boss0",
+      "boss1",
+      "boss2",
+      "boss3",
+      "boss4",
+      "idle0",
+      "idle1",
+      "idle2",
+      "idle3",
+      "idle4",
+      "mob0",
+      "mob1",
+      "mob2",
+      "mob3",
+      "mob4"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "huaXiong": {
+    "path": "resources/anim/huaXiong/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/huaXiong/skeleton.json",
+    "atlasPath": "resources/anim/huaXiong/skeleton.atlas",
+    "texturePath": "resources/anim/huaXiong/skeleton.png",
+    "animations": [
+      "attackhx",
+      "gohx"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "lvBu": {
+    "path": "resources/anim/lvBu/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/lvBu/skeleton.json",
+    "atlasPath": "resources/anim/lvBu/skeleton.atlas",
+    "texturePath": "resources/anim/lvBu/skeleton.png",
+    "animations": [
+      "attacklvbu",
+      "golvbu"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "maChao": {
+    "path": "resources/anim/maChao/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/maChao/skeleton.json",
+    "atlasPath": "resources/anim/maChao/skeleton.atlas",
+    "texturePath": "resources/anim/maChao/skeleton.png",
+    "animations": [
+      "attack1",
+      "attack2",
+      "zhan1",
+      "zhan2"
+    ],
+    "skins": [
+      "default",
+      "1",
+      "2",
+      "3"
+    ],
+    "available": true
+  },
+  "mihuan": {
+    "path": "resources/anim/mihuan/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/mihuan/skeleton.json",
+    "atlasPath": "resources/anim/mihuan/skeleton.atlas",
+    "texturePath": "resources/anim/mihuan/skeleton.png",
+    "animations": [
+      "ci",
+      "zhan"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "stamina": {
+    "path": "resources/anim/stamina/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/stamina/skeleton.json",
+    "atlasPath": "resources/anim/stamina/skeleton.atlas",
+    "texturePath": "resources/anim/stamina/skeleton.png",
+    "animations": [
+      "1",
+      "2"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "thief": {
+    "path": "resources/anim/thief/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/thief/skeleton.json",
+    "atlasPath": "resources/anim/thief/skeleton.atlas",
+    "texturePath": "resources/anim/thief/skeleton.png",
+    "animations": [
+      "animation",
+      "animation2",
+      "animation3",
+      "die"
+    ],
+    "skins": [
+      "default"
+    ],
+    "available": true
+  },
+  "zhangFei": {
+    "path": "resources/anim/zhangFei/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/zhangFei/skeleton.json",
+    "atlasPath": "resources/anim/zhangFei/skeleton.atlas",
+    "texturePath": "resources/anim/zhangFei/skeleton.png",
+    "animations": [
+      "attack1",
+      "attack2",
+      "zhan1",
+      "zhan2"
+    ],
+    "skins": [
+      "default",
+      "1",
+      "2",
+      "3"
+    ],
+    "available": true
+  },
+  "zhaoYun": {
+    "path": "resources/anim/zhaoYun/skeleton.json",
+    "sourcePath": "origin_project/resources/anim/zhaoYun/skeleton.json",
+    "atlasPath": "resources/anim/zhaoYun/skeleton.atlas",
+    "texturePath": "resources/anim/zhaoYun/skeleton.png",
+    "animations": [
+      "attack1",
+      "attack2",
+      "attack4",
+      "shouye",
+      "zhan1",
+      "zhan2"
+    ],
+    "skins": [
+      "default",
+      "1",
+      "2",
+      "3"
+    ],
+    "available": true
+  }
+});
+module.exports={SPINE_CATALOG};

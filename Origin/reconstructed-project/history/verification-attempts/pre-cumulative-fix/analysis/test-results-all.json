@@ -1,0 +1,587 @@
+{
+  "schemaVersion": 2,
+  "name": "CUMULATIVE-ROUNDS-01-05",
+  "status": "FAIL",
+  "startedAt": "2026-07-24T08:42:00.097Z",
+  "finishedAt": "2026-07-24T08:42:13.010Z",
+  "durationMs": 12913,
+  "runtime": {
+    "node": "v22.16.0",
+    "npm": "10.9.2",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "packageChecks": {
+    "packageLockPresent": true,
+    "npmrcPresent": true,
+    "scripts": {
+      "test:decode": true,
+      "verify:round02": true,
+      "verify:round03": true,
+      "verify:round04": true,
+      "verify:round05": true,
+      "dev:mob0-simulation": true,
+      "dev:friendly-unit-simulation": true,
+      "manifest:cumulative": true,
+      "verify:all": true
+    }
+  },
+  "historyChecks": {
+    "round01": {
+      "requiredFileCount": 12,
+      "missing": [],
+      "complete": true
+    },
+    "round02": {
+      "requiredFileCount": 12,
+      "missing": [],
+      "complete": true
+    },
+    "round03": {
+      "requiredFileCount": 14,
+      "missing": [],
+      "complete": true
+    },
+    "round04": {
+      "requiredFileCount": 12,
+      "missing": [],
+      "complete": true
+    },
+    "round05": {
+      "requiredFileCount": 12,
+      "missing": [],
+      "complete": true
+    }
+  },
+  "previousRoundManifest": {
+    "manifest": "analysis/deliverable-manifest-round-04.json",
+    "expectedHistoricalFileCount": 208,
+    "presentHistoricalFileCount": 208,
+    "missing": [],
+    "complete": true,
+    "note": "Round 04 manifest is cumulative for rounds 01-04; files may be incrementally modified in Round 05 but must remain present."
+  },
+  "immutableHashes": {
+    "original/bundle.js": {
+      "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "unchanged": true
+    },
+    "work/bundle.strings-decoded.js": {
+      "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "unchanged": true
+    },
+    "original/index.js": {
+      "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "unchanged": true
+    },
+    "src/network/HttpClient.js": {
+      "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+      "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+      "unchanged": true
+    },
+    "tools/vendor/typescript-5.8.3.tgz": {
+      "expected": "4b867378e82e75791492505f2ed1b986a6c04b2196f78179d01670862444550a",
+      "actual": "4b867378e82e75791492505f2ed1b986a6c04b2196f78179d01670862444550a",
+      "unchanged": true
+    }
+  },
+  "steps": [
+    {
+      "name": "round01-recorded-string-decoding",
+      "command": "npm run test:decode",
+      "status": 0,
+      "signal": null,
+      "startedAt": "2026-07-24T08:42:00.116Z",
+      "finishedAt": "2026-07-24T08:42:06.199Z",
+      "stdoutTail": "\n> zhaoyun-adou-reconstruction@0.1.0 test:decode\n> node tests/behavior/decode-strings.test.js\n\n{\n  \"status\": \"PASS\",\n  \"tests\": {\n    \"originalHashUnchanged\": true,\n    \"identityFormattedStage\": true,\n    \"protectedPrefixByteIdentical\": true,\n    \"logicalLineCountPreserved\": true,\n    \"outputSyntaxValid\": true,\n    \"replacementMapCountMatches\": true,\n    \"unresolvedCountMatches\": true,\n    \"noPostRuntimeStringTableMutation\": true,\n    \"deterministicReproduction\": true\n  },\n  \"inputSha256\": \"19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595\",\n  \"outputSha256\": \"f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b\",\n  \"replacements\": 81687,\n  \"unresolved\": 3006\n}\n",
+      "stderrTail": ""
+    },
+    {
+      "name": "round02-net01",
+      "command": "npm run verify:round02",
+      "status": 0,
+      "signal": null,
+      "startedAt": "2026-07-24T08:42:06.199Z",
+      "finishedAt": "2026-07-24T08:42:07.343Z",
+      "stdoutTail": "  ---\n  duration_ms: 0.524108\n  type: 'test'\n  ...\n# Subtest: login 成功时应用响应并保持 requestPayload 原样\nok 15 - login 成功时应用响应并保持 requestPayload 原样\n  ---\n  duration_ms: 0.507914\n  type: 'test'\n  ...\n# Subtest: login 网络失败返回 null；空 code 同步触发 fail 且不创建请求\nok 16 - login 网络失败返回 null；空 code 同步触发 fail 且不创建请求\n  ---\n  duration_ms: 0.994676\n  type: 'test'\n  ...\n# Subtest: applyLoginResponse 对缺失字段使用原始默认值并保留旧 authentication\nok 17 - applyLoginResponse 对缺失字段使用原始默认值并保留旧 authentication\n  ---\n  duration_ms: 0.324922\n  type: 'test'\n  ...\n# Subtest: synchronizeCloudSaveAfterLogin 覆盖未登录、无云存档、采用云端和回传本地四条分支\nok 18 - synchronizeCloudSaveAfterLogin 覆盖未登录、无云存档、采用云端和回传本地四条分支\n  ---\n  duration_ms: 0.752517\n  type: 'test'\n  ...\n# Subtest: uploadCloudSave 保留首局/每五局节流、force 绕过计数和非法计数行为\nok 19 - uploadCloudSave 保留首局/每五局节流、force 绕过计数和非法计数行为\n  ---\n  duration_ms: 0.843923\n  type: 'test'\n  ...\n# Subtest: configureHttpClientDependencies 拒绝未知或非函数绑定\nok 20 - configureHttpClientDependencies 拒绝未知或非函数绑定\n  ---\n  duration_ms: 0.3847\n  type: 'test'\n  ...\n1..20\n# tests 32\n# suites 0\n# pass 32\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 65.900867\n",
+      "stderrTail": ""
+    },
+    {
+      "name": "round03-boot-to-battle",
+      "command": "npm run verify:round03",
+      "status": 0,
+      "signal": null,
+      "startedAt": "2026-07-24T08:42:07.344Z",
+      "finishedAt": "2026-07-24T08:42:08.610Z",
+      "stdoutTail": "  duration_ms: 24.189249\n  type: 'test'\n  ...\n# Subtest: MainScene preserves the 5000ms debounce and does not consume stamina twice\nok 10 - MainScene preserves the 5000ms debounce and does not consume stamina twice\n  ---\n  duration_ms: 3.257875\n  type: 'test'\n  ...\n# Subtest: MainScene fails explicitly when stamina is below the confirmed cost\nok 11 - MainScene fails explicitly when stamina is below the confirmed cost\n  ---\n  duration_ms: 4.396479\n  type: 'test'\n  ...\n# Subtest: MatchScene timing path pauses fixed update, opens real BattleScene, then resumes\nok 12 - MatchScene timing path pauses fixed update, opens real BattleScene, then resumes\n  ---\n  duration_ms: 24.289063\n  type: 'test'\n  ...\n# Subtest: AnimationEntityPool preserves aDou pool key, resource path, fast-mode and recovery order\nok 13 - AnimationEntityPool preserves aDou pool key, resource path, fast-mode and recovery order\n  ---\n  duration_ms: 1.038441\n  type: 'test'\n  ...\n# Subtest: FixedUpdateManager preserves 500ms clamp and 80ms substeps\nok 14 - FixedUpdateManager preserves 500ms clamp and 80ms substeps\n  ---\n  duration_ms: 1.496932\n  type: 'test'\n  ...\n# Subtest: SceneManager original openScene method remains non-Promise while observation helper resolves\nok 15 - SceneManager original openScene method remains non-Promise while observation helper resolves\n  ---\n  duration_ms: 0.667821\n  type: 'test'\n  ...\n1..15\n# tests 15\n# suites 0\n# pass 15\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 179.671879\nRound 03 verification PASS (15 tests × 2 runs).\n",
+      "stderrTail": ""
+    },
+    {
+      "name": "round04-enemy-runtime",
+      "command": "npm run verify:round04",
+      "status": 0,
+      "signal": null,
+      "startedAt": "2026-07-24T08:42:08.610Z",
+      "finishedAt": "2026-07-24T08:42:10.480Z",
+      "stdoutTail": "  duration_ms: 0.628502\n  type: 'test'\n  ...\n# Subtest: login 成功时应用响应并保持 requestPayload 原样\nok 15 - login 成功时应用响应并保持 requestPayload 原样\n  ---\n  duration_ms: 0.523708\n  type: 'test'\n  ...\n# Subtest: login 网络失败返回 null；空 code 同步触发 fail 且不创建请求\nok 16 - login 网络失败返回 null；空 code 同步触发 fail 且不创建请求\n  ---\n  duration_ms: 0.932514\n  type: 'test'\n  ...\n# Subtest: applyLoginResponse 对缺失字段使用原始默认值并保留旧 authentication\nok 17 - applyLoginResponse 对缺失字段使用原始默认值并保留旧 authentication\n  ---\n  duration_ms: 0.226446\n  type: 'test'\n  ...\n# Subtest: synchronizeCloudSaveAfterLogin 覆盖未登录、无云存档、采用云端和回传本地四条分支\nok 18 - synchronizeCloudSaveAfterLogin 覆盖未登录、无云存档、采用云端和回传本地四条分支\n  ---\n  duration_ms: 0.492391\n  type: 'test'\n  ...\n# Subtest: uploadCloudSave 保留首局/每五局节流、force 绕过计数和非法计数行为\nok 19 - uploadCloudSave 保留首局/每五局节流、force 绕过计数和非法计数行为\n  ---\n  duration_ms: 0.499431\n  type: 'test'\n  ...\n# Subtest: configureHttpClientDependencies 拒绝未知或非函数绑定\nok 20 - configureHttpClientDependencies 拒绝未知或非函数绑定\n  ---\n  duration_ms: 0.240077\n  type: 'test'\n  ...\n1..20\n# tests 32\n# suites 0\n# pass 32\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 62.775989\nRound 04 verification PASS (24 tests × 2, Round 03 15, NET-01 32).\n",
+      "stderrTail": ""
+    },
+    {
+      "name": "round05-friendly-unit-combat",
+      "command": "npm run verify:round05",
+      "status": 0,
+      "signal": null,
+      "startedAt": "2026-07-24T08:42:10.480Z",
+      "finishedAt": "2026-07-24T08:42:12.774Z",
+      "stdoutTail": "  duration_ms: 0.559079\n  type: 'test'\n  ...\n# Subtest: login 成功时应用响应并保持 requestPayload 原样\nok 15 - login 成功时应用响应并保持 requestPayload 原样\n  ---\n  duration_ms: 0.515936\n  type: 'test'\n  ...\n# Subtest: login 网络失败返回 null；空 code 同步触发 fail 且不创建请求\nok 16 - login 网络失败返回 null；空 code 同步触发 fail 且不创建请求\n  ---\n  duration_ms: 0.335829\n  type: 'test'\n  ...\n# Subtest: applyLoginResponse 对缺失字段使用原始默认值并保留旧 authentication\nok 17 - applyLoginResponse 对缺失字段使用原始默认值并保留旧 authentication\n  ---\n  duration_ms: 0.853206\n  type: 'test'\n  ...\n# Subtest: synchronizeCloudSaveAfterLogin 覆盖未登录、无云存档、采用云端和回传本地四条分支\nok 18 - synchronizeCloudSaveAfterLogin 覆盖未登录、无云存档、采用云端和回传本地四条分支\n  ---\n  duration_ms: 0.506932\n  type: 'test'\n  ...\n# Subtest: uploadCloudSave 保留首局/每五局节流、force 绕过计数和非法计数行为\nok 19 - uploadCloudSave 保留首局/每五局节流、force 绕过计数和非法计数行为\n  ---\n  duration_ms: 0.595824\n  type: 'test'\n  ...\n# Subtest: configureHttpClientDependencies 拒绝未知或非函数绑定\nok 20 - configureHttpClientDependencies 拒绝未知或非函数绑定\n  ---\n  duration_ms: 0.248839\n  type: 'test'\n  ...\n1..20\n# tests 32\n# suites 0\n# pass 32\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 63.006266\nRound 05 verification PASS (24 tests × 2; Round03 15; Round04 24; NET-01 32).\n",
+      "stderrTail": ""
+    },
+    {
+      "name": "development-mob0-simulation",
+      "command": "npm run dev:mob0-simulation",
+      "status": 0,
+      "signal": null,
+      "startedAt": "2026-07-24T08:42:12.774Z",
+      "finishedAt": "2026-07-24T08:42:12.887Z",
+      "stdoutTail": "    {\n      \"elapsedMs\": 26080,\n      \"enemyId\": 1,\n      \"playerLane\": true,\n      \"pathIndex\": 16,\n      \"x\": 560,\n      \"y\": 640\n    },\n    {\n      \"elapsedMs\": 27680,\n      \"enemyId\": 2,\n      \"playerLane\": false,\n      \"pathIndex\": 16,\n      \"x\": 0,\n      \"y\": 80\n    }\n  ],\n  \"targets\": {\n    \"playerHealth\": 2,\n    \"opponentHealth\": 2,\n    \"playerDamageLog\": [\n      {\n        \"amount\": 1,\n        \"before\": 3,\n        \"after\": 2,\n        \"sourceEnemyId\": 1\n      }\n    ],\n    \"opponentDamageLog\": [\n      {\n        \"amount\": 1,\n        \"before\": 3,\n        \"after\": 2,\n        \"sourceEnemyId\": 2\n      }\n    ]\n  },\n  \"pools\": {\n    \"Mob0Class\": 2,\n    \"mobVisual\": 2\n  },\n  \"serviceCalls\": {\n    \"audio\": 2,\n    \"effects\": 2,\n    \"rewards\": 0\n  },\n  \"networkRequests\": 0,\n  \"nativePlatformCalls\": 0\n}\n",
+      "stderrTail": ""
+    },
+    {
+      "name": "development-friendly-unit-simulation",
+      "command": "npm run dev:friendly-unit-simulation",
+      "status": 0,
+      "signal": null,
+      "startedAt": "2026-07-24T08:42:12.887Z",
+      "finishedAt": "2026-07-24T08:42:13.010Z",
+      "stdoutTail": "      \"secondHealth\": 6,\n      \"enemies\": 1,\n      \"attacksStarted\": 2,\n      \"attacksSettled\": 2\n    },\n    {\n      \"elapsedMs\": 2800,\n      \"unitState\": \"UnitAttack\",\n      \"lastAttackTime\": 2480,\n      \"firstHealth\": 0,\n      \"secondHealth\": 6,\n      \"enemies\": 1,\n      \"attacksStarted\": 3,\n      \"attacksSettled\": 2\n    },\n    {\n      \"elapsedMs\": 3200,\n      \"unitState\": \"UnitAttack\",\n      \"lastAttackTime\": 2480,\n      \"firstHealth\": 0,\n      \"secondHealth\": 3,\n      \"enemies\": 1,\n      \"attacksStarted\": 3,\n      \"attacksSettled\": 3\n    },\n    {\n      \"elapsedMs\": 3600,\n      \"unitState\": \"UnitAttack\",\n      \"lastAttackTime\": 3280,\n      \"firstHealth\": 0,\n      \"secondHealth\": 3,\n      \"enemies\": 1,\n      \"attacksStarted\": 4,\n      \"attacksSettled\": 3\n    },\n    {\n      \"elapsedMs\": 4000,\n      \"unitState\": \"UnitAttack\",\n      \"lastAttackTime\": 3280,\n      \"firstHealth\": 0,\n      \"secondHealth\": 0,\n      \"enemies\": 0,\n      \"attacksStarted\": 4,\n      \"attacksSettled\": 4\n    }\n  ],\n  \"networkRequests\": 0,\n  \"nativePlatformCalls\": 0\n}\n",
+      "stderrTail": ""
+    }
+  ],
+  "roundReports": {
+    "round01": {
+      "status": "PASS",
+      "tests": {
+        "originalHashUnchanged": true,
+        "identityFormattedStage": true,
+        "protectedPrefixByteIdentical": true,
+        "logicalLineCountPreserved": true,
+        "outputSyntaxValid": true,
+        "replacementMapCountMatches": true,
+        "unresolvedCountMatches": true,
+        "noPostRuntimeStringTableMutation": true,
+        "deterministicReproduction": true
+      },
+      "inputSha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "outputSha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "replacements": 81687,
+      "unresolved": 3006
+    },
+    "round02": {
+      "round": "02",
+      "moduleId": "NET-01",
+      "status": "PASS",
+      "commands": [
+        "node tools/check-net01.js",
+        "node --test tests/unit/HttpClient.test.js tests/behavior/NET-01.behavior.test.js",
+        "npm run verify:round02 (executed twice)"
+      ],
+      "tests": {
+        "total": 32,
+        "passed": 32,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "staticChecks": {
+        "javascriptSyntax": "PASS",
+        "commonJsImportExport": "PASS",
+        "undefinedModuleLoad": "PASS",
+        "duplicateMethods": "PASS",
+        "circularDependencies": "PASS (none in reconstructed source graph)",
+        "urlAndApiPaths": "PASS",
+        "originalMethodCoverage": "PASS (22/22)",
+        "symbolMapCompleteness": "PASS",
+        "originalBundleHash": "PASS",
+        "decodedBundleHash": "PASS",
+        "deterministicRepeat": "PASS"
+      },
+      "networkAccess": false,
+      "originalHashes": {
+        "original/bundle.js": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+        "work/bundle.strings-decoded.js": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+      },
+      "artifactHashes": {
+        "src/network/HttpClient.js": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+        "src/core/SingletonBase.js": "5de35d6effdaf2790f69769e4d9a0eb7ebe7a5a362132dab2f8b92a2c4b6bb82",
+        "analysis/static-check-NET-01.json": "afb0c35a73c67b78e3ec7884b9f2a11880a82983529f73e0f62ce70d6b829389",
+        "analysis/method-coverage-NET-01.json": "5416fa91a71e7dfe49c6070b86acb97aeca986107c158931f3d4ce1724fed31c",
+        "tests/unit/HttpClient.test.js": "61a4a7fa858881c881f4c25c38e08dd8163117d1df86ba6e645b0b5e304878a7",
+        "tests/behavior/NET-01.behavior.test.js": "1056a7f4dce825e81746485f31b27e3d1c6bd90b5f98242bdf29bf4ec9a691c3",
+        "analysis/deliverable-manifest-round-02.json": "2f08e0a5284054809e625214c05ba6ab626aa9b04596f58f202970e61ffbebbf"
+      },
+      "behaviorDifferences": {
+        "confirmedNonEquivalent": 0,
+        "possiblyEquivalent": 2,
+        "unverifiable": 1,
+        "detailsFile": "analysis/behavior-diff.md"
+      }
+    },
+    "round03": {
+      "round": 3,
+      "name": "BOOT-TO-BATTLE",
+      "status": "PASS",
+      "firstRun": {
+        "staticStatus": 0,
+        "testStatus": 0,
+        "counts": {
+          "tests": 15,
+          "pass": 15,
+          "fail": 0,
+          "skipped": 0
+        }
+      },
+      "secondRun": {
+        "staticStatus": 0,
+        "testStatus": 0,
+        "counts": {
+          "tests": 15,
+          "pass": 15,
+          "fail": 0,
+          "skipped": 0
+        }
+      },
+      "determinism": {
+        "staticReportHashFirst": "253418d6a7a4327d06d9dd9d15eaf84eee8fe284b428c0fef35a5755a45a4c21",
+        "staticReportHashSecond": "253418d6a7a4327d06d9dd9d15eaf84eee8fe284b428c0fef35a5755a45a4c21",
+        "staticReportIdentical": true,
+        "sourceTreeHashBefore": "f548ebaaac1bed9d1c52ad33171889d57d1fb332d6aefc6fed999b9e8c5a942c",
+        "sourceTreeHashAfter": "f548ebaaac1bed9d1c52ad33171889d57d1fb332d6aefc6fed999b9e8c5a942c",
+        "testsDidNotModifySource": true
+      },
+      "immutableHashes": {
+        "originalBundle": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+        "decodedBundle": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+        "originalIndex": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+      },
+      "realNetworkRequests": 0,
+      "nativePlatformCalls": 0,
+      "testFiles": [
+        "tests/unit/BootToBattleCore.test.js",
+        "tests/unit/AnimationEntityPool.test.js",
+        "tests/behavior/BootToMainScene.test.js",
+        "tests/behavior/MainToMatchScene.test.js",
+        "tests/behavior/MatchToBattleScene.test.js",
+        "tests/behavior/DirectBattleDevelopmentMode.test.js",
+        "tests/behavior/BattleFirstFrame.test.js",
+        "tests/behavior/BattleCleanup.test.js"
+      ]
+    },
+    "round04": {
+      "round": 4,
+      "name": "ENEMY-RUNTIME-01",
+      "status": "PASS",
+      "round04": {
+        "firstRun": {
+          "commandStatus": 0,
+          "counts": {
+            "tests": 24,
+            "suites": 0,
+            "pass": 24,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        "secondRun": {
+          "commandStatus": 0,
+          "counts": {
+            "tests": 24,
+            "suites": 0,
+            "pass": 24,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        "testFiles": [
+          "tests/unit/MapPath.test.js",
+          "tests/unit/EnemyMovement.test.js",
+          "tests/unit/EnemySpatialIndex.test.js",
+          "tests/unit/EnemyTargetSelection.test.js",
+          "tests/unit/EnemyAttack.test.js",
+          "tests/unit/EnemyDamage.test.js",
+          "tests/unit/EnemyDeath.test.js",
+          "tests/unit/EnemyPoolReset.test.js",
+          "tests/behavior/Mob0PathToTarget.test.js",
+          "tests/behavior/Mob0AttackBattleTarget.test.js",
+          "tests/behavior/Mob0KilledBeforeArrival.test.js",
+          "tests/behavior/Mob0PairBattle.test.js",
+          "tests/behavior/BattleTargetDestroyed.test.js",
+          "tests/behavior/EnemyCleanupAfterBattle.test.js",
+          "tests/behavior/ReusedMob0HasCleanState.test.js"
+        ]
+      },
+      "staticChecks": {
+        "firstRunStatus": 0,
+        "secondRunStatus": 0,
+        "checksPassed": 78,
+        "checksFailed": 0,
+        "sourceFilesChecked": 133,
+        "reportHashFirst": "2283eadbb0bb58d48ecb28f2c37d6449888b7f71d4ad0e8ea820fc3e84bf93e5",
+        "reportHashSecond": "2283eadbb0bb58d48ecb28f2c37d6449888b7f71d4ad0e8ea820fc3e84bf93e5",
+        "deterministic": true
+      },
+      "mob0Simulation": {
+        "firstRun": {
+          "parseError": null,
+          "mode": "DEVELOPMENT_ENEMY_RUNTIME_SIMULATION",
+          "elapsedMs": 29360,
+          "completed": true,
+          "pathTransitionCount": 32,
+          "playerHealth": 2,
+          "opponentHealth": 2,
+          "mob0ClassPool": 2,
+          "mobVisualPool": 2,
+          "networkRequests": 0,
+          "nativePlatformCalls": 0
+        },
+        "secondRun": {
+          "parseError": null,
+          "mode": "DEVELOPMENT_ENEMY_RUNTIME_SIMULATION",
+          "elapsedMs": 29360,
+          "completed": true,
+          "pathTransitionCount": 32,
+          "playerHealth": 2,
+          "opponentHealth": 2,
+          "mob0ClassPool": 2,
+          "mobVisualPool": 2,
+          "networkRequests": 0,
+          "nativePlatformCalls": 0
+        },
+        "deterministic": true
+      },
+      "regressions": {
+        "round03": {
+          "commandStatus": 0,
+          "counts": {
+            "tests": 15,
+            "suites": 0,
+            "pass": 15,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "testFiles": [
+            "tests/unit/BootToBattleCore.test.js",
+            "tests/unit/AnimationEntityPool.test.js",
+            "tests/behavior/BootToMainScene.test.js",
+            "tests/behavior/MainToMatchScene.test.js",
+            "tests/behavior/MatchToBattleScene.test.js",
+            "tests/behavior/DirectBattleDevelopmentMode.test.js",
+            "tests/behavior/BattleFirstFrame.test.js",
+            "tests/behavior/BattleCleanup.test.js"
+          ]
+        },
+        "net01": {
+          "commandStatus": 0,
+          "counts": {
+            "tests": 32,
+            "suites": 0,
+            "pass": 32,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "testFiles": [
+            "tests/unit/HttpClient.test.js",
+            "tests/behavior/NET-01.behavior.test.js"
+          ]
+        }
+      },
+      "determinism": {
+        "sourceTreeHashBefore": "19e2941876e23a82b58fdc668efb30f17e21743d5db19b7543f97d2b16da67ac",
+        "sourceTreeHashAfter": "19e2941876e23a82b58fdc668efb30f17e21743d5db19b7543f97d2b16da67ac",
+        "sourceTestsToolsUnchanged": true
+      },
+      "immutableHashesBefore": {
+        "originalBundle": {
+          "file": "original/bundle.js",
+          "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+          "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+          "unchanged": true
+        },
+        "decodedBundle": {
+          "file": "work/bundle.strings-decoded.js",
+          "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+          "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+          "unchanged": true
+        },
+        "originalIndex": {
+          "file": "original/index.js",
+          "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+          "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+          "unchanged": true
+        },
+        "httpClient": {
+          "file": "src/network/HttpClient.js",
+          "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+          "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+          "unchanged": true
+        }
+      },
+      "immutableHashesAfter": {
+        "originalBundle": {
+          "file": "original/bundle.js",
+          "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+          "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+          "unchanged": true
+        },
+        "decodedBundle": {
+          "file": "work/bundle.strings-decoded.js",
+          "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+          "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+          "unchanged": true
+        },
+        "originalIndex": {
+          "file": "original/index.js",
+          "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+          "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+          "unchanged": true
+        },
+        "httpClient": {
+          "file": "src/network/HttpClient.js",
+          "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+          "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+          "unchanged": true
+        }
+      },
+      "realNetworkRequests": 0,
+      "nativePlatformCalls": 0
+    },
+    "round05": {
+      "round": 5,
+      "name": "FRIENDLY-UNIT-COMBAT-01",
+      "status": "PASS",
+      "tests": {
+        "round05First": {
+          "tests": 24,
+          "pass": 24,
+          "fail": 0,
+          "skipped": 0
+        },
+        "round05Second": {
+          "tests": 24,
+          "pass": 24,
+          "fail": 0,
+          "skipped": 0
+        },
+        "round03": {
+          "tests": 15,
+          "pass": 15,
+          "fail": 0,
+          "skipped": 0
+        },
+        "round04": {
+          "tests": 24,
+          "pass": 24,
+          "fail": 0,
+          "skipped": 0
+        },
+        "net01": {
+          "tests": 32,
+          "pass": 32,
+          "fail": 0,
+          "skipped": 0
+        }
+      },
+      "staticChecks": {
+        "firstStatus": 0,
+        "secondStatus": 0,
+        "deterministic": true,
+        "hash": "ecfd99d686d25566fb75743a90e59a6eb6c14361a026be1c90c0e2b89151b350"
+      },
+      "simulation": {
+        "first": {
+          "completed": true,
+          "elapsedMs": 4000,
+          "type": "刀",
+          "damage": 3,
+          "range": 120,
+          "interval": 0.8,
+          "attacks": 4,
+          "settled": 4,
+          "rewards": 2,
+          "logicPool": 2,
+          "visualPool": 2,
+          "networkRequests": 0,
+          "nativePlatformCalls": 0
+        },
+        "second": {
+          "completed": true,
+          "elapsedMs": 4000,
+          "type": "刀",
+          "damage": 3,
+          "range": 120,
+          "interval": 0.8,
+          "attacks": 4,
+          "settled": 4,
+          "rewards": 2,
+          "logicPool": 2,
+          "visualPool": 2,
+          "networkRequests": 0,
+          "nativePlatformCalls": 0
+        },
+        "deterministic": true
+      },
+      "immutableHashesBefore": {
+        "original/bundle.js": {
+          "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+          "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+        },
+        "work/bundle.strings-decoded.js": {
+          "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+          "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+        },
+        "original/index.js": {
+          "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+          "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+        },
+        "src/network/HttpClient.js": {
+          "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+          "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+        }
+      },
+      "immutableHashesAfter": {
+        "original/bundle.js": {
+          "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+          "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+        },
+        "work/bundle.strings-decoded.js": {
+          "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+          "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+        },
+        "original/index.js": {
+          "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+          "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+        },
+        "src/network/HttpClient.js": {
+          "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+          "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+        }
+      },
+      "realNetworkRequests": 0,
+      "nativePlatformCalls": 0
+    }
+  },
+  "failures": [
+    "TypeScript is not configured as the bundled local dependency"
+  ]
+}

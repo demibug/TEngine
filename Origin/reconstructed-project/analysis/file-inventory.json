@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "present": [
+    {
+      "path": "bundle.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "index.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "laya.adapter-weixin.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "laya.core.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "laya.spine.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "laya.trail2D.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "laya.trailCommon.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "laya.ui.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "laya.webgl_2D.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "spine-core-3.7.js",
+      "status": "CONFIRMED"
+    },
+    {
+      "path": "参考游戏分析.md",
+      "status": "CONFIRMED"
+    }
+  ],
+  "missing": [
+    {
+      "path": "bundle.js.map",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "game.js",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "game.json",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "project.config.json",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "project.private.config.json",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "scene/LoadScene.ls",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "scene/MainScene.ls",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "scene/MatchScene.ls",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "scene/BattleScene.ls",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "scene/GameOverScene.ls",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "fileconfig.json",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "resources/anim/fileconfig.json",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "resources/img/fileconfig.json",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "resources/music/fileconfig.json",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    },
+    {
+      "path": "resources/sound/fileconfig.json",
+      "status": "UNKNOWN_FILE_NOT_PROVIDED"
+    }
+  ],
+  "fileLibrarySearch": {
+    "attempted": true,
+    "completed": false,
+    "resultStatus": "UNKNOWN",
+    "notes": "The retrieval service returned an error during this round. Missing-file conclusions are based only on the current /mnt/data upload set; no File Library absence claim is made."
+  }
+}

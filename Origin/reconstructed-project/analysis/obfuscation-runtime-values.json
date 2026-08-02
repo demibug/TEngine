@@ -1,0 +1,23 @@
+{
+  "status": "CONFIRMED",
+  "evaluatedRange": "bundle.js:1-1000",
+  "stringTableCount": 49,
+  "stringEntryCount": 5987,
+  "indexTableLength": 334,
+  "capturedPrimitiveOrArrayGlobals": 449,
+  "selectedValues": {
+    "ck": "charAt",
+    "cl": "5",
+    "cm": 93,
+    "cn": "700AAC4714634B57A6CFC3E87500E78F806F8F2CE1FCB3C7543B994CFCEE904E33F0E3A66BF54FAE91A4C42C7B129590CD9F8205CCE9EB2614CEEA354922A8CC7DD39E71723DB230864A2B36EB825DF0",
+    "dY": "prototype",
+    "d5": "resources/anim",
+    "eb": "nr",
+    "ef": "up",
+    "fw": "$d",
+    "fB": "STOPPED",
+    "fM": "onFire",
+    "gF": "https://alicdn.mihuangame.com/wxGame/ZhaoYunAndADou/share_v2.json",
+    "g9": "IK"
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "moduleId": "FRIENDLY-UNIT-COMBAT-01",
+  "symbols": [
+    {
+      "originalSymbol": "qE",
+      "newSymbol": "GameObjectEventProxy",
+      "kind": "class",
+      "sourceRange": "19600-19684",
+      "confidence": "HIGH",
+      "evidence": [
+        "delegates all event operations through am()"
+      ]
+    },
+    {
+      "originalSymbol": "rb",
+      "newSymbol": "UnitDragBase",
+      "kind": "class",
+      "sourceRange": "24863-24930",
+      "confidence": "HIGH",
+      "evidence": [
+        "pointer threshold and drag hooks"
+      ]
+    },
+    {
+      "originalSymbol": "ri",
+      "newSymbol": "UnitDragBaseAlias",
+      "kind": "alias",
+      "sourceRange": "22656",
+      "confidence": "HIGH",
+      "evidence": [
+        "ri = rb"
+      ]
+    },
+    {
+      "originalSymbol": "rc",
+      "newSymbol": "UnitBase",
+      "kind": "class",
+      "sourceRange": "22694-23112",
+      "confidence": "HIGH",
+      "evidence": [
+        "unit level/placement/state/pool lifecycle"
+      ]
+    },
+    {
+      "originalSymbol": "td",
+      "newSymbol": "SoldierBase",
+      "kind": "class",
+      "sourceRange": "23114-23437",
+      "confidence": "HIGH",
+      "evidence": [
+        "base soldier damage/range/interval and animation behavior"
+      ]
+    },
+    {
+      "originalSymbol": "tb.zx[0]",
+      "newSymbol": "KnifeSoldier",
+      "kind": "class/factory registration",
+      "sourceRange": "24443-24551",
+      "confidence": "HIGH",
+      "evidence": [
+        "Q_=knife; attack/Nx; knife_attack; knifeSoliderAttack"
+      ]
+    },
+    {
+      "originalSymbol": "ok",
+      "newSymbol": "BowSoldierCandidateDeferred",
+      "kind": "class",
+      "sourceRange": "26093-26263",
+      "confidence": "HIGH",
+      "evidence": [
+        "Q_=bow and arrow resource config"
+      ],
+      "status": "DEFERRED"
+    },
+    {
+      "originalSymbol": "sc",
+      "newSymbol": "UnitClassPoolAdapter",
+      "kind": "class",
+      "sourceRange": "22656-22691",
+      "confidence": "HIGH",
+      "evidence": [
+        "Laya.Pool.createByClass/recoverByClass"
+      ]
+    },
+    {
+      "originalSymbol": "vc",
+      "newSymbol": "UnitRegistry",
+      "kind": "class",
+      "sourceRange": "29460-30476",
+      "confidence": "HIGH",
+      "evidence": [
+        "PA Map, WA factory dispatch, WP cleanup"
+      ]
+    },
+    {
+      "originalSymbol": "vU.wH",
+      "newSymbol": "BattleManager._updateUnitAttacks",
+      "kind": "method",
+      "sourceRange": "50456-50519",
+      "confidence": "HIGH",
+      "evidence": [
+        "cooldown, query, state transition, attack call"
+      ]
+    },
+    {
+      "originalSymbol": "tO",
+      "newSymbol": "KnifeHitEffectContract",
+      "kind": "class contract",
+      "sourceRange": "24840-24860",
+      "confidence": "MEDIUM",
+      "evidence": [
+        "extends r6 and applies knife hit presentation"
+      ],
+      "implementation": "KnifeAttackTimeline + effects port"
+    },
+    {
+      "originalSymbol": "tc/oF",
+      "newSymbol": "HitStrategyFactoryContract",
+      "kind": "static factory contract",
+      "sourceRange": "24936-24983",
+      "confidence": "MEDIUM",
+      "evidence": [
+        "produce/copyFrom/recover strategy data"
+      ],
+      "implementation": "knife target-id record only"
+    },
+    {
+      "originalSymbol": "r6",
+      "newSymbol": "AttackEffectBaseContract",
+      "kind": "class contract",
+      "sourceRange": "26264-26428",
+      "confidence": "MEDIUM",
+      "evidence": [
+        "Cw calls target.hit(sS,iS)"
+      ],
+      "implementation": "KnifeAttackTimeline delayed EnemyBase.hit"
+    },
+    {
+      "originalSymbol": "vA.gx",
+      "newSymbol": "KnifeAttackTimeline.start",
+      "kind": "method contract",
+      "sourceRange": "37249 onward",
+      "confidence": "MEDIUM",
+      "evidence": [
+        "effect manager creates and starts attack effect"
+      ]
+    }
+  ]
+}

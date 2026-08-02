@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "status": "CONFIRMED",
+  "originalFiles": [
+    {
+      "path": "original/bundle.js",
+      "sizeBytes": 2424018,
+      "newlineCount": 67832,
+      "logicalLineCount": 67833,
+      "endsWithNewline": false,
+      "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "sha1": "a42cedef5d97554e7e9017b7954afe93a0590ebf",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/index.js",
+      "sizeBytes": 4337,
+      "newlineCount": 67,
+      "logicalLineCount": 68,
+      "endsWithNewline": false,
+      "sha256": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "sha1": "53fd662d3b3c527d9777a812cbdb645110d8ca5d",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/libs/laya.adapter-weixin.js",
+      "sizeBytes": 33990,
+      "newlineCount": 898,
+      "logicalLineCount": 899,
+      "endsWithNewline": false,
+      "sha256": "9c12b6292a4d1a1f22b7c83622a2fd28c8fddfe8db7568835575838caa659af4",
+      "sha1": "5bfbd12b0f584d2adf04667ffac59f78abab7d0b",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/libs/laya.core.js",
+      "sizeBytes": 976221,
+      "newlineCount": 22969,
+      "logicalLineCount": 22970,
+      "endsWithNewline": false,
+      "sha256": "8c0e14bb20712035e01656179367b74326fda1c9d640b015405eb0493924ca05",
+      "sha1": "8d81fc9f0e159de9fb50d7f1db1f8abe5a64a159",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/libs/laya.spine.js",
+      "sizeBytes": 118598,
+      "newlineCount": 2764,
+      "logicalLineCount": 2765,
+      "endsWithNewline": false,
+      "sha256": "6e9c52af18e14fdf9eb4e42fd0ec6e41e9f06d0dcc0a0f773e569914a7b5997e",
+      "sha1": "dae3f8630d7b5b6c3b6416fbe987d2f39da66943",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/libs/laya.trail2D.js",
+      "sizeBytes": 6381,
+      "newlineCount": 113,
+      "logicalLineCount": 114,
+      "endsWithNewline": false,
+      "sha256": "efc9342050a083489d4497d3466fd72945d0ca8d6e96a86dd5d0772bdb8b01ac",
+      "sha1": "9434a96fb86d64d27b2f38d71c32e4b5cf335777",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/libs/laya.trailCommon.js",
+      "sizeBytes": 14011,
+      "newlineCount": 178,
+      "logicalLineCount": 179,
+      "endsWithNewline": false,
+      "sha256": "b0405cee9dae24a6697d3f1f4a251f4c505643c48cc92c1cbfcd1b8dcd257762",
+      "sha1": "db2dc49dec50d376f7445ecfaf172bb128ceeab1",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/libs/laya.ui.js",
+      "sizeBytes": 142455,
+      "newlineCount": 3372,
+      "logicalLineCount": 3373,
+      "endsWithNewline": false,
+      "sha256": "39d0458a5a18a15f1c6c3796be6740240ec42e6ef67a5c3d16a6c817330ae9a5",
+      "sha1": "81edb19656c60e14a866f0ff671dfa00d9556578",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/libs/laya.webgl_2D.js",
+      "sizeBytes": 239647,
+      "newlineCount": 5082,
+      "logicalLineCount": 5083,
+      "endsWithNewline": false,
+      "sha256": "16f51d5fe624beef62ce5c150c03d58bb8a6cabb9a6c20b4ffe92f8e61faa3f0",
+      "sha1": "650b8072d5e5ee5debe39b871589912f57e6e262",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/libs/spine-core-3.7.js",
+      "sizeBytes": 168046,
+      "newlineCount": 4234,
+      "logicalLineCount": 4235,
+      "endsWithNewline": false,
+      "sha256": "e4427fe85a5371ba04cca65c50de584d231ccba81d0e3c81bb17a5d884fd4aaa",
+      "sha1": "c43ce83258f6fd456efa1778c5fc1e1eef681815",
+      "mode": "0o444"
+    },
+    {
+      "path": "original/manifest.sha256",
+      "sizeBytes": 949,
+      "newlineCount": 11,
+      "logicalLineCount": 11,
+      "endsWithNewline": true,
+      "sha256": "bbf38fb4fef6d0f1d79f158fb29f04440af19089080b92c188a2d4b4e2762a6f",
+      "sha1": "e6ceca510aa7953c6afec118388ddcd02cc9e1d7",
+      "mode": "0o644"
+    },
+    {
+      "path": "original/reference/参考游戏分析.md",
+      "sizeBytes": 47259,
+      "newlineCount": 489,
+      "logicalLineCount": 490,
+      "endsWithNewline": false,
+      "sha256": "f4edacc722598605f18cf20c3829f7880ca73e5ed8080adf31a01bac68798057",
+      "sha1": "ddd7336a529e18d79be4039efd0e726abbc4ac7b",
+      "mode": "0o444"
+    }
+  ],
+  "bundleBaseline": {
+    "canonicalPath": "original/bundle.js",
+    "sourceUploadPath": "/mnt/data/bundle.js",
+    "sizeBytes": 2424018,
+    "newlineCount": 67832,
+    "logicalLineCount": 67833,
+    "endsWithNewline": false,
+    "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+    "sha1": "a42cedef5d97554e7e9017b7954afe93a0590ebf",
+    "readOnlyMode": "0o444",
+    "byteIdenticalToUpload": true
+  },
+  "stages": [
+    {
+      "stage": "original",
+      "path": "original/bundle.js",
+      "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "transformation": "none"
+    },
+    {
+      "stage": "formatted",
+      "path": "work/bundle.formatted.js",
+      "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "transformation": "identity-copy; formatting intentionally skipped to preserve source coordinates",
+      "byteIdenticalToPrevious": true
+    },
+    {
+      "stage": "strings-decoded",
+      "path": "work/bundle.strings-decoded.js",
+      "sha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "transformationTool": "tools/decode-strings.js",
+      "transformationToolSha256": "9bfe5cdf3a478bf0bf48235273905bcf450fa3f9ee47d1f5a5d3b40f97926c2a",
+      "inputSha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+    }
+  ],
+  "generatedDate": "2026-07-24"
+}

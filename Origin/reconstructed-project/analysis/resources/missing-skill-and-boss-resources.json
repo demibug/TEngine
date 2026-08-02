@@ -1,0 +1,47 @@
+{
+  "resolved": {
+    "bossSpine": 12,
+    "skillVfx": 6,
+    "criticalScenes": 5,
+    "allScenes": 14,
+    "prefabsAndDialogs": 53,
+    "trailPrefabs": 6,
+    "spineSets": 16
+  },
+  "missing": {
+    "audioSubpackages": {
+      "directories": [
+        "resources/music",
+        "resources/sound"
+      ],
+      "keys": [
+        "boss_sweep_skill",
+        "caoCao_skill_seal",
+        "chain_lock",
+        "diaoChan_skill_charm",
+        "dongZhuo_skill_phantom",
+        "dongZhuo_skill_phase1_suck",
+        "luBu_skill",
+        "summon_cavalry_skill",
+        "xiahouDun_skill_cloud",
+        "xiahouDun_skill_lightning",
+        "zhangJiao_skill_horn",
+        "zhenFu_skill_rain",
+        "zhenFu_skill_rain_cycle"
+      ],
+      "reason": "Declared by game.json but files are absent from origin_project"
+    },
+    "reconstructedBundleEntry": {
+      "reason": "origin_project/game.js still loads original js/bundle.js and js/index.js"
+    },
+    "unmappedSerializedUuidAssets": {
+      "examples": [
+        "res://5bf43f39-5425-4fb0-bffd-b4d58ddcac67"
+      ],
+      "reason": "Original Laya asset database UUID map was not supplied"
+    },
+    "soldierFrameAnimationRuntime": {
+      "reason": "Frame textures exist in AutoAtlas but formal FrameSkeleton runtime is not yet connected to Unit presentation"
+    }
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "module": "FRIENDLY-UNIT-COMBAT-01",
+  "requestedRanges": [
+    "22694-23112",
+    "23114-23437",
+    "24443-24834",
+    "24863-24930",
+    "26093-26506",
+    "29460-30476",
+    "50471-50519"
+  ],
+  "actualRanges": [
+    {
+      "range": "11069-11352",
+      "reason": "base soldier text/config, level multipliers and formal combat values"
+    },
+    {
+      "range": "11770-11795",
+      "reason": "GameData runtime ID allocation used by unit initialization"
+    },
+    {
+      "range": "3163-3297",
+      "reason": "opponent attack multiplier xi used by SoldierBase._p"
+    },
+    {
+      "range": "19600-19684",
+      "reason": "qE event-proxy parent class"
+    },
+    {
+      "range": "22656-22691",
+      "reason": "ri=rb alias and sc class-pool adapter"
+    },
+    {
+      "range": "22694-23112",
+      "reason": "rc complete class"
+    },
+    {
+      "range": "23114-23437",
+      "reason": "td complete class"
+    },
+    {
+      "range": "24443-24834",
+      "reason": "base soldier constructor table; selected knife class and alternate candidates"
+    },
+    {
+      "range": "24840-24860",
+      "reason": "knife effect class tO"
+    },
+    {
+      "range": "24863-24930",
+      "reason": "rb complete drag/event base"
+    },
+    {
+      "range": "24936-24983",
+      "reason": "hit-strategy factory branch used by knife attack descriptor"
+    },
+    {
+      "range": "26093-26263",
+      "reason": "ok bow candidate dependency evaluation"
+    },
+    {
+      "range": "26264-26428",
+      "reason": "r6 damage/effect base called by tO"
+    },
+    {
+      "range": "29460-30476",
+      "reason": "vc complete registry boundary"
+    },
+    {
+      "range": "37209-37465",
+      "reason": "vA attack-effect manager contract used by knife"
+    },
+    {
+      "range": "50456-50519",
+      "reason": "BattleManager soldier/general attack loop including method boundary"
+    }
+  ],
+  "includedModules": [
+    {
+      "module": "UNIT-CONFIG-CORE",
+      "reasonIncluded": "formal values required before creation",
+      "recoveredScope": "four base entries and level multipliers",
+      "deferredScope": "full general/merge/buff configuration"
+    },
+    {
+      "module": "UNIT-POOL-CORE",
+      "reasonIncluded": "formal factory uses class and visual pools",
+      "recoveredScope": "knife logic class and soldier visual key",
+      "deferredScope": "other unit visual assets"
+    },
+    {
+      "module": "KNIFE-ATTACK-TIMELINE",
+      "reasonIncluded": "source damage is not immediate; tO/r6/vA delay contract is required",
+      "recoveredScope": "500/playback-rate delayed hit, cancellation and effect ports",
+      "deferredScope": "full Tween/Spine visuals and generic effect manager"
+    }
+  ],
+  "deferredDependencies": [
+    "Bow/projectile closure",
+    "Pike/cavalry attack closures",
+    "BuffManager",
+    "general/hero classes",
+    "formal drag UI and grid containers",
+    "Spine/prefab resources"
+  ]
+}

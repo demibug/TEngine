@@ -1,0 +1,191 @@
+{
+  "round": "ROUND-07K",
+  "symbols": [
+    {
+      "original": "uf",
+      "renamed": "BuffTargetResolver.resolve",
+      "sourceRange": "1666-1674",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "um",
+      "renamed": "createBuffData",
+      "sourceRange": "3115-3136",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "up.th",
+      "renamed": "BuffTimeMode.PERMANENT",
+      "value": -1,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "up.round",
+      "renamed": "BuffTimeMode.ROUND",
+      "value": -2,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "rE",
+      "renamed": "BuffHandlerBase",
+      "sourceRange": "20855-21075",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uM",
+      "renamed": "NumberBuffHandler",
+      "sourceRange": "21076-21193",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uN",
+      "renamed": "StateBuffHandler",
+      "sourceRange": "21194-21347",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uS",
+      "renamed": "CustomBuffHandler",
+      "sourceRange": "21580-21682",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "oJ",
+      "renamed": "BuffHandlerFactory",
+      "sourceRange": "22432-22499",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "nB",
+      "renamed": "BuffConflictResolver",
+      "sourceRange": "22499-22555",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "vd",
+      "renamed": "BuffManager",
+      "sourceRange": "30476-30694",
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uM",
+      "renamed": "NumberBuffHandler",
+      "buffType": 0,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uM",
+      "renamed": "NumberBuffHandler",
+      "buffType": 1,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uM",
+      "renamed": "NumberBuffHandler",
+      "buffType": 2,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uM",
+      "renamed": "NumberBuffHandler",
+      "buffType": 3,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uM",
+      "renamed": "NumberBuffHandler",
+      "buffType": 4,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uM",
+      "renamed": "NumberBuffHandler",
+      "buffType": 5,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uM",
+      "renamed": "NumberBuffHandler",
+      "buffType": 6,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uS",
+      "renamed": "CustomBuffHandler",
+      "buffType": 7,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uO",
+      "renamed": "StunBuffHandler",
+      "buffType": 8,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uU",
+      "renamed": "FallBuffHandler",
+      "buffType": 9,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uW",
+      "renamed": "PierceBuffHandler",
+      "buffType": 10,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "u4",
+      "renamed": "ElectrocuteBuffHandler",
+      "buffType": 11,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uQ",
+      "renamed": "KnockbackBuffHandler",
+      "buffType": 12,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uP",
+      "renamed": "ChaosBuffHandler",
+      "buffType": 13,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uR",
+      "renamed": "BurnStaticBuffHandler",
+      "buffType": 14,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "u0",
+      "renamed": "LimitBuffHandler",
+      "buffType": 15,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uT",
+      "renamed": "LockBuffHandler",
+      "buffType": 16,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uY",
+      "renamed": "KnockdownBuffHandler",
+      "buffType": 17,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "uZ",
+      "renamed": "SuppressionBuffHandler",
+      "buffType": 18,
+      "confidence": "HIGH"
+    },
+    {
+      "original": "u1",
+      "renamed": "CharmBuffHandler",
+      "buffType": 19,
+      "confidence": "HIGH"
+    }
+  ]
+}

@@ -1,0 +1,254 @@
+{
+  "version": "0.8.1",
+  "round": "ROUND-08A-UNITY-CORE-COMBAT-DOCUMENTATION",
+  "documentCount": 49,
+  "documents": [
+    {
+      "path": "unity-handoff/ADDING_A_BOSS.md",
+      "size": 420,
+      "sha256": "0015f74fa8a5391504c9186c98f928fe98796ed9c8c2cfa166caf9f08f306759"
+    },
+    {
+      "path": "unity-handoff/ADDING_A_BUFF.md",
+      "size": 419,
+      "sha256": "3d2ad2f2e157e1226dfd821d3dd3e3cba8c1b79114c30011bc2c5695701b2172"
+    },
+    {
+      "path": "unity-handoff/ADDING_A_ENEMY.md",
+      "size": 422,
+      "sha256": "388359fd5ead7010e29a19f8be744aa1d34522024ec2cd81e96f64508b1d1a5e"
+    },
+    {
+      "path": "unity-handoff/ADDING_A_PROJECTILE.md",
+      "size": 431,
+      "sha256": "76bc841a2bdf87079357001574ec4ae4daa1d7d18952ec231044177df20b78b8"
+    },
+    {
+      "path": "unity-handoff/ADDING_A_SKILL.md",
+      "size": 421,
+      "sha256": "9863954712b0c1aeb12cda907c80475315cfb016087dfaf9b6ef7d020b0686ac"
+    },
+    {
+      "path": "unity-handoff/ADDING_A_UNIT.md",
+      "size": 419,
+      "sha256": "a0c8ac4c278dcf033ed28883dd3f666ce6549dc27857426d2b4f07bc5a9e22cb"
+    },
+    {
+      "path": "unity-handoff/ADDING_A_WEAPON.md",
+      "size": 423,
+      "sha256": "197d8a4a442efdb06b2c50634622ea67b76e58fea326dd2f2b216ff806a200b7"
+    },
+    {
+      "path": "unity-handoff/BATTLE_RESULT_SCHEMA.json",
+      "size": 364,
+      "sha256": "db2270ed0a4fddf8030fe83e4ff503fd8f9935455f39de6a9a3e6792a70f5592"
+    },
+    {
+      "path": "unity-handoff/BOSS_CATALOG.json",
+      "size": 4990,
+      "sha256": "dc5e05e80241164633456b98a22739b4c8edf96a5978ccfa5d5b0e162916f21f"
+    },
+    {
+      "path": "unity-handoff/BUFF_CATALOG.json",
+      "size": 2482,
+      "sha256": "dd017ea63a6c9f4a07b578160f9eb6276e733e423931f9b94063feee1d8dde11"
+    },
+    {
+      "path": "unity-handoff/CORE_COMBAT_OVERVIEW.md",
+      "size": 1218,
+      "sha256": "bae318efb5f438f40527f8e8a526efe7fd9f567445140a666f447801b3ce5c15"
+    },
+    {
+      "path": "unity-handoff/CORE_COMBAT_REFERENCE.json",
+      "size": 1055,
+      "sha256": "4b0d21c1eef5bf047ec0ea1b1239c5d8018f4d2c0658d1d1282b4fa0ef55e4f6"
+    },
+    {
+      "path": "unity-handoff/ENEMY_CATALOG.json",
+      "size": 1145,
+      "sha256": "051fceb8a1bba384fae7bde56e9538dfa5f39fa8de45edc8b83790242ce932d7"
+    },
+    {
+      "path": "unity-handoff/EVENT_CATALOG.json",
+      "size": 649,
+      "sha256": "665ecaa7e4125023b636ca19c94518f69e04011d47ad6f0685bb170e1ba6396c"
+    },
+    {
+      "path": "unity-handoff/MISSING_ASSETS_AND_UI.md",
+      "size": 702,
+      "sha256": "3822f3c19697e10e1431dba538e7c1a6e70dde19413c248c8695b45fe5a28a4f"
+    },
+    {
+      "path": "unity-handoff/PROJECTILE_CATALOG.json",
+      "size": 164,
+      "sha256": "89f83e82f03ed5532024ab5d609e12f7174b05ea00df305301b759283dfd2e3c"
+    },
+    {
+      "path": "unity-handoff/README.md",
+      "size": 1893,
+      "sha256": "df2ef88c847c37d345c71c6ca876771394f25833dd045379dbc310f384bb7599"
+    },
+    {
+      "path": "unity-handoff/SINGLE_GAME_FLOW.md",
+      "size": 874,
+      "sha256": "3f298d2e7340ca93cc07e6b9f64f3580d0a59a65650493b5e59f8c340e584978"
+    },
+    {
+      "path": "unity-handoff/SKILL_CATALOG.json",
+      "size": 5045,
+      "sha256": "b33ad229f77a03565600d93911bbfa1aeac09cfa580c4f0f8ae8ae81fa9b9936"
+    },
+    {
+      "path": "unity-handoff/STATE_MACHINES.md",
+      "size": 507,
+      "sha256": "e2bbc90eca1f287a2ceba4af15022f85a403a3a2a5fb3e13dfafc8968390e17d"
+    },
+    {
+      "path": "unity-handoff/UNITY_CLASS_MAPPING.md",
+      "size": 1230,
+      "sha256": "e8afdf7514a1828688ff6558ef7ae94ab4bb9cf658ae042339fda14fb0d55507"
+    },
+    {
+      "path": "unity-handoff/UNITY_PORT_INTERFACES.md",
+      "size": 454,
+      "sha256": "fb85a64c953108721d6f9286b085a17ff87eaf5895e71960a117eea9b3409961"
+    },
+    {
+      "path": "unity-handoff/UNIT_CATALOG.json",
+      "size": 1245,
+      "sha256": "a40ac7566e9be6cf9d289062622b3f0ea140fcab4c5e6562f23a1beaf41a361d"
+    },
+    {
+      "path": "unity-handoff/WAVE_CONFIG.json",
+      "size": 1020,
+      "sha256": "cda521667ba18edff4ac24dc9a6d78ea7b5f436c6be2f2a3933e79016a0662f3"
+    },
+    {
+      "path": "unity-handoff/WEAPON_CATALOG.json",
+      "size": 4913,
+      "sha256": "5b7427ac9c086132922b8294fe25f85fef6c452ddcc67e8b96e41aa031f70b3d"
+    },
+    {
+      "path": "unity-handoff/csharp-reference/BattleInputCommand.cs",
+      "size": 647,
+      "sha256": "6040921c867651260bbf2e4638ecd633e758e786988132d95c41810ea1ab0968"
+    },
+    {
+      "path": "unity-handoff/csharp-reference/BattleResultDto.cs",
+      "size": 579,
+      "sha256": "7d31ce9e8ce5b31f0cf5ab1f5f9cac250c75d27705482aa188aa08def20da771"
+    },
+    {
+      "path": "unity-handoff/csharp-reference/CombatPorts.cs",
+      "size": 697,
+      "sha256": "12d43fe9df6c3a969cbdf57765be17b2a6fd75425e6ef818c24e19b0bedea5a6"
+    },
+    {
+      "path": "unity-handoff/csharp-reference/CombatTickDriver.cs",
+      "size": 1136,
+      "sha256": "911f6d91cb822a7470f0a8f23fe3be695b3cdcfb45a06440985ee390ca5f3cd2"
+    },
+    {
+      "path": "unity-handoff/csharp-reference/ConfigDtos.cs",
+      "size": 940,
+      "sha256": "34538bb80d6d86067624e7cb3ac5af4e31ad1b1978bf0657bde23e67a845691b"
+    },
+    {
+      "path": "unity-handoff/csharp-reference/RuntimeCompositionExample.cs",
+      "size": 1144,
+      "sha256": "4f4191bdd2161d1a16415e3c33663f8391d2cf8beed33c5754f9af5996616699"
+    },
+    {
+      "path": "unity-handoff/reference/00_IMPLEMENTATION_STATUS.md",
+      "size": 2180,
+      "sha256": "cc1349e53927e489bea16e4c43b9eebb878ecc6cdc6d5c17ab88b8fb9e73b11e"
+    },
+    {
+      "path": "unity-handoff/reference/01_ARCHITECTURE.md",
+      "size": 2096,
+      "sha256": "160756ad7ea5ce11b8a286655e8485cab5237b3894419041f51730af80970337"
+    },
+    {
+      "path": "unity-handoff/reference/02_SINGLE_GAME_FLOW.md",
+      "size": 1917,
+      "sha256": "696defa808514c34d3c232f156ce6262ed653c6369514448b3e7059d0976f20f"
+    },
+    {
+      "path": "unity-handoff/reference/03_COMBAT_TICK.md",
+      "size": 1194,
+      "sha256": "6da8bc79683b52d1c949d797ed8d132ddae8fd15384ab176a5b744a82bfe39f7"
+    },
+    {
+      "path": "unity-handoff/reference/04_LIFECYCLE_AND_CLEANUP.md",
+      "size": 1469,
+      "sha256": "4b3f7e245163a0c3006e0f9e4905e0582502efc20b4a44665d96ed2b7505852f"
+    },
+    {
+      "path": "unity-handoff/reference/05_COMMANDS_EVENTS_RESULTS.md",
+      "size": 1667,
+      "sha256": "bf41c63713c2de53c28eb2bbdfcf4e8445e8d94c12ddf3489e724f60f67b0e14"
+    },
+    {
+      "path": "unity-handoff/reference/06_MAP_AND_PLACEMENT.md",
+      "size": 1106,
+      "sha256": "28236fe7787048598fc44a2db11c695a75677b35017a074c1ed09ccae60af117"
+    },
+    {
+      "path": "unity-handoff/reference/07_DECK_ECONOMY_AI.md",
+      "size": 1041,
+      "sha256": "dbad3aa9eb97aa27205d08530dcac0126951e75598a95cf5d263ef7c8931c8f8"
+    },
+    {
+      "path": "unity-handoff/reference/08_ENTITIES.md",
+      "size": 1193,
+      "sha256": "5370d9a7cf59f19b2fd797975560b1c1dd8a732988e14d33c59a93015cc01c4a"
+    },
+    {
+      "path": "unity-handoff/reference/09_WEAPONS_PROJECTILES_DAMAGE.md",
+      "size": 1273,
+      "sha256": "77f2c04d19bc257df0c4d8977a9eddfb69ec84f4f31bd1efe15734e9d7f91d50"
+    },
+    {
+      "path": "unity-handoff/reference/10_BUFFS_SKILLS.md",
+      "size": 1175,
+      "sha256": "a5e91356a2da7cea79a46252bebed8424f29d9edba60a0535978191fa8a8e37a"
+    },
+    {
+      "path": "unity-handoff/reference/11_POOLING_AND_OWNERSHIP.md",
+      "size": 947,
+      "sha256": "2eb837d44eea20524a6e5bde05d39f77146e5dae53978e4eed94b1acb0794f86"
+    },
+    {
+      "path": "unity-handoff/reference/12_MANAGER_API_REFERENCE.md",
+      "size": 1444,
+      "sha256": "c069de3bb13476bb863c874c11e689c0ed064291980c691b57c7230fc761c8a1"
+    },
+    {
+      "path": "unity-handoff/reference/13_CONFIG_GUIDE.md",
+      "size": 1263,
+      "sha256": "4af4efe8a0319c8d63a52d158f060d4c8642c7d7b05244ecbd9664ded3435d05"
+    },
+    {
+      "path": "unity-handoff/reference/14_UNITY_BLUEPRINT.md",
+      "size": 1096,
+      "sha256": "1767cea346e972ddefd1a37ac546289363f5f57ad8c00a62086a0f842c5117eb"
+    },
+    {
+      "path": "unity-handoff/reference/15_MIGRATION_CHECKLIST.md",
+      "size": 1078,
+      "sha256": "93cc7b013e49e7d39e1c7a3f0ca10759bc412d96dd00084554e8ffc2e87da3fa"
+    },
+    {
+      "path": "unity-handoff/reference/16_KNOWN_GAPS.md",
+      "size": 1183,
+      "sha256": "1d618b0d76c8da6199895ed755b23c8f3193853b1c9cb4f34c7e2705ee1e9e4e"
+    },
+    {
+      "path": "unity-handoff/reference/17_SOURCE_TRACEABILITY.md",
+      "size": 1413,
+      "sha256": "6c4b301273ee20491aec59bd984b620e769ede479da5e34bdd647fd4832777ec"
+    }
+  ],
+  "behaviorChanges": false,
+  "entrypoint": "unity-handoff/README.md"
+}

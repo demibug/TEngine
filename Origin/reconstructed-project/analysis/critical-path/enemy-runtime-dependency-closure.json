@@ -1,0 +1,62 @@
+{
+  "module": "ENEMY-RUNTIME-01",
+  "included": [
+    {
+      "module": "qE event proxy",
+      "sourceRange": "19600-19684",
+      "reasonIncluded": "ro direct base",
+      "recoveredScope": "all event forwarding",
+      "deferredScope": null
+    },
+    {
+      "module": "A* and MapData",
+      "sourceRange": "12194-12847",
+      "reasonIncluded": "Mob0 cannot move without real routes",
+      "recoveredScope": "four maps, four-direction A*, side routes",
+      "deferredScope": "placement sequence Te/Re"
+    },
+    {
+      "module": "EnemyData/GameData stats",
+      "sourceRange": "11561-12175",
+      "reasonIncluded": "Mob0 HP/speed initialization",
+      "recoveredScope": "normal HP, speed, early multipliers",
+      "deferredScope": "rank bonus after wave 10"
+    },
+    {
+      "module": "generic and class pools",
+      "sourceRange": "13380-14360,19184-19260",
+      "reasonIncluded": "Mob0 has two-level pooling",
+      "recoveredScope": "mob key pool and class pool",
+      "deferredScope": "unrelated visual keys"
+    },
+    {
+      "module": "EnemyManager spatial core",
+      "sourceRange": "32939-33696",
+      "reasonIncluded": "registration, update, query, cleanup",
+      "recoveredScope": "Mob0 registry/index/query/wave entry",
+      "deferredScope": "boss and buff-special branches"
+    },
+    {
+      "module": "BattleTarget compatibility",
+      "sourceRange": "20311-20339,57007-59129",
+      "reasonIncluded": "real aDou damage and battle finish",
+      "recoveredScope": "side health write and battle finish event",
+      "deferredScope": "tm target visual/controller"
+    }
+  ],
+  "excluded": [
+    "weapons",
+    "bullets",
+    "buff implementations",
+    "boss classes",
+    "drop manager",
+    "full effect/audio managers",
+    "wx/tt platform modules"
+  ],
+  "risk": "MEDIUM",
+  "riskReasons": [
+    "missing formal prefab and Spine wrapper",
+    "some ro/vi special branches deferred",
+    "rank health bonus after wave 10 remains partial"
+  ]
+}

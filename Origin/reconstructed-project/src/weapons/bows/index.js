@@ -1,0 +1,9 @@
+module.exports.IronBow=require('./IronBow').IronBow;
+module.exports.LongBow=require('./LongBow').LongBow;
+module.exports.OverlordBow=require('./OverlordBow').OverlordBow;
+module.exports.HornBow=require('./HornBow').HornBow;
+module.exports.SunsetBow=require('./SunsetBow').SunsetBow;
+module.exports.ShenBiBow=require('./ShenBiBow').ShenBiBow;
+module.exports.IronArrowBow=require('./IronArrowBow').IronArrowBow;
+module.exports.ZhugeCrossbow=require('./ZhugeCrossbow').ZhugeCrossbow;
+module.exports.ShediaoBow=require('./ShediaoBow').ShediaoBow;

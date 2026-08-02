@@ -1,0 +1,18 @@
+{
+  "ProjectileManager": "vA",
+  "ProjectileFactory": [
+    "vj",
+    "vk"
+  ],
+  "ProjectileBase": "qY",
+  "movement": [
+    "line",
+    "bezier",
+    "target"
+  ],
+  "hitStrategies": [
+    100,
+    101,
+    102
+  ]
+}

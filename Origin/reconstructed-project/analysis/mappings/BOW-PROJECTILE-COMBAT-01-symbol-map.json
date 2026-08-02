@@ -1,0 +1,238 @@
+{
+  "moduleId": "BOW-PROJECTILE-COMBAT-01",
+  "round": 6,
+  "status": "COMPLETE_FOR_BOW_AND_SIMPLE_DYNAMIC_ARROW",
+  "symbols": [
+    {
+      "originalSymbol": "ok",
+      "newSymbol": "BowSoldier",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:26093-26264",
+      "extends": "td / SoldierBase",
+      "createdBy": [
+        "UnitFactory index 1",
+        "UnitFactory key 弓",
+        "UnitRegistry.createUnit"
+      ],
+      "updatedBy": [
+        "BattleManager friendly-unit attack polling"
+      ],
+      "registeredWith": [
+        "UnitRegistry"
+      ],
+      "poolKeys": [
+        "class pool: BowSoldier",
+        "visual pool: soldier",
+        "animation key: bow"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "class extends td",
+        "正式兵种数组 Lp[1] 为 弓",
+        "设置动画键 bow",
+        "STOPPED 回调中创建 SimpleDynamicArrow",
+        "攻击音效 bow_attack"
+      ]
+    },
+    {
+      "originalSymbol": "rd",
+      "newSymbol": "SimpleDynamicArrow",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:26698-26845",
+      "extends": "qY / ProjectileBase",
+      "createdBy": [
+        "vj/vk projectile factory",
+        "BowSoldier STOPPED callback"
+      ],
+      "updatedBy": [
+        "vA / ProjectileManager"
+      ],
+      "registeredWith": [
+        "ProjectileFactory key SimpleDynamicArrow",
+        "ProjectileManager active array"
+      ],
+      "poolKeys": [
+        "bullet_pool_SimpleDynamicArrow_弓箭小兵箭矢"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "class extends qY",
+        "正式注册失败字符串明确命名 SimpleDynamicArrow",
+        "默认表现尺寸 22×72、锚点 .5/.9",
+        "Cw 调用 enemy.hit"
+      ]
+    },
+    {
+      "originalSymbol": "qY",
+      "newSymbol": "ProjectileBase",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:27874-28290",
+      "extends": null,
+      "createdBy": [
+        "projectile subclasses"
+      ],
+      "updatedBy": [
+        "ProjectileManager"
+      ],
+      "registeredWith": [],
+      "poolKeys": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "保存攻击者、伤害、移动策略和命中策略",
+        "代理 x/y/rotation 到表现节点",
+        "定义 fire/update/hit/remove/recover 生命周期"
+      ]
+    },
+    {
+      "originalSymbol": "pP",
+      "newSymbol": "ProjectileMovementBase",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:27558-27670",
+      "extends": null,
+      "createdBy": [
+        "movement strategy factory"
+      ],
+      "updatedBy": [
+        "ProjectileManager before projectile onUpdate"
+      ],
+      "registeredWith": [],
+      "poolKeys": [
+        "movement strategy pool"
+      ],
+      "confidence": "MEDIUM",
+      "evidence": [
+        "保存 projectile 引用、归一化进度和速度倍率",
+        "定义 create/recover/update 钩子",
+        "多个移动类型继承该基类"
+      ]
+    },
+    {
+      "originalSymbol": "on",
+      "newSymbol": "TargetEnemyBezierMovement",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:27671-27873",
+      "extends": "pP / ProjectileMovementBase",
+      "createdBy": [
+        "BowSoldier.launchArrow"
+      ],
+      "updatedBy": [
+        "ProjectileManager"
+      ],
+      "registeredWith": [],
+      "poolKeys": [
+        "TargetEnemyBezierMovement"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "Ak 保存 enemy id",
+        "每帧从 EnemyManager 按 id 刷新目标中心",
+        "使用二次贝塞尔控制点 y-curvature",
+        "进度达到 .8 后允许命中"
+      ]
+    },
+    {
+      "originalSymbol": "vj/vk",
+      "newSymbol": "ProjectileFactory",
+      "kind": "factory",
+      "sourceRange": "bundle.strings-decoded.js:33698-33780",
+      "extends": null,
+      "createdBy": [
+        "battle bootstrap"
+      ],
+      "updatedBy": [],
+      "registeredWith": [],
+      "poolKeys": [
+        "bullet_pool_<type>_<appearance>"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "按注册表选择类",
+        "分配递增 projectile id",
+        "从复合对象池获取逻辑和表现",
+        "未知类型显式失败"
+      ]
+    },
+    {
+      "originalSymbol": "vA",
+      "newSymbol": "ProjectileManager",
+      "kind": "singleton class",
+      "sourceRange": "bundle.strings-decoded.js:37209-37474",
+      "extends": "qU / singleton base",
+      "createdBy": [
+        "battle bootstrap"
+      ],
+      "updatedBy": [
+        "FixedUpdateManager/GameLoop key bulletMgr"
+      ],
+      "registeredWith": [
+        "GameLoop"
+      ],
+      "poolKeys": [],
+      "confidence": "HIGH",
+      "evidence": [
+        "活动投射物使用 Array",
+        "update 反向遍历",
+        "先更新 movement 再执行 projectile update/命中",
+        "gameOver 反向回收所有投射物"
+      ]
+    },
+    {
+      "originalSymbol": "tc/oE",
+      "newSymbol": "HitEnemyStrategy",
+      "kind": "strategy/factory",
+      "sourceRange": "bundle.strings-decoded.js:24936-24983",
+      "extends": null,
+      "createdBy": [
+        "BowSoldier"
+      ],
+      "updatedBy": [
+        "ProjectileManager"
+      ],
+      "registeredWith": [],
+      "poolKeys": [
+        "HitEnemyStrategy100"
+      ],
+      "confidence": "HIGH",
+      "evidence": [
+        "策略编号 100",
+        "保存单目标 id",
+        "命中后请求移除",
+        "支持对象池回收"
+      ]
+    },
+    {
+      "originalSymbol": "np",
+      "newSymbol": "ProjectileMath",
+      "kind": "static utility subset",
+      "sourceRange": "bundle.strings-decoded.js:2698-2798",
+      "extends": null,
+      "createdBy": [],
+      "updatedBy": [],
+      "registeredWith": [],
+      "poolKeys": [],
+      "confidence": "MEDIUM",
+      "evidence": [
+        "二次贝塞尔位置公式",
+        "二次贝塞尔切线角度",
+        "距离与角度辅助函数均为纯函数"
+      ]
+    },
+    {
+      "originalSymbol": "r6",
+      "newSymbol": "DeferredAdjacentProjectile",
+      "kind": "class",
+      "sourceRange": "bundle.strings-decoded.js:26264-26428",
+      "extends": "qY / ProjectileBase",
+      "createdBy": [],
+      "updatedBy": [],
+      "registeredWith": [],
+      "poolKeys": [],
+      "confidence": "LOW",
+      "evidence": [
+        "位于 BowSoldier 后但未被基础弓兵创建链调用",
+        "依赖 mx 自定义形状和额外 Tween",
+        "本轮明确暂缓"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "round": "01",
+  "generatedAtUtc": "2026-07-23T16:44:44.733284+00:00",
+  "status": "PARTIAL_RECONSTRUCTION_STRING_STAGE_COMPLETE",
+  "artifacts": [
+    {
+      "path": "README.md",
+      "sizeBytes": 1524,
+      "sha256": "8e3d0504b1cf75ca370332ed0931747a83a6da557161e9c7bc4efcda42d3405f"
+    },
+    {
+      "path": "analysis/baseline-manifest.json",
+      "sizeBytes": 5565,
+      "sha256": "8e832ae9c43b569b5cea51fcb190781f888da28ce810a64200a670f4cd220676"
+    },
+    {
+      "path": "analysis/deliverable-manifest.json",
+      "sizeBytes": 6532,
+      "sha256": "e102203fa37dba6450b6b108da245a6c30dbd86fe4460b6876a734fd9aa26a99"
+    },
+    {
+      "path": "analysis/file-inventory.json",
+      "sizeBytes": 2605,
+      "sha256": "f91c635305ca6676f5bf124d0650f1c700877b7a84af22feb95c25807f8e7b1d"
+    },
+    {
+      "path": "analysis/obfuscation-runtime-values.json",
+      "sizeBytes": 675,
+      "sha256": "3f93b194907d1b43f2e5125aca82a1dcda21921908aadfde6a24e5dc36131324"
+    },
+    {
+      "path": "analysis/obfuscation-runtime.md",
+      "sizeBytes": 4872,
+      "sha256": "f67fe6cef65184a0fb0f2706f802f37175ecfa614ea8622106b14c3d0d20d06f"
+    },
+    {
+      "path": "analysis/opaque-predicate-values.json",
+      "sizeBytes": 804,
+      "sha256": "b437be0ff2a8f945033f6c5fc55d758f4a3e524c4fc6be1c9ecaf1786715eee1"
+    },
+    {
+      "path": "analysis/original-files.sha256",
+      "sizeBytes": 949,
+      "sha256": "bbf38fb4fef6d0f1d79f158fb29f04440af19089080b92c188a2d4b4e2762a6f"
+    },
+    {
+      "path": "analysis/reconstruction-log.md",
+      "sizeBytes": 2090,
+      "sha256": "85cb4a74c5014376d29f117c99c2a19598d48cfeacce4ebb830648fba67a886f"
+    },
+    {
+      "path": "analysis/recovered-source-list.json",
+      "sizeBytes": 290,
+      "sha256": "aff4e7513a491e49cd9ee96f6ef2537bf890e80eb75333a47d7b17e4c64983cc"
+    },
+    {
+      "path": "analysis/round-01-artifacts.json",
+      "sizeBytes": 4743,
+      "sha256": "982b2087a8a91594a9b023131c56a5e022403ef0d5f8185dc15631ce4f00278c"
+    },
+    {
+      "path": "analysis/round-01-report.md",
+      "sizeBytes": 1838,
+      "sha256": "56e611942d375ce201c41ad5d99493ddf36998a703cbce2fb90bd9f2b3496dd5"
+    },
+    {
+      "path": "analysis/source-map-report.md",
+      "sizeBytes": 2421,
+      "sha256": "aa701b6b7fc5d37532caf6479c4175a8596f4c6d8e73ec33a6123ecd85098f6c"
+    },
+    {
+      "path": "analysis/string-decoding-map.jsonl",
+      "sizeBytes": 32560923,
+      "sha256": "4a232bae0da6d5d402d2ef78215ba0efd3185550c224e06dbc1cc816baaac6b6"
+    },
+    {
+      "path": "analysis/string-decoding-report.json",
+      "sizeBytes": 8779,
+      "sha256": "1e897e053a9a6535f036737101433cd566f2e360795af9483bdcb9e9ffe4a422"
+    },
+    {
+      "path": "analysis/string-decoding-report.md",
+      "sizeBytes": 3149,
+      "sha256": "94dafbd7b8560a16e02b365cb495d3b410a49c64d5640fe4551754232721d630"
+    },
+    {
+      "path": "analysis/string-decoding-unresolved.jsonl",
+      "sizeBytes": 896645,
+      "sha256": "a66df6bb2d5a58512dc3325dce2f79f63199ed0b67ae7a62ce7a953e54af5a2a"
+    },
+    {
+      "path": "analysis/test-results-round-01.json",
+      "sizeBytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "analysis/transformation-chain.json",
+      "sizeBytes": 1204,
+      "sha256": "60beb757bdb8906e31dea896f8b9182e453b9aa940a3755ce5e0c1fe7362ad30"
+    },
+    {
+      "path": "analysis/unresolved-items.md",
+      "sizeBytes": 1869,
+      "sha256": "8a8acec56c7e9db0c1249e24b7f60ade529530566c4e7dcd098b29613ef8ca18"
+    },
+    {
+      "path": "package.json",
+      "sizeBytes": 653,
+      "sha256": "d2395d1705c11519483e8c6674664fca120df3dc7efe31c91ead9c55b764020f"
+    },
+    {
+      "path": "tests/behavior/decode-strings.test.js",
+      "sizeBytes": 5491,
+      "sha256": "6fdfa597d0c83d7ca20e4f89b9857a7b2e41b60f8604d898e3207206905b891c"
+    },
+    {
+      "path": "tests/mocks/README.md",
+      "sizeBytes": 328,
+      "sha256": "2f0cc78ac986b5411b7e1b395e04be9f2e5e99a231d994a2c2d40a44ae695461"
+    },
+    {
+      "path": "tools/decode-strings.js",
+      "sizeBytes": 47136,
+      "sha256": "9bfe5cdf3a478bf0bf48235273905bcf450fa3f9ee47d1f5a5d3b40f97926c2a"
+    },
+    {
+      "path": "work/bundle.formatted.js",
+      "sizeBytes": 2424018,
+      "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+    },
+    {
+      "path": "work/bundle.strings-decoded.js",
+      "sizeBytes": 2772800,
+      "sha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+    },
+    {
+      "path": "work/obfuscation-runtime.original.js",
+      "sizeBytes": 75764,
+      "sha256": "c75d469ac4537376709eab6aea22c733400c36f00e061fb7abd9ce2a63f295ad"
+    },
+    {
+      "path": "work/obfuscation-runtime.safe-eval.js",
+      "sizeBytes": 75392,
+      "sha256": "180d9cc230e43ded3088726cd68f2fc661c64c7b8883036f2ddb6cfd41fde9e7"
+    }
+  ]
+}

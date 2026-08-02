@@ -1,0 +1,13 @@
+{
+  "round": "ROUND-07B-CAVALRY",
+  "symbol": "e[3]",
+  "class": "CavalrySoldier",
+  "configIndex": 3,
+  "text": "骑",
+  "animationKey": "cavalry",
+  "sources": [
+    "work/bundle.strings-decoded.js:11069-11352",
+    "work/bundle.strings-decoded.js:24750-24831",
+    "work/bundle.strings-decoded.js:24840-24984"
+  ]
+}

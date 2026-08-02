@@ -1,0 +1,268 @@
+{
+  "arrowTrail": {
+    "path": "prefab/bulletTrail/arrowTrail.lh",
+    "time": 0.3,
+    "minVertexDistance": 1,
+    "widthMultiplier": 5,
+    "widthCurve": [
+      {
+        "x": 0,
+        "y": 1,
+        "inTangent": 0,
+        "outTangent": 0
+      },
+      {
+        "x": 1,
+        "y": 0,
+        "inTangent": 0,
+        "outTangent": 0
+      }
+    ],
+    "alphaElements": [
+      0,
+      0,
+      0.11024566739797592,
+      0.6000000238418579,
+      1,
+      0.5
+    ],
+    "rgbElements": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      0.5038759708404541,
+      0.5038759708404541,
+      0.5038759708404541
+    ],
+    "textureMode": 0,
+    "textureUuid": "../../internal/WhiteTexture.png"
+  },
+  "daoqiTrail": {
+    "path": "prefab/bulletTrail/daoqiTrail.lh",
+    "time": 0.178,
+    "minVertexDistance": 0.02,
+    "widthMultiplier": 50,
+    "widthCurve": [
+      {
+        "x": 0,
+        "y": 0.1,
+        "inTangent": 0,
+        "outTangent": 0
+      },
+      {
+        "x": 1,
+        "y": 0,
+        "inTangent": 0,
+        "outTangent": 0
+      }
+    ],
+    "alphaElements": [
+      0,
+      0.550000011920929,
+      0.5964535474777222,
+      0,
+      1,
+      0
+    ],
+    "rgbElements": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      0.7558139562606812,
+      0.7558139562606812,
+      0.7558139562606812
+    ],
+    "textureMode": 0,
+    "textureUuid": "../../internal/WhiteTexture.png"
+  },
+  "fireArrowTrail": {
+    "path": "prefab/bulletTrail/fireArrowTrail.lh",
+    "time": 1,
+    "minVertexDistance": 1,
+    "widthMultiplier": 50,
+    "widthCurve": [
+      {
+        "x": 0,
+        "y": 1,
+        "inTangent": 0,
+        "outTangent": 0
+      },
+      {
+        "x": 1,
+        "y": 0,
+        "inTangent": 0,
+        "outTangent": 0
+      }
+    ],
+    "alphaElements": [
+      0,
+      1,
+      1,
+      0.5
+    ],
+    "rgbElements": [
+      0,
+      1,
+      0,
+      0,
+      1,
+      1,
+      0.605072021484375,
+      0
+    ],
+    "textureMode": 0,
+    "textureUuid": "5272e6f4-c7fb-4420-b523-5fa0d72b6abd"
+  },
+  "fireDragonTrail": {
+    "path": "prefab/bulletTrail/fireDragonTrail.lh",
+    "time": 5,
+    "minVertexDistance": 1,
+    "widthMultiplier": 150,
+    "widthCurve": [
+      {
+        "x": 0,
+        "y": 0,
+        "inTangent": 0,
+        "outTangent": 2.3377049180327876
+      },
+      {
+        "x": 0.10394265232974914,
+        "y": 0.17704918032786887,
+        "inTangent": 0.7840749414519879,
+        "outTangent": 0.7318032786885234
+      },
+      {
+        "x": 0.3870967741935484,
+        "y": 0.1622338863326347,
+        "inTangent": -0.14597406443121408,
+        "outTangent": -0.3080665312600503
+      },
+      {
+        "x": 0.7240143369175626,
+        "y": 0.06229508196721312,
+        "inTangent": -0.2123536299765807,
+        "outTangent": -0.11434426229508167
+      },
+      {
+        "x": 1,
+        "y": 0.048283811475409846,
+        "inTangent": 0,
+        "outTangent": 0
+      }
+    ],
+    "alphaElements": [
+      0,
+      1,
+      0.75,
+      1,
+      1,
+      0
+    ],
+    "rgbElements": [
+      0,
+      1,
+      0,
+      0,
+      1,
+      1,
+      0.605072021484375,
+      0
+    ],
+    "textureMode": 1,
+    "textureUuid": "../../internal/WhiteTexture.png"
+  },
+  "knifeTrail": {
+    "path": "prefab/bulletTrail/knifeTrail.lh",
+    "time": 0.2,
+    "minVertexDistance": 1,
+    "widthMultiplier": 50,
+    "widthCurve": [
+      {
+        "x": 0,
+        "y": 0.1,
+        "inTangent": 0,
+        "outTangent": 0
+      },
+      {
+        "x": 1,
+        "y": 0,
+        "inTangent": 0,
+        "outTangent": 0
+      }
+    ],
+    "alphaElements": [
+      0,
+      0,
+      0.17991362512111664,
+      1,
+      1,
+      0.5
+    ],
+    "rgbElements": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      0.5038759708404541,
+      0.5038759708404541,
+      0.5038759708404541
+    ],
+    "textureMode": 0,
+    "textureUuid": "../../internal/WhiteTexture.png"
+  },
+  "trail": {
+    "path": "prefab/trail.lh",
+    "time": 0.5,
+    "minVertexDistance": 0.1,
+    "widthMultiplier": 50,
+    "widthCurve": [
+      {
+        "x": 0,
+        "y": 1,
+        "inTangent": 0,
+        "outTangent": 0
+      },
+      {
+        "x": 1,
+        "y": 0,
+        "inTangent": 0,
+        "outTangent": 0
+      }
+    ],
+    "alphaElements": [
+      0,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "rgbElements": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "textureMode": 0,
+    "textureUuid": "../internal/WhiteTexture.png"
+  }
+}

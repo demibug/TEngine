@@ -1,0 +1,111 @@
+{
+  "round": 3,
+  "slice": "BOOT-TO-BATTLE",
+  "symbols": [
+    {
+      "original": "pV / nx",
+      "renamed": "GameLoop",
+      "kind": "class/singleton",
+      "confidence": "HIGH",
+      "reason": "注册 frameLoop(1)，管理带键更新回调并以80ms分步"
+    },
+    {
+      "original": "q3 / sF",
+      "renamed": "SceneManager",
+      "kind": "class/singleton",
+      "confidence": "HIGH",
+      "reason": "打开/关闭 scene/*.ls 与 dialog/*.lh"
+    },
+    {
+      "original": "tw / uq",
+      "renamed": "GameDataCore",
+      "kind": "class/singleton",
+      "confidence": "HIGH",
+      "reason": "聚合 player/map/enemy/battle 并按顺序 startGame"
+    },
+    {
+      "original": "uo",
+      "renamed": "BattleState",
+      "kind": "class",
+      "confidence": "HIGH",
+      "reason": "轮次、金币、生命、准备期和胜负事件字段明确"
+    },
+    {
+      "original": "nz",
+      "renamed": "AnimationEntityPool",
+      "kind": "class/singleton",
+      "confidence": "HIGH",
+      "reason": "Laya.Pool、sk_/fsk_ 键和 resources/anim 路径明确"
+    },
+    {
+      "original": "s3",
+      "renamed": "LoadSceneController",
+      "kind": "scene class",
+      "confidence": "HIGH",
+      "reason": "UUID、加载文案和 Main/Match 跳转明确"
+    },
+    {
+      "original": "nA",
+      "renamed": "MainSceneController",
+      "kind": "scene class",
+      "confidence": "HIGH",
+      "reason": "startGame、体力不足文案和 MatchScene 跳转明确"
+    },
+    {
+      "original": "nd",
+      "renamed": "MatchSceneController",
+      "kind": "scene class",
+      "confidence": "HIGH",
+      "reason": "匹配完成计时、oK 战斗转场明确"
+    },
+    {
+      "original": "r5",
+      "renamed": "BattleSceneController",
+      "kind": "scene class",
+      "confidence": "HIGH",
+      "reason": "UUID、Gq、BattleScene 生命周期明确"
+    },
+    {
+      "original": "sE",
+      "renamed": "BattleFlowCoordinator",
+      "kind": "class/singleton",
+      "confidence": "HIGH",
+      "reason": "init/startGame/gameOver 的管理器调用顺序明确"
+    },
+    {
+      "original": "vU",
+      "renamed": "BattleManager",
+      "kind": "class/singleton",
+      "confidence": "HIGH",
+      "reason": "BattleMgr 更新键、波次和成对生成逻辑明确"
+    },
+    {
+      "original": "vi",
+      "renamed": "EnemyManager",
+      "kind": "class/singleton",
+      "confidence": "HIGH",
+      "reason": "enemyMgr 更新键、注册表和生成逻辑明确"
+    },
+    {
+      "original": "vc",
+      "renamed": "UnitRegistry",
+      "kind": "class/singleton",
+      "confidence": "MEDIUM",
+      "reason": "BattleManager 直接读取多个单位 Map；完整职责未恢复"
+    },
+    {
+      "original": "s0 / ss",
+      "renamed": "EnemyFactory",
+      "kind": "factory",
+      "confidence": "HIGH",
+      "reason": "注册 Map、WL/jL 创建和类型表明确"
+    },
+    {
+      "original": "Mob0 concrete class",
+      "renamed": "Mob0Enemy",
+      "kind": "class",
+      "confidence": "HIGH",
+      "reason": "map0 enemyTypeIndex=0 与 Mob0 注册表对应"
+    }
+  ]
+}

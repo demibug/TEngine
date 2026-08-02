@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "round": 2,
+  "moduleId": "NET-01",
+  "generatedAt": "2026-07-24T01:05:47.802460+00:00",
+  "sourceBaselines": {
+    "original/bundle.js": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+    "work/bundle.strings-decoded.js": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+  },
+  "testSummary": {
+    "tests": 32,
+    "passed": 32,
+    "failed": 0,
+    "repeatedRunPassed": 32,
+    "deterministic": true,
+    "realNetworkAccessed": false,
+    "staticChecks": 18,
+    "staticChecksPassed": true
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sizeBytes": 2013,
+      "sha256": "f5b2f0aea21d3c0f21edff003039ef2c8ef391f37d6880f976964317c1a4cb51"
+    },
+    {
+      "path": "package.json",
+      "sizeBytes": 811,
+      "sha256": "ad109cb6cbeffbfd80935e93f9c1f9cce11b2428ffffa2b21aae8b5523f1fb44"
+    },
+    {
+      "path": "src/package.json",
+      "sizeBytes": 23,
+      "sha256": "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a"
+    },
+    {
+      "path": "src/core/SingletonBase.js",
+      "sizeBytes": 552,
+      "sha256": "4aeaec9a38413db21f4f46124cb9bbafb04484251104eeee1f9c9f599376639d"
+    },
+    {
+      "path": "src/network/HttpClient.js",
+      "sizeBytes": 16008,
+      "sha256": "7a15929349a6f9718b32001e42bd7b4bf9856028e51f459014ffde33be31c163"
+    },
+    {
+      "path": "src/network/index.js",
+      "sizeBytes": 133,
+      "sha256": "8c9f0838b0885d571c1042f5057ffbca403f6b66ff83ae2d2ae37e035d3119e6"
+    },
+    {
+      "path": "analysis/modules/NET-01.json",
+      "sizeBytes": 10621,
+      "sha256": "83678637aefe96ec4ccf85d46bb58b3eff85b60472bc9b31344a56e1e6242238"
+    },
+    {
+      "path": "analysis/modules/NET-01-method-coverage.json",
+      "sizeBytes": 4590,
+      "sha256": "3a46c2e19eeb4ff0a982c74108fdea7e050b648bb90795ea830d3b8c7cb33811"
+    },
+    {
+      "path": "analysis/behavior/NET-01.md",
+      "sizeBytes": 7757,
+      "sha256": "40c139dd12902d4483aa421d1ecb39a0da10555c0356da7d86e98540ee181e01"
+    },
+    {
+      "path": "analysis/mappings/NET-01-symbol-map.json",
+      "sizeBytes": 9897,
+      "sha256": "e040ba5a4d48407ac2d36ce74cc31135487275a2ebf3c35e1332aa7012977535"
+    },
+    {
+      "path": "analysis/architecture/module-conventions.md",
+      "sizeBytes": 5206,
+      "sha256": "967100565031b48dbcf3fa570a21f6e516f494a2781fb001afa671faac24520c"
+    },
+    {
+      "path": "analysis/unresolved-items.md",
+      "sizeBytes": 3044,
+      "sha256": "1687cd80f84367d5c042ed7a6f315f228847c55f04a5fb6075d1151dd1a6c193"
+    },
+    {
+      "path": "analysis/dependency-map.md",
+      "sizeBytes": 3092,
+      "sha256": "d56d7749bcd4ff1be89fd9e8b5ada133b22cefb6696145e1904fc70d94e46db8"
+    },
+    {
+      "path": "analysis/reconstruction-log.md",
+      "sizeBytes": 4875,
+      "sha256": "8c27dec200229f6110f991be4dd70bc68c2348d08baf4d59414285abd1da1d1c"
+    },
+    {
+      "path": "analysis/round-02-report.md",
+      "sizeBytes": 2044,
+      "sha256": "665779c2c6a0715c21b3ae6865c1fe9a31b30c8dc8279198a6443703ad1f21dd"
+    },
+    {
+      "path": "analysis/test-results-round-02.json",
+      "sizeBytes": 701,
+      "sha256": "4f1a41dea1cfdb8875e4cf01bcffb29dec12a1efaa5acc9899cf40876e7005d3"
+    },
+    {
+      "path": "analysis/static-checks-round-02.json",
+      "sizeBytes": 1219,
+      "sha256": "76a39fa82d3a078e57bb34c2eee7cde65ec6bfbaf7c4c3fb37708caefbcf087e"
+    },
+    {
+      "path": "analysis/transformation-chain.json",
+      "sizeBytes": 2050,
+      "sha256": "c8d60ee66efdf6e10467783881ca1f39b9ad936914486c4386ac63c554e2c620"
+    },
+    {
+      "path": "tests/mocks/LayaHttpMock.js",
+      "sizeBytes": 5010,
+      "sha256": "70581babf4479d831220934e7f2e2d65d05a7149966e76d412992f5273e46810"
+    },
+    {
+      "path": "tests/mocks/NetworkMock.js",
+      "sizeBytes": 2527,
+      "sha256": "5c34d3f61f4cc74be8316c90749630fd6e3cccde8290f7b9b7e406207a318ecb"
+    },
+    {
+      "path": "tests/unit/HttpClient.test.js",
+      "sizeBytes": 20235,
+      "sha256": "c8256fa58215408ecd59a2a251d8e5772f82c1aa9debe1007a64583032b05f26"
+    },
+    {
+      "path": "tests/behavior/NET-01.behavior.test.js",
+      "sizeBytes": 5377,
+      "sha256": "f0e42ba25ce04a10d728a5eff416d238f24e0a08d31b0c15b22c0ae1eb3b5ad1"
+    },
+    {
+      "path": "tools/run-net01-tests.js",
+      "sizeBytes": 2171,
+      "sha256": "b642e80c6e054834d19e2d074aba6855b5fdfb01ad93daa39dffe4a654c3e423"
+    },
+    {
+      "path": "tools/verify-net01.js",
+      "sizeBytes": 12986,
+      "sha256": "c6f4c7ab5767ad82f3c377ed5f2185fef8a6d730c2fc04c174ddb90a52b7a75e"
+    },
+    {
+      "path": "work/extracts/NET-01-requested-5087-6037.js",
+      "sizeBytes": 33795,
+      "sha256": "66176a62b660ef2ce9ad746ebf864702e2067b2ca3e0f1eeb3d6a242f36939b3"
+    },
+    {
+      "path": "work/extracts/context-iife-1014-1695.js",
+      "sizeBytes": 24243,
+      "sha256": "36d2a2376920b846b2e738c1a2e22df9748639ea58092c546ff0b408f50a5d76"
+    },
+    {
+      "path": "work/extracts/context-pre-net-3763-5086.js",
+      "sizeBytes": 39338,
+      "sha256": "885130cbd828e88c887dd3700b146d4d62f9e165683790c725cb7329505de057"
+    }
+  ]
+}

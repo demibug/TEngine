@@ -1,0 +1,19 @@
+{
+  "status": "COMPLETE_FOR_CORE_RUNTIME_NO_ASSETS",
+  "sourceRange": "30868-32939",
+  "count": 12,
+  "types": [
+    {"key":"ZhangLiang","name":"张梁","symbol":"nj","skill":"SoulCapture"},
+    {"key":"ZhangBao","name":"张宝","symbol":"oO","skill":"SoulSummon"},
+    {"key":"ZhangJiao","name":"张角","symbol":"tj","skill":"Inspire"},
+    {"key":"SunShangXiang","name":"孙尚香","symbol":"oP","skill":"Demolition"},
+    {"key":"ZhenFu","name":"甄宓","symbol":"rT","skill":"RainStorm"},
+    {"key":"DiaoChan","name":"貂蝉","symbol":"sR","skill":"Enthrall"},
+    {"key":"HuaXiong","name":"华雄","symbol":"tz","skill":"CavalryOrder"},
+    {"key":"LvBu","name":"吕布","symbol":"nJ","skill":"FangTianHalberd"},
+    {"key":"DongZhuo","name":"董卓","symbol":"oA","skill":"Devour"},
+    {"key":"DianWei","name":"典韦","symbol":"rv","skill":"Madness"},
+    {"key":"XiaHouDun","name":"夏侯惇","symbol":"q5","skill":"DevourEyes"},
+    {"key":"CaoCao","name":"曹操","symbol":"vg","skill":"WarlordSeal"}
+  ]
+}

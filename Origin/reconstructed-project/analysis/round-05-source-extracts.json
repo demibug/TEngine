@@ -1,0 +1,122 @@
+[
+  {
+    "file": "work/round-05-extracts/AttackEffectBase-r6-26264-26428.js",
+    "sizeBytes": 6332,
+    "sha256": "e364d797b31e3f8f0435d0c2a8f52f146257f2057821e98f2f8f4da8c03ecc6f",
+    "lineCount": 165
+  },
+  {
+    "file": "work/round-05-extracts/AttackEffectManager-vA-37209-37450.js",
+    "sizeBytes": 9674,
+    "sha256": "e2a72d7dd65b02fa096cd08407b5b1fb3669ae3928a1c93f8131b2a3e7ed6094",
+    "lineCount": 242
+  },
+  {
+    "file": "work/round-05-extracts/AttackTriggerData-oF-24936-25020.js",
+    "sizeBytes": 2665,
+    "sha256": "1639c90074e46a2fc3f66d6dd95310ce4a44905b74acef393211abcf86b13d4e",
+    "lineCount": 85
+  },
+  {
+    "file": "work/round-05-extracts/BaseSoldierFactories-24443-24834.js",
+    "sizeBytes": 15129,
+    "sha256": "f8c93522ced86c8add5554259a1681de5b4b61964f3f1f4a8f159fdc2619a784",
+    "lineCount": 392
+  },
+  {
+    "file": "work/round-05-extracts/BaseUnitCreators-24443-24834.js",
+    "sizeBytes": 15129,
+    "sha256": "f8c93522ced86c8add5554259a1681de5b4b61964f3f1f4a8f159fdc2619a784",
+    "lineCount": 392
+  },
+  {
+    "file": "work/round-05-extracts/BattleManagerAttack-50471-50519.js",
+    "sizeBytes": 2224,
+    "sha256": "dd3280fa0cf06fe8191536c004c498e12a9920b4751dd6743d393c972f6f158c",
+    "lineCount": 49
+  },
+  {
+    "file": "work/round-05-extracts/BattleManagerAttackLoop-50456-50519.js",
+    "sizeBytes": 2647,
+    "sha256": "7daab404d4bee2425bd78ef04cdaab667b3adbc9b2571fce674cc158e9f4e93b",
+    "lineCount": 64
+  },
+  {
+    "file": "work/round-05-extracts/BattleStateMultiplier-3163-3297.js",
+    "sizeBytes": 4834,
+    "sha256": "deeb38dcc4be0c9eb0aecbddb64904c2f851e1843fe1822ad577b9f206aa4e28",
+    "lineCount": 135
+  },
+  {
+    "file": "work/round-05-extracts/BowCandidate-ok-26093-26506.js",
+    "sizeBytes": 16060,
+    "sha256": "2332d72303d0cd6aca1290d73114aa75f2b97891b18a9ad3f571c2d42df6bdae",
+    "lineCount": 414
+  },
+  {
+    "file": "work/round-05-extracts/Candidate-ok-26093-26506.js",
+    "sizeBytes": 16060,
+    "sha256": "2332d72303d0cd6aca1290d73114aa75f2b97891b18a9ad3f571c2d42df6bdae",
+    "lineCount": 414
+  },
+  {
+    "file": "work/round-05-extracts/DragBase-rb-24863-24930.js",
+    "sizeBytes": 2297,
+    "sha256": "3db3330e31c5a39ca3ace21185537705b1c11f6cfc0344fd06437a69989c482f",
+    "lineCount": 68
+  },
+  {
+    "file": "work/round-05-extracts/FriendlyUnitConfig-11069-11352.js",
+    "sizeBytes": 9896,
+    "sha256": "c629892ac57b1b9bd9ad7bfd0cef37b00c9a24f098cd1bd21a606158712362bc",
+    "lineCount": 284
+  },
+  {
+    "file": "work/round-05-extracts/GameDataRuntimeId-11770-11795.js",
+    "sizeBytes": 1126,
+    "sha256": "c018dcd04b2c9f187ebec8780c4e6985fb595ae873158242574a8865a6b4ccfa",
+    "lineCount": 26
+  },
+  {
+    "file": "work/round-05-extracts/GenericEventProxy-qE-19600-19684.js",
+    "sizeBytes": 2716,
+    "sha256": "bb305afdddc32a760ab63a98b03e7bbb12e9a6d25d5784a6961f489cdad9d7bf",
+    "lineCount": 85
+  },
+  {
+    "file": "work/round-05-extracts/KnifeHitEffect-tO-24840-24860.js",
+    "sizeBytes": 606,
+    "sha256": "40c0b4e30f8246e13f47965e77b48c1665b314bb432d22c624bd3c0c8b3bf59a",
+    "lineCount": 21
+  },
+  {
+    "file": "work/round-05-extracts/SoldierBase-td-23114-23437.js",
+    "sizeBytes": 12741,
+    "sha256": "44882bc9abaf4a6d90dcf29fd02a2ea6e6d723569d373ea84c87348e2d4bf964",
+    "lineCount": 324
+  },
+  {
+    "file": "work/round-05-extracts/UnitClassPool-sc-22656-22691.js",
+    "sizeBytes": 1157,
+    "sha256": "de7abae0d212ef56d6268d56c10ba62c24a8446274d0fa8d4e8f760b502acf7f",
+    "lineCount": 36
+  },
+  {
+    "file": "work/round-05-extracts/UnitCore-rc-22694-23112.js",
+    "sizeBytes": 19352,
+    "sha256": "c75d253d16748b957911abb202a6089f242cf42fea3ee852c5aaf17cad0b9e21",
+    "lineCount": 419
+  },
+  {
+    "file": "work/round-05-extracts/UnitDragBase-rb-24863-24930.js",
+    "sizeBytes": 2297,
+    "sha256": "3db3330e31c5a39ca3ace21185537705b1c11f6cfc0344fd06437a69989c482f",
+    "lineCount": 68
+  },
+  {
+    "file": "work/round-05-extracts/UnitRegistry-vc-29460-30476.js",
+    "sizeBytes": 36535,
+    "sha256": "d9bb91bea99eb72ffe9746fb31dbe7ba31be2e656469ff93008b5d95dea4e395",
+    "lineCount": 1017
+  }
+]

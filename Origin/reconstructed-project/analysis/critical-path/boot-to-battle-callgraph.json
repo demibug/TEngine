@@ -1,0 +1,711 @@
+{
+  "round": 3,
+  "name": "BOOT-TO-BATTLE",
+  "nodes": [
+    {
+      "id": "BOOT-INDEX",
+      "originalSymbol": "index.js IIFE",
+      "suggestedName": "GameBootstrap",
+      "sourceRange": "original/index.js:1-68",
+      "role": "启动",
+      "calledBy": [],
+      "calls": [
+        "LAYA-INIT",
+        "LOAD-SCENE-OPEN"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "LAYA-INIT",
+      "originalSymbol": "Laya.init",
+      "suggestedName": "Laya initialization",
+      "sourceRange": "original/index.js:51-67",
+      "role": "启动",
+      "calledBy": [
+        "BOOT-INDEX"
+      ],
+      "calls": [
+        "LOAD-SCENE-OPEN"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "LOAD-SCENE-OPEN",
+      "originalSymbol": "startupScene",
+      "suggestedName": "Open LoadScene",
+      "sourceRange": "original/index.js:55-63",
+      "role": "场景",
+      "calledBy": [
+        "BOOT-INDEX",
+        "LAYA-INIT"
+      ],
+      "calls": [
+        "LOAD-SCENE"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "LOAD-SCENE",
+      "originalSymbol": "s3",
+      "suggestedName": "LoadSceneController",
+      "sourceRange": "bundle.strings-decoded.js:50996-51270",
+      "role": "场景",
+      "calledBy": [
+        "LOAD-SCENE-OPEN"
+      ],
+      "calls": [
+        "GAME-LOOP",
+        "GAME-DATA",
+        "BATTLE-FLOW-INIT",
+        "SCENE-MANAGER"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "uuid": "nFCDlT3GRD-9N62vwVVE4Q",
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "GAME-LOOP",
+      "originalSymbol": "pV / nx",
+      "suggestedName": "GameLoop",
+      "sourceRange": "bundle.strings-decoded.js:3769-3874; alias:11920",
+      "role": "启动",
+      "calledBy": [
+        "LOAD-SCENE",
+        "MATCH-SCENE"
+      ],
+      "calls": [
+        "ENEMY-MANAGER-UPDATE",
+        "BATTLE-MANAGER-UPDATE",
+        "BATTLE-SCENE-UPDATE"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_CRITICAL_PATH"
+    },
+    {
+      "id": "GAME-DATA",
+      "originalSymbol": "tw / uq",
+      "suggestedName": "GameDataCore",
+      "sourceRange": "bundle.strings-decoded.js:11561-11908; alias:13293",
+      "role": "数据",
+      "calledBy": [
+        "LOAD-SCENE",
+        "BATTLE-FLOW-START"
+      ],
+      "calls": [
+        "PLAYER-DATA",
+        "MAP-DATA",
+        "ENEMY-DATA",
+        "BATTLE-STATE"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "PLAYER-DATA",
+      "originalSymbol": "tY / p0 contracts",
+      "suggestedName": "PlayerDataCore + StaminaServiceCore",
+      "sourceRange": "bundle.strings-decoded.js:8525-9429; 11436-11445",
+      "role": "数据",
+      "calledBy": [
+        "GAME-DATA",
+        "MAIN-SCENE",
+        "MATCH-SCENE"
+      ],
+      "calls": [],
+      "confidence": "MEDIUM",
+      "requiredForBattleEntry": true,
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "MAP-DATA",
+      "originalSymbol": "s4",
+      "suggestedName": "MapDataCore",
+      "sourceRange": "bundle.strings-decoded.js:12483-12847",
+      "role": "数据",
+      "calledBy": [
+        "GAME-DATA",
+        "BATTLE-SCENE",
+        "BATTLE-MANAGER",
+        "MOB0"
+      ],
+      "calls": [],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_CRITICAL_PATH"
+    },
+    {
+      "id": "ENEMY-DATA",
+      "originalSymbol": "sD",
+      "suggestedName": "EnemyDataCore",
+      "sourceRange": "bundle.strings-decoded.js:11994-12175",
+      "role": "数据",
+      "calledBy": [
+        "GAME-DATA",
+        "BATTLE-MANAGER",
+        "ENEMY-MANAGER"
+      ],
+      "calls": [],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_CRITICAL_PATH"
+    },
+    {
+      "id": "BATTLE-STATE",
+      "originalSymbol": "uo",
+      "suggestedName": "BattleState",
+      "sourceRange": "bundle.strings-decoded.js:3163-3297",
+      "role": "数据",
+      "calledBy": [
+        "GAME-DATA",
+        "BATTLE-MANAGER",
+        "BATTLE-SCENE"
+      ],
+      "calls": [],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_CRITICAL_PATH"
+    },
+    {
+      "id": "BATTLE-FLOW-INIT",
+      "originalSymbol": "sE.init",
+      "suggestedName": "BattleFlowCoordinator.init",
+      "sourceRange": "bundle.strings-decoded.js:55027-55229",
+      "role": "启动",
+      "calledBy": [
+        "LOAD-SCENE"
+      ],
+      "calls": [
+        "SCENE-MANAGER",
+        "ENEMY-MANAGER",
+        "UNIT-REGISTRY",
+        "BATTLE-MANAGER"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_CRITICAL_PATH"
+    },
+    {
+      "id": "SCENE-MANAGER",
+      "originalSymbol": "q3 / sF",
+      "suggestedName": "SceneManager",
+      "sourceRange": "bundle.strings-decoded.js:5715-5869; alias:13165",
+      "role": "场景",
+      "calledBy": [
+        "LOAD-SCENE",
+        "MAIN-SCENE",
+        "BATTLE-FLOW-START"
+      ],
+      "calls": [
+        "MAIN-SCENE",
+        "MATCH-SCENE",
+        "BATTLE-SCENE"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_CRITICAL_PATH"
+    },
+    {
+      "id": "MAIN-SCENE",
+      "originalSymbol": "nA.startGame",
+      "suggestedName": "MainSceneController.startGame",
+      "sourceRange": "bundle.strings-decoded.js:64782-65947; startGame:65424-65443",
+      "role": "场景",
+      "calledBy": [
+        "SCENE-MANAGER",
+        "LOAD-SCENE"
+      ],
+      "calls": [
+        "PLAYER-DATA",
+        "MATCH-SCENE"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "uuid": "dKvUsPTsTBGGfiZxHMSqtg",
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "MATCH-SCENE",
+      "originalSymbol": "nd / oK",
+      "suggestedName": "MatchSceneController",
+      "sourceRange": "bundle.strings-decoded.js:60834-61284",
+      "role": "场景",
+      "calledBy": [
+        "SCENE-MANAGER",
+        "MAIN-SCENE",
+        "LOAD-SCENE"
+      ],
+      "calls": [
+        "GAME-LOOP",
+        "BATTLE-FLOW-START"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "uuid": "dxhrI-d-T2icEkklUGt-kQ",
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "BATTLE-FLOW-START",
+      "originalSymbol": "sE.startGame",
+      "suggestedName": "BattleFlowCoordinator.startBattle",
+      "sourceRange": "bundle.strings-decoded.js:55027-55229",
+      "role": "战斗",
+      "calledBy": [
+        "MATCH-SCENE",
+        "DevelopmentBootstrap.$_main_"
+      ],
+      "calls": [
+        "GAME-DATA",
+        "BATTLE-MANAGER",
+        "ENEMY-MANAGER",
+        "UNIT-REGISTRY",
+        "SCENE-MANAGER"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_CRITICAL_PATH"
+    },
+    {
+      "id": "UNIT-REGISTRY",
+      "originalSymbol": "vc",
+      "suggestedName": "UnitRegistry",
+      "sourceRange": "bundle.strings-decoded.js:29460-30477",
+      "role": "实体",
+      "calledBy": [
+        "BATTLE-FLOW-INIT",
+        "BATTLE-FLOW-START",
+        "BATTLE-MANAGER"
+      ],
+      "calls": [],
+      "confidence": "MEDIUM",
+      "requiredForBattleEntry": true,
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "ENEMY-FACTORY",
+      "originalSymbol": "s0 / ss",
+      "suggestedName": "EnemyFactory",
+      "sourceRange": "bundle.strings-decoded.js:19220-19260",
+      "role": "实体",
+      "calledBy": [
+        "ENEMY-MANAGER"
+      ],
+      "calls": [
+        "MOB0"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_REGISTERED_TYPES"
+    },
+    {
+      "id": "ENEMY-MANAGER",
+      "originalSymbol": "vi",
+      "suggestedName": "EnemyManager",
+      "sourceRange": "bundle.strings-decoded.js:32939-33696",
+      "role": "战斗",
+      "calledBy": [
+        "BATTLE-FLOW-INIT",
+        "BATTLE-MANAGER"
+      ],
+      "calls": [
+        "ENEMY-FACTORY",
+        "MOB0"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "BATTLE-MANAGER",
+      "originalSymbol": "vU",
+      "suggestedName": "BattleManager",
+      "sourceRange": "bundle.strings-decoded.js:50323-50534",
+      "role": "战斗",
+      "calledBy": [
+        "BATTLE-FLOW-INIT",
+        "BATTLE-FLOW-START",
+        "GAME-LOOP"
+      ],
+      "calls": [
+        "BATTLE-STATE",
+        "ENEMY-DATA",
+        "MAP-DATA",
+        "ENEMY-MANAGER",
+        "BATTLE-MANAGER-UPDATE"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_BATTLE_ENTRY"
+    },
+    {
+      "id": "ANIMATION-POOL",
+      "originalSymbol": "nz",
+      "suggestedName": "AnimationEntityPool",
+      "sourceRange": "bundle.strings-decoded.js:18534-18608",
+      "role": "实体",
+      "calledBy": [
+        "BATTLE-SCENE"
+      ],
+      "calls": [
+        "ADOU-TARGET"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_ADOU_CREATION"
+    },
+    {
+      "id": "BATTLE-SCENE",
+      "originalSymbol": "r5",
+      "suggestedName": "BattleSceneController",
+      "sourceRange": "bundle.strings-decoded.js:57007-59129; Gq:58444-58490",
+      "role": "场景",
+      "calledBy": [
+        "SCENE-MANAGER",
+        "BATTLE-FLOW-START"
+      ],
+      "calls": [
+        "ANIMATION-POOL",
+        "ADOU-TARGET",
+        "BATTLE-SCENE-UPDATE"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "uuid": "a1VsRozfQfKce35jblVR3w",
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "ADOU-TARGET",
+      "originalSymbol": "nz.$d(\"aDou\") / uz",
+      "suggestedName": "two pooled aDou targets",
+      "sourceRange": "bundle.strings-decoded.js:18560-18570; 58444-58490",
+      "role": "实体",
+      "calledBy": [
+        "ANIMATION-POOL",
+        "BATTLE-SCENE"
+      ],
+      "calls": [],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "PARTIAL_VISUAL_IMPLEMENTATION"
+    },
+    {
+      "id": "BATTLE-MANAGER-UPDATE",
+      "originalSymbol": "vU.update",
+      "suggestedName": "BattleManager.update",
+      "sourceRange": "bundle.strings-decoded.js:50323-50534",
+      "role": "战斗",
+      "calledBy": [
+        "GAME-LOOP",
+        "BATTLE-MANAGER"
+      ],
+      "calls": [
+        "ENEMY-MANAGER",
+        "FIRST-ENEMY-PAIR"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "COMPLETE_FOR_FIRST_WAVE"
+    },
+    {
+      "id": "BATTLE-SCENE-UPDATE",
+      "originalSymbol": "r5.update / B$",
+      "suggestedName": "BattleSceneController.update",
+      "sourceRange": "bundle.strings-decoded.js:57007-59129",
+      "role": "场景",
+      "calledBy": [
+        "GAME-LOOP",
+        "BATTLE-SCENE"
+      ],
+      "calls": [],
+      "confidence": "MEDIUM",
+      "requiredForBattleEntry": true,
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "MOB0",
+      "originalSymbol": "Mob0 concrete class",
+      "suggestedName": "Mob0Enemy",
+      "sourceRange": "bundle.strings-decoded.js:31062-31114",
+      "role": "实体",
+      "calledBy": [
+        "ENEMY-FACTORY",
+        "ENEMY-MANAGER"
+      ],
+      "calls": [],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "PARTIAL_CRITICAL_PATH_IMPLEMENTATION"
+    },
+    {
+      "id": "FIRST-ENEMY-PAIR",
+      "originalSymbol": "vU spawn pair",
+      "suggestedName": "first paired Mob0 spawn",
+      "sourceRange": "bundle.strings-decoded.js:50323-50534",
+      "role": "战斗",
+      "calledBy": [
+        "BATTLE-MANAGER-UPDATE"
+      ],
+      "calls": [
+        "MOB0"
+      ],
+      "confidence": "HIGH",
+      "requiredForBattleEntry": true,
+      "status": "CONFIRMED"
+    }
+  ],
+  "edges": [
+    {
+      "from": "BOOT-INDEX",
+      "to": "LAYA-INIT"
+    },
+    {
+      "from": "BOOT-INDEX",
+      "to": "LOAD-SCENE-OPEN"
+    },
+    {
+      "from": "LAYA-INIT",
+      "to": "LOAD-SCENE-OPEN"
+    },
+    {
+      "from": "LOAD-SCENE-OPEN",
+      "to": "LOAD-SCENE"
+    },
+    {
+      "from": "LOAD-SCENE",
+      "to": "GAME-LOOP"
+    },
+    {
+      "from": "LOAD-SCENE",
+      "to": "GAME-DATA"
+    },
+    {
+      "from": "LOAD-SCENE",
+      "to": "BATTLE-FLOW-INIT"
+    },
+    {
+      "from": "LOAD-SCENE",
+      "to": "SCENE-MANAGER"
+    },
+    {
+      "from": "GAME-LOOP",
+      "to": "ENEMY-MANAGER-UPDATE"
+    },
+    {
+      "from": "GAME-LOOP",
+      "to": "BATTLE-MANAGER-UPDATE"
+    },
+    {
+      "from": "GAME-LOOP",
+      "to": "BATTLE-SCENE-UPDATE"
+    },
+    {
+      "from": "GAME-DATA",
+      "to": "PLAYER-DATA"
+    },
+    {
+      "from": "GAME-DATA",
+      "to": "MAP-DATA"
+    },
+    {
+      "from": "GAME-DATA",
+      "to": "ENEMY-DATA"
+    },
+    {
+      "from": "GAME-DATA",
+      "to": "BATTLE-STATE"
+    },
+    {
+      "from": "BATTLE-FLOW-INIT",
+      "to": "SCENE-MANAGER"
+    },
+    {
+      "from": "BATTLE-FLOW-INIT",
+      "to": "ENEMY-MANAGER"
+    },
+    {
+      "from": "BATTLE-FLOW-INIT",
+      "to": "UNIT-REGISTRY"
+    },
+    {
+      "from": "BATTLE-FLOW-INIT",
+      "to": "BATTLE-MANAGER"
+    },
+    {
+      "from": "SCENE-MANAGER",
+      "to": "MAIN-SCENE"
+    },
+    {
+      "from": "SCENE-MANAGER",
+      "to": "MATCH-SCENE"
+    },
+    {
+      "from": "SCENE-MANAGER",
+      "to": "BATTLE-SCENE"
+    },
+    {
+      "from": "MAIN-SCENE",
+      "to": "PLAYER-DATA"
+    },
+    {
+      "from": "MAIN-SCENE",
+      "to": "MATCH-SCENE"
+    },
+    {
+      "from": "MATCH-SCENE",
+      "to": "GAME-LOOP"
+    },
+    {
+      "from": "MATCH-SCENE",
+      "to": "BATTLE-FLOW-START"
+    },
+    {
+      "from": "BATTLE-FLOW-START",
+      "to": "GAME-DATA"
+    },
+    {
+      "from": "BATTLE-FLOW-START",
+      "to": "BATTLE-MANAGER"
+    },
+    {
+      "from": "BATTLE-FLOW-START",
+      "to": "ENEMY-MANAGER"
+    },
+    {
+      "from": "BATTLE-FLOW-START",
+      "to": "UNIT-REGISTRY"
+    },
+    {
+      "from": "BATTLE-FLOW-START",
+      "to": "SCENE-MANAGER"
+    },
+    {
+      "from": "ENEMY-FACTORY",
+      "to": "MOB0"
+    },
+    {
+      "from": "ENEMY-MANAGER",
+      "to": "ENEMY-FACTORY"
+    },
+    {
+      "from": "ENEMY-MANAGER",
+      "to": "MOB0"
+    },
+    {
+      "from": "BATTLE-MANAGER",
+      "to": "BATTLE-STATE"
+    },
+    {
+      "from": "BATTLE-MANAGER",
+      "to": "ENEMY-DATA"
+    },
+    {
+      "from": "BATTLE-MANAGER",
+      "to": "MAP-DATA"
+    },
+    {
+      "from": "BATTLE-MANAGER",
+      "to": "ENEMY-MANAGER"
+    },
+    {
+      "from": "BATTLE-MANAGER",
+      "to": "BATTLE-MANAGER-UPDATE"
+    },
+    {
+      "from": "ANIMATION-POOL",
+      "to": "ADOU-TARGET"
+    },
+    {
+      "from": "BATTLE-SCENE",
+      "to": "ANIMATION-POOL"
+    },
+    {
+      "from": "BATTLE-SCENE",
+      "to": "ADOU-TARGET"
+    },
+    {
+      "from": "BATTLE-SCENE",
+      "to": "BATTLE-SCENE-UPDATE"
+    },
+    {
+      "from": "BATTLE-MANAGER-UPDATE",
+      "to": "ENEMY-MANAGER"
+    },
+    {
+      "from": "BATTLE-MANAGER-UPDATE",
+      "to": "FIRST-ENEMY-PAIR"
+    },
+    {
+      "from": "FIRST-ENEMY-PAIR",
+      "to": "MOB0"
+    }
+  ],
+  "normalPath": [
+    "BOOT-INDEX",
+    "LAYA-INIT",
+    "LOAD-SCENE-OPEN",
+    "LOAD-SCENE",
+    "BATTLE-FLOW-INIT",
+    "SCENE-MANAGER",
+    "MAIN-SCENE",
+    "MATCH-SCENE",
+    "BATTLE-FLOW-START",
+    "BATTLE-MANAGER",
+    "BATTLE-SCENE",
+    "ADOU-TARGET",
+    "GAME-LOOP",
+    "BATTLE-MANAGER-UPDATE",
+    "FIRST-ENEMY-PAIR"
+  ],
+  "specialLaunchPath": [
+    "BOOT-INDEX",
+    "LAYA-INIT",
+    "LOAD-SCENE-OPEN",
+    "LOAD-SCENE",
+    "BATTLE-FLOW-INIT",
+    "SCENE-MANAGER",
+    "MATCH-SCENE",
+    "BATTLE-FLOW-START",
+    "BATTLE-MANAGER",
+    "BATTLE-SCENE"
+  ],
+  "developmentDirectPath": [
+    "BOOT-INDEX",
+    "LAYA-INIT",
+    "DevelopmentBootstrap.$_main_",
+    "GAME-DATA",
+    "BATTLE-FLOW-INIT",
+    "BATTLE-FLOW-START",
+    "BATTLE-MANAGER",
+    "BATTLE-SCENE",
+    "ADOU-TARGET",
+    "GAME-LOOP",
+    "BATTLE-MANAGER-UPDATE",
+    "FIRST-ENEMY-PAIR"
+  ],
+  "completionBoundary": {
+    "battleSceneCreated": true,
+    "battleLifecycleExecuted": true,
+    "battleManagerBound": true,
+    "battleStateEnteredWaitingOrSpawning": true,
+    "firstPlayerSideObjectCreated": true,
+    "firstOpponentSideObjectCreated": true,
+    "waveConfigurationInitialized": true,
+    "frameLoopRegistered": true,
+    "firstFrameExecutable": true,
+    "cleanupListenersRegistered": true,
+    "battleStartedObservable": true,
+    "firstEnemyPairObservable": true,
+    "formalDelayMs": 10000,
+    "developmentDelayOverrideMs": 0,
+    "spawnIntervalMs": 1500,
+    "note": "原代码不会在 BattleScene.onAwake 自动创建友军；最先创建的是双方两个 aDou 目标。普通敌人由 BattleManager 在准备期结束后成对生成。"
+  }
+}

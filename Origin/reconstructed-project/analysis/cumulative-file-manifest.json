@@ -1,0 +1,2203 @@
+{
+  "schemaVersion": 3,
+  "round": 6,
+  "snapshot": "cumulative-rounds-01-06",
+  "snapshotType": "FULL_CUMULATIVE_PROJECT",
+  "containsRounds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "generatedAt": "2026-07-24T14:43:28.517Z",
+  "containsAllHistoricalResults": true,
+  "containsAllHistoricalRounds": true,
+  "status": "CUMULATIVE_VERIFIED",
+  "historicalRounds": {
+    "round01": {
+      "requiredFiles": [
+        "analysis/round-01-report.md",
+        "tools/decode-strings.js",
+        "work/bundle.strings-decoded.js"
+      ],
+      "missing": [],
+      "complete": true
+    },
+    "round02": {
+      "requiredFiles": [
+        "analysis/round-02-report.md",
+        "src/network/HttpClient.js",
+        "tests/unit/HttpClient.test.js"
+      ],
+      "missing": [],
+      "complete": true
+    },
+    "round03": {
+      "requiredFiles": [
+        "analysis/round-03-report.md",
+        "src/bootstrap/GameBootstrap.js",
+        "src/scenes/BattleSceneController.js"
+      ],
+      "missing": [],
+      "complete": true
+    },
+    "round04": {
+      "requiredFiles": [
+        "analysis/round-04-report.md",
+        "src/entities/Mob0Enemy.js",
+        "src/battle/MapData.js"
+      ],
+      "missing": [],
+      "complete": true
+    },
+    "round05": {
+      "requiredFiles": [
+        "analysis/round-05-report.md",
+        "src/units/KnifeSoldier.js",
+        "src/units/UnitRegistry.js"
+      ],
+      "missing": [],
+      "complete": true
+    },
+    "round06": {
+      "requiredFiles": [
+        "analysis/round-06-report.md",
+        "src/units/BowSoldier.js",
+        "src/projectiles/SimpleDynamicArrow.js",
+        "src/projectiles/ProjectileManager.js"
+      ],
+      "missing": [],
+      "complete": true
+    }
+  },
+  "immutableInputs": {
+    "original/bundle.js": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+    "work/bundle.strings-decoded.js": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+    "original/index.js": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+    "src/network/HttpClient.js": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+  },
+  "fileCount": 419,
+  "totalBytes": 50080478,
+  "projectFileCountExcludingManifestArtifacts": 419,
+  "totalBytesExcludingManifestArtifacts": 50080478,
+  "directoryCounts": {
+    ".npmrc": 1,
+    "README.md": 1,
+    "analysis": 132,
+    "history": 16,
+    "original": 11,
+    "package-lock.json": 1,
+    "package.json": 1,
+    "src": 77,
+    "tests": 78,
+    "tools": 22,
+    "vendor": 1,
+    "work": 78
+  },
+  "treeSha256": "629a0b93ffe0dc7863dccd70985d998989830332ecf5caf7488f23dae31c860a",
+  "manifestArtifacts": [
+    "analysis/cumulative-file-manifest.json",
+    "analysis/cumulative-file-list.txt",
+    "analysis/deliverable-manifest.json"
+  ],
+  "selfHashPolicy": "Manifest artifacts are listed separately to avoid recursive self-hashing.",
+  "files": [
+    {
+      "path": ".npmrc",
+      "sizeBytes": 63,
+      "sha256": "41f8a13613525ed10e9f62a615e08f91c991e96f7a003f16544b23eb80c8f19b"
+    },
+    {
+      "path": "README.md",
+      "sizeBytes": 15858,
+      "sha256": "9b2b7bbbbeadf631196c1321de2c433c117d18759165c7f1237cedc2bf04c3be"
+    },
+    {
+      "path": "analysis/architecture/module-conventions.md",
+      "sizeBytes": 7013,
+      "sha256": "4bf1c6e94e574c683f3ac4152eaa152744a95283a850a1bd55ca5e727e90af27"
+    },
+    {
+      "path": "analysis/baseline-manifest.json",
+      "sizeBytes": 5565,
+      "sha256": "8e832ae9c43b569b5cea51fcb190781f888da28ce810a64200a670f4cd220676"
+    },
+    {
+      "path": "analysis/behavior-diff-round-04.md",
+      "sizeBytes": 772,
+      "sha256": "931e299e5edf7223e07414fad4607b1518f12ba11dc6608dd9a8676ff56d2fd6"
+    },
+    {
+      "path": "analysis/behavior-diff-round-05.md",
+      "sizeBytes": 1038,
+      "sha256": "3a2791b002fc53549c7dc7baadb6ea46113b7baa48d169d63d232fcfba0a675f"
+    },
+    {
+      "path": "analysis/behavior-diff-round-06.md",
+      "sizeBytes": 1506,
+      "sha256": "386038a01eb94bb98843ba9b8f706ebcaa0be361b9680c10db107af2a1095da0"
+    },
+    {
+      "path": "analysis/behavior-diff.md",
+      "sizeBytes": 3766,
+      "sha256": "09ec7acae2c9cee424060e9181aa4b311be4e880e79cb0331fa79f44c9e27149"
+    },
+    {
+      "path": "analysis/behavior/BOOT-TO-BATTLE.md",
+      "sizeBytes": 2387,
+      "sha256": "1634fd60540f57c850a802e680353735f4421743e4c29e868b2cdf9dcbcb57ed"
+    },
+    {
+      "path": "analysis/behavior/BOW-PROJECTILE-COMBAT-01.md",
+      "sizeBytes": 1268,
+      "sha256": "37c324a22dd806bac140e772279740adf6be8cb328e8745ed5110312e71a700f"
+    },
+    {
+      "path": "analysis/behavior/ENEMY-RUNTIME-01.md",
+      "sizeBytes": 1368,
+      "sha256": "2de5eecfb2846a8a14db6ccb7e8acddd30820b8c07b705051e9617483c6792b1"
+    },
+    {
+      "path": "analysis/behavior/FRIENDLY-UNIT-COMBAT-01.md",
+      "sizeBytes": 1814,
+      "sha256": "d7da1b9dfbf61a86f0e798c79bac2cc279386f9aa46c58f4a2c9329205fb990f"
+    },
+    {
+      "path": "analysis/behavior/NET-01.md",
+      "sizeBytes": 9731,
+      "sha256": "92c9c28b4d47e0437b8bde2eb85339bc8c4bad4d262964ec4908e9568ad10aa5"
+    },
+    {
+      "path": "analysis/behavior/bow-attack-animation-contract.md",
+      "sizeBytes": 1234,
+      "sha256": "0fe4bd925445abfdfd2244f7e0597321d8b2782cef0c2e828dde203f0e8eea35"
+    },
+    {
+      "path": "analysis/behavior/bow-target-selection.md",
+      "sizeBytes": 1174,
+      "sha256": "046108bd1c3ec50f96e0a00562b6cc009a787a263d126bc43b85d8eee9937dd3"
+    },
+    {
+      "path": "analysis/behavior/enemy-lifecycle.md",
+      "sizeBytes": 1218,
+      "sha256": "bc788d393aaa9a74b4fc238609e7e780ecc6566d6e1c807d283f14379cd3ad4c"
+    },
+    {
+      "path": "analysis/behavior/enemy-pool-reset-contract.md",
+      "sizeBytes": 1038,
+      "sha256": "4b2334df9b8f17dd86815ef6cb60d50b272286223870cd78f178aaacb98ee32f"
+    },
+    {
+      "path": "analysis/behavior/enemy-spatial-index.md",
+      "sizeBytes": 935,
+      "sha256": "2b5be4d0060f152ea34fa58a4d84cb065b5c40e0ee75b3e5bcb53cd160ae363f"
+    },
+    {
+      "path": "analysis/behavior/enemy-state-machine.md",
+      "sizeBytes": 1104,
+      "sha256": "acd5a9b480cadd743d19cb1991254fef1d923afc1f53b83b9d14b0bc2e4b6bcf"
+    },
+    {
+      "path": "analysis/behavior/enemy-target-selection.md",
+      "sizeBytes": 763,
+      "sha256": "153d28dd69d99d03a8d9359986e48ffba058da437c7fd08fdf5c5e8b19c182f3"
+    },
+    {
+      "path": "analysis/behavior/friendly-target-selection.md",
+      "sizeBytes": 1006,
+      "sha256": "b31344ad7db9ecfd7675172a384ca65807dcf7cac1d262166e9b8f1ad9732904"
+    },
+    {
+      "path": "analysis/behavior/friendly-unit-lifecycle.md",
+      "sizeBytes": 1701,
+      "sha256": "e29de78d31c7ac3cc3adec054cfa9327a73caac0e67b53e13c53d1a37b7817f2"
+    },
+    {
+      "path": "analysis/behavior/friendly-unit-pool-reset-contract.md",
+      "sizeBytes": 918,
+      "sha256": "0d22435871112ef3f9374384a2831f5de967c69e3bc896de0a527ad9cc784937"
+    },
+    {
+      "path": "analysis/behavior/projectile-lifecycle.md",
+      "sizeBytes": 1149,
+      "sha256": "920cd14fe41b5f7852ae22ebae116a549f691dd4c298ab946830b121917d6c83"
+    },
+    {
+      "path": "analysis/behavior/projectile-pool-reset-contract.md",
+      "sizeBytes": 836,
+      "sha256": "18e5bc27fc3cb4a2fc0e8682f6c5ebfe03052ee11929dced9db34da832f98155"
+    },
+    {
+      "path": "analysis/behavior/projectile-update-order.md",
+      "sizeBytes": 1005,
+      "sha256": "921bc44451ced48df2175beca483f2b3c6fb3cdb986579808ebfe4d5e7df03c0"
+    },
+    {
+      "path": "analysis/behavior/simple-dynamic-arrow-trajectory.md",
+      "sizeBytes": 1340,
+      "sha256": "4f14caf4dee1aa7caa623c15fc7d76ba2d4db14a00bed4b75e8f998126d06aac"
+    },
+    {
+      "path": "analysis/behavior/unit-registry.md",
+      "sizeBytes": 3442,
+      "sha256": "8ec4d4871e146a6e3e08a099194a0380cf63dac1f0b65a506b560b0d45efbf1d"
+    },
+    {
+      "path": "analysis/complete-file-list.json",
+      "sizeBytes": 75294,
+      "sha256": "762264d096864f6aa3fdea08d7d67edc3e0d934bed25a766567644a378e22fbd"
+    },
+    {
+      "path": "analysis/complete-file-list.txt",
+      "sizeBytes": 46749,
+      "sha256": "4c615e6e0dc70f2652f903a68c16b43d7dd7d247a76bd984455c58c2993921a8"
+    },
+    {
+      "path": "analysis/critical-path/battle-entry-definition.md",
+      "sizeBytes": 1925,
+      "sha256": "1ce029ee976600dbad263ccffe90e3c0c18d511620fc31e1d8becc538d5876ab"
+    },
+    {
+      "path": "analysis/critical-path/boot-to-battle-callgraph.json",
+      "sizeBytes": 17298,
+      "sha256": "814d3a81cf09f6d26b3547e17f1ab2cd77fdf62cd4db1d0f5684cdf7199e793d"
+    },
+    {
+      "path": "analysis/critical-path/boot-to-battle-callgraph.md",
+      "sizeBytes": 5149,
+      "sha256": "6e967b66862fa89f1df03336b948d374caa02deb9785f41cdd656c030283ae1c"
+    },
+    {
+      "path": "analysis/critical-path/boot-to-battle-method-coverage.json",
+      "sizeBytes": 23359,
+      "sha256": "cea1ce24738cc067fe0157c8a2e65b768f1dc61df44f95e6167c1dbf7a6f6499"
+    },
+    {
+      "path": "analysis/critical-path/boot-to-battle-symbols.json",
+      "sizeBytes": 11386,
+      "sha256": "a11f17fc75f169342e24f76762c6ade4cb4182c9834e153fcc0bce7a06ff73ab"
+    },
+    {
+      "path": "analysis/critical-path/bow-projectile-classgraph.json",
+      "sizeBytes": 7956,
+      "sha256": "cf823eea9cee264c553905f632710f8c2b2723a75739feb070ae4fc2c64df583"
+    },
+    {
+      "path": "analysis/critical-path/bow-projectile-classgraph.md",
+      "sizeBytes": 1403,
+      "sha256": "a020703e639359006473672595c8d050c71005902bf216cf302a25a95da3f75c"
+    },
+    {
+      "path": "analysis/critical-path/bow-projectile-dependency-closure.json",
+      "sizeBytes": 3305,
+      "sha256": "605e3ae511d75e97f3d93f70e6931094e987ed1badf8fa4dcc09e9f396752684"
+    },
+    {
+      "path": "analysis/critical-path/bow-soldier-stats.json",
+      "sizeBytes": 4569,
+      "sha256": "73df6c1b85b5789a393ef858f4bd8b597f8a0de2cb3b46bb55205743309cbc8d"
+    },
+    {
+      "path": "analysis/critical-path/deferred-modules.md",
+      "sizeBytes": 1833,
+      "sha256": "83b84fc282f4bad2edecee7c5ae99a08a712f98c7cb90da633ed4cd541e3ac18"
+    },
+    {
+      "path": "analysis/critical-path/enemy-runtime-classgraph.json",
+      "sizeBytes": 8268,
+      "sha256": "39d72b555c65b7d4cf427f000bc5528259a3d2239deb699f472ec36c6b0da252"
+    },
+    {
+      "path": "analysis/critical-path/enemy-runtime-classgraph.md",
+      "sizeBytes": 1237,
+      "sha256": "524de1a06c2dc5abd2bff0e15a1ff757037164b8e61ba984b4df653a186b1331"
+    },
+    {
+      "path": "analysis/critical-path/enemy-runtime-dependency-closure.json",
+      "sizeBytes": 1984,
+      "sha256": "26dd3148af422278bd83fb161f3f9a5e7c995f303fb0d3c88ccf5eb175d3ddd0"
+    },
+    {
+      "path": "analysis/critical-path/first-friendly-unit-selection.md",
+      "sizeBytes": 1056,
+      "sha256": "f3211f223cca8374dda171a71bde931d9e1130c81a3f8caeaff99436601e7ba8"
+    },
+    {
+      "path": "analysis/critical-path/first-friendly-unit-stats.json",
+      "sizeBytes": 3626,
+      "sha256": "a6a14c6556fa1540a55554eeb8d4b43c2e62b628f26d7129afb37e8f858fa6f6"
+    },
+    {
+      "path": "analysis/critical-path/friendly-unit-classgraph.json",
+      "sizeBytes": 7512,
+      "sha256": "2ecaba5522b191da89a03f7d16f5d5475a7810ef86f9302640545ebb8f578aca"
+    },
+    {
+      "path": "analysis/critical-path/friendly-unit-classgraph.md",
+      "sizeBytes": 1551,
+      "sha256": "34f8c90b3c6c0b339ec0f5045cd7bb57f49869bf8866fd04d9b1707ba9c54cb4"
+    },
+    {
+      "path": "analysis/critical-path/friendly-unit-dependency-closure.json",
+      "sizeBytes": 2929,
+      "sha256": "793fdf374fe5f24d7fb8bda6685419f84f48c553cffbf1abc57c7ea877fc13ea"
+    },
+    {
+      "path": "analysis/critical-path/minimum-player-state.json",
+      "sizeBytes": 6218,
+      "sha256": "9c64d77f4f9a9b1c9dd44fc121cf1fc234ff3174ccf037c242a7b2198cd3d1a9"
+    },
+    {
+      "path": "analysis/critical-path/simple-arrow-stats.json",
+      "sizeBytes": 4204,
+      "sha256": "a438a1508376fca213f327bb6fcc01dd395301b3ef241dd00e8ef6dd63f827af"
+    },
+    {
+      "path": "analysis/cumulative-snapshot-audit.json",
+      "sizeBytes": 4824,
+      "sha256": "787e0a5d9f8125de804e0a9abd51cf1f006853d843ea61bfe229ec48c7a41c90"
+    },
+    {
+      "path": "analysis/cumulative-snapshot-report.json",
+      "sizeBytes": 32509,
+      "sha256": "b6cd9d167eef29298c909daec3a4b575ad566714b1da485d701a67f6ee96681f"
+    },
+    {
+      "path": "analysis/cumulative-snapshot-report.md",
+      "sizeBytes": 899,
+      "sha256": "136d94b661d644c1685a523f5b8103e7bffbae4942dd74253a571a71d053bbc7"
+    },
+    {
+      "path": "analysis/cumulative-verification-report.md",
+      "sizeBytes": 804,
+      "sha256": "e28ee160a0598280a732a57b88bd77c6dfabb8371a8beb0bd094d16dc22cb820"
+    },
+    {
+      "path": "analysis/deliverable-manifest-cumulative-round-05.json",
+      "sizeBytes": 61796,
+      "sha256": "92f4d48f7a69fa2cf977342d977c6bb9f86675d34b1b36104d63733817db6b94"
+    },
+    {
+      "path": "analysis/deliverable-manifest-cumulative-round-06.json",
+      "sizeBytes": 75608,
+      "sha256": "b0efe143d2ad0039b6d6b65d7b65b07b023db8d39b0afcaacce207b8ef1f2df9"
+    },
+    {
+      "path": "analysis/deliverable-manifest-round-02.json",
+      "sizeBytes": 3911,
+      "sha256": "2f08e0a5284054809e625214c05ba6ab626aa9b04596f58f202970e61ffbebbf"
+    },
+    {
+      "path": "analysis/deliverable-manifest-round-03.json",
+      "sizeBytes": 27819,
+      "sha256": "dbb1c70bfaa0aa8495af8846ec7222f751415e5b055729f82c0b5b0c3517a8a3"
+    },
+    {
+      "path": "analysis/deliverable-manifest-round-04.json",
+      "sizeBytes": 37809,
+      "sha256": "93f4a8d23786b02d3ac6a03bc60672d03727c25792d4b25893932501e7ba465b"
+    },
+    {
+      "path": "analysis/deliverable-manifest-round-05.json",
+      "sizeBytes": 64672,
+      "sha256": "ea1f8904847d7477cc511fa6e555e94319d3e07ee029adac5891dde938b4bce6"
+    },
+    {
+      "path": "analysis/deliverable-manifest-round-06.json",
+      "sizeBytes": 18459,
+      "sha256": "3770dd2bc4fedcbc12c0a286eaa9bc435ba6d6618c25a09cab54fae19d0cb7ba"
+    },
+    {
+      "path": "analysis/dependency-map.md",
+      "sizeBytes": 8428,
+      "sha256": "daad77671b1b248f3c467ecbf010580f97da02b850b064879aca09363f831f4b"
+    },
+    {
+      "path": "analysis/development-command-results.json",
+      "sizeBytes": 3074,
+      "sha256": "63c0374f9ee962d7d44372c643a3e3043c1849b6497bb81ee2a553963d499e4a"
+    },
+    {
+      "path": "analysis/file-inventory.json",
+      "sizeBytes": 2605,
+      "sha256": "f91c635305ca6676f5bf124d0650f1c700877b7a84af22feb95c25807f8e7b1d"
+    },
+    {
+      "path": "analysis/fresh-install-verification-round-06.json",
+      "sizeBytes": 1708,
+      "sha256": "b18b4389456410e4f17b7e3790bafb06a08b606112bf8058f80cb26b9502f97f"
+    },
+    {
+      "path": "analysis/fresh-install-verification-round-06.md",
+      "sizeBytes": 829,
+      "sha256": "3600bea0dad93209e8a63bc942aa1b161edace32f24b2d424c9f088a7936a9cc"
+    },
+    {
+      "path": "analysis/fresh-install-verification.json",
+      "sizeBytes": 4265,
+      "sha256": "70491145b28e41d4df4de7c80daef133fb290a6ac43c1eea7260f8675f91ebcd"
+    },
+    {
+      "path": "analysis/fresh-install-verification.md",
+      "sizeBytes": 923,
+      "sha256": "53e92fe86d0b3c3aabf41bde84b21a0a695b3183e031bb968d0a795774c12adc"
+    },
+    {
+      "path": "analysis/mappings/BOOT-TO-BATTLE-symbol-map.json",
+      "sizeBytes": 3125,
+      "sha256": "14fac704a0a41a18ff86011a9d261382bfacab1778a38afb06b1ff245ced2577"
+    },
+    {
+      "path": "analysis/mappings/BOW-PROJECTILE-COMBAT-01-symbol-map.json",
+      "sizeBytes": 6566,
+      "sha256": "011c320fad9d5d72a479cb0a945f342f12d275f624737b37c4d5ce95dacdf007"
+    },
+    {
+      "path": "analysis/mappings/ENEMY-RUNTIME-01-symbol-map.json",
+      "sizeBytes": 6595,
+      "sha256": "f93ee410191b8676ef522c21ad589f30f3cd40b0c5a5147e4828b78258a2c6d2"
+    },
+    {
+      "path": "analysis/mappings/FRIENDLY-UNIT-COMBAT-01-symbol-map.json",
+      "sizeBytes": 3863,
+      "sha256": "28d306245bced677c27b06bb877b7e9bc296c23af4aca25b5c07cff8387242fb"
+    },
+    {
+      "path": "analysis/mappings/NET-01-symbol-map.json",
+      "sizeBytes": 10369,
+      "sha256": "d58949e7b95872d1a903e62c5681a7bc38027326ef706e91ec7cd9f218d84fab"
+    },
+    {
+      "path": "analysis/method-coverage-NET-01.json",
+      "sizeBytes": 10124,
+      "sha256": "5416fa91a71e7dfe49c6070b86acb97aeca986107c158931f3d4ce1724fed31c"
+    },
+    {
+      "path": "analysis/modules/ANIMATION-POOL-01.json",
+      "sizeBytes": 717,
+      "sha256": "a6eb9f05c49fa3e2915bad5dbd71d6801924a69c857d8d91fcefead317f83b31"
+    },
+    {
+      "path": "analysis/modules/BATTLE-MGR-01.json",
+      "sizeBytes": 881,
+      "sha256": "f34c44d0566b293831d815498e2601e582eb562dcef537f2b23bc6290be58080"
+    },
+    {
+      "path": "analysis/modules/BOOT-TO-BATTLE.json",
+      "sizeBytes": 4104,
+      "sha256": "b07102afe462c80c71a03472da1d3f9f3195a7af40737860e731ba63b980deba"
+    },
+    {
+      "path": "analysis/modules/BOW-PROJECTILE-COMBAT-01-method-coverage.json",
+      "sizeBytes": 6385,
+      "sha256": "5eced6fe7a5889c6af13eabdbce6f32efe3511412c4b61a0db9fc7d1bc82a78c"
+    },
+    {
+      "path": "analysis/modules/BOW-PROJECTILE-COMBAT-01.json",
+      "sizeBytes": 3359,
+      "sha256": "f5577dd4ca163b663213718dd86f946adc4179aa3cd350d0bf19d54cc5d90590"
+    },
+    {
+      "path": "analysis/modules/DATA-CP-01.json",
+      "sizeBytes": 822,
+      "sha256": "ded213e40eb3daa54391cc9311f44eac7f12e6c5b99de8f8e89883addb5b669e"
+    },
+    {
+      "path": "analysis/modules/ENEMY-MGR-CP-01.json",
+      "sizeBytes": 801,
+      "sha256": "af93c8f299c9841a7896cc0d075f5a891b21d906e31c5bd7f997a0eeca8a30e0"
+    },
+    {
+      "path": "analysis/modules/ENEMY-RUNTIME-01-method-coverage.json",
+      "sizeBytes": 3490,
+      "sha256": "86dd139cc8a0c8401c60bfae97bef2c3af5fe2a4f17c7cd84d12ba7c8690429b"
+    },
+    {
+      "path": "analysis/modules/ENEMY-RUNTIME-01.json",
+      "sizeBytes": 3052,
+      "sha256": "663a79c172a4d5403df3b61fb4ed6e1aee9565c676e4b44e07776e9d9aaf089d"
+    },
+    {
+      "path": "analysis/modules/FRIENDLY-UNIT-COMBAT-01-method-coverage.json",
+      "sizeBytes": 26819,
+      "sha256": "e35d3532de75d530313161813469a44dcca5510610ac7776cc53c2f5a047487f"
+    },
+    {
+      "path": "analysis/modules/FRIENDLY-UNIT-COMBAT-01.json",
+      "sizeBytes": 3448,
+      "sha256": "3411eef117983bc01264d235de11a779d20b23c4eb29405b77d2571ecd7d6cd2"
+    },
+    {
+      "path": "analysis/modules/NET-01-method-coverage.json",
+      "sizeBytes": 4590,
+      "sha256": "3a46c2e19eeb4ff0a982c74108fdea7e050b648bb90795ea830d3b8c7cb33811"
+    },
+    {
+      "path": "analysis/modules/NET-01.json",
+      "sizeBytes": 6320,
+      "sha256": "da5e587c941c15a6903c8d24908385cc5b2bc5855b557f57791613cb04d9962f"
+    },
+    {
+      "path": "analysis/modules/SCENE-BATTLE-01.json",
+      "sizeBytes": 884,
+      "sha256": "638cc1c1125d5c69464ea5461a9454e615b417b620e225bd2054931db2a91acf"
+    },
+    {
+      "path": "analysis/modules/SCENE-LOAD-01.json",
+      "sizeBytes": 829,
+      "sha256": "883ac743220277b307f5a67c9036c09c6c8e811e75a423e8fac85fe47887a6c5"
+    },
+    {
+      "path": "analysis/modules/SCENE-MAIN-01.json",
+      "sizeBytes": 778,
+      "sha256": "dd62698327e175f2f4f0cfc0f3f8a5f9bf2e0404e970b35e31d1d309a1cb7ac4"
+    },
+    {
+      "path": "analysis/modules/SCENE-MATCH-01.json",
+      "sizeBytes": 785,
+      "sha256": "cfedd7e59c5b13e7c9a4fc97cedacf45455ed06479c152669efa7f5d2f2e9aa8"
+    },
+    {
+      "path": "analysis/modules/SCENE-MGR-01.json",
+      "sizeBytes": 713,
+      "sha256": "2368cc43a457d3a342d53cc6bdb09659d4dfe86ad041d1b8559fa9bd0083490d"
+    },
+    {
+      "path": "analysis/obfuscation-runtime-values.json",
+      "sizeBytes": 675,
+      "sha256": "3f93b194907d1b43f2e5125aca82a1dcda21921908aadfde6a24e5dc36131324"
+    },
+    {
+      "path": "analysis/obfuscation-runtime.md",
+      "sizeBytes": 4872,
+      "sha256": "f67fe6cef65184a0fb0f2706f802f37175ecfa614ea8622106b14c3d0d20d06f"
+    },
+    {
+      "path": "analysis/opaque-predicate-values.json",
+      "sizeBytes": 804,
+      "sha256": "b437be0ff2a8f945033f6c5fc55d758f4a3e524c4fc6be1c9ecaf1786715eee1"
+    },
+    {
+      "path": "analysis/original-files.sha256",
+      "sizeBytes": 949,
+      "sha256": "bbf38fb4fef6d0f1d79f158fb29f04440af19089080b92c188a2d4b4e2762a6f"
+    },
+    {
+      "path": "analysis/reconstruction-log.md",
+      "sizeBytes": 20014,
+      "sha256": "62500d3e8bb06132524810896075f42ab4382d6f41b82165e578fa7df3978b9c"
+    },
+    {
+      "path": "analysis/recovered-source-list.json",
+      "sizeBytes": 290,
+      "sha256": "aff4e7513a491e49cd9ee96f6ef2537bf890e80eb75333a47d7b17e4c64983cc"
+    },
+    {
+      "path": "analysis/round-01-artifacts.json",
+      "sizeBytes": 4932,
+      "sha256": "3a2b6ef198d0fce34b64cbcc7a10259ba49ea0f3048d0d130b25701c5b63769c"
+    },
+    {
+      "path": "analysis/round-01-report.md",
+      "sizeBytes": 1838,
+      "sha256": "56e611942d375ce201c41ad5d99493ddf36998a703cbce2fb90bd9f2b3496dd5"
+    },
+    {
+      "path": "analysis/round-02-artifacts.json",
+      "sizeBytes": 5129,
+      "sha256": "6d6772a580ce3c2734227812f283e66e6ffaf2d819e0b5c89ca5286c16d97314"
+    },
+    {
+      "path": "analysis/round-02-report.md",
+      "sizeBytes": 1924,
+      "sha256": "761c56a9c71fcbaab0230a7d9713a913c4b54f4528ffcad640f9bdc1d4db7b51"
+    },
+    {
+      "path": "analysis/round-03-artifacts.json",
+      "sizeBytes": 2331,
+      "sha256": "cabc6146c3f06f13bed3527c9892df208b1d9b7621673272fc60820898db4cb4"
+    },
+    {
+      "path": "analysis/round-03-report.md",
+      "sizeBytes": 9642,
+      "sha256": "2322d2f07cdc974d7a69cbc461f28079b90b15336950b3300b106b9b65d0ab41"
+    },
+    {
+      "path": "analysis/round-04-artifacts.json",
+      "sizeBytes": 15423,
+      "sha256": "ad354c00cc32787f211dc6d4a5bad551f19627a0493f8a9e1b1149f19f5770e8"
+    },
+    {
+      "path": "analysis/round-04-report.md",
+      "sizeBytes": 5014,
+      "sha256": "e545eff7d43a37cd9705b3e3ac9b759582a0afad7180b82e3f00bd94cb1b20ff"
+    },
+    {
+      "path": "analysis/round-05-artifacts.json",
+      "sizeBytes": 4587,
+      "sha256": "ed065db944d908572859dbd295e0c8ddce4af015782329aa5260df1e91c5a452"
+    },
+    {
+      "path": "analysis/round-05-plan-compliance.json",
+      "sizeBytes": 2208,
+      "sha256": "f8a1d4d594e5cf67535bedd526d43c856d7a8a81f19929fb42111dbe916678f7"
+    },
+    {
+      "path": "analysis/round-05-plan-compliance.md",
+      "sizeBytes": 2089,
+      "sha256": "d7212199d86ae2f3d3ea0e63ae8016bd870e960e11cfb3556010c590f9b03bf5"
+    },
+    {
+      "path": "analysis/round-05-report.md",
+      "sizeBytes": 7822,
+      "sha256": "e683062ff156fda0b97badf0fd527541099326117f22c87c7fb881fdc2dca480"
+    },
+    {
+      "path": "analysis/round-05-source-extracts.json",
+      "sizeBytes": 4120,
+      "sha256": "a898bef000a64808d3c3edfbfad40c117e1a421dbe9916032daff4f05db5a6f6"
+    },
+    {
+      "path": "analysis/round-06-artifacts.json",
+      "sizeBytes": 4399,
+      "sha256": "8ddfea667dd7f3bcccf861a15d2a6dcc3c7e9b78a2f2c36d127e9db98f668ed9"
+    },
+    {
+      "path": "analysis/round-06-report.md",
+      "sizeBytes": 11633,
+      "sha256": "b5bc65389e184a85c4d39e86f733283685348b696f40513c5558f46213f453ec"
+    },
+    {
+      "path": "analysis/source-map-report.md",
+      "sizeBytes": 2421,
+      "sha256": "aa701b6b7fc5d37532caf6479c4175a8596f4c6d8e73ec33a6123ecd85098f6c"
+    },
+    {
+      "path": "analysis/static-check-NET-01.json",
+      "sizeBytes": 1363,
+      "sha256": "afb0c35a73c67b78e3ec7884b9f2a11880a82983529f73e0f62ce70d6b829389"
+    },
+    {
+      "path": "analysis/static-checks-round-02.json",
+      "sizeBytes": 1219,
+      "sha256": "76a39fa82d3a078e57bb34c2eee7cde65ec6bfbaf7c4c3fb37708caefbcf087e"
+    },
+    {
+      "path": "analysis/static-checks-round-03.json",
+      "sizeBytes": 7010,
+      "sha256": "2cf4b977ef23c09abd371cb603f9e2b345c8b68cbbc37efdb4367eea3b914f2e"
+    },
+    {
+      "path": "analysis/static-checks-round-04.json",
+      "sizeBytes": 16619,
+      "sha256": "9f101171206688c27d014716b2fe7adc9b6a3f5e74af0219735ca14d76f164ee"
+    },
+    {
+      "path": "analysis/static-checks-round-05.json",
+      "sizeBytes": 41475,
+      "sha256": "42a0af30c5f3084ba0bdd0df88daf2c08f08dece66761e44048b66f51f890bca"
+    },
+    {
+      "path": "analysis/static-checks-round-06.json",
+      "sizeBytes": 32380,
+      "sha256": "b71bd2555a4b2dcb2733da308729a38eba8e2c11ffa6ed6315d51c5421e8a767"
+    },
+    {
+      "path": "analysis/string-decoding-map.jsonl",
+      "sizeBytes": 32560923,
+      "sha256": "4a232bae0da6d5d402d2ef78215ba0efd3185550c224e06dbc1cc816baaac6b6"
+    },
+    {
+      "path": "analysis/string-decoding-report.json",
+      "sizeBytes": 8779,
+      "sha256": "1e897e053a9a6535f036737101433cd566f2e360795af9483bdcb9e9ffe4a422"
+    },
+    {
+      "path": "analysis/string-decoding-report.md",
+      "sizeBytes": 3149,
+      "sha256": "94dafbd7b8560a16e02b365cb495d3b410a49c64d5640fe4551754232721d630"
+    },
+    {
+      "path": "analysis/string-decoding-unresolved.jsonl",
+      "sizeBytes": 896645,
+      "sha256": "a66df6bb2d5a58512dc3325dce2f79f63199ed0b67ae7a62ce7a953e54af5a2a"
+    },
+    {
+      "path": "analysis/test-results-all.json",
+      "sizeBytes": 9948,
+      "sha256": "827eb723cdfb26f241c6b571a136a59fb71a21648d4851ac59b6646c105d2d54"
+    },
+    {
+      "path": "analysis/test-results-round-01.json",
+      "sizeBytes": 602,
+      "sha256": "364d9e4f8d7f603b3fdd0a3abb70c1526bc31a6011807c32a42a0dc59a3f5940"
+    },
+    {
+      "path": "analysis/test-results-round-02.json",
+      "sizeBytes": 2024,
+      "sha256": "4aac8759e4f33c18c1d08973c79c91dcba8defc40733de5315f27fe06c5ac787"
+    },
+    {
+      "path": "analysis/test-results-round-03.json",
+      "sizeBytes": 1619,
+      "sha256": "cf1afae29e53198bd94406f7079ab912c56a3576f5e971b1de60256afc423bce"
+    },
+    {
+      "path": "analysis/test-results-round-04.json",
+      "sizeBytes": 5895,
+      "sha256": "7faf43c4d17a0f1d6294721b50b5f4d288942121cc957652e7b388007fb5c676"
+    },
+    {
+      "path": "analysis/test-results-round-05.json",
+      "sizeBytes": 3238,
+      "sha256": "8333e2acbee8e484ccd1277eb7bbc67b85d788cde2df56c20daf0cd6ab6224e5"
+    },
+    {
+      "path": "analysis/test-results-round-06.json",
+      "sizeBytes": 12821,
+      "sha256": "e8b62a96ac951d9a7cafcdbc2ad51822a381b8cbebb67a2421695a5502f7ce79"
+    },
+    {
+      "path": "analysis/test-results-verify-all.json",
+      "sizeBytes": 9948,
+      "sha256": "827eb723cdfb26f241c6b571a136a59fb71a21648d4851ac59b6646c105d2d54"
+    },
+    {
+      "path": "analysis/transformation-chain.json",
+      "sizeBytes": 11254,
+      "sha256": "4ba5b768152cf970198d453dad01215001b1b8411e278e532fbcacf58a32f68a"
+    },
+    {
+      "path": "analysis/unresolved-items.md",
+      "sizeBytes": 9548,
+      "sha256": "2017b2c263e8c0b717c3e26db542c278c708a22f17b6354ef911206b14d344d7"
+    },
+    {
+      "path": "history/README.md",
+      "sizeBytes": 668,
+      "sha256": "147fa8740de6ec437ed31d6a70df73eae9199a454e556aa064dd82890b510a5c"
+    },
+    {
+      "path": "history/historical-file-preservation.json",
+      "sizeBytes": 3663,
+      "sha256": "830a675085c5f0a22bbe721b910314ea9e7a074401568f2fec64651c6d7bd641"
+    },
+    {
+      "path": "history/superseded/round-02/src/package.json",
+      "sizeBytes": 23,
+      "sha256": "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a"
+    },
+    {
+      "path": "history/superseded/round-02/tools/run-net01-tests.js",
+      "sizeBytes": 2171,
+      "sha256": "b642e80c6e054834d19e2d074aba6855b5fdfb01ad93daa39dffe4a654c3e423"
+    },
+    {
+      "path": "history/superseded/round-02/tools/verify-net01.js",
+      "sizeBytes": 12986,
+      "sha256": "c6f4c7ab5767ad82f3c377ed5f2185fef8a6d730c2fc04c174ddb90a52b7a75e"
+    },
+    {
+      "path": "history/superseded/round-05/src/combat/KnifeHitAreaAttack.js",
+      "sizeBytes": 2237,
+      "sha256": "35962bdbac5210a8b9d938a3bf6c878d30966068dd63411de3c1fd883c5d9df4"
+    },
+    {
+      "path": "history/superseded/round-05/src/combat/dev/DevelopmentAttackTimeline.js",
+      "sizeBytes": 517,
+      "sha256": "b0fbf7d08712934889dcbee570b810afc237fc6205e0709510ab6cc41e44aeb8"
+    },
+    {
+      "path": "history/superseded/round-05/src/combat/index.js",
+      "sizeBytes": 71,
+      "sha256": "ea731841d649bb893bba332bf5da57a591f42b80c5a524b7188ebeee87eb76d7"
+    },
+    {
+      "path": "history/superseded/round-05/src/data/FriendlyUnitData.js",
+      "sizeBytes": 2655,
+      "sha256": "8420f639a30f45b7a830033f5c2255f7286a86e89082cbac303217eedec71c31"
+    },
+    {
+      "path": "history/superseded/round-05/src/units/DragEventBase.js",
+      "sizeBytes": 1728,
+      "sha256": "b8ae8bf8c9b8074714f19a67012dc07abe71d8f8956ccc4ca82e183a036cd8c0"
+    },
+    {
+      "path": "history/superseded/round-05/tests/mocks/createFriendlyCombatHarness.js",
+      "sizeBytes": 3893,
+      "sha256": "b0aa30acf725287f001a51f0f9fae23927ae95ebff18e99220a83f608bc443b4"
+    },
+    {
+      "path": "history/superseded/round-05/tests/mocks/friendlyCombatAssertions.js",
+      "sizeBytes": 1091,
+      "sha256": "ed558372694f36af77f5f5d3c08eb2f9d427b11cb16e5160a3d4e31bad0ee11a"
+    },
+    {
+      "path": "history/superseded/round-05/tools/run-friendly-unit.js",
+      "sizeBytes": 1001,
+      "sha256": "c953d856d015a90ac1da1a0b85ed97175af595f744137191c1262ef018a3ba0d"
+    },
+    {
+      "path": "history/superseded/round-05/tools/run-micro-battle.js",
+      "sizeBytes": 1626,
+      "sha256": "8c31d28bc1d2deb293b95df9b04c31c162e0321992982e1e5289e9fb1388561f"
+    },
+    {
+      "path": "history/verification-attempts/pre-cumulative-fix/analysis/cumulative-verification-report.md",
+      "sizeBytes": 727,
+      "sha256": "89ec2166a9711ccccc4e5e5fdfe0aa11380b7948fb4b5b158ac2b1a45b77d61d"
+    },
+    {
+      "path": "history/verification-attempts/pre-cumulative-fix/analysis/test-results-all.json",
+      "sizeBytes": 29334,
+      "sha256": "4dfb235841e007de96569d0da116a2e71a66aa9d2fac1b4cee522237d2efbcfb"
+    },
+    {
+      "path": "original/bundle.js",
+      "sizeBytes": 2424018,
+      "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+    },
+    {
+      "path": "original/index.js",
+      "sizeBytes": 4337,
+      "sha256": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+    },
+    {
+      "path": "original/libs/laya.adapter-weixin.js",
+      "sizeBytes": 33990,
+      "sha256": "9c12b6292a4d1a1f22b7c83622a2fd28c8fddfe8db7568835575838caa659af4"
+    },
+    {
+      "path": "original/libs/laya.core.js",
+      "sizeBytes": 976221,
+      "sha256": "8c0e14bb20712035e01656179367b74326fda1c9d640b015405eb0493924ca05"
+    },
+    {
+      "path": "original/libs/laya.spine.js",
+      "sizeBytes": 118598,
+      "sha256": "6e9c52af18e14fdf9eb4e42fd0ec6e41e9f06d0dcc0a0f773e569914a7b5997e"
+    },
+    {
+      "path": "original/libs/laya.trail2D.js",
+      "sizeBytes": 6381,
+      "sha256": "efc9342050a083489d4497d3466fd72945d0ca8d6e96a86dd5d0772bdb8b01ac"
+    },
+    {
+      "path": "original/libs/laya.trailCommon.js",
+      "sizeBytes": 14011,
+      "sha256": "b0405cee9dae24a6697d3f1f4a251f4c505643c48cc92c1cbfcd1b8dcd257762"
+    },
+    {
+      "path": "original/libs/laya.ui.js",
+      "sizeBytes": 142455,
+      "sha256": "39d0458a5a18a15f1c6c3796be6740240ec42e6ef67a5c3d16a6c817330ae9a5"
+    },
+    {
+      "path": "original/libs/laya.webgl_2D.js",
+      "sizeBytes": 239647,
+      "sha256": "16f51d5fe624beef62ce5c150c03d58bb8a6cabb9a6c20b4ffe92f8e61faa3f0"
+    },
+    {
+      "path": "original/libs/spine-core-3.7.js",
+      "sizeBytes": 168046,
+      "sha256": "e4427fe85a5371ba04cca65c50de584d231ccba81d0e3c81bb17a5d884fd4aaa"
+    },
+    {
+      "path": "original/reference/参考游戏分析.md",
+      "sizeBytes": 47259,
+      "sha256": "f4edacc722598605f18cf20c3829f7880ca73e5ed8080adf31a01bac68798057"
+    },
+    {
+      "path": "package-lock.json",
+      "sizeBytes": 787,
+      "sha256": "4033872f2d9d178af298697747afd8daf21ffb3c2400aebac012d66f3f505f03"
+    },
+    {
+      "path": "package.json",
+      "sizeBytes": 6353,
+      "sha256": "a354f0635fff9503af0d3355b737ce8fc59c8f4b1648d2f13dcb919056243872"
+    },
+    {
+      "path": "src/battle/BattleFlowCoordinator.js",
+      "sizeBytes": 5360,
+      "sha256": "11272bfb5f3e0f4279a4dc4e11426fa1ee2385a3d173483bcfd85f309b1a0385"
+    },
+    {
+      "path": "src/battle/BattleFlowManager.js",
+      "sizeBytes": 67,
+      "sha256": "55fa985b8f5fd008ba217f176b47653297676f30eb268569a7cafd0e29db1120"
+    },
+    {
+      "path": "src/battle/BattleManager.js",
+      "sizeBytes": 7309,
+      "sha256": "e192510ff4363eb1ad244ad3543a6cf80da87ac34372d51f86c50d0b0dcdcd23"
+    },
+    {
+      "path": "src/battle/BattleState.js",
+      "sizeBytes": 3416,
+      "sha256": "29cb3ba8ed927e06b1ee068f66e7a062ad75192b44bc25f086a8cf1339581757"
+    },
+    {
+      "path": "src/battle/EnemyFactory.js",
+      "sizeBytes": 2813,
+      "sha256": "890c287acd040e6e6474699636150347280b507189c79ae80251a7e9dd71cd0e"
+    },
+    {
+      "path": "src/battle/EnemyManager.js",
+      "sizeBytes": 11369,
+      "sha256": "11f38acbac88186e4d85243a8801a9c5771a3d6c44fa7c6a41219f5f1078f164"
+    },
+    {
+      "path": "src/battle/MapData.js",
+      "sizeBytes": 12756,
+      "sha256": "48748acc88568ffb2300640450d13ea12629a93d92f3cca7a142a80ba1e0068f"
+    },
+    {
+      "path": "src/battle/UnitRegistry.js",
+      "sizeBytes": 124,
+      "sha256": "5786e9172097705ca15506233067d6f3b507c5270fee98bc642df13e52756d82"
+    },
+    {
+      "path": "src/battle/dev/DevelopmentBattleServices.js",
+      "sizeBytes": 3137,
+      "sha256": "2a4eee990d26d20df8536f56e818d8dcf3ea5d26433ed979264b4b48998aeae7"
+    },
+    {
+      "path": "src/battle/dev/DevelopmentCombatServices.js",
+      "sizeBytes": 5868,
+      "sha256": "9d27dac3665430dd3fb5ef32d03b84df0b6526bee0ecc41e2b342dfed9757370"
+    },
+    {
+      "path": "src/battle/dev/DevelopmentRangedBattleServices.js",
+      "sizeBytes": 476,
+      "sha256": "50be4dfa46c5b02b87cb04b2710014a3223292cf2fc0276c7b2fba562acbd4c2"
+    },
+    {
+      "path": "src/battle/dev/DevelopmentUnitServices.js",
+      "sizeBytes": 4015,
+      "sha256": "42cd8739a35f898967029d9b901393e3147889446942471c9811083a0294e80a"
+    },
+    {
+      "path": "src/battle/dev/DevelopmentUnitSpawner.js",
+      "sizeBytes": 1950,
+      "sha256": "419739b456ccb6142129e6dcf9311e0315fd6bed819a1364e51c4cb727fb8ef7"
+    },
+    {
+      "path": "src/battle/index.js",
+      "sizeBytes": 260,
+      "sha256": "c9a140591fa534cdb0f42865c74b4365cb6e92447eb3549dd005293900d88962"
+    },
+    {
+      "path": "src/bootstrap/DevelopmentBootstrap.js",
+      "sizeBytes": 18889,
+      "sha256": "6c7e05900144dbad43ae591bb9015a39b2a27fa7184c8eaf7e6425ac23638803"
+    },
+    {
+      "path": "src/bootstrap/DevelopmentServices.js",
+      "sizeBytes": 1107,
+      "sha256": "a538ce2a0b0687c730375217c86c1c80d6e26cc1fc71762f431cb5d23a08d26e"
+    },
+    {
+      "path": "src/bootstrap/GameBootstrap.js",
+      "sizeBytes": 3281,
+      "sha256": "b715dfd8a8ac095a87d744078102c0f3c019bc685740c669dd47d18da631c4fc"
+    },
+    {
+      "path": "src/bootstrap/index.js",
+      "sizeBytes": 109,
+      "sha256": "d49e0268808a0bece6e870912f897d214401f4f387d4ff1229bfedffbd2a89ca"
+    },
+    {
+      "path": "src/combat/KnifeAttackTimeline.js",
+      "sizeBytes": 2836,
+      "sha256": "58d041391972a16a04d4890946f7cc437382e830a8af65d2c48a8e7f5fd29444"
+    },
+    {
+      "path": "src/combat/dev/DevelopmentAnimationDriver.js",
+      "sizeBytes": 3053,
+      "sha256": "4a74b5748b83a4af5684e76cc8a552fa552a7d0350711cb6ab0c5348f76c7b8d"
+    },
+    {
+      "path": "src/config/DevelopmentConfig.js",
+      "sizeBytes": 1791,
+      "sha256": "8ad5c18c04c5f86a279595048a28ae32705db084082c112fb7e9769c736f5592"
+    },
+    {
+      "path": "src/config/GameConfig.js",
+      "sizeBytes": 2739,
+      "sha256": "f56b511bed0dbcd157b159d69f9e46266a8c9282583f677ca7e53233da7cf27c"
+    },
+    {
+      "path": "src/core/AnimationEntityPool.js",
+      "sizeBytes": 4086,
+      "sha256": "650dc9aae90b7dade259d516b65415bb04ed823a3f0546819415df09ed605169"
+    },
+    {
+      "path": "src/core/ClassRegistry.js",
+      "sizeBytes": 1701,
+      "sha256": "d9bc3e409ebf75bfdb873c814d7954982bdd016dd2a59928439044693a7d36c4"
+    },
+    {
+      "path": "src/core/EventBus.js",
+      "sizeBytes": 3152,
+      "sha256": "a06ad9bbc44f481244bf2ffb6dbd48045d0ba5f1731c55db51cce05de66552ce"
+    },
+    {
+      "path": "src/core/FixedUpdateManager.js",
+      "sizeBytes": 214,
+      "sha256": "ebc8eb9e26bc538771001b6de84832e7382f364562f041eda2d3dbd4dd309840"
+    },
+    {
+      "path": "src/core/GameLoop.js",
+      "sizeBytes": 3098,
+      "sha256": "349fe5a3a8732683853f559f860f8222c1c53c8a6bc41c276009469cb3ddf76b"
+    },
+    {
+      "path": "src/core/GameObjectEventProxy.js",
+      "sizeBytes": 1249,
+      "sha256": "c18f00bc66f842bb3e53173e2dd7b6186bee34802f3931e0de4f08c1f7bc6227"
+    },
+    {
+      "path": "src/core/LayaRuntime.js",
+      "sizeBytes": 167,
+      "sha256": "9e23c8a9dfbe8b3a10105cf1c88da591c6cdf988bfe30149811ca51e667336b6"
+    },
+    {
+      "path": "src/core/MathRandom.js",
+      "sizeBytes": 1051,
+      "sha256": "9236cc1a17cdf2de489eae05deb827c741323c6c13b91610f8d735eba880e1bc"
+    },
+    {
+      "path": "src/core/ObjectPool.js",
+      "sizeBytes": 4320,
+      "sha256": "c64eb1101aed7a7fbf1863b75e66c7c0c255619a242a55386b247dd8fcaae3fb"
+    },
+    {
+      "path": "src/core/PlacementReservationRegistry.js",
+      "sizeBytes": 505,
+      "sha256": "6214863cc9d02cda680e0d64e7823057b79e6d2133f1477c25394c8c37d4e45c"
+    },
+    {
+      "path": "src/core/RuntimeContext.js",
+      "sizeBytes": 320,
+      "sha256": "2445885b418dcb82e557474e4bd607ea5d13078e97f12b569f30eb96709cad43"
+    },
+    {
+      "path": "src/core/SceneManager.js",
+      "sizeBytes": 3784,
+      "sha256": "c87bf49a9dbf5c234baa97831e8caaac09c28ab14e9825194617293b070dff86"
+    },
+    {
+      "path": "src/core/SingletonBase.js",
+      "sizeBytes": 376,
+      "sha256": "ae560cea7bdb11ba214d8a37b7ca01dc670178139bb0a3ad7c6101c39c1d785b"
+    },
+    {
+      "path": "src/data/BattleDataCore.js",
+      "sizeBytes": 3388,
+      "sha256": "1b0838ab542feb13b9703574f3b89bf275f0bbb8da46c0f4d38c242ccdd93732"
+    },
+    {
+      "path": "src/data/CriticalGameState.js",
+      "sizeBytes": 4285,
+      "sha256": "cbd2f6e42c00144527a511b4f9beb4f7725eb6279ae3684e6f242de518607da9"
+    },
+    {
+      "path": "src/data/PlayerDataCore.js",
+      "sizeBytes": 3025,
+      "sha256": "2cfbe103ae14c54114478196a32cf2712179e1535968e4bfab84fd95cd29213d"
+    },
+    {
+      "path": "src/data/index.js",
+      "sizeBytes": 141,
+      "sha256": "321c5dd65a0a0e57f86a4c32ed9500739970249200d64daa1220cd0d3ea6c589"
+    },
+    {
+      "path": "src/entities/BattleTarget.js",
+      "sizeBytes": 2987,
+      "sha256": "3b8a0a183ceb93fe0967fc1fcaeda127bd1819f56b440cabfa5c41d12a553ebc"
+    },
+    {
+      "path": "src/entities/EnemyBase.js",
+      "sizeBytes": 23987,
+      "sha256": "55cb664baac101e13804ebce7083fec510d84a0554facb8f0740b5aea70ecd0a"
+    },
+    {
+      "path": "src/entities/EnemyEventProxy.js",
+      "sizeBytes": 320,
+      "sha256": "cdabecd3addc292e8022bcc7d0dbcf0aa8498ff2f43d5f32dfc1bb9387c008c8"
+    },
+    {
+      "path": "src/entities/EntityFactory.js",
+      "sizeBytes": 1005,
+      "sha256": "2148f9b1c59a8e2acb99e82934b69dd2747c94bd4af88d43b095240599b7d4ff"
+    },
+    {
+      "path": "src/entities/Mob0Enemy.js",
+      "sizeBytes": 1870,
+      "sha256": "7cc7ca92296c8afe80905c52127266b015088172d716c2ddec98828f117d5d43"
+    },
+    {
+      "path": "src/entities/NormalEnemyBase.js",
+      "sizeBytes": 3622,
+      "sha256": "e2fd699e05c5b4c48383f52653c0e93c5f26cd868d9a35debfd811bc48bd70a6"
+    },
+    {
+      "path": "src/entities/index.js",
+      "sizeBytes": 196,
+      "sha256": "2c1f7d23b9ead6e906533e2b8e6a55c629490be47f3c8dc5785cafeb4bd1f6e1"
+    },
+    {
+      "path": "src/network/HttpClient.js",
+      "sizeBytes": 15952,
+      "sha256": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+    },
+    {
+      "path": "src/network/dev/DevelopmentNetworkData.js",
+      "sizeBytes": 2118,
+      "sha256": "4fb5c9f3269ae4e18a728ad838050f83768218517746cd3cd284d4b1bd039d12"
+    },
+    {
+      "path": "src/network/index.js",
+      "sizeBytes": 251,
+      "sha256": "cf69318a84ba21d0b4eef58cc51424ae33cf8ddcda4a4bad8d7ad4902374da3b"
+    },
+    {
+      "path": "src/platform/PlatformAdapter.js",
+      "sizeBytes": 922,
+      "sha256": "5cb80892118e4cce13743dc572b41116cd7aa28f0a7bd029110cd1b20695a8a5"
+    },
+    {
+      "path": "src/platform/dev/DevelopmentAudio.js",
+      "sizeBytes": 327,
+      "sha256": "f2da0cc305bf732383c8eb7f3c3ca256a2e7146cec62cacb3b67d9cd3c921d4b"
+    },
+    {
+      "path": "src/platform/dev/DevelopmentPlatform.js",
+      "sizeBytes": 1606,
+      "sha256": "5ac482da43d8fce5729d3d68bebe89c0d0e304bbd2557b88266c61017c3fd292"
+    },
+    {
+      "path": "src/platform/dev/DevelopmentStartupPolicy.js",
+      "sizeBytes": 804,
+      "sha256": "b0351eb5dbf7b49cd555881f398c0597152ae3fbc9a8cb5d5deceabb45b89a56"
+    },
+    {
+      "path": "src/platform/dev/DevelopmentTipService.js",
+      "sizeBytes": 184,
+      "sha256": "c5bfeecabfe64de5317fd419654899815f1663737c7f464441d152f6862099b8"
+    },
+    {
+      "path": "src/projectiles/HitEnemyStrategy.js",
+      "sizeBytes": 1526,
+      "sha256": "1b5d3d60ee65927a2bd3d685808b39e12a29ae115ccfd0f40ca76649e548f16d"
+    },
+    {
+      "path": "src/projectiles/ProjectileBase.js",
+      "sizeBytes": 6050,
+      "sha256": "550cf83cb2a283623c05cdf197b73870542dc564ebdf1c978aeda387d92047e5"
+    },
+    {
+      "path": "src/projectiles/ProjectileFactory.js",
+      "sizeBytes": 4779,
+      "sha256": "78ee0b1d6467765b3f64501d680129e961489a50f2dfd2a2b3fb3df07acd8b75"
+    },
+    {
+      "path": "src/projectiles/ProjectileManager.js",
+      "sizeBytes": 6485,
+      "sha256": "9a97d5e4e216ef47a50a3c25845f6af176aaa4d43a5331686666d0d4fa99d331"
+    },
+    {
+      "path": "src/projectiles/ProjectileMath.js",
+      "sizeBytes": 1825,
+      "sha256": "95346d2be04495da188e9234e558ca578226d3f5b0172bf83df3de8d03f83599"
+    },
+    {
+      "path": "src/projectiles/SimpleDynamicArrow.js",
+      "sizeBytes": 2423,
+      "sha256": "72e8531b4ad32e9dd1e7db3f8ba8502fa09256211888178b6ceae07ae25793ed"
+    },
+    {
+      "path": "src/projectiles/TargetEnemyBezierMovement.js",
+      "sizeBytes": 6341,
+      "sha256": "fd39b309a6891f741104410998e02abba28bd731a30479ee3e253107c0ca25aa"
+    },
+    {
+      "path": "src/projectiles/index.js",
+      "sizeBytes": 297,
+      "sha256": "d1d787ce13d00cbbd3c127b0258bb40b3a5a31486a1e1c8ac823d1bfff852ef6"
+    },
+    {
+      "path": "src/scenes/BattleSceneController.js",
+      "sizeBytes": 7602,
+      "sha256": "5b7e389b4f5bb11dfaba5477b6f3f1c11851081c14b5883f3b30d09e01a280b8"
+    },
+    {
+      "path": "src/scenes/LoadSceneController.js",
+      "sizeBytes": 7503,
+      "sha256": "adaa8d2dec54ac521161f899474674a3137aa427cf411c41cc804b3375b6a42c"
+    },
+    {
+      "path": "src/scenes/MainSceneController.js",
+      "sizeBytes": 2284,
+      "sha256": "60af9e07f7bfdd08a91864512df9e67d884c6f340fe5e6aa884aa80e259248d3"
+    },
+    {
+      "path": "src/scenes/MatchSceneController.js",
+      "sizeBytes": 3947,
+      "sha256": "c20046acba78b1e71f83021ff794f985204a331c177ec55b92d9509063bddb26"
+    },
+    {
+      "path": "src/scenes/SceneControllerBase.js",
+      "sizeBytes": 1150,
+      "sha256": "268557617fd799e194b3cdc9df7c052d3457f1fda1bf27110adac649665b5d69"
+    },
+    {
+      "path": "src/scenes/index.js",
+      "sizeBytes": 195,
+      "sha256": "0235464b0edeaa27457432a828d7979a3ab2c6a0f6f74d225f0f07d0693c9a61"
+    },
+    {
+      "path": "src/units/BowSoldier.js",
+      "sizeBytes": 6487,
+      "sha256": "a4212a8aab01c1c205fa8e23ea836fb1190eece5e1f53d8df10eebb9a893d6c7"
+    },
+    {
+      "path": "src/units/KnifeSoldier.js",
+      "sizeBytes": 2895,
+      "sha256": "c8e9b26a5b0c94f9939f4fd69abcf8929e0d7066d6e3edc5368543a527a6b408"
+    },
+    {
+      "path": "src/units/SoldierBase.js",
+      "sizeBytes": 6834,
+      "sha256": "caab5e4525a8bc12895b55d5ae15d0e8c96994472fe107463728e45ef551182b"
+    },
+    {
+      "path": "src/units/UnitBase.js",
+      "sizeBytes": 8935,
+      "sha256": "2c4748e4a41e024eb8729097a76785ad3f37d8465826d3db63ce0c0e46b22a86"
+    },
+    {
+      "path": "src/units/UnitConfig.js",
+      "sizeBytes": 3600,
+      "sha256": "7a445427a64297dcb15c8f1b8097d1bd26483b783af6a9fc40f2def1a7070618"
+    },
+    {
+      "path": "src/units/UnitDragBase.js",
+      "sizeBytes": 2157,
+      "sha256": "bcf904a2b5305b946de4adcc78c58e44437265ac608ff1d69755129ef866250c"
+    },
+    {
+      "path": "src/units/UnitFactory.js",
+      "sizeBytes": 2456,
+      "sha256": "266135ef8bb66189802cadeb77716b44d35d4438a864997b52cbe51a123eb4fa"
+    },
+    {
+      "path": "src/units/UnitRegistry.js",
+      "sizeBytes": 8023,
+      "sha256": "a91a6cbdb3e0f1d5d3344d8ddae8240b44e35e48123e6aeb270b324363819568"
+    },
+    {
+      "path": "src/units/index.js",
+      "sizeBytes": 282,
+      "sha256": "27ac99fb4ca8d58e2654cf86cf157cf8b84061fdb5b5c3c0197ac5fe99a6d183"
+    },
+    {
+      "path": "tests/behavior/BattleCleanup.test.js",
+      "sizeBytes": 1334,
+      "sha256": "b79ab43a11b5f061a88b277e82d7c54ca2ba327404711e5cbef23d8e84aabaa3"
+    },
+    {
+      "path": "tests/behavior/BattleCleanupWithFriendlyUnits.test.js",
+      "sizeBytes": 1084,
+      "sha256": "0a4be0be624c06ca1f9440c1a1bfc5b30becd8cadaa500e73b7b848231b18eee"
+    },
+    {
+      "path": "tests/behavior/BattleEndsWithArrowInFlight.test.js",
+      "sizeBytes": 1044,
+      "sha256": "d354278e2d31c7058b3c286c0e6fe02159209dd8200455a3418ff4ca23b9abc3"
+    },
+    {
+      "path": "tests/behavior/BattleFirstFrame.test.js",
+      "sizeBytes": 2297,
+      "sha256": "ca66b4c3a51c1be0e072562ad817712f64231eef0c5554bb6dd19de48b6513fd"
+    },
+    {
+      "path": "tests/behavior/BattleTargetDestroyed.test.js",
+      "sizeBytes": 855,
+      "sha256": "201b2282d9bba80e989f381acb8251e8227db8d4872d125b44a0273a47b3d604"
+    },
+    {
+      "path": "tests/behavior/BootToMainScene.test.js",
+      "sizeBytes": 2547,
+      "sha256": "6a11de75a754fb8cd43dc6f2591daf92eea0c6a1e93ff61d05bb280e706ac2cd"
+    },
+    {
+      "path": "tests/behavior/BowAndKnifeAttackTogether.test.js",
+      "sizeBytes": 1494,
+      "sha256": "5f0321e1a0c160a3078046b65a1f77398db6102b30b872be53be56b24c30941e"
+    },
+    {
+      "path": "tests/behavior/BowCleanupDuringAnimation.test.js",
+      "sizeBytes": 848,
+      "sha256": "ba0f2beefe32953bbf8e9672cf40303010af4c404f87adc9125e860bbd9bca4c"
+    },
+    {
+      "path": "tests/behavior/BowShootsMob0.test.js",
+      "sizeBytes": 961,
+      "sha256": "21776e8396d4fdd26b60e7c6c280f1d55a991d7d98b4dcb0b7643a011cd32418"
+    },
+    {
+      "path": "tests/behavior/BowSoldierKillsMob0.test.js",
+      "sizeBytes": 856,
+      "sha256": "d0ce63a701dbade702522d6d8130cd9c9140c545b55adf81f48953f053000736"
+    },
+    {
+      "path": "tests/behavior/DirectBattleDevelopmentMode.test.js",
+      "sizeBytes": 2208,
+      "sha256": "cfaa42e00043c32c2f40cb3c281e41b6fc1d4c9cc78a0a9c5a28491a385ee650"
+    },
+    {
+      "path": "tests/behavior/EnemyCleanupAfterBattle.test.js",
+      "sizeBytes": 836,
+      "sha256": "9fc30ba2980902fae38c5d2fa7e925c6dfa93d546b6c5732525c5bee14f3e169"
+    },
+    {
+      "path": "tests/behavior/FriendlyUnitKillsMob0.test.js",
+      "sizeBytes": 1135,
+      "sha256": "bc022fb14e70de38350db0b07b37f3d064f6b06511e27ee013dea72138f79c39"
+    },
+    {
+      "path": "tests/behavior/FriendlyUnitRemovedDuringAttack.test.js",
+      "sizeBytes": 759,
+      "sha256": "44362fde90238e52808d82f5b4516b0d8f41ee2c2c0b5e795f37fc1f000ddd45"
+    },
+    {
+      "path": "tests/behavior/FriendlyUnitRetargetsAfterKill.test.js",
+      "sizeBytes": 990,
+      "sha256": "cce6491a271d851d118c1ad3074e4ce0edf48e1519c31015f1c7806eb5d27bc2"
+    },
+    {
+      "path": "tests/behavior/FullMicroBattle.test.js",
+      "sizeBytes": 1278,
+      "sha256": "ebf75f3eeb3c21bd6f7cdf03b396872a1e9ca7fae9ff4fa92597c504ac296a73"
+    },
+    {
+      "path": "tests/behavior/FullRangedMicroBattle.test.js",
+      "sizeBytes": 1548,
+      "sha256": "b7677ca30e4929ac47978798325d7164bc6597a5a9f14fc68e4e3e4bdb756d85"
+    },
+    {
+      "path": "tests/behavior/MainToMatchScene.test.js",
+      "sizeBytes": 1459,
+      "sha256": "18ae62ee950d3e36a69a2a8eaa0ae784fc656869ddb047812cdd78d638cb6abb"
+    },
+    {
+      "path": "tests/behavior/MatchToBattleScene.test.js",
+      "sizeBytes": 1443,
+      "sha256": "134f3c0c58d5933f38ef3847e0355b3b90be104f91ecb9241a49699a93825146"
+    },
+    {
+      "path": "tests/behavior/MicroBattleCli.test.js",
+      "sizeBytes": 2010,
+      "sha256": "221d970bbdf154d3eac82d2e8bf4d30a6c8d0a6f183fbc5f2629d1b99cf201c4"
+    },
+    {
+      "path": "tests/behavior/Mob0AttackBattleTarget.test.js",
+      "sizeBytes": 870,
+      "sha256": "bcd1125ff38ce6c5948c544a2f98df445f86524083c631e2f1438dc7d80c7b1c"
+    },
+    {
+      "path": "tests/behavior/Mob0KilledBeforeArrival.test.js",
+      "sizeBytes": 742,
+      "sha256": "14a7ed9250e9259a8ceb8822755e2f4b826e581b1399bfc8b26588133441dff1"
+    },
+    {
+      "path": "tests/behavior/Mob0LeavesRange.test.js",
+      "sizeBytes": 864,
+      "sha256": "d11c3c4e0e6e3665ee682d729bb428b7fc1cf9b29d634a1d495c6e98dabcf836"
+    },
+    {
+      "path": "tests/behavior/Mob0PairBattle.test.js",
+      "sizeBytes": 1037,
+      "sha256": "64be4fc3cc61ee46525c37a1ad4dbb047f8c8896af581403b60acddfd1ea0c01"
+    },
+    {
+      "path": "tests/behavior/Mob0PathToTarget.test.js",
+      "sizeBytes": 1160,
+      "sha256": "0253c42a3ae7931c73da48daa6f6dbcb4995ecd19e255cb1ca30929d09fa719f"
+    },
+    {
+      "path": "tests/behavior/MovingTargetArrowFlight.test.js",
+      "sizeBytes": 1890,
+      "sha256": "2af2df6fa0a60b8d2517980ef9f92e6e365f03c0890111178475c78a8701bc28"
+    },
+    {
+      "path": "tests/behavior/MultipleArrows.test.js",
+      "sizeBytes": 932,
+      "sha256": "009ff71f770813598987c63897052088850bc4f7e6ad025cd376bad7d73ae5b6"
+    },
+    {
+      "path": "tests/behavior/MultipleFriendlyUnitsTargetMob0.test.js",
+      "sizeBytes": 894,
+      "sha256": "32cbbc09630157f9ae9ac1c9ddb19ec9921086c558fc7f9f371852ff16759f6c"
+    },
+    {
+      "path": "tests/behavior/NET-01.behavior.test.js",
+      "sizeBytes": 11916,
+      "sha256": "1056a7f4dce825e81746485f31b27e3d1c6bd90b5f98242bdf29bf4ec9a691c3"
+    },
+    {
+      "path": "tests/behavior/ReusedArrowHasCleanState.test.js",
+      "sizeBytes": 1501,
+      "sha256": "fa95fb4eb6d7b193eebe6ed8fe192b53fd7e01443a0c3ff4004657be97c2c1b6"
+    },
+    {
+      "path": "tests/behavior/ReusedFriendlyUnitHasCleanState.test.js",
+      "sizeBytes": 868,
+      "sha256": "d67df741ce76f0ccc7add806d9ef21b16e69b5a1882160587863ddf96c574c08"
+    },
+    {
+      "path": "tests/behavior/ReusedMob0HasCleanState.test.js",
+      "sizeBytes": 886,
+      "sha256": "36f8d4153d50a89b29e2b03129469a8e6ba020ac10da036abcc41579423d694e"
+    },
+    {
+      "path": "tests/behavior/ReusedTargetIsNotHit.test.js",
+      "sizeBytes": 1178,
+      "sha256": "e858a2ab9804c3ec4f6099810f9a90745733980f1cc3a02da5fae97a134ea3cc"
+    },
+    {
+      "path": "tests/behavior/TargetDiesBeforeArrowCreation.test.js",
+      "sizeBytes": 809,
+      "sha256": "a15d540ddb61160f19ec65839dddd27ac2e94c75e52daa704d0b34148f2c878a"
+    },
+    {
+      "path": "tests/behavior/TargetDiesDuringArrowFlight.test.js",
+      "sizeBytes": 929,
+      "sha256": "6ca5596b1206a07ea8b943be26dda6a6a401c70c2870ff86b2aadfe6558a6537"
+    },
+    {
+      "path": "tests/behavior/TwoArrowsSameTarget.test.js",
+      "sizeBytes": 1089,
+      "sha256": "fb6af06e0a4f9f6672a0be3d16a49296a42dba4efc08baa425495e54569cb37e"
+    },
+    {
+      "path": "tests/behavior/decode-strings.test.js",
+      "sizeBytes": 5491,
+      "sha256": "6fdfa597d0c83d7ca20e4f89b9857a7b2e41b60f8604d898e3207206905b891c"
+    },
+    {
+      "path": "tests/mocks/DevelopmentPlatformMock.js",
+      "sizeBytes": 208,
+      "sha256": "1da2ef59594e1320f77b258d8157de3b303d3b75243cda0e5d94430d1f5c4aa8"
+    },
+    {
+      "path": "tests/mocks/LayaHttpMock.js",
+      "sizeBytes": 4385,
+      "sha256": "d4786ca403b5da0e7f290dc5fb79917a3b50694c9104cb6e51da812910870a16"
+    },
+    {
+      "path": "tests/mocks/LayaSceneMock.js",
+      "sizeBytes": 10412,
+      "sha256": "8bcc1fdf116306740061a2d6e7248b3f67f458d004e6e00a562b03731ca94b44"
+    },
+    {
+      "path": "tests/mocks/LayaTimerMock.js",
+      "sizeBytes": 3003,
+      "sha256": "98faf2823e316d7c20785597ce2a994d90201d04050c42f841b79052d6f5dcf4"
+    },
+    {
+      "path": "tests/mocks/NetworkMock.js",
+      "sizeBytes": 1620,
+      "sha256": "2b63c072156ab520aa3da92fa802d2f76959ee18812672c5a618f40bd8769f7c"
+    },
+    {
+      "path": "tests/mocks/PlayerDataCoreMock.js",
+      "sizeBytes": 268,
+      "sha256": "6f9bc750a587f1ce5d69788de1bf90c942640bf437a532df855cb0e87541a72e"
+    },
+    {
+      "path": "tests/mocks/README.md",
+      "sizeBytes": 328,
+      "sha256": "2f0cc78ac986b5411b7e1b395e04be9f2e5e99a231d994a2c2d40a44ae695461"
+    },
+    {
+      "path": "tests/mocks/createBootToBattleHarness.js",
+      "sizeBytes": 2021,
+      "sha256": "afe13e280f105418e448f5d6e7699baf7b447ed24fa30d64b0c65e96514cfa58"
+    },
+    {
+      "path": "tests/mocks/createDevelopmentHarness.js",
+      "sizeBytes": 71,
+      "sha256": "a46a349605e60dda3beab2545eb71fd2505efc961b4648e44e728ef62370525c"
+    },
+    {
+      "path": "tests/mocks/createEnemyRuntimeHarness.js",
+      "sizeBytes": 5751,
+      "sha256": "b055f9a5a2cb9788de7f08587c37de957fb9b94b60ba71fdd08229aa9752f495"
+    },
+    {
+      "path": "tests/mocks/createFriendlyUnitCombatHarness.js",
+      "sizeBytes": 5193,
+      "sha256": "65ac5fd6ee14338cec2ad462d2a8ef785fe692c370bc84a21c902f2180e2a3ff"
+    },
+    {
+      "path": "tests/mocks/createRangedCombatHarness.js",
+      "sizeBytes": 7705,
+      "sha256": "96cd2a50370b5319e330d13c9523ae7772b8ca054931dccab1df42b32b003094"
+    },
+    {
+      "path": "tests/unit/AnimationEntityPool.test.js",
+      "sizeBytes": 1514,
+      "sha256": "da29e75e8dbb32f25817d72f4934442b67c11128760b86f4b8b1fb0382459c74"
+    },
+    {
+      "path": "tests/unit/BootToBattleCore.test.js",
+      "sizeBytes": 1370,
+      "sha256": "a09818144e6d8c5f731da2b828c65134d4f5658f64ab80609e8fdc26bc808875"
+    },
+    {
+      "path": "tests/unit/BowSoldierAttackEvent.test.js",
+      "sizeBytes": 2237,
+      "sha256": "6765b32a2576bcfa4db003e034adb191fad008ab0defff309c208fa47469a0c8"
+    },
+    {
+      "path": "tests/unit/BowSoldierFactory.test.js",
+      "sizeBytes": 2084,
+      "sha256": "9dfb354114ff83794ecacbf238e3c1c39e3503a9c507767b27f4e96348d35a7f"
+    },
+    {
+      "path": "tests/unit/BowSoldierInitialization.test.js",
+      "sizeBytes": 1345,
+      "sha256": "ab33cbe4859818d9702bc9010aa2a889341916e4d29db4c37139a45d5c911af1"
+    },
+    {
+      "path": "tests/unit/BowSoldierTargetSelection.test.js",
+      "sizeBytes": 1272,
+      "sha256": "3a605265ca74a55ed3401f9823c280771074be1df4d264709c75700f707bd14e"
+    },
+    {
+      "path": "tests/unit/EnemyAttack.test.js",
+      "sizeBytes": 1389,
+      "sha256": "fe1d625ac479ce3368f9d2e2f59bd3830c1d41c8125d81163e6acd47c123da3c"
+    },
+    {
+      "path": "tests/unit/EnemyDamage.test.js",
+      "sizeBytes": 1215,
+      "sha256": "1858d11becf295159706e1e1faf3fb8145df45e5918fe8f4608ce72fdfd94489"
+    },
+    {
+      "path": "tests/unit/EnemyDeath.test.js",
+      "sizeBytes": 1423,
+      "sha256": "105fa4600c23a4cb0dfa6dfd312745609d04f06dca2b5b90aafaa087bed1265d"
+    },
+    {
+      "path": "tests/unit/EnemyMovement.test.js",
+      "sizeBytes": 1706,
+      "sha256": "542e64c292cfc2acc24ac6dbd72bf0a01ec2e2ce93aedf1ee23727cfd9772ceb"
+    },
+    {
+      "path": "tests/unit/EnemyPoolReset.test.js",
+      "sizeBytes": 1598,
+      "sha256": "4151c628ca52b0eeebaacfb8ba39547c139f054ce77986e00f93622bb02c2076"
+    },
+    {
+      "path": "tests/unit/EnemySpatialIndex.test.js",
+      "sizeBytes": 1416,
+      "sha256": "2fcd6241ae5eb3c4f49406457def0f6ed64053fb3a0288841b359f113a09269d"
+    },
+    {
+      "path": "tests/unit/EnemyTargetSelection.test.js",
+      "sizeBytes": 1523,
+      "sha256": "86ed90d53f9b157a324a02f7d3ecaa755385bc462c14f3497c88a6595c72417c"
+    },
+    {
+      "path": "tests/unit/FriendlyUnitAttackTiming.test.js",
+      "sizeBytes": 1450,
+      "sha256": "fae1760398ed111ae79dd9c1547222eb43370003900f97ae2db04c3af3bf2be1"
+    },
+    {
+      "path": "tests/unit/FriendlyUnitDamage.test.js",
+      "sizeBytes": 1146,
+      "sha256": "0011ca467b9c72a35aed77b96ca3cf500fcf0373d5936d6a10bdd798b29eb4d1"
+    },
+    {
+      "path": "tests/unit/FriendlyUnitDeath.test.js",
+      "sizeBytes": 1428,
+      "sha256": "b07a82b81d36f58467df4ee0fd5d988fa57507bad579f2863fa562ddc80d15ff"
+    },
+    {
+      "path": "tests/unit/FriendlyUnitFactory.test.js",
+      "sizeBytes": 1970,
+      "sha256": "09d9de9ac9f12522f1d0159e8768f3de81810e553440e72d671694e1fe642e57"
+    },
+    {
+      "path": "tests/unit/FriendlyUnitInitialization.test.js",
+      "sizeBytes": 1469,
+      "sha256": "9a418e52d90f6ae3ac0ce3c203802e2b0e53389540627e7c962eb2ca0405b6bd"
+    },
+    {
+      "path": "tests/unit/FriendlyUnitPoolReset.test.js",
+      "sizeBytes": 1293,
+      "sha256": "41f856216ac020250050b9a4010e17c56ef20342c6a0d849f023f4b6cdfff256"
+    },
+    {
+      "path": "tests/unit/FriendlyUnitTargetSelection.test.js",
+      "sizeBytes": 1400,
+      "sha256": "d7bebffc2175b2b7c9367a00bb568ab890f1c12c8f4aaf54b6a8bda983ea9baf"
+    },
+    {
+      "path": "tests/unit/HttpClient.test.js",
+      "sizeBytes": 12534,
+      "sha256": "61a4a7fa858881c881f4c25c38e08dd8163117d1df86ba6e645b0b5e304878a7"
+    },
+    {
+      "path": "tests/unit/MapPath.test.js",
+      "sizeBytes": 1399,
+      "sha256": "f5be1517037b253d132e1d9d7baa0358999615d5f49fc4f752ad1091d9802882"
+    },
+    {
+      "path": "tests/unit/ProjectileFactory.test.js",
+      "sizeBytes": 1506,
+      "sha256": "f082634da9f471a10e1b73795fbfe07fa7767d89503bdeec3ff84ce7fbf8b4cc"
+    },
+    {
+      "path": "tests/unit/ProjectileHit.test.js",
+      "sizeBytes": 1626,
+      "sha256": "279d59019acd4a656c17efafefd9fce034d5af2b696a68bac2fccd3efc7d91a6"
+    },
+    {
+      "path": "tests/unit/ProjectileManager.test.js",
+      "sizeBytes": 1395,
+      "sha256": "e7d401243506ff741a0bac89587e69d30110be2f5b2c9ebad01b62fc3b23b15c"
+    },
+    {
+      "path": "tests/unit/ProjectilePoolReset.test.js",
+      "sizeBytes": 1309,
+      "sha256": "29c886f8851503aa52d827db0ec351f776803dbe6be02a76fe99d5b654458259"
+    },
+    {
+      "path": "tests/unit/ProjectileTargetInvalidation.test.js",
+      "sizeBytes": 1012,
+      "sha256": "458c88e40ed0c1ce388cb908541a7cb7e3529fc408e8cc22045242ae3f7cf1b1"
+    },
+    {
+      "path": "tests/unit/SimpleDynamicArrowTrajectory.test.js",
+      "sizeBytes": 2980,
+      "sha256": "0e039434419ac2f21f270c9fc464baecd6791be6251a5d8f0077ff653594ca7f"
+    },
+    {
+      "path": "tests/unit/UnitRegistry.test.js",
+      "sizeBytes": 1489,
+      "sha256": "a0e61519ea0a929534ceb6d597feb98da76d38cd057933bae8ccbd950e92ebf6"
+    },
+    {
+      "path": "tools/audit-cumulative-snapshot.js",
+      "sizeBytes": 14939,
+      "sha256": "d91286178f8c9d6dd46f15079d1bbb278a242e10a30c1f48639ced1ed1114222"
+    },
+    {
+      "path": "tools/build-cumulative-manifest.js",
+      "sizeBytes": 4827,
+      "sha256": "3e493462ca933354f33bf02a9aef1f21600a52b3a8f3a35c69876c715d9a3c7a"
+    },
+    {
+      "path": "tools/check-net01.js",
+      "sizeBytes": 14380,
+      "sha256": "aa5f018515447b14ad7fd1b6d4e695133092acb00d42dfb241e228bdea0e70f4"
+    },
+    {
+      "path": "tools/check-round03.js",
+      "sizeBytes": 8459,
+      "sha256": "df7a3467c40468eab76a0219bae243667d3cbe83b9d478584bb92e8f03d10523"
+    },
+    {
+      "path": "tools/check-round04.js",
+      "sizeBytes": 19725,
+      "sha256": "c64a3b165789a7af1d436ed5dde1f37ba6443f6f840020f99fc870284067c311"
+    },
+    {
+      "path": "tools/check-round05.js",
+      "sizeBytes": 10907,
+      "sha256": "6145353e0af788309f87ab2edc78faad5334934995b4226cc2113139f5c14b84"
+    },
+    {
+      "path": "tools/check-round06.js",
+      "sizeBytes": 15964,
+      "sha256": "5eb11160e8076f629aada02e03ad9f983e8b7b6749542f429635c392748b0ead"
+    },
+    {
+      "path": "tools/decode-strings.js",
+      "sizeBytes": 47136,
+      "sha256": "9bfe5cdf3a478bf0bf48235273905bcf450fa3f9ee47d1f5a5d3b40f97926c2a"
+    },
+    {
+      "path": "tools/run-all-development.js",
+      "sizeBytes": 2000,
+      "sha256": "0a880d5e6d86a30f03296bb5aba51e5c5eafbfb7ea19f5c0171325c08b18e6fc"
+    },
+    {
+      "path": "tools/run-boot-development.js",
+      "sizeBytes": 2067,
+      "sha256": "b1efe5143915be12bba496785a7948b68fbd16a6260da59c147a212150638a29"
+    },
+    {
+      "path": "tools/run-bow-soldier.js",
+      "sizeBytes": 3398,
+      "sha256": "7bf1566bc7a7fb9a7fe02eca05a722c70c2cdf95624c8d575ce19cc797306b76"
+    },
+    {
+      "path": "tools/run-friendly-unit-simulation.js",
+      "sizeBytes": 10219,
+      "sha256": "c6f4782911b70a7f1c13c65bb7e7f1b516a030c4a23fd043b80f18583fac246f"
+    },
+    {
+      "path": "tools/run-friendly-unit.js",
+      "sizeBytes": 103,
+      "sha256": "a7e87e89f17522f36df480dc4bc5dcfd229ff25ea7efdd3bc342238c4aec6dea"
+    },
+    {
+      "path": "tools/run-micro-battle.js",
+      "sizeBytes": 103,
+      "sha256": "a7e87e89f17522f36df480dc4bc5dcfd229ff25ea7efdd3bc342238c4aec6dea"
+    },
+    {
+      "path": "tools/run-mob0-simulation.js",
+      "sizeBytes": 2200,
+      "sha256": "38f53f5169c5c987f47184e7618850d084221b520679b5eadcb119821906123e"
+    },
+    {
+      "path": "tools/run-projectile.js",
+      "sizeBytes": 3116,
+      "sha256": "430333f952e908250844785b99f4d648eea0c4c7e87d2dc10c149c67cf8670e4"
+    },
+    {
+      "path": "tools/run-ranged-battle.js",
+      "sizeBytes": 7700,
+      "sha256": "48cf4b954a6206795200ecbdc9aee0dc67d4d7d710acbaca0de9af7f3c986037"
+    },
+    {
+      "path": "tools/verify-all.js",
+      "sizeBytes": 5414,
+      "sha256": "e35729ed98dab15dc12ca8f1bf37a74b66db4561b164845ace59bf20f22c1a82"
+    },
+    {
+      "path": "tools/verify-round03.js",
+      "sizeBytes": 4145,
+      "sha256": "9051dd2802247d52b43285135ccf5b6d377cda251fc5d04293ec16abbb56dfd8"
+    },
+    {
+      "path": "tools/verify-round04.js",
+      "sizeBytes": 10559,
+      "sha256": "9e974ce862b241f12e380c81e9575ad6af1528741235c1055a014d06c09f9360"
+    },
+    {
+      "path": "tools/verify-round05.js",
+      "sizeBytes": 7364,
+      "sha256": "f0a082fa41f7444a49d8925c2e733c05232d6f50020f0f61be294ae23bb9f852"
+    },
+    {
+      "path": "tools/verify-round06.js",
+      "sizeBytes": 8157,
+      "sha256": "650bc109a1844becd61ea476553eda2aa73481419745a2ff3a864fd09d18931b"
+    },
+    {
+      "path": "vendor/typescript-5.8.3.tgz",
+      "sizeBytes": 4250406,
+      "sha256": "4b867378e82e75791492505f2ed1b986a6c04b2196f78179d01670862444550a"
+    },
+    {
+      "path": "work/bundle.formatted.js",
+      "sizeBytes": 2424018,
+      "sha256": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+    },
+    {
+      "path": "work/bundle.strings-decoded.js",
+      "sizeBytes": 2772800,
+      "sha256": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+    },
+    {
+      "path": "work/extracts/NET-01-requested-5087-6037.js",
+      "sizeBytes": 33795,
+      "sha256": "66176a62b660ef2ce9ad746ebf864702e2067b2ca3e0f1eeb3d6a242f36939b3"
+    },
+    {
+      "path": "work/extracts/context-iife-1014-1695.js",
+      "sizeBytes": 24243,
+      "sha256": "36d2a2376920b846b2e738c1a2e22df9748639ea58092c546ff0b408f50a5d76"
+    },
+    {
+      "path": "work/extracts/context-pre-net-3763-5086.js",
+      "sizeBytes": 39338,
+      "sha256": "885130cbd828e88c887dd3700b146d4d62f9e165683790c725cb7329505de057"
+    },
+    {
+      "path": "work/extracts/round06/SHA256SUMS",
+      "sizeBytes": 1306,
+      "sha256": "76033b7b6c34c71572591429e5ad5d22c2554e01de1195eedc73c79a6be014cd"
+    },
+    {
+      "path": "work/extracts/round06/battle-flow-manager-init-55064-55210.js",
+      "sizeBytes": 8378,
+      "sha256": "155d44684af2ada13e97e08dedd8c1bfdcb2df0d53de560ba1725edf45c5964e"
+    },
+    {
+      "path": "work/extracts/round06/bow-adjacent-26264-26428.js",
+      "sizeBytes": 6332,
+      "sha256": "e364d797b31e3f8f0435d0c2a8f52f146257f2057821e98f2f8f4da8c03ecc6f"
+    },
+    {
+      "path": "work/extracts/round06/bow-soldier-26093-26264.js",
+      "sizeBytes": 6230,
+      "sha256": "f0eb4f1a972123d866fb2e5ebc0cb7fca44a8174141ce0ed6b3df980193ad387"
+    },
+    {
+      "path": "work/extracts/round06/hit-strategy-24936-24983.js",
+      "sizeBytes": 1646,
+      "sha256": "5ebf3b44065683dd303d43122ac0c17d59dc357dbf6efdf5fc4f371a3c46cac9"
+    },
+    {
+      "path": "work/extracts/round06/movement-27558-27873.js",
+      "sizeBytes": 11749,
+      "sha256": "8cd9388176cd2f5e8a17a072af730c4efb340fffa83199d3895af4c91caeef55"
+    },
+    {
+      "path": "work/extracts/round06/projectile-base-27874-28290.js",
+      "sizeBytes": 15111,
+      "sha256": "4fddd3a13f6c8253f9490cbe4436d8f00d225d1955e253901e66371ac836f6b6"
+    },
+    {
+      "path": "work/extracts/round06/projectile-factory-33698-33780.js",
+      "sizeBytes": 2596,
+      "sha256": "5216fa702f128afa6b3ed16d9d6c6ace52e19eeb3a9332e47f8a28a311ae6428"
+    },
+    {
+      "path": "work/extracts/round06/projectile-manager-37209-37474.js",
+      "sizeBytes": 10371,
+      "sha256": "3b23bd57b6dbc7a7da872b33a05588e685fa74f423ad600f0ed0f749a78a9134"
+    },
+    {
+      "path": "work/extracts/round06/projectile-math-2698-2798.js",
+      "sizeBytes": 3804,
+      "sha256": "7acc47efd0b6a0673b4c110ba5a93707ca3fccab1bf0d5eb12292af1eabe6dc3"
+    },
+    {
+      "path": "work/extracts/round06/simple-dynamic-arrow-26698-26845.js",
+      "sizeBytes": 5170,
+      "sha256": "01f14154ac9c7064d5ff28204dd9ec606f1a0a0af08dca6ecdace018f145c54a"
+    },
+    {
+      "path": "work/extracts/round06/unit-config-11069-11352.js",
+      "sizeBytes": 9896,
+      "sha256": "c629892ac57b1b9bd9ad7bfd0cef37b00c9a24f098cd1bd21a606158712362bc"
+    },
+    {
+      "path": "work/obfuscation-runtime.original.js",
+      "sizeBytes": 75764,
+      "sha256": "c75d469ac4537376709eab6aea22c733400c36f00e061fb7abd9ce2a63f295ad"
+    },
+    {
+      "path": "work/obfuscation-runtime.safe-eval.js",
+      "sizeBytes": 75392,
+      "sha256": "180d9cc230e43ded3088726cd68f2fc661c64c7b8883036f2ddb6cfd41fde9e7"
+    },
+    {
+      "path": "work/round-03-extracts/AICtr-49682-50322.js",
+      "sizeBytes": 24226,
+      "sha256": "f1fd358647d2b8dccb22da069fa6bb79bef963b3e1837a457a72184e15a2ac3c"
+    },
+    {
+      "path": "work/round-03-extracts/BattleInput-59634-60381.js",
+      "sizeBytes": 37724,
+      "sha256": "676d4e15a7a5e8cf8e62162ee0f1ab078f015726b05be2b518ba20b72d0a6e67"
+    },
+    {
+      "path": "work/round-03-extracts/BattleManager-50323-50534.js",
+      "sizeBytes": 8574,
+      "sha256": "c5ec2e3a51f9138713d7cfb500586c42479df551a8b148c376124cf13b78ff94"
+    },
+    {
+      "path": "work/round-03-extracts/BattleScene-57007-59129.js",
+      "sizeBytes": 111296,
+      "sha256": "c1716dda726aa2b166612fa9e16c1c81320bd8a29a3ef17eeaead0ecafb85607"
+    },
+    {
+      "path": "work/round-03-extracts/BattleState-3163-3297.js",
+      "sizeBytes": 4834,
+      "sha256": "deeb38dcc4be0c9eb0aecbddb64904c2f851e1843fe1822ad577b9f206aa4e28"
+    },
+    {
+      "path": "work/round-03-extracts/DeckManager-46448-46609.js",
+      "sizeBytes": 5624,
+      "sha256": "2693103be597cea626bc402f223ddfc5480b48700c2277f0510f11df99b5fed5"
+    },
+    {
+      "path": "work/round-03-extracts/EnemyFactory-19184-19260.js",
+      "sizeBytes": 2617,
+      "sha256": "abc76feaa32d0ae8e932a2a478fb7723005f901d22f08b3f86ff7b7594efcdf8"
+    },
+    {
+      "path": "work/round-03-extracts/EnemyManager-32939-33700.js",
+      "sizeBytes": 26682,
+      "sha256": "57cf940b4af82fbe6efbd6edba467cea58053c609d707cac8cbdb943560c51dd"
+    },
+    {
+      "path": "work/round-03-extracts/FixedUpdateManager-3763-3874.js",
+      "sizeBytes": 3758,
+      "sha256": "ca28556e748efbd32dd99d3396f01c19f5382f8fb43b5c338bad43ed26a5516a"
+    },
+    {
+      "path": "work/round-03-extracts/GameData-11561-11908.js",
+      "sizeBytes": 14323,
+      "sha256": "d2b5a8ebd63bed463cfaa23bdefb2dea293a995d2d15ea9feb618394b4b5bf4f"
+    },
+    {
+      "path": "work/round-03-extracts/GameFlow-55027-55229.js",
+      "sizeBytes": 10118,
+      "sha256": "851b556c5434d9ec46c9cc22fe218d7509240d5c04b272f904cf84d7a0779d9b"
+    },
+    {
+      "path": "work/round-03-extracts/LoadScene-50996-51270.js",
+      "sizeBytes": 12117,
+      "sha256": "c1d4c5ccecc6a70c591ef089077f479b033e201be1e21faf61e8f974d4428ce4"
+    },
+    {
+      "path": "work/round-03-extracts/MainScene-64782-65947.js",
+      "sizeBytes": 58750,
+      "sha256": "23605812a9282317972ee01685e41106a853a2dca1519c10366ee17320621a54"
+    },
+    {
+      "path": "work/round-03-extracts/MatchScene-60834-61284.js",
+      "sizeBytes": 22400,
+      "sha256": "2b5803dbd542f7ddd9ae4aab26f6f099c920e82c66e00ead96984087adca2598"
+    },
+    {
+      "path": "work/round-03-extracts/SceneManager-5715-5869.js",
+      "sizeBytes": 5347,
+      "sha256": "04df36bb1802a9dbbb0e315d1064a7b363bd053c3211d72ef4aa186c7b9c526c"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyBase-ro-19685-20858.js",
+      "sizeBytes": 52963,
+      "sha256": "01a2ac0dbe4c4987c62ddcf9b4865ab4fff5fdf3229c2e649b94da49c6002d5d"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyData-sD-11994-12175.js",
+      "sizeBytes": 6694,
+      "sha256": "7cc7244a003cb0756d226dad802b5e7e84ebe046338538c9bb29f785514b74a1"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyEventBase-19600-19684.js",
+      "sizeBytes": 2716,
+      "sha256": "bb305afdddc32a760ab63a98b03e7bbb12e9a6d25d5784a6961f489cdad9d7bf"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyFactory-19184-19260.js",
+      "sizeBytes": 2617,
+      "sha256": "abc76feaa32d0ae8e932a2a478fb7723005f901d22f08b3f86ff7b7594efcdf8"
+    },
+    {
+      "path": "work/round-04-extracts/EnemyManager-vi-32939-33696.js",
+      "sizeBytes": 26582,
+      "sha256": "09804e5e2a2d215dc8fd7f82a22d90553ca19da020aab881530545c57d174059"
+    },
+    {
+      "path": "work/round-04-extracts/GenericPool-uu-13380-14360.js",
+      "sizeBytes": 35389,
+      "sha256": "f99bd7ca171777ed1b4c922872132a175e2cf30d26da03e3b14778d7f3fbcc60"
+    },
+    {
+      "path": "work/round-04-extracts/MapData-AStar-12194-12847.js",
+      "sizeBytes": 25132,
+      "sha256": "4b426a2c2ed0473365eace77846387bf398a86394cbe7f343931b3d6016eaf0f"
+    },
+    {
+      "path": "work/round-04-extracts/Mob0-st-31062-31114.js",
+      "sizeBytes": 1682,
+      "sha256": "806bd88bfe999bf469dad99b6e7c91adaa62ff44d2bd25845cd6d0bb5758d427"
+    },
+    {
+      "path": "work/round-04-extracts/NormalEnemy-pe-31262-31482.js",
+      "sizeBytes": 9156,
+      "sha256": "383ed574940ff3859cb6896f7a5810c2d6ec4849405f411201a0bcb3de1d4022"
+    },
+    {
+      "path": "work/round-05-extracts/AttackEffectBase-r6-26264-26428.js",
+      "sizeBytes": 6332,
+      "sha256": "e364d797b31e3f8f0435d0c2a8f52f146257f2057821e98f2f8f4da8c03ecc6f"
+    },
+    {
+      "path": "work/round-05-extracts/AttackEffectManager-vA-37209-37450.js",
+      "sizeBytes": 9674,
+      "sha256": "e2a72d7dd65b02fa096cd08407b5b1fb3669ae3928a1c93f8131b2a3e7ed6094"
+    },
+    {
+      "path": "work/round-05-extracts/AttackTriggerData-oF-24936-25020.js",
+      "sizeBytes": 2665,
+      "sha256": "1639c90074e46a2fc3f66d6dd95310ce4a44905b74acef393211abcf86b13d4e"
+    },
+    {
+      "path": "work/round-05-extracts/BaseSoldierFactories-24443-24834.js",
+      "sizeBytes": 15129,
+      "sha256": "f8c93522ced86c8add5554259a1681de5b4b61964f3f1f4a8f159fdc2619a784"
+    },
+    {
+      "path": "work/round-05-extracts/BaseUnitCreators-24380-24980.js",
+      "sizeBytes": 21632,
+      "sha256": "d3fc4519e22d2251ab9c3c9d72b216bc3e08a37591b0c2bad5b96c739c65bfbd"
+    },
+    {
+      "path": "work/round-05-extracts/BaseUnitCreators-24443-24834.js",
+      "sizeBytes": 15129,
+      "sha256": "f8c93522ced86c8add5554259a1681de5b4b61964f3f1f4a8f159fdc2619a784"
+    },
+    {
+      "path": "work/round-05-extracts/BaseUnitFactory-24443-24834.js",
+      "sizeBytes": 15129,
+      "sha256": "f8c93522ced86c8add5554259a1681de5b4b61964f3f1f4a8f159fdc2619a784"
+    },
+    {
+      "path": "work/round-05-extracts/BattleAttackLoop-50390-50550.js",
+      "sizeBytes": 6085,
+      "sha256": "e64e1463494dca596e998940af9ffa9ef0a3b1e30a1e32184bdde194baf6d763"
+    },
+    {
+      "path": "work/round-05-extracts/BattleAttackLoop-50443-50519.js",
+      "sizeBytes": 3060,
+      "sha256": "23db043e63f9898c95a73f702399e5dfc3b893b56997baa7dfeaf033abe9a7da"
+    },
+    {
+      "path": "work/round-05-extracts/BattleManagerAttack-50471-50519.js",
+      "sizeBytes": 2224,
+      "sha256": "dd3280fa0cf06fe8191536c004c498e12a9920b4751dd6743d393c972f6f158c"
+    },
+    {
+      "path": "work/round-05-extracts/BattleManagerAttackLoop-50456-50519.js",
+      "sizeBytes": 2647,
+      "sha256": "7daab404d4bee2425bd78ef04cdaab667b3adbc9b2571fce674cc158e9f4e93b"
+    },
+    {
+      "path": "work/round-05-extracts/BattleStateMultiplier-3163-3297.js",
+      "sizeBytes": 4834,
+      "sha256": "deeb38dcc4be0c9eb0aecbddb64904c2f851e1843fe1822ad577b9f206aa4e28"
+    },
+    {
+      "path": "work/round-05-extracts/BowAndHitArea-ok-r6-26093-26428.js",
+      "sizeBytes": 12509,
+      "sha256": "55534bcff6e7a6c64b1f946588e5d72a972346912f882c06815112b1ee939806"
+    },
+    {
+      "path": "work/round-05-extracts/BowCandidate-ok-26093-26506.js",
+      "sizeBytes": 16060,
+      "sha256": "2332d72303d0cd6aca1290d73114aa75f2b97891b18a9ad3f571c2d42df6bdae"
+    },
+    {
+      "path": "work/round-05-extracts/BulletBase-qY-27874-28120.js",
+      "sizeBytes": 8736,
+      "sha256": "60b9711dbc1b2c48d2f35149ae869fa6ec625a97d3f0712739a71bb050d8611c"
+    },
+    {
+      "path": "work/round-05-extracts/BulletManager-vA-37209-37320.js",
+      "sizeBytes": 3663,
+      "sha256": "81eb31c0a082839ac7639476be809288e103c8affd36b33e615d97aaf99f8d8f"
+    },
+    {
+      "path": "work/round-05-extracts/Candidate-ok-26040-26540.js",
+      "sizeBytes": 19175,
+      "sha256": "4f119e6b9197241fe23ef053e93c4917e6c5b47aaa7e2064ec237dc9620dede7"
+    },
+    {
+      "path": "work/round-05-extracts/Candidate-ok-26093-26506.js",
+      "sizeBytes": 16060,
+      "sha256": "2332d72303d0cd6aca1290d73114aa75f2b97891b18a9ad3f571c2d42df6bdae"
+    },
+    {
+      "path": "work/round-05-extracts/DragBase-rb-24863-24930.js",
+      "sizeBytes": 2297,
+      "sha256": "3db3330e31c5a39ca3ace21185537705b1c11f6cfc0344fd06437a69989c482f"
+    },
+    {
+      "path": "work/round-05-extracts/EventProxy-qE-19600-19684.js",
+      "sizeBytes": 2716,
+      "sha256": "bb305afdddc32a760ab63a98b03e7bbb12e9a6d25d5784a6961f489cdad9d7bf"
+    },
+    {
+      "path": "work/round-05-extracts/FriendlyUnitConfig-11060-11370.js",
+      "sizeBytes": 10721,
+      "sha256": "2462e69e00ba2d97e751d7b7fdff948c85c35db11064ea7836f4838326f75656"
+    },
+    {
+      "path": "work/round-05-extracts/FriendlyUnitConfig-11069-11352.js",
+      "sizeBytes": 9896,
+      "sha256": "c629892ac57b1b9bd9ad7bfd0cef37b00c9a24f098cd1bd21a606158712362bc"
+    },
+    {
+      "path": "work/round-05-extracts/GameDataRuntimeId-11770-11795.js",
+      "sizeBytes": 1126,
+      "sha256": "c018dcd04b2c9f187ebec8780c4e6985fb595ae873158242574a8865a6b4ccfa"
+    },
+    {
+      "path": "work/round-05-extracts/GenericEventProxy-qE-19600-19684.js",
+      "sizeBytes": 2716,
+      "sha256": "bb305afdddc32a760ab63a98b03e7bbb12e9a6d25d5784a6961f489cdad9d7bf"
+    },
+    {
+      "path": "work/round-05-extracts/KnifeHitAndDrag-24840-24930.js",
+      "sizeBytes": 2944,
+      "sha256": "00e05655cc8be240fc1dc623aa0af712a397d4cc2bf35bdf469b3f80b876a3cf"
+    },
+    {
+      "path": "work/round-05-extracts/KnifeHitEffect-tO-24840-24860.js",
+      "sizeBytes": 606,
+      "sha256": "40c0b4e30f8246e13f47965e77b48c1665b314bb432d22c624bd3c0c8b3bf59a"
+    },
+    {
+      "path": "work/round-05-extracts/SoldierBase-td-23112-23437.js",
+      "sizeBytes": 12814,
+      "sha256": "db442386c202a991121254f9d45d89df6da3588fa00715bac4d4c85d85f58f85"
+    },
+    {
+      "path": "work/round-05-extracts/SoldierBase-td-23114-23437.js",
+      "sizeBytes": 12741,
+      "sha256": "44882bc9abaf4a6d90dcf29fd02a2ea6e6d723569d373ea84c87348e2d4bf964"
+    },
+    {
+      "path": "work/round-05-extracts/TargetStrategy-tc-24936-25270.js",
+      "sizeBytes": 11338,
+      "sha256": "c57b8a490238abfa3b5d1f43cace148fe0a57940ba2a30aecc3c2aeb3e2a71d4"
+    },
+    {
+      "path": "work/round-05-extracts/UnitClassPool-sc-22656-22691.js",
+      "sizeBytes": 1157,
+      "sha256": "de7abae0d212ef56d6268d56c10ba62c24a8446274d0fa8d4e8f760b502acf7f"
+    },
+    {
+      "path": "work/round-05-extracts/UnitCore-rc-22550-23480.js",
+      "sizeBytes": 38729,
+      "sha256": "cc9420696401dfe1a30c1f1cbe5eeec5c59b6e49720513b4a59ba2a24b420f1b"
+    },
+    {
+      "path": "work/round-05-extracts/UnitCore-rc-22694-23112.js",
+      "sizeBytes": 19352,
+      "sha256": "c75d253d16748b957911abb202a6089f242cf42fea3ee852c5aaf17cad0b9e21"
+    },
+    {
+      "path": "work/round-05-extracts/UnitDragBase-rb-24863-24930.js",
+      "sizeBytes": 2297,
+      "sha256": "3db3330e31c5a39ca3ace21185537705b1c11f6cfc0344fd06437a69989c482f"
+    },
+    {
+      "path": "work/round-05-extracts/UnitRegistry-vc-29440-30520.js",
+      "sizeBytes": 38630,
+      "sha256": "f5610dd3aba83428026d4e3d9f6ef70e4c9523ef5c4a9f4e632d63ababc49e19"
+    },
+    {
+      "path": "work/round-05-extracts/UnitRegistry-vc-29460-30476.js",
+      "sizeBytes": 36535,
+      "sha256": "d9bb91bea99eb72ffe9746fb31dbe7ba31be2e656469ff93008b5d95dea4e395"
+    }
+  ]
+}

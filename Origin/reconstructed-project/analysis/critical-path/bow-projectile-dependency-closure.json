@@ -1,0 +1,103 @@
+{
+  "moduleId": "BOW-PROJECTILE-COMBAT-01",
+  "requestedRanges": [
+    "26093-26264",
+    "26264-26428",
+    "26698-26845",
+    "27578-nearby",
+    "27874-28120",
+    "37209-37320"
+  ],
+  "actualRanges": [
+    "2698-2798",
+    "11069-11352",
+    "24936-24983",
+    "26093-26428",
+    "26698-26845",
+    "27558-27873",
+    "27874-28290",
+    "33698-33780",
+    "37209-37474",
+    "55064-55210"
+  ],
+  "extensionReasons": [
+    {
+      "sourceRange": "2698-2798",
+      "reason": "恢复二次贝塞尔插值、切线角度、距离与角度归一化的纯数学函数。"
+    },
+    {
+      "sourceRange": "11069-11352",
+      "reason": "确认正式兵种顺序、弓兵配置索引、伤害、攻击范围、攻击间隔与等级倍率。"
+    },
+    {
+      "sourceRange": "24936-24983",
+      "reason": "确认弓箭使用的单目标命中策略编号 100 及命中后移除契约。"
+    },
+    {
+      "sourceRange": "27558-27873",
+      "reason": "rd 的移动逻辑由 pP/on 目标追踪二次贝塞尔策略提供，指定范围只含注册点。"
+    },
+    {
+      "sourceRange": "27874-28290",
+      "reason": "qY 类实际结束晚于用户给出的 28120 行，必须覆盖完整回收和事件契约。"
+    },
+    {
+      "sourceRange": "33698-33780",
+      "reason": "vj/vk 负责正式投射物类型解析、复合池键、ID 分配与工厂回收。"
+    },
+    {
+      "sourceRange": "37209-37474",
+      "reason": "vA 类实际结束晚于用户给出的 37320 行，必须覆盖完整 gameOver、反向遍历和回收。"
+    },
+    {
+      "sourceRange": "55064-55210",
+      "reason": "确认投射物管理器在战斗初始化、开始与结束时的调用顺序。"
+    }
+  ],
+  "includedModules": [
+    {
+      "module": "FRIENDLY-UNIT-COMBAT-01",
+      "reasonIncluded": "复用 UnitFactory、UnitRegistry、SoldierBase 和 BattleManager 轮询。",
+      "recoveredScope": "新增正式弓兵注册并保持刀兵行为。",
+      "deferredScope": "枪兵、骑兵、完整卡牌 UI。"
+    },
+    {
+      "module": "ENEMY-RUNTIME-01",
+      "reasonIncluded": "箭矢目标查询、目标中心、真实伤害和死亡回收依赖 EnemyManager/Mob0。",
+      "recoveredScope": "只复用既有实现。",
+      "deferredScope": "其他敌人和 Boss。"
+    },
+    {
+      "module": "PROJECTILE-RUNTIME-SUBSET",
+      "reasonIncluded": "弓兵必须有真实移动箭矢。",
+      "recoveredScope": "qY、rd、on、策略 100、vj/vk、vA 的直接闭包。",
+      "deferredScope": "所有其他投射物、武器、Trail2D。"
+    },
+    {
+      "module": "DEVELOPMENT-ANIMATION-DRIVER",
+      "reasonIncluded": "缺少正式 Spine/prefab 但必须保留 STOPPED 语义。",
+      "recoveredScope": "仅开发模式按正式片段时长触发 STOPPED。",
+      "deferredScope": "正式 Spine 动画表现。"
+    }
+  ],
+  "directDependencies": [
+    "SoldierBase",
+    "UnitFactory",
+    "UnitRegistry",
+    "BattleManager",
+    "EnemyManager",
+    "EnemyBase",
+    "ObjectPool",
+    "FixedUpdateManager",
+    "Laya.Event.STOPPED",
+    "Laya.Tween"
+  ],
+  "deferredDependencies": [
+    "Spine animation asset for bow",
+    "arrow image resource",
+    "full BulletFactory registry",
+    "Trail2D",
+    "audio/effect production services"
+  ],
+  "closureRisk": "MEDIUM"
+}

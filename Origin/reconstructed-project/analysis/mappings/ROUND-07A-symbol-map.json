@@ -1,0 +1,9 @@
+{
+  "round": "07A",
+  "unit": {
+    "text": "枪",
+    "index": 2,
+    "animationKey": "pike",
+    "source": "bundle.strings-decoded.js:24556-24749"
+  }
+}
