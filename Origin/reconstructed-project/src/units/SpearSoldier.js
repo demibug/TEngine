@@ -26,11 +26,10 @@ class SpearSoldier extends SoldierBase {
 
   configure(options = {}) {
     super.configure(options);
-    if (!options.attackEffectManager && !options.attackTimeline) {
-      // 保持与现有近战框架兼容；正式枪击表现管理器将在后续 Bullet/Weapon 恢复阶段接入。
-      this.attackTimeline = options.attackTimeline || null;
+    if (!options.attackEffectManager || typeof options.attackEffectManager.add !== 'function') {
+      throw new TypeError('SpearSoldier requires attackEffectManager');
     }
-    this.attackEffectManager = options.attackEffectManager || null;
+    this.attackEffectManager = options.attackEffectManager;
     return this;
   }
 
@@ -46,14 +45,14 @@ class SpearSoldier extends SoldierBase {
     const target=targets[0];
     if(!target)return null;
     const {PikeAttackEffect}=require('../combat/PikeAttackEffect');
-    const effect=new PikeAttackEffect().launch({owner:this,target,enemyManager:this.enemyManager,damage:this.getAttackDamage?this.getAttackDamage():this.baseAttackPower});
+    const effect=this.attackEffectManager.create(PikeAttackEffect).launch({owner:this,target,enemyManager:this.enemyManager,damage:this.getAttackDamage?this.getAttackDamage():this.baseAttackPower});
     this.pendingAttack=effect;
-    if(this.attackEffectManager&&typeof this.attackEffectManager.add==='function')this.attackEffectManager.add(effect);
-    else effect.update(1000);
+    this.attackEffectManager.add(effect);
     return effect;
   }
 
   gameOver() {
+    if (this.attackEffectManager && typeof this.attackEffectManager.cancelOwner === 'function') this.attackEffectManager.cancelOwner(this);
     this.pendingAttack = null;
     this.pikeRotation = 0;
     return super.gameOver();

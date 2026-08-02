@@ -14,13 +14,16 @@ class GeneralFactory {
     return new GeneralPart({ id, word, side, level });
   }
 
-  createGeneral(parts, { id = this.nextId++, side = true, isPlayer = true, weaponId = null } = {}) {
+  createGeneral(parts, { id = this.nextId++, side = true, isPlayer = true, weaponId = null, weapon = null, combat = null, experienceThresholds = null, experience = 0, skillManager = null, skillKey = null, skill = null } = {}) {
     if (!Array.isArray(parts) || parts.length !== 2) throw new Error('General merge requires exactly two parts');
     const definition = findGeneralByParts(parts);
     if (!definition) throw new Error(`Unsupported general part merge: ${parts.map(part => part.word).join('')}`);
-    const general = new GeneralUnit({ id, name: definition.name, side, level: 1 });
+    const general = new GeneralUnit({ id, name: definition.name, side, level: 1, experienceThresholds, experience });
     general.init(parts, isPlayer, definition.index);
     general.weaponId = weaponId;
+    if (weapon) general.attachWeapon(weapon);
+    if (combat) general.configureCombat(combat);
+    if (skillManager || skill) general.configureSkill({ skillManager, skillKey, skill });
     for (const part of parts) part.assignTo(general.id);
     return general;
   }

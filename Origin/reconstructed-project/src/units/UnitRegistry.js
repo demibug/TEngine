@@ -34,9 +34,10 @@ class UnitRegistry extends SingletonBase {
     parentResolver,
     buffManager = null,
     logger = console,
-    mapTileManager = null,
-    weaponManager = null,
-    generalFactory = null,
+      mapTileManager = null,
+      weaponManager = null,
+      skillManager = null,
+      generalFactory = null,
   } = {}) {
     if (!unitFactory || !gameData || !eventBus || !placementReservations) {
       throw new TypeError('UnitRegistry requires unitFactory, gameData, eventBus and placementReservations');
@@ -44,7 +45,7 @@ class UnitRegistry extends SingletonBase {
     if (typeof parentResolver !== 'function') throw new TypeError('UnitRegistry requires parentResolver()');
     Object.assign(this, {
       unitFactory, gameData, eventBus, placementReservations, parentResolver,
-      buffManager, logger, mapTileManager, weaponManager,
+      buffManager, logger, mapTileManager, weaponManager, skillManager,
       generalFactory: generalFactory || new GeneralFactory(),
     });
     this._configured = true;
@@ -153,7 +154,26 @@ class UnitRegistry extends SingletonBase {
   }
 
   getUnit(id) {
-    return this.soldiers.get(id) || this.secondaryUnits.get(id) || this.farmers.get(id);
+    return this.soldiers.get(id) || this.generals.get(id) || this.secondaryUnits.get(id) || this.farmers.get(id);
+  }
+
+  setSkillManager(skillManager) {
+    if (skillManager != null && typeof skillManager.attach !== 'function') throw new TypeError('UnitRegistry skillManager requires attach()');
+    this.skillManager = skillManager;
+    return this;
+  }
+
+  awardGeneralExperience(contributorIds, amount = 0) {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < 0) throw new TypeError('General experience reward must be a non-negative number');
+    const ids = Array.isArray(contributorIds) ? contributorIds : [contributorIds];
+    const results = [];
+    for (const id of [...new Set(ids.filter(valueId => valueId != null))]) {
+      const general = this.generals.get(id);
+      if (!general || typeof general.addExperience !== 'function') continue;
+      results.push({ id, result: general.addExperience(value), unit: general });
+    }
+    return results;
   }
 
   allUnits() { return [...this.soldiers.values(), ...this.secondaryUnits.values(), ...this.farmers.values()]; }
@@ -168,7 +188,7 @@ class UnitRegistry extends SingletonBase {
   }
   lowestLevel(side, count = 1) { return this.unitsBySide(side).sort((a,b)=>a.level-b.level||a.id-b.id).slice(0,count); }
   highestLevel(side, count = 1) { return this.unitsBySide(side).sort((a,b)=>b.level-a.level||a.id-b.id).slice(0,count); }
-  removeUnit(id) { return this.removeSoldier(id) || this.removeSecondary(id) || this.removeFarmer(id); }
+  removeUnit(id) { return this.removeSoldier(id) || this.removeGeneral(id) || this.removeSecondary(id) || this.removeFarmer(id); }
 
   removeSoldier(id) {
     const unit = this.soldiers.get(id);
@@ -190,10 +210,11 @@ class UnitRegistry extends SingletonBase {
   }
 
   /** Recovered sE/QA path: two GeneralPart objects become one GeneralUnit. */
-  mergeGeneralParts(partIds, { side = true, isPlayer = true, weaponId = null } = {}) {
+  mergeGeneralParts(partIds, { side = true, isPlayer = true, weaponId = null, weapon = null, combat = null, experienceThresholds = null, experience = 0, skillManager = this.skillManager, skillKey = null, skill = null } = {}) {
     const parts = partIds.map(id => this.secondaryUnits.get(id));
     if (parts.some(part => !part)) throw new Error(`Unknown general part in merge: ${partIds.join(',')}`);
-    const general = this.generalFactory.createGeneral(parts, { side, isPlayer, weaponId });
+    if (parts.some(part => part.ownerId !== -1)) throw new Error(`General part is already assigned: ${parts.find(part => part.ownerId !== -1).id}`);
+    const general = this.generalFactory.createGeneral(parts, { side, isPlayer, weaponId, weapon, combat, experienceThresholds, experience, skillManager, skillKey, skill });
     this.generals.set(general.id, general);
     this.generalComponents.set(general.id, parts.map(part => part.id));
     return general;
@@ -202,10 +223,14 @@ class UnitRegistry extends SingletonBase {
   removeGeneral(id) {
     const general = this.generals.get(id);
     if (!general) return false;
-    general.gameOver();
+    const parts = Array.isArray(general.parts) ? general.parts.slice() : [];
+    const result = typeof general.recycle === 'function' ? general.recycle('registry-remove') : general.gameOver();
+    for (const part of parts) {
+      if (part && typeof part.unbindFromGeneral === 'function') part.unbindFromGeneral(id);
+    }
     this.generals.delete(id);
     this.generalComponents.delete(id);
-    return true;
+    return result !== false;
   }
 
   removeFarmer(id) {
@@ -308,6 +333,7 @@ class UnitRegistry extends SingletonBase {
     this.parentResolver = null;
     this.mapTileManager = null;
     this.weaponManager = null;
+    this.skillManager = null;
     this.generalFactory = null;
   }
 

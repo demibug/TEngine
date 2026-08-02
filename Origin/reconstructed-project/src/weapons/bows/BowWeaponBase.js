@@ -17,13 +17,15 @@ class BowWeaponBase extends WeaponBase {
   attach(owner, buffManager) {
     if (this.owner && this.owner !== owner) this.detach();
     this.owner = owner;
-    this.buffPort = new WeaponBuffPort(buffManager, this.constructor.config?.name || 'BowWeapon');
+    this.buffManager = buffManager || owner?.buffManager || null;
+    this.buffPort = new WeaponBuffPort(this.buffManager, this.constructor.config?.name || 'BowWeapon');
     this.onAttach();
     return this;
   }
   detach() {
     if (this.owner) this.onDetach();
     this.owner = null;
+    this.buffManager = null;
     this.activeProjectiles.clear();
     return this;
   }
@@ -31,9 +33,10 @@ class BowWeaponBase extends WeaponBase {
   onDetach() {}
   getTargetList() {
     const manager = this.owner && (this.owner.enemyManager || this.owner.battle?.enemyManager);
-    return manager && manager.enemies
-      ? Array.from(manager.enemies.values()).filter(enemy => enemy && enemy.currentState !== 4 && enemy.targetable !== false)
-      : [];
+    if (!manager) return [];
+    if (manager.enemies) return Array.from(manager.enemies.values()).filter(enemy => enemy && enemy.currentState !== 4 && enemy.targetable !== false);
+    const center=this._ownerCenter();
+    return typeof manager.queryTargets === 'function' ? manager.queryTargets(center.x,center.y,Number(this.owner?.attackRange)||Infinity,this.owner?.side) : [];
   }
   selectTarget() { return this.getTargetList()[0] || null; }
   _ownerCenter() {
@@ -67,13 +70,22 @@ class BowWeaponBase extends WeaponBase {
       scale: visual.scale || null,
       anchor: visual.anchor || null,
     };
+    const baseDamage = extra.damage == null ? (this.owner.attackPower || this.owner.attackDamage || 0) : extra.damage;
+    const damageMultiplier = Number(extra.damageMultiplier == null ? 1 : extra.damageMultiplier);
+    const ownerCenter=this._ownerCenter();
+    const targetCenter={x:(Number(target.x)||0)+(Number(target.width)||0)/2,y:(Number(target.y)||0)+(Number(target.height)||0)/2};
+    const distance=Math.hypot(targetCenter.x-ownerCenter.x,targetCenter.y-ownerCenter.y);
+    const distanceMultiplier=extra.distanceScale ? Math.max(1,distance/Math.max(Number(this.owner.attackRange)||1,1)) : 1;
+    const speedScale = Number(extra.speedScale == null ? 1 : extra.speedScale)
+      * Number(extra.speedMultiplier == null ? 1 : extra.speedMultiplier);
     const projectile = manager.create({
       ...extra,
       type,
       appearance,
       attacker: this.owner,
-      damage: extra.damage == null ? (this.owner.attackPower || this.owner.attackDamage || 0) : extra.damage,
-      speedScale: extra.speedScale == null ? 1 : extra.speedScale,
+      damage: Number(baseDamage) * (Number.isFinite(damageMultiplier) ? damageMultiplier : 1) * distanceMultiplier,
+      speedScale: Number.isFinite(speedScale) ? speedScale : 1,
+      buffManager: this.buffPort.manager,
       hitStrategy,
       movement,
     }, this._ownerCenter());
@@ -81,11 +93,12 @@ class BowWeaponBase extends WeaponBase {
     this.activeProjectiles.add(projectile);
     return projectile;
   }
-  attack(target) {
-    const selected = target || this.selectTarget();
+  attack(input) {
+    const context = input && input.target ? input : { target: input };
+    const selected = context.target || this.selectTarget();
     if (!selected) return null;
     this.attackCount += 1;
-    return this.performAttack(selected);
+    return this.performAttack(selected, context);
   }
   performAttack() { throw new Error(`${this.constructor.name}.performAttack not implemented`); }
   update() { return false; }

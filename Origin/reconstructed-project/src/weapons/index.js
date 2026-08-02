@@ -1,1 +1,1 @@
-module.exports={WeaponBase:require("./WeaponBase"),WeaponFactory:require("./WeaponFactory"),WeaponManager:require("./WeaponManager"),WeaponRegistry:require("./WeaponRegistry")};
+module.exports={WeaponBase:require("./WeaponBase"),WeaponAttackEffect:require("./WeaponAttackEffect").WeaponAttackEffect,WeaponFactory:require("./WeaponFactory"),WeaponManager:require("./WeaponManager"),WeaponRegistry:require("./WeaponRegistry")};

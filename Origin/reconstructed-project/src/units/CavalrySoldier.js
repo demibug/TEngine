@@ -18,7 +18,10 @@ class CavalrySoldier extends SoldierBase {
 
   configure(options = {}) {
     super.configure(options);
-    this.attackEffectManager = options.attackEffectManager || null;
+    if (!options.attackEffectManager || typeof options.attackEffectManager.add !== 'function') {
+      throw new TypeError('CavalrySoldier requires attackEffectManager');
+    }
+    this.attackEffectManager = options.attackEffectManager;
     this.pendingSweeps = [];
     return this;
   }
@@ -34,11 +37,11 @@ class CavalrySoldier extends SoldierBase {
     if(!targets.length)return null;
     const damage=this.getAttackDamage?this.getAttackDamage():this.baseAttackPower;
     const effects=[
-      new CavalrySweepEffect().launch({owner:this,enemyManager:this.enemyManager,damage,multiplier:0.5,radius:this.attackRange}),
-      new CavalrySweepEffect().launch({owner:this,enemyManager:this.enemyManager,damage,multiplier:1,radius:this.attackRange,delayMs:80})
+      this.attackEffectManager.create(CavalrySweepEffect).launch({owner:this,enemyManager:this.enemyManager,damage,multiplier:0.5,radius:this.attackRange}),
+      this.attackEffectManager.create(CavalrySweepEffect).launch({owner:this,enemyManager:this.enemyManager,damage,multiplier:1,radius:this.attackRange,delayMs:80})
     ];
     this.pendingSweeps=effects;
-    for(const e of effects)e.update(100);
+    for (const effect of effects) this.attackEffectManager.add(effect);
     return {effects};
   }
 
@@ -48,6 +51,7 @@ class CavalrySoldier extends SoldierBase {
   }
 
   gameOver() {
+    if (this.attackEffectManager && typeof this.attackEffectManager.cancelOwner === 'function') this.attackEffectManager.cancelOwner(this);
     for (const effect of this.pendingSweeps) {
       if (effect && typeof effect.cleanup === 'function') effect.cleanup();
     }

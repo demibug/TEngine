@@ -2,6 +2,7 @@
 
 const { SingletonBase } = require('../core/SingletonBase');
 const { GameEvents } = require('../core/EventBus');
+const { AttackScheduler } = require('../combat/AttackScheduler');
 
 const BattleManagerState = Object.freeze({
   IDLE: 0,
@@ -31,10 +32,20 @@ class BattleManager extends SingletonBase {
     this.startCount = 0;
     this.updateCount = 0;
     this.firstFrameExecuted = false;
+    this.generalExperiencePerKill = 1;
+    this._experienceEventBus = null;
+    this.attackScheduler = null;
+    this.attackEffectManager = null;
   }
 
-  configure({ gameData, enemyManager, eventBus, gameLoop, unitManager, placementReservations, random, specialSpawnPolicy, waveManager = null, bossManager = null, skillManager = null, weaponManager = null, economy = null, laya, now = Date.now, logger = console } = {}) {
-    Object.assign(this, { gameData, enemyManager, eventBus, gameLoop, unitManager, placementReservations, random, specialSpawnPolicy, waveManager, bossManager, skillManager, laya, now, logger });
+  configure({ gameData, enemyManager, eventBus, gameLoop, unitManager, placementReservations, random, specialSpawnPolicy, waveManager = null, bossManager = null, skillManager = null, weaponManager = null, economy = null, laya, now = Date.now, logger = console, generalExperiencePerKill = 1, attackScheduler = null, attackEffectManager = null } = {}) {
+    Object.assign(this, { gameData, enemyManager, eventBus, gameLoop, unitManager, placementReservations, random, specialSpawnPolicy, waveManager, bossManager, skillManager, weaponManager, economy, laya, now, logger });
+    this.attackScheduler = attackScheduler || new AttackScheduler({ enemyManager });
+    this.attackEffectManager = attackEffectManager;
+    this.generalExperiencePerKill = Number.isFinite(Number(generalExperiencePerKill)) && Number(generalExperiencePerKill) >= 0
+      ? Number(generalExperiencePerKill) : 1;
+    if (skillManager && unitManager && typeof unitManager.setSkillManager === 'function') unitManager.setSkillManager(skillManager);
+    this._bindExperienceEvents();
     return this;
   }
 
@@ -69,6 +80,7 @@ class BattleManager extends SingletonBase {
     this.firstFrameExecuted = true;
     this._updateSpawnState(deltaMs);
     this._updateUnitAttacks();
+    if (this.attackEffectManager && typeof this.attackEffectManager.update === 'function') this.attackEffectManager.update(deltaMs);
   }
 
   _updateSpawnState(deltaMs) {
@@ -146,28 +158,45 @@ class BattleManager extends SingletonBase {
     }
     for (const unit of this.generals.values()) {
       if (!unit.isActive) continue;
-      this._updateAttackUnit(unit, unit.general, 'GeneralIdle', currentTime);
+      // GeneralUnit is engine-neutral and owns its own combat state machine.
+      // Only configured generals participate; target/range/effect data is
+      // injected at merge time and is intentionally not guessed here.
+      if (typeof unit.updateCombat === 'function') unit.updateCombat(currentTime);
     }
   }
 
-  _updateAttackUnit(unit, displayObject, idleState, currentTime) {
-    if (!displayObject) throw new Error('Battle unit is missing its display object');
-    const centerX = displayObject.x + displayObject.width / 2;
-    const centerY = displayObject.y + displayObject.height / 2;
-    const intervalSeconds = unit.attackIntervalSeconds != null ? unit.attackIntervalSeconds : unit.attackIntervalScale;
-    const intervalMs = 1000 * intervalSeconds;
-    if (unit.currentState !== 'UnitAttack') {
-      unit.targets = this.enemyManager.queryTargets(centerX, centerY, unit.attackRange, unit.side);
-      if (unit.targets.length > 0 && currentTime - unit.lastAttackTime >= intervalMs) unit.changeState('UnitAttack');
-      return;
+  _bindExperienceEvents() {
+    if (this._experienceEventBus === this.eventBus) return;
+    if (this._experienceEventBus && typeof this._experienceEventBus.off === 'function') {
+      this._experienceEventBus.off(GameEvents.ENEMY_KILLED_BY, this, this._onEnemyKilled);
     }
-    if (unit.disabled || unit.inPool) { unit.changeState(idleState); return; }
-    if (currentTime - unit.lastAttackTime < intervalMs) return;
-    unit.lastAttackTime = currentTime;
-    unit.targets = this.enemyManager.queryTargets(centerX, centerY, unit.attackRange, unit.side);
-    if (!unit.targets || unit.targets.length === 0) { unit.changeState(idleState); return; }
-    if (unit.weapon && typeof unit.weapon.attack === 'function') unit.weapon.attack(unit.targets[0]);
-    else unit.attack();
+    this._experienceEventBus = this.eventBus;
+    if (this.eventBus && typeof this.eventBus.on === 'function') {
+      this.eventBus.on(GameEvents.ENEMY_KILLED_BY, this, this._onEnemyKilled);
+    }
+  }
+
+  _onEnemyKilled(attackerId, contributorIds, experienceReward = this.generalExperiencePerKill) {
+    if (!this.unitManager || typeof this.unitManager.awardGeneralExperience !== 'function') return [];
+    const ids = Array.isArray(contributorIds) ? contributorIds.slice() : [];
+    if (attackerId != null && !ids.includes(attackerId)) ids.unshift(attackerId);
+    const reward = Number.isFinite(Number(experienceReward)) && Number(experienceReward) >= 0
+      ? Number(experienceReward) : this.generalExperiencePerKill;
+    return this.unitManager.awardGeneralExperience(ids, reward);
+  }
+
+  triggerGeneralSkill(generalId, context = {}) {
+    const generals = this.generals || (this.unitManager && this.unitManager.generals);
+    const general = generals && generals.get(generalId);
+    if (!general) return { activated: false, reason: 'unknown-general' };
+    if (typeof general.triggerSkill !== 'function') return { activated: false, reason: 'general-skill-entry-missing' };
+    return general.triggerSkill(context);
+  }
+
+  _updateAttackUnit(unit, displayObject, idleState, currentTime) {
+    void displayObject;
+    void idleState;
+    return this.attackScheduler.update(unit, { enemyManager: this.enemyManager, now: () => currentTime });
   }
 
   gameOver() {
@@ -179,6 +208,11 @@ class BattleManager extends SingletonBase {
     this.unitsThisWave = 0;
     if (this.waveManager && typeof this.waveManager.gameOver === 'function') this.waveManager.gameOver();
     if (this.weaponManager && typeof this.weaponManager.gameOver === 'function') this.weaponManager.gameOver();
+    if (this.attackEffectManager && typeof this.attackEffectManager.gameOver === 'function') this.attackEffectManager.gameOver();
+    if (this._experienceEventBus && typeof this._experienceEventBus.off === 'function') {
+      this._experienceEventBus.off(GameEvents.ENEMY_KILLED_BY, this, this._onEnemyKilled);
+    }
+    this._experienceEventBus = null;
     this.started = false;
     this.state = BattleManagerState.IDLE;
   }
@@ -204,6 +238,13 @@ class BattleManager extends SingletonBase {
     this.startCount = 0;
     this.updateCount = 0;
     this.firstFrameExecuted = false;
+    this.generalExperiencePerKill = 1;
+    this.attackScheduler = null;
+    this.attackEffectManager = null;
+    if (this._experienceEventBus && typeof this._experienceEventBus.off === 'function') {
+      this._experienceEventBus.off(GameEvents.ENEMY_KILLED_BY, this, this._onEnemyKilled);
+    }
+    this._experienceEventBus = null;
     this.battleState = null;
   }
 }

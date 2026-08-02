@@ -25,6 +25,7 @@ const { AIController } = require('../ai/AIController');
 const WeaponManager = require('../weapons/WeaponManager');
 const { KnifeAttackTimeline } = require('../combat/KnifeAttackTimeline');
 const { DevelopmentAnimationDriver } = require('../combat/dev/DevelopmentAnimationDriver');
+const { AttackEffectManager } = require('../combat/AttackEffectManager');
 const { ProjectileFactory } = require('../projectiles/ProjectileFactory');
 const { ProjectileManager } = require('../projectiles/ProjectileManager');
 const { BuffManager } = require('../buffs/BuffManager');
@@ -226,6 +227,7 @@ class DevelopmentBootstrap {
     waveManager.init();
 
     const specialSpawnPolicy = new DevelopmentSpecialSpawnPolicy();
+    const attackEffectManager = new AttackEffectManager({ objectPool });
     const battleManager = BattleManager.instance().configure({
       gameData,
       enemyManager,
@@ -243,6 +245,7 @@ class DevelopmentBootstrap {
       laya: this.Laya,
       now: this.now,
       logger: this.logger,
+      attackEffectManager,
     });
 
     const projectileEffects = new DevelopmentProjectileEffects();
@@ -284,6 +287,7 @@ class DevelopmentBootstrap {
       laya: this.Laya,
       enemyManager,
       effects: knifeEffects,
+      attackEffectManager,
       logger: this.logger,
     });
     const unitFactory = UnitFactory.instance();
@@ -300,6 +304,7 @@ class DevelopmentBootstrap {
         audio: unitAudio,
         enemyManager,
         attackTimeline: knifeAttackTimeline,
+        attackEffectManager,
         projectileManager,
         buffManager,
         logger: this.logger,
@@ -461,6 +466,7 @@ class DevelopmentBootstrap {
       unitAudio,
       knifeEffects,
       knifeAttackTimeline,
+      attackEffectManager,
       projectileEffects,
       projectileFactory,
       projectileManager,

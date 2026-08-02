@@ -2,6 +2,7 @@
 
 const KNIFE_HIT_DELAY_BASE_MS = 500; // hu[176]
 const KNIFE_ATTACK_EFFECT_TYPE = 'knifeSoliderAttack'; // 原字符串拼写
+const { KnifeAttackEffect } = require('./KnifeAttackEffect');
 
 /**
  * 最小正式攻击闭包：tO → r6 → oF → vA 中刀兵实际使用的分支。
@@ -14,13 +15,13 @@ const KNIFE_ATTACK_EFFECT_TYPE = 'knifeSoliderAttack'; // 原字符串拼写
  * 重建状态：COMPLETE_FOR_KNIFE_HIT_TIMING
  */
 class KnifeAttackTimeline {
-  constructor({ laya, enemyManager, effects, logger = console } = {}) {
+  constructor({ laya, enemyManager, effects, attackEffectManager = null, logger = console } = {}) {
     if (!laya || !laya.timer) throw new TypeError('KnifeAttackTimeline requires Laya.timer');
     if (!enemyManager) throw new TypeError('KnifeAttackTimeline requires EnemyManager');
     if (!effects || typeof effects.startKnifeAttack !== 'function' || typeof effects.showKnifeHit !== 'function') {
       throw new TypeError('KnifeAttackTimeline requires startKnifeAttack() and showKnifeHit() effects');
     }
-    Object.assign(this, { laya, enemyManager, effects, logger });
+    Object.assign(this, { laya, enemyManager, effects, attackEffectManager, logger });
     this.started = [];
     this.settled = [];
   }
@@ -44,29 +45,57 @@ class KnifeAttackTimeline {
     this.started.push(record);
     this.effects.startKnifeAttack(record, attacker, target);
 
-    this.laya.timer.once(delayMs, attacker, () => {
-      if (generation !== attacker.lifecycleGeneration || attacker.inPool || attacker.destroyed || !attacker.isActive) {
-        record.cancelled = true;
-        this.settled.push(record);
-        return;
-      }
-      const enemy = this.enemyManager.getById(target.id);
-      if (!enemy || !enemy.isTargetableBy(attacker.side)) {
-        record.cancelled = true;
-        this.settled.push(record);
-        return;
-      }
-      enemy.hit(damage, attacker);
-      this.effects.showKnifeHit(record, attacker, enemy);
-      record.settled = true;
-      record.settledAt = this.laya.timer.currTimer;
-      this.settled.push(record);
-    });
+    if (this.attackEffectManager) {
+      const effect = this.attackEffectManager.create(KnifeAttackEffect);
+      effect.launch({ owner: attacker, timeline: this, target, damage, record, delayMs });
+      record.effect = effect;
+      this.attackEffectManager.add(effect);
+    } else {
+      this.laya.timer.once(delayMs, attacker, () => this.resolve({ owner: attacker, target, damage, record }));
+    }
     return record;
   }
 
   cancelFor(attacker) {
+    if (this.attackEffectManager && typeof this.attackEffectManager.cancelOwner === 'function') {
+      this.attackEffectManager.cancelOwner(attacker);
+    }
     this.laya.timer.clearAll(attacker);
+  }
+
+  resolve(effectOrContext) {
+    const context = effectOrContext && effectOrContext.owner ? effectOrContext : {
+      owner: effectOrContext.owner,
+      target: effectOrContext.target,
+      damage: effectOrContext.damage,
+      record: effectOrContext.record,
+    };
+    const { owner, target, damage, record } = context;
+    if (record.settled || record.cancelled) return record;
+    if (owner.lifecycleGeneration != null && record.generation !== owner.lifecycleGeneration || owner.inPool || owner.destroyed || !owner.isActive) {
+      record.cancelled = true;
+      this.settled.push(record);
+      return record;
+    }
+    const enemy = this.enemyManager.getById(target.id);
+    if (!enemy || !enemy.isTargetableBy(owner.side)) {
+      record.cancelled = true;
+      this.settled.push(record);
+      return record;
+    }
+    enemy.hit(damage, owner);
+    this.effects.showKnifeHit(record, owner, enemy);
+    record.settled = true;
+    record.settledAt = this.laya.timer.currTimer;
+    this.settled.push(record);
+    return record;
+  }
+
+  cancel(effect) {
+    if (!effect || !effect.record || effect.record.settled || effect.record.cancelled) return false;
+    effect.record.cancelled = true;
+    this.settled.push(effect.record);
+    return true;
   }
 
   resetForTests() {

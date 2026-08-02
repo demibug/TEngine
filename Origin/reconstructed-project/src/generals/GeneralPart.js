@@ -60,11 +60,20 @@ class GeneralPart {
     return this;
   }
 
+  unbindFromGeneral(generalId = null) {
+    if (generalId != null && this.ownerId !== generalId) return false;
+    this.ownerId = -1;
+    this.state = GeneralPartState.NONE;
+    this.active = true;
+    return true;
+  }
+
   gameOver() {
     this.active = false;
     this.ownerId = -1;
     this.state = GeneralPartState.NONE;
     this.placement = null;
+    return true;
   }
 }
 

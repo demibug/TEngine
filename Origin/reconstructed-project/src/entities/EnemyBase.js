@@ -422,7 +422,10 @@ class EnemyBase extends EnemyEventProxy {
     if (this.health <= 0) this.changeState(EnemyRuntimeState.DEAD);
     if (attacker && attacker.id != null) {
       if (!this.damageContributors.includes(attacker.id)) this.damageContributors.push(attacker.id);
-      if (this.health <= 0) this.eventBus.event(GameEvents.ENEMY_KILLED_BY, attacker.id, this.damageContributors.slice());
+      if (this.health <= 0) {
+        const experienceReward = this.isSpecial ? 10 : 1;
+        this.eventBus.event(GameEvents.ENEMY_KILLED_BY, attacker.id, this.damageContributors.slice(), experienceReward);
+      }
     }
     return true;
   }

@@ -57,6 +57,7 @@ class SimpleDynamicArrow extends ProjectileBase {
       damage: this.damage,
       applied: result,
     });
+    this.applyImpactEffects(enemy);
     return result;
   }
 
