@@ -188,6 +188,9 @@ class DevelopmentBootstrap {
       rewardService: enemyRewards,
       buffManager,
       deadEntityRegistry,
+      // 吹飞推进 gameLoop（bundle:31461 nx.La / 31344 nx.wa）：注入同一 GameLoop 单例，
+      // NormalEnemyBase.Xw/Gw 经其 register/unregister 以 80ms 子步长推进吹飞。
+      gameLoop,
       targetResolver: playerLane => {
         const scene = this.lastBattleScene;
         if (!scene) throw new Error('BattleScene is unavailable while resolving aDou target');
@@ -319,6 +322,9 @@ class DevelopmentBootstrap {
       buffManager,
       mapTileManager,
       weaponManager,
+      attackEffectManager,
+      projectileManager,
+      enemyManager,
       logger: this.logger,
     });
     buffManager.configure({ enemyManager, unitRegistry: unitManager, gameLoop, eventBus, objectPool, logger: this.logger });

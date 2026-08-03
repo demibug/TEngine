@@ -61,7 +61,9 @@ test('bow attacks accept GeneralUnit attack contexts and preserve special projec
   weapon.attach(owner);
   weapon.randomSource = () => 0;
   const projectile = weapon.attack({ target: enemy, targets: [enemy], damage: 5 });
-  assert.equal(projectile.config.type, 'FireArrow');
+  // 提案 ④b（task 8.3）：火龙经专属弹种 FireDragonArrow 实体承载（对齐 bundle:42572 type:vs=FireDragonArrow），
+  // 先前 src 退化为 FireArrow + special 标签——此处校正断言为真实专属弹种。
+  assert.equal(projectile.config.type, 'FireDragonArrow');
   assert.equal(projectile.config.impact.burn.durationMs, 5000);
   assert.equal(projectile.fired, true);
 });

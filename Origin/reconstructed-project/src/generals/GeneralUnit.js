@@ -6,9 +6,13 @@ const {
   GENERAL_ATTACK_SPEED_MULTIPLIERS,
   GENERAL_DAMAGE_MULTIPLIERS,
 } = require('./GeneralDefinitions');
+const { ProjectileAttackEffect } = require('../combat/ProjectileAttackEffect');
+const { WeaponAttackLifecycleEffect } = require('../combat/WeaponAttackLifecycleEffect');
 
-// 现有友军配置只确认了首个升级阈值；后续阈值必须由配置注入，不能在核心逻辑中猜测。
-const DEFAULT_GENERAL_EXPERIENCE_THRESHOLDS = Object.freeze([0, 10, null, null, null]);
+// 武将经验升级阈值。来源 bundle Ip(bundle.strings-decoded.js:11278)
+// Ip=[0,10,b[21],b[66],b[171]](b=hu),hu 解码得 hu[21]=35、hu[66]=75、hu[171]=130,
+// 故完整五级阈值为 [0,10,35,75,130](已 node 独立解码复核)。
+const DEFAULT_GENERAL_EXPERIENCE_THRESHOLDS = Object.freeze([0, 10, 35, 75, 130]);
 const GENERAL_MAX_LEVEL = 5;
 
 const GeneralCombatState = Object.freeze({
@@ -81,6 +85,8 @@ class GeneralUnit {
     this.targetPolicy = 'nearest';
     this.targetSelector = null;
     this.attackExecutor = null;
+    this.attackEffectManager = null;
+    this.projectileManager = null;
     this.combatClock = Date.now;
     this.onStateChange = null;
     this.lastAttackResult = null;
@@ -298,6 +304,8 @@ class GeneralUnit {
     targetPolicy = 'nearest',
     targetSelector = null,
     attackExecutor = null,
+    attackEffectManager = null,
+    projectileManager = null,
     now = Date.now,
     onStateChange = null,
   } = {}) {
@@ -328,6 +336,9 @@ class GeneralUnit {
     if (attackExecutor != null && typeof attackExecutor !== 'function') {
       throw new TypeError('GeneralUnit attackExecutor must be a function');
     }
+    if (attackEffectManager != null && typeof attackEffectManager.add !== 'function') {
+      throw new TypeError('GeneralUnit attackEffectManager requires add()');
+    }
 
     this.enemyManager = enemyManager;
     this.setCombatPosition(position);
@@ -340,6 +351,8 @@ class GeneralUnit {
     this.targetPolicy = targetPolicy;
     this.targetSelector = targetSelector;
     this.attackExecutor = attackExecutor;
+    this.attackEffectManager = attackEffectManager;
+    this.projectileManager = projectileManager;
     this.combatClock = now;
     this.onStateChange = onStateChange;
     this.combatConfigured = true;
@@ -367,6 +380,9 @@ class GeneralUnit {
 
   die(reason = 'combat') {
     if (this.inPool || this.lifecycleState === GeneralLifecycleState.DEAD) return false;
+    if (this.attackEffectManager && typeof this.attackEffectManager.cancelOwner === 'function') {
+      this.attackEffectManager.cancelOwner(this);
+    }
     this.active = false;
     this.lifecycleState = GeneralLifecycleState.DEAD;
     this.deathReason = String(reason);
@@ -494,15 +510,48 @@ class GeneralUnit {
       targets: targets.slice(),
       damage: this.attackDamage,
       range: this.attackRange,
+      deferApply: Boolean(this.attackEffectManager),
     };
     let result = null;
     if (this.weapon && typeof this.weapon.attack === 'function') result = this.weapon.attack(context);
     else if (this.attackExecutor) result = this.attackExecutor(context);
+    result = this._registerAttackEffects(result);
+    // 技能每次攻击 hook（如跳斩溅射）：经 SkillEffectPort.onOwnerAttack 通知该武将名下活跃技能 effect。
+    if (this.skillManager && this.skillManager.effectPort && typeof this.skillManager.effectPort.onOwnerAttack === 'function') {
+      this.skillManager.effectPort.onOwnerAttack(this.id, context);
+    }
     this.lastAttackTime = Number(now);
     this.attackCount += 1;
     this.lastAttackResult = result;
     this.changeState(GeneralCombatState.IDLE);
     return { attacked: true, targetId: this.targetId, result };
+  }
+
+  _registerAttackEffects(result) {
+    const manager = this.attackEffectManager;
+    if (!manager || result == null) return result;
+
+    if (result.effect && typeof result.effect.apply === 'function') {
+      const lifecycle = manager.create(WeaponAttackLifecycleEffect).launch({ owner: this, effect: result.effect });
+      manager.add(lifecycle);
+      result.effectHandle = lifecycle;
+      return result;
+    }
+
+    const projectiles = Array.isArray(result) ? result : [result];
+    const handles = [];
+    for (const projectile of projectiles) {
+      if (!projectile || projectile.projectileId == null || !projectile.manager) continue;
+      const lifecycle = manager.create(ProjectileAttackEffect).adopt({
+        owner: this,
+        projectileManager: projectile.manager,
+        projectile,
+      });
+      manager.add(lifecycle);
+      handles.push(lifecycle);
+    }
+    if (handles.length) return { projectiles: result, effectHandles: handles };
+    return result;
   }
 
   recycle(reason = 'game-over') {
@@ -527,6 +576,8 @@ class GeneralUnit {
     this.targetPolicy = 'nearest';
     this.targetSelector = null;
     this.attackExecutor = null;
+    this.attackEffectManager = null;
+    this.projectileManager = null;
     this.inPool = true;
     this.lifecycleState = GeneralLifecycleState.RECYCLED;
     return true;

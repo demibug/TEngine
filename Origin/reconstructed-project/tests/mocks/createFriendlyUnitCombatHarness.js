@@ -5,6 +5,7 @@ const { PlacementReservationRegistry } = require('../../src/core/PlacementReserv
 const { UnitFactory } = require('../../src/units/UnitFactory');
 const { UnitRegistry } = require('../../src/units/UnitRegistry');
 const { KnifeAttackTimeline } = require('../../src/combat/KnifeAttackTimeline');
+const { AttackEffectManager } = require('../../src/combat/AttackEffectManager');
 const { BattleManager } = require('../../src/battle/BattleManager');
 const {
   DevelopmentUnitPresentation,
@@ -30,6 +31,7 @@ function createFriendlyUnitCombatHarness(options = {}) {
   const presentation = new DevelopmentUnitPresentation({ laya: Laya });
   const audio = new DevelopmentUnitAudio();
   const effects = new DevelopmentKnifeEffects();
+  const attackEffectManager = new AttackEffectManager({ objectPool });
 
   objectPool.registerKey(
     'soldier',
@@ -56,6 +58,7 @@ function createFriendlyUnitCombatHarness(options = {}) {
       audio,
       enemyManager,
       attackTimeline,
+      attackEffectManager,
       logger: options.logger || { log() {}, warn() {}, error() {} },
       dragThreshold: 10,
     }),
@@ -85,6 +88,7 @@ function createFriendlyUnitCombatHarness(options = {}) {
     placementReservations,
     random: deterministicRandom,
     specialSpawnPolicy,
+    attackEffectManager,
     laya: Laya,
     now: () => Laya.timer.currTimer,
     logger: options.logger || { log() {}, warn() {}, error() {} },
@@ -151,6 +155,7 @@ function createFriendlyUnitCombatHarness(options = {}) {
     battleManager.resetForTests();
     unitFactory.resetForTests();
     attackTimeline.resetForTests();
+    attackEffectManager.resetForTests();
     placementReservations.clear();
     enemyHarness.cleanup();
   }
@@ -162,6 +167,7 @@ function createFriendlyUnitCombatHarness(options = {}) {
     unitAudio: audio,
     knifeEffects: effects,
     attackTimeline,
+    attackEffectManager,
     unitFactory,
     unitRegistry,
     battleManager,

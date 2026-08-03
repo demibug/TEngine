@@ -6,6 +6,9 @@
   "scripts": {
     "decode:strings": "node tools/decode-strings.js --input work/bundle.formatted.js --output work/bundle.strings-decoded.js --report analysis/string-decoding-report.json --map analysis/string-decoding-map.jsonl --unresolved analysis/string-decoding-unresolved.jsonl --runtime-values analysis/obfuscation-runtime-values.json",
     "test:decode": "node tests/behavior/decode-strings.test.js",
+    "test:general-skills": "node --test tests/unit/GeneralActiveSkills.test.js",
+    "test:special-weapons": "node --test tests/unit/SpecialWeaponEffects.test.js tests/unit/AttributeWeaponBonuses.test.js tests/unit/WeaponLogic.test.js tests/unit/WeaponSkillProjectiles.test.js",
+    "test:projectile-types": "node --test tests/unit/ProjectileTypes.test.js tests/unit/ProjectileMovement.test.js tests/unit/WeaponSkillProjectiles.test.js",
     "check:net01": "node tools/check-net01.js",
     "test:net01": "node --test tests/unit/HttpClient.test.js tests/behavior/NET-01.behavior.test.js",
     "verify:round02": "npm run check:net01 && npm run test:net01",

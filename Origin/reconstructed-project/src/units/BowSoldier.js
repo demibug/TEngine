@@ -5,6 +5,7 @@ const { HitEnemyStrategy } = require('../projectiles/HitEnemyStrategy');
 const { TargetEnemyBezierMovement } = require('../projectiles/TargetEnemyBezierMovement');
 const { SimpleDynamicArrow } = require('../projectiles/SimpleDynamicArrow');
 const { quadraticTangentDegrees } = require('../projectiles/ProjectileMath');
+const { ProjectileAttackEffect } = require('../combat/ProjectileAttackEffect');
 
 /**
  * 重建模块：BOW-PROJECTILE-COMBAT-01 / BowSoldier
@@ -27,7 +28,11 @@ class BowSoldier extends SoldierBase {
   configure(options = {}) {
     super.configure(options);
     if (!options.projectileManager) throw new TypeError('BowSoldier requires projectileManager');
+    if (!options.attackEffectManager || typeof options.attackEffectManager.add !== 'function') {
+      throw new TypeError('BowSoldier requires attackEffectManager');
+    }
     this.projectileManager = options.projectileManager;
+    this.attackEffectManager = options.attackEffectManager;
     return this;
   }
 
@@ -47,6 +52,9 @@ class BowSoldier extends SoldierBase {
   }
 
   gameOver() {
+    if (this.attackEffectManager && typeof this.attackEffectManager.cancelOwner === 'function') {
+      this.attackEffectManager.cancelOwner(this);
+    }
     if (this.animation) {
       if (this.laya.Tween && typeof this.laya.Tween.killAll === 'function') this.laya.Tween.killAll(this.animation);
       this.animation.rotation = 0;
@@ -128,17 +136,21 @@ class BowSoldier extends SoldierBase {
 
     this.animation.play('attack', false, true, this.attackReleaseEventMs, this.attackAnimationEndMs);
     const startPoint = this._unitCenter();
-    const projectile = this.projectileManager.create({
-      type: SimpleDynamicArrow.projectileTypeKey,
-      appearance: SimpleDynamicArrow.DEFAULT_APPEARANCE,
-      attacker: this,
-      damage: this.attackDamage,
-      speedScale: this.projectileSpeedScale,
-      hitStrategy,
-      movement,
-    }, startPoint);
-    projectile.fire();
-    return projectile;
+    const effect = this.attackEffectManager.create(ProjectileAttackEffect).launch({
+      owner: this,
+      projectileManager: this.projectileManager,
+      config: {
+        type: SimpleDynamicArrow.projectileTypeKey,
+        appearance: SimpleDynamicArrow.DEFAULT_APPEARANCE,
+        damage: this.attackDamage,
+        speedScale: this.projectileSpeedScale,
+        hitStrategy,
+        movement,
+      },
+      startPoint,
+    });
+    this.attackEffectManager.add(effect);
+    return effect.projectile;
   }
 
   _unitCenter() {

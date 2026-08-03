@@ -38,10 +38,10 @@
 
 | 范围 | 任务数 | 已完成 | 进行中 | 阻塞 | 当前进度 |
 |---|---:|---:|---:|---:|---:|
-| P0 核心战斗闭环 | 4 | 2 | 1 | 0 | 50% |
+| P0 核心战斗闭环 | 4 | 3 | 1 | 0 | 75% |
 | P1 核心扩展 | 6 | 0 | 0 | 0 | 0% |
 | P2 非纯逻辑内容 | 4 | 0 | 0 | 0 | 0% |
-| 执行阶段 | 6 | 1 | 2 | 0 | 17% |
+| 执行阶段 | 6 | 2 | 2 | 0 | 33% |
 
 当前执行顺序：阶段 1 → 阶段 2 → 阶段 3 → 阶段 4 → 阶段 5 → 阶段 6。
 
@@ -79,19 +79,19 @@
 
 ### P0-03 六个武将主动技能
 
-- 状态：`未开始`
+- 状态：`已完成`
 - 优先级：P0
 - 工作项：
-  - [ ] 跳斩。
-  - [ ] 七进七出。
-  - [ ] 战吼。
-  - [ ] 圣剑。
-  - [ ] 箭雨。
-  - [ ] 火箭齐射。
+  - [x] 跳斩。
+  - [x] 七进七出。
+  - [x] 战吼。
+  - [x] 圣剑。
+  - [x] 箭雨。
+  - [x] 火箭齐射。
 - 实现约束：每个技能使用独立的纯逻辑效果对象，不直接依赖 Unity/Laya 表现层。
 - 验收标准：六个技能均有可触发、可结算、可清理的逻辑效果，并能由武将战斗流程调用。
-- 完成记录：暂无。
-- 最后变动：`[新增] 2026-08-03` 建立任务。
+- 完成记录：2026-08-03 依据 OpenSpec 提案 `general-active-skills`（dependsOn `general-combat-wiring`）实现六个武将主动技能纯逻辑 effect：新增 `src/skills/effects/` 下 `BattleShoutEffect`/`HolySwordEffect`/`ArrowRainEffect`/`FireArrowBarrageEffect`/`LeapSlashEffect`/`SevenInSevenOutEffect` + 共用 `effectTargets.js`；`SkillEffectPort._installCoreHandlers` 注册六个 handler（替换原 `DEFERRED_EFFECT_WITH_EXACT_CONTRACT`），并补 `projectileManager`/`attackEffectManager` 到 services、新增 `onOwnerAttack` 每次攻击 hook 通道；`EffectHandle` 扩展 `onOwnerAttack`；`GeneralUnit.attack` 增一行 guarded hook 通知跳斩溅射。效果对齐 bundle 取证：跳斩 5 次 50% 溅射 + `guanYu_skill_roar`（bundle:38497/45983/45942）、战吼 2000ms STUN（45659）、圣剑范围伤害 + KNOCKDOWN + `holyBlade_skill`（45902/45687/45696）、箭雨多支箭经 ProjectileAttackEffect/ProjectileManager（46141/44798/44748）、火箭烈 `n=floor(max(1,(level-1)/2))` + `k=range(1,3,true)*n` + `DEFERRED_PROJECTILE_VARIANT`（46145/45744/45746/45877）、七进七出 7 次突进（45655）。回收复用已 wired 的 `removeOwner→clearOwner` 链路。新增 `tests/unit/GeneralActiveSkills.test.js` 13 项用例全部通过；全量 234 个 src 文件 `node --check` 通过；武将/统一攻击回归 15 项全部通过；未运行 Unity/TEngine 验证。火焰箭专属弹种以 `DEFERRED_PROJECTILE_VARIANT` 标记待提案 ④。
+- 最后变动：`[完成] 2026-08-03` 完成 P0-03 全部六个技能纯逻辑 effect 与测试；Unity/TEngine 接入验收仍由阶段 6 统一执行。
 
 ### P0-04 枪兵、骑兵正式攻击时序
 
@@ -111,7 +111,7 @@
 
 | 编号 | 任务 | 状态 | 验收要点 | 最后变动 |
 |---|---|---|---|---|
-| P1-01 | 特殊投射物和剩余武器效果 | 未开始 | 投射物生命周期、命中效果和剩余武器特性可独立调用 | `[新增] 2026-08-03` |
+| P1-01 | 特殊投射物和剩余武器效果 | 部分完成 | 投射物生命周期、命中效果和剩余武器特性可独立调用 | `[完成] 2026-08-03` |
 | P1-02 | 非 Mob0 敌人的专属行为 | 未开始 | 不同敌人类型拥有与报告一致的行为分支 | `[新增] 2026-08-03` |
 | P1-03 | 友军受击契约确认与武将生命周期 | 部分完成 | 确认友军无受击契约（已忠实实现 `UnsupportedFriendlyUnitDamageError`；原始游戏友军无 HP／护甲／护盾／死亡机制，敌人攻击承受方为阿斗 BattleTarget）；武将 die/recycle 生命周期注入拆分至后续 P0 任务 | `[重定义验收] 2026-08-03` |
 | P1-04 | 完整 AI 策略 | 未开始 | 目标选择、攻击决策和特殊行为满足战斗规则 | `[新增] 2026-08-03` |
@@ -172,29 +172,29 @@
 
 ### 阶段 4：恢复武将主动技能
 
-- 状态：`未开始`
+- 状态：`已完成`
 - 目标：恢复六个武将主动技能的纯逻辑效果。
 - 关联任务：P0-03。
 - 执行顺序：战吼 → 圣剑 → 箭雨 → 火箭齐射 → 跳斩 → 七进七出。
 - 完成条件：每个技能都能独立触发、结算和清理，并能接入武将技能触发入口。
-- 完成记录：暂无。
-- 最后变动：`[新增] 2026-08-03` 建立阶段。
+- 完成记录：2026-08-03 按 OpenSpec 提案 `general-active-skills` 完成六个技能 effect、SkillEffectPort 注册与 onOwnerAttack hook；新增 `tests/unit/GeneralActiveSkills.test.js` 13 项用例覆盖触发/结算/清理/DEFERRED 回归/recycle 回归，全部通过；全量 234 个 src 文件语法检查通过；武将/统一攻击回归 15 项通过。阶段 4 纯逻辑工作完成，Unity/TEngine 接入验证保留至阶段 6。
+- 最后变动：`[完成] 2026-08-03` 完成阶段 4 纯逻辑交付。
 
 ### 阶段 5：补齐战斗边界
 
-- 状态：`未开始`
+- 状态：`进行中`
 - 目标：补齐核心战斗之外但会影响战斗闭环的边界行为。
 - 关联任务：P1-01 至 P1-06。
 - 工作项：
   - [x] 友军受击契约确认（原始游戏友军无受击／血量／死亡机制，已忠实实现 `UnsupportedFriendlyUnitDamageError` 拒绝）。
   - [ ] 非 Mob0 敌人特殊行为。
-  - [ ] 特殊投射物。
+  - [x] 特殊投射物（P1-01 ④a/④b 纯逻辑层完成：24 武器 effect + 5 属性修正 + 23 弹种实体 + 8 移动策略 + 武器技能投射物实体连接；VFX/渲染为 P2 非目标）。
   - [ ] Boss 技能边界。
   - [ ] AI 高级策略。
   - [ ] 完整卡牌、拖拽和合成流程。
 - 完成条件：P1 任务全部完成，且不破坏阶段 1～4 已完成的战斗流程。
-- 完成记录：暂无。
-- 最后变动：`[新增] 2026-08-03` 建立阶段。
+- 完成记录：2026-08-03 依据 OpenSpec 提案 `special-weapons-projectiles`（④a 武器效果 + ④b 投射物实体）完成 P1-01 特殊投射物与剩余武器效果纯逻辑层：24 把特殊非弓武器每把有专属 effect（经 `WeaponSpecialEffects.js` 分派，晕眩/跌倒/攻速/金币经现有 BuffType 与经济路径，不引入新 BuffType）、5 把属性武器加成数值生效（铁剑 +3 攻、大戟 +1 距、长剑/长刀/长枪 +0.5 距）、23 弹种覆盖 bundle 注册全集（16 新建 + 5 壳补全 + 1 误标 ShenBiPunch→ShenBiArrow 校正）、8 移动策略接入 `resetData` 真实生命周期、武器技能投射物实体连接（七星刀流星雨→StarBullet、诸葛连弩火箭雨→FireArrow、火龙→FireDragonArrow 校正 IronBow 退化、陨石→新增 `MeteorStrikeEffect` 经 StaticFireBall/GroundSpikeBullet 孤子弹种承载）。取证偏差已标注（青龙偃月刀倍率/君子小人剑伤害 PARTIAL、陨石 bundle 原始为纯特效 DEFERRED、铁枪 1 个枪阵）。新增 `tests/unit/WeaponSkillProjectiles.test.js` 10 项、`SpecialWeaponEffects.test.js`/`AttributeWeaponBonuses.test.js`/`ProjectileTypes.test.js`/`ProjectileMovement.test.js` 全部通过；全量 259 个 src 文件 `node --check` 通过；弓兵/投射物/武将主动技能回归 85 项通过；`test:special-weapons`/`test:projectile-types` 脚本已加入 package.json。未运行 Unity/TEngine 验证。
+- 最后变动：`[完成] 2026-08-03` 完成 P1-01 ④a/④b 纯逻辑层交付（VFX/渲染保留至 P2）。
 
 ### 阶段 6：统一验证
 
@@ -230,8 +230,11 @@
 | 2026-08-03 | `[完成子项]` | 将 `BowSoldier` 在原始 `STOPPED/650ms` 发射点创建的箭矢改由 `ProjectileAttackEffect` 统一登记和驱动；投射物完成后自动退出效果管理器，弓兵回收时取消未完成投射物；补充弓兵发射、战斗结束、投射物对象池和统一攻击效果用例。全量 `src` 226 个 JavaScript 文件通过语法检查；统一攻击相关 12 项、投射物相关 18 项、`round05` 25 项、`round06` 33 项全部通过，未运行 Unity/TEngine 验证。 | 阶段 2、弓兵攻击生命周期 |
 | 2026-08-03 | `[完成子项]` | 新增 `WeaponAttackLifecycleEffect`，让 `GeneralUnit` 在配置 `AttackEffectManager` 时延迟普通武器命中到管理器更新阶段；武将回收会取消挂起效果；武将弓类由 `GeneralUnit` 将已创建投射物登记为 `ProjectileAttackEffect`，避免重复登记并保持原始投射物生命周期。新增 `GeneralUnifiedAttack.test.js`，武将专项 3 项、统一攻击相关合计 10 项、`round05` 25 项、`round06` 33 项、`test:projectile` 18 项全部通过；`src` 227 个 JavaScript 文件全部通过语法检查；`test:round03` 当前 15 项通过 12 项、失败 3 项，失败集中在既有 BattleScene 首帧/未注册敌人类型/DirectBattle 行为断言；未运行 Unity/TEngine 验证。 | P0-04、阶段 2、武将攻击生命周期 |
 | 2026-08-03 | `[重定义验收/数值修正]` | 修正小兵成长数值还原错误：`UnitConfig` `MAX_SOLDIER_LEVEL` 5→3、`EXPERIENCE_THRESHOLDS` 从误用的武将 `Ip` 表 `[0,10,null,null,null]` 改为 bundle `Dp` 表 `[0,8,23]`（取证 `bundle:11278`/`bundle:40157`），同步 `DeckDefinitions`、`UnitLevelService`、`unity-export/config/units.json` 与生成器 `export-unity-config.js`（`maxLevel` 改用 `MAX_SOLDIER_LEVEL` 常量）；重定义 P1-03 验收，移除伪需求护甲／护盾／完整承受伤害（原始游戏友军无受击契约、不可被击杀，承受方为阿斗 BattleTarget，已忠实实现 `UnsupportedFriendlyUnitDamageError`），武将 die/recycle 生命周期注入拆分至后续 P0 任务。tests/ 无小兵 4-5 级断言，无需调整。全量 227 个 src 文件语法检查通过；`test:friendly-units` 16 项、武将/投射物/弓兵回归合计 14 项、`test:round03` 12/15（3 项失败为既有 BattleScene 首帧/未注册敌人类型/DirectBattle，与本轮无关）全部通过。 | P1-03、小兵成长数值 |
+| 2026-08-03 | `[完成]` | 依据 OpenSpec 提案 `general-active-skills`（dependsOn `general-combat-wiring`）完成 P0-03/阶段 4 六个武将主动技能纯逻辑 effect：新增 `BattleShoutEffect`/`HolySwordEffect`/`ArrowRainEffect`/`FireArrowBarrageEffect`/`LeapSlashEffect`/`SevenInSevenOutEffect` + 共用 `effectTargets.js`；`SkillEffectPort` 注册六 handler 替换 DEFERRED、补 `projectileManager`/`attackEffectManager` 到 services、新增 `onOwnerAttack` hook；`EffectHandle` 扩展 `onOwnerAttack`；`GeneralUnit.attack` 增 guarded hook 通知跳斩溅射。效果对齐 bundle 取证（跳斩 5 次 50% 溅射+`guanYu_skill_roar`、战吼 2000ms STUN、圣剑范围伤害+KNOCKDOWN+`holyBlade_skill`、箭雨多支箭经 ProjectileAttackEffect/ProjectileManager、火箭烈 `n=floor(max(1,(level-1)/2))`+`k=range(1,3,true)*n`+`DEFERRED_PROJECTILE_VARIANT`、七进七出 7 次突进）。取证修正：火箭烈多重数下限钳制为 1（`bundle:45744` `Math.max(1,…)`，非 0），已同步 spec/proposal。新增 `tests/unit/GeneralActiveSkills.test.js` 13 项全部通过；全量 234 个 src 文件 `node --check` 通过；武将/统一攻击回归 15 项通过；`test:general-skills` 脚本已加入 package.json。未运行 Unity/TEngine 验证。 | P0-03、阶段 4、武将主动技能 |
+
+| 2026-08-03 | `[完成]` | 依据 OpenSpec 提案 `special-weapons-projectiles`（dependsOn 无，与 `general-combat-wiring`/`general-active-skills` 无文件重叠）完成 P1-01/阶段 5 特殊投射物与剩余武器效果纯逻辑层。④a：24 把特殊非弓武器经新增 `WeaponSpecialEffects.js` 承载专属 effect（概率攻速类虎啸战刀/狼牙棒/铁蒺藜骨朵、首击类虎头湛金枪 3 枪阵/铁枪 1 枪阵/钩镰枪跌倒/古锭刀金币、计数类三尖刀/铁刀/10 把君子小人剑、击杀类梨花枪 8 朵梨花/青龙偃月刀刀气/点钢枪、等级类方天画戟/龙胆亮银枪/丈八蛇矛），晕眩/跌倒/攻速经现有 `STUN`/`KNOCKDOWN`/`ATTACK_SPEED` BuffType，金币经 `battleEconomy.award`；5 把属性武器 `WEAPON_DEFINITIONS` 增 `addAttackPower`/`attackRangeBonus` 字段使 `getCombatModifiers()` 返回非零。④b：16 新建弹种子类 + 5 壳补全专属逻辑 + `ShenBiPunch`→`ShenBiArrow` 误标校正，覆盖 bundle 23 弹种全集；7 新建移动策略 + 3 占位骨架校正接入 `ProjectileBase.resetData({movement})` 真实生命周期；武器技能投射物实体连接——七星刀流星雨→StarBullet（`WeaponAttackEffect._applyMeteorShower` 经 `projectileSpawner`）、诸葛连弩火箭雨→FireArrow（`ZhugeCrossbow` 已用，与 bundle:38995 一致）、火龙→FireDragonArrow（校正 `IronBow` 先前退化为 FireArrow+special 标签，对齐 bundle:42572 type:vs=FireDragonArrow，BREAKING：`WeaponLogic.test.js` 断言同步改为 FireDragonArrow）、陨石→新增 `MeteorStrikeEffect` 经 StaticFireBall/GroundSpikeBullet 孤子弹种承载（DEFERRED：bundle:27450 陨石原始为纯 Laya.Image 视觉特效不走弹种通道，此为纯逻辑层弹种化重建）。数值标注：青龙偃月刀倍率/君子小人剑伤害/铁蒺藜骨朵眩晕时长/陨石数量 PARTIAL 可注入常量，弹种未取证逻辑 DEFERRED。新增 `tests/unit/WeaponSkillProjectiles.test.js` 10 项；`SpecialWeaponEffects.test.js`/`AttributeWeaponBonuses.test.js`/`WeaponLogic.test.js`/`ProjectileTypes.test.js`/`ProjectileMovement.test.js` 合计 52 项通过；弓兵/投射物/武将主动技能行为回归 33 项通过；全量 259 个 src 文件 `node --check` 通过；`test:special-weapons`/`test:projectile-types` 脚本已加入 package.json。未运行 Unity/TEngine 验证。 | P1-01、阶段 5、特殊武器与投射物实体 |
 
 ## 当前阻塞与备注
 
 - 阻塞：暂无。
-- 备注：P0-01、P0-02 和阶段 1 的纯逻辑工作已完成；P0-04/阶段 2 与阶段 3 正在进行，弓兵投射物及武将普通武器攻击已纳入统一攻击生命周期，下一步是补齐原始动画事件精确结算并进行阶段 2 最终验收；其余任务仍为“未开始”。`test:round03` 当前存在 3 项 BattleScene/DirectBattle 基线失败，未将其误记为本次统一攻击改动已通过；后续实现、范围调整、验收结果和验证限制变化必须追加到“变更记录”。
+- 备注：P0-01、P0-02 和阶段 1 的纯逻辑工作已完成；P0-03/阶段 4 武将主动技能已完成；P0-04/阶段 2 与阶段 3 正在进行，弓兵投射物及武将普通武器攻击已纳入统一攻击生命周期，下一步是补齐原始动画事件精确结算并进行阶段 2 最终验收；P1-01/阶段 5 特殊投射物与剩余武器效果纯逻辑层已完成（VFX/渲染保留至 P2）；其余 P1 任务仍为"未开始"。`test:round03` 当前存在 3 项 BattleScene/DirectBattle 基线失败，未将其误记为本次统一攻击改动已通过；后续实现、范围调整、验收结果和验证限制变化必须追加到"变更记录"。

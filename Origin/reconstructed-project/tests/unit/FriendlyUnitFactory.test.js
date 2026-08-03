@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const { createFriendlyUnitCombatHarness } = require('../mocks/createFriendlyUnitCombatHarness');
 const { KnifeSoldier } = require('../../src/units/KnifeSoldier');
 const { BowSoldier } = require('../../src/units/BowSoldier');
-const { UnresolvedFriendlyUnitTypeError } = require('../../src/units/UnitFactory');
+const { SpearSoldier } = require('../../src/units/SpearSoldier');
+const { CavalrySoldier } = require('../../src/units/CavalrySoldier');
 
 test('formal knife soldier is registered by original index 0 and text 刀', t => {
   const h = createFriendlyUnitCombatHarness(); t.after(h.cleanup);
@@ -15,13 +16,16 @@ test('formal knife soldier is registered by original index 0 and text 刀', t =>
   assert.equal(h.unitFactory.creationLog.at(-1).unit, byIndex);
 });
 
-test('formal bow registration occupies original index 1 while later base types remain explicit gaps', t => {
+test('formal bow, spear and cavalry registrations preserve their original indices', t => {
   const h = createFriendlyUnitCombatHarness(); t.after(h.cleanup);
   assert.equal(h.unitFactory.byIndex.get(1).text, '弓');
   assert.equal(h.unitFactory.byIndex.get(1).ClassType, BowSoldier);
   assert.equal(h.unitFactory.byText.get('弓').index, 1);
-  assert.throws(() => h.unitFactory.createByText('枪'), UnresolvedFriendlyUnitTypeError);
-  assert.throws(() => h.unitFactory.createByIndex(2), UnresolvedFriendlyUnitTypeError);
+  assert.equal(h.unitFactory.byIndex.get(2).ClassType, SpearSoldier);
+  assert.equal(h.unitFactory.byText.get('枪').index, 2);
+  assert.ok(h.unitFactory.createByText('枪') instanceof SpearSoldier);
+  assert.equal(h.unitFactory.byIndex.get(3).ClassType, CavalrySoldier);
+  assert.equal(h.unitFactory.byText.get('骑').index, 3);
 });
 
 test('development placement still creates through UnitFactory and UnitRegistry', t => {

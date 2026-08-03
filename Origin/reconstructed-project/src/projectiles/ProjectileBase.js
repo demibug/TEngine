@@ -39,6 +39,7 @@ class ProjectileBase {
     this.removeDelayMs = 0;
     this.removeDelayRemainingMs = 0;
     this.movement = null;
+    this.movementConfig = null;
     this.hitStrategy = null;
     this.impact = null;
     this.buffManager = null;
@@ -105,6 +106,7 @@ class ProjectileBase {
 
     if (!config.movement) throw new TypeError('Projectile reset requires movement strategy');
     this.movement = config.movement;
+    this.movementConfig = config.movementConfig || null;
     this.movement.attach(this);
     return this;
   }
@@ -228,6 +230,7 @@ class ProjectileBase {
     this.invalidReset = false;
     if (this.movement) this.movement.recover();
     this.movement = null;
+    this.movementConfig = null;
     this.hitEnemyIds.clear();
     if (this.hitStrategy && typeof this.hitStrategy.recover === 'function') this.hitStrategy.recover();
     this.hitStrategy = null;

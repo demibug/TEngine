@@ -38,6 +38,9 @@ class UnitRegistry extends SingletonBase {
       weaponManager = null,
       skillManager = null,
       generalFactory = null,
+      attackEffectManager = null,
+      projectileManager = null,
+      enemyManager = null,
   } = {}) {
     if (!unitFactory || !gameData || !eventBus || !placementReservations) {
       throw new TypeError('UnitRegistry requires unitFactory, gameData, eventBus and placementReservations');
@@ -46,6 +49,7 @@ class UnitRegistry extends SingletonBase {
     Object.assign(this, {
       unitFactory, gameData, eventBus, placementReservations, parentResolver,
       buffManager, logger, mapTileManager, weaponManager, skillManager,
+      attackEffectManager, projectileManager, enemyManager,
       generalFactory: generalFactory || new GeneralFactory(),
     });
     this._configured = true;
@@ -214,10 +218,36 @@ class UnitRegistry extends SingletonBase {
     const parts = partIds.map(id => this.secondaryUnits.get(id));
     if (parts.some(part => !part)) throw new Error(`Unknown general part in merge: ${partIds.join(',')}`);
     if (parts.some(part => part.ownerId !== -1)) throw new Error(`General part is already assigned: ${parts.find(part => part.ownerId !== -1).id}`);
-    const general = this.generalFactory.createGeneral(parts, { side, isPlayer, weaponId, weapon, combat, experienceThresholds, experience, skillManager, skillKey, skill });
+    // 调用方未显式传 combat 时,从 registry 的 enemyManager/效果管理器自动构造,使武将合成即参战。
+    const sourceCombat = combat || this._buildAutoCombat(parts);
+    const generalCombat = sourceCombat ? {
+      ...sourceCombat,
+      attackEffectManager: sourceCombat.attackEffectManager || this.attackEffectManager,
+      projectileManager: sourceCombat.projectileManager || this.projectileManager,
+    } : sourceCombat;
+    const general = this.generalFactory.createGeneral(parts, { side, isPlayer, weaponId, weapon, combat: generalCombat, experienceThresholds, experience, skillManager, skillKey, skill });
     this.generals.set(general.id, general);
     this.generalComponents.set(general.id, parts.map(part => part.id));
     return general;
+  }
+
+  /** 由 registry 持有的运行时依赖构造武将战斗配置;enemyManager 缺失时返回 null(武将暂不参战)。 */
+  _buildAutoCombat(parts) {
+    if (!this.enemyManager || typeof this.enemyManager.queryTargets !== 'function') return null;
+    const map = this.gameData && this.gameData.map ? this.gameData.map : null;
+    const width = map ? map.gridWidth : 0;
+    const height = map ? map.gridHeight : 0;
+    const first = parts[0];
+    let position = { x: 0, y: 0, width, height };
+    if (first && first.placement) {
+      position = { x: Number(first.placement.pixelX) || 0, y: Number(first.placement.pixelY) || 0, width, height };
+    }
+    return {
+      enemyManager: this.enemyManager,
+      attackEffectManager: this.attackEffectManager,
+      projectileManager: this.projectileManager,
+      position,
+    };
   }
 
   removeGeneral(id) {
@@ -334,6 +364,9 @@ class UnitRegistry extends SingletonBase {
     this.mapTileManager = null;
     this.weaponManager = null;
     this.skillManager = null;
+    this.attackEffectManager = null;
+    this.projectileManager = null;
+    this.enemyManager = null;
     this.generalFactory = null;
   }
 

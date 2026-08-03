@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createRangedCombatHarness } = require('../mocks/createRangedCombatHarness');
 const { BowSoldier } = require('../../src/units/BowSoldier');
-const { UnresolvedFriendlyUnitTypeError } = require('../../src/units/UnitFactory');
+const { SpearSoldier } = require('../../src/units/SpearSoldier');
 
 test('formal key 弓 and index 1 create BowSoldier through UnitFactory and UnitRegistry', t => {
   const h = createRangedCombatHarness(); t.after(h.cleanup);
@@ -16,10 +16,11 @@ test('formal key 弓 and index 1 create BowSoldier through UnitFactory and UnitR
   assert.equal(h.objectPool.takeLog.some(entry => entry.kind === 'class' && entry.value === unit), true);
 });
 
-test('unreconstructed later ranged unit keys still fail explicitly', t => {
+test('formal spear registration is available to the ranged combat harness', t => {
   const h = createRangedCombatHarness(); t.after(h.cleanup);
-  assert.throws(() => h.unitFactory.createByText('枪'), UnresolvedFriendlyUnitTypeError);
-  assert.throws(() => h.unitFactory.createByIndex(2), UnresolvedFriendlyUnitTypeError);
+  const unit = h.unitFactory.createByText('枪');
+  assert.ok(unit instanceof SpearSoldier);
+  assert.equal(h.unitFactory.byIndex.get(2).ClassType, SpearSoldier);
 });
 
 test('pooled BowSoldier clears prior STOPPED listeners, target and attack state before reuse', t => {

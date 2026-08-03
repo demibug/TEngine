@@ -1,7 +1,7 @@
 'use strict';
 
 const { SoldierBase } = require('./SoldierBase');
-const { CavalrySweepEffect } = require('../combat/CavalrySweepEffect');
+const { CavalrySweepEffect, CAVALRY_SWEEP_DELAY_MS } = require('../combat/CavalrySweepEffect');
 
 /**
  * ROUND-07B-CAVALRY
@@ -36,9 +36,25 @@ class CavalrySoldier extends SoldierBase {
     const targets=this.enemyManager.queryTargets(this.displayObject.x,this.displayObject.y,this.attackRange,this.side)||[];
     if(!targets.length)return null;
     const damage=this.getAttackDamage?this.getAttackDamage():this.baseAttackPower;
+    if (this.animation) this.animation.play('attack', false);
+    if (this.audio) this.audio.play('cavalry_attack');
     const effects=[
-      this.attackEffectManager.create(CavalrySweepEffect).launch({owner:this,enemyManager:this.enemyManager,damage,multiplier:0.5,radius:this.attackRange}),
-      this.attackEffectManager.create(CavalrySweepEffect).launch({owner:this,enemyManager:this.enemyManager,damage,multiplier:1,radius:this.attackRange,delayMs:80})
+      this.attackEffectManager.create(CavalrySweepEffect).launch({
+        owner:this,
+        enemyManager:this.enemyManager,
+        damage,
+        multiplier:0.5,
+        radius:this.attackRange / 2,
+        delayMs:CAVALRY_SWEEP_DELAY_MS,
+      }),
+      this.attackEffectManager.create(CavalrySweepEffect).launch({
+        owner:this,
+        enemyManager:this.enemyManager,
+        damage,
+        multiplier:0.5,
+        radius:this.attackRange,
+        delayMs:CAVALRY_SWEEP_DELAY_MS,
+      })
     ];
     this.pendingSweeps=effects;
     for (const effect of effects) this.attackEffectManager.add(effect);

@@ -2,6 +2,8 @@
 
 const { EnemyEventProxy } = require('./EnemyEventProxy');
 const { GameEvents } = require('../core/EventBus');
+// GameLoop 单例：吹飞 Xw/Gw 经 GameLoop.register/unregister 注册每帧推进（bundle:31461 nx.La / 31344 nx.wa）。
+const { GameLoop } = require('../core/GameLoop');
 
 /**
  * 原代码没有独立状态枚举；以下常量是对 ro.curState 数值分支的可维护导出。
@@ -19,6 +21,39 @@ const ENEMY_BASE_SPEED = 50;
 const CONTACT_ATTACK_COOLDOWN_MS = 500;
 const CONTACT_DAMAGE_DELAY_MS = 50;
 const TIME_UNIT_MS = 1000;
+
+/**
+ * 灵魂投射 DEFERRED 默认桩：塔状态接口（bundle au.Ii/au.Ti 的 Ci/num/range/pos）。
+ * 桩返回 {Ci:false} 使 sB 条件永不满足（bundle:31329 a.Ci && ...）。真实塔实现属提案 ②③，经 configure 注入。
+ * DEFERRED: bundle:31328-31332 塔字段语义未取证，桩默认不触发。
+ */
+function defaultSoulTowerResolver(_isPlayerLane) {
+  return { Ci: false, num: 0, range: 0, pos: { x: 0, y: 0 } };
+}
+
+/**
+ * 灵魂投射 DEFERRED 默认桩：飞行管理器（bundle qs.vg，创建 soulHead.png 绿色灵魂头投射物飞行）。
+ * 桩为 no-op + 立即 onComplete（仅当 sB 条件被外部注入塔满足时才会调到；桩塔下 sB 条件已拦截，不会调到飞行）。
+ * DEFERRED: bundle:31426 qs.vg 飞行管理器未取证，真实实现属提案 ②③，经 configure 注入。
+ */
+const defaultSoulFlightManager = {
+  fly(_fromX, _fromY, _toX, _toY, _durationMs, _color, _resource, onComplete) {
+    if (typeof onComplete === 'function') onComplete();
+  },
+};
+
+/**
+ * 吹飞 DEFERRED 默认 gameLoop：对齐 bundle 的 nx.instance() 全局单例访问（bundle:31461 nx.La / 31344 nx.wa）。
+ * bundle 原版在 Xw/gameOver 中直接用 nx.instance().La("blownUp"+id,...) / nx.instance().wa("blownUp")，
+ * 不经构造注入——GameLoop 是全局单例。此处默认桩委托 GameLoop.instance() 单例（等价 nx.instance()），
+ * GameLoop.update 以 80ms 逻辑子步长调用回调（GameLoop.LOGIC_STEP_MS），Gw(deltaMs) 收到真实步长正常推进。
+ * 真实 gameLoop 经 configure 注入覆盖（生产/测试可注入同一单例或测试桩）。
+ * 若 GameLoop 未 init（update 未跑），Gw 不会被调用——吹飞停滞但不致死，比 NaN 瞬死安全。
+ */
+const defaultGameLoopAccessor = {
+  register(key, caller, callback) { return GameLoop.instance().register(key, caller, callback); },
+  unregister(key) { return GameLoop.instance().unregister(key); },
+};
 
 function distanceSquared(a, b) {
   const dx = a.x - b.x;
@@ -110,6 +145,14 @@ class EnemyBase extends EnemyEventProxy {
     logger = console,
     buffManager = null,
     deadEntityRegistry = null,
+    // 灵魂投射外部依赖（DEFERRED，属提案 ②③）。默认桩不触发：塔 {Ci:false} 使 sB 条件永不满足；
+    // 飞行管理器 no-op + 立即 onComplete（仅当 sB 条件被外部注入塔满足时才会调到，桩塔下不会调到）。
+    // DEFERRED: bundle:31423-31426 qs.vg / au.Ii/Ti 塔状态接口未取证，真实实现由 ②③ 注入。
+    soulTowerResolver = null,
+    soulFlightManager = null,
+    // 吹飞推进 gameLoop（bundle:31461 nx.La / 31344 nx.wa）。可选注入：默认桩委托 GameLoop.instance() 单例
+    // （对齐 bundle nx.instance() 全局访问）。GameLoop.update 以 80ms 子步长调用 Gw(deltaMs) 正常推进吹飞。
+    gameLoop = null,
   } = {}) {
     const required = { laya, eventBus, gameData, enemyFactory, objectPool, parentResolver, presentation, audio, effects, rewardService, targetResolver };
     for (const [name, value] of Object.entries(required)) {
@@ -129,6 +172,11 @@ class EnemyBase extends EnemyEventProxy {
     Object.assign(this, { laya, eventBus, gameData, enemyFactory, objectPool, parentResolver, presentation, audio, effects, rewardService, targetResolver, logger });
     this.buffManager = buffManager || this.buffManager || null;
     this.deadEntityRegistry = deadEntityRegistry || this.deadEntityRegistry || null;
+    // 灵魂投射 DEFERRED 接口：未注入时使用默认桩（不触发）。
+    this.soulTowerResolver = soulTowerResolver || defaultSoulTowerResolver;
+    this.soulFlightManager = soulFlightManager || defaultSoulFlightManager;
+    // 吹飞 gameLoop：未注入时委托 GameLoop.instance() 单例（对齐 bundle nx.instance()）。
+    this.gameLoop = gameLoop || defaultGameLoopAccessor;
     this._configured = true;
     return this;
   }

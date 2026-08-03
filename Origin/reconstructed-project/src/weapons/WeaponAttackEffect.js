@@ -25,6 +25,7 @@ class WeaponAttackEffect {
     random = Math.random,
     maxTargets = Infinity,
     allowRepeat = false,
+    projectileSpawner = null,
   } = {}) {
     this.type = type;
     this.attacker = attacker;
@@ -38,7 +39,9 @@ class WeaponAttackEffect {
     this.random = typeof random === 'function' ? random : Math.random;
     this.maxTargets = Number.isFinite(Number(maxTargets)) ? Math.max(0, Number(maxTargets)) : Infinity;
     this.allowRepeat = Boolean(allowRepeat);
+    this.projectileSpawner = typeof projectileSpawner === 'function' ? projectileSpawner : null;
     this.hits = [];
+    this.spawnedProjectiles = [];
     this.completed = false;
   }
 
@@ -56,6 +59,7 @@ class WeaponAttackEffect {
       type: this.type,
       damage: this.damage * this.multiplier,
       hits: this.hits.slice(),
+      spawnedProjectiles: this.spawnedProjectiles.slice(),
       completed: this.completed,
     };
   }
@@ -78,6 +82,17 @@ class WeaponAttackEffect {
         continue;
       }
       selected.push(target);
+      // 提案 ④b：流星雨经专属弹种实体（StarBullet）承载，经 projectileSpawner 创建并登记
+      if (this.projectileSpawner) {
+        const projectile = this.projectileSpawner({
+          type: 'StarBullet',
+          attacker: this.attacker,
+          target,
+          damage: this.damage * this.multiplier,
+          center: this.center,
+        });
+        if (projectile) this.spawnedProjectiles.push(projectile);
+      }
       this._hit(target, this.damage * this.multiplier);
     }
   }

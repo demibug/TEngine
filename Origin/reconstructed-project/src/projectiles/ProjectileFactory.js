@@ -6,7 +6,24 @@ const {FireArrow} = require('./types/FireArrow');
 const {HuoFengHuang} = require('./types/HuoFengHuang');
 const {PikeSnakeBullet} = require('./types/PikeSnakeBullet');
 const {LightningChain} = require('./types/LightningChain');
-const {ShenBiPunch} = require('./types/ShenBiPunch');
+const {ShenBiArrow} = require('./types/ShenBiArrow');
+// 提案 ④b 新增 16 弹种
+const {SimpleHitAreaBullet} = require('./types/SimpleHitAreaBullet');
+const {KnifeBullet} = require('./types/KnifeBullet');
+const {PikeBullet} = require('./types/PikeBullet');
+const {StaticFireBall} = require('./types/StaticFireBall');
+const {VirtualBullet} = require('./types/VirtualBullet');
+const {SwordBullet} = require('./types/SwordBullet');
+const {StarBullet} = require('./types/StarBullet');
+const {FireDragonArrow} = require('./types/FireDragonArrow');
+const {GroundSpikeBullet} = require('./types/GroundSpikeBullet');
+const {FireExplosiveArrow} = require('./types/FireExplosiveArrow');
+const {DaoQiBullet} = require('./types/DaoQiBullet');
+const {AttachCustomShapeBullet} = require('./types/AttachCustomShapeBullet');
+const {SimpleHitBullet} = require('./types/SimpleHitBullet');
+const {LiHuaBullet} = require('./types/LiHuaBullet');
+const {LightningArrow} = require('./types/LightningArrow');
+const {FlyPike} = require('./types/FlyPike');
 
 class UnresolvedProjectileTypeError extends Error {
   constructor(key) {
@@ -39,7 +56,24 @@ class ProjectileFactory {
       ['HuoFengHuang', HuoFengHuang],
       ['PikeSnakeBullet', PikeSnakeBullet],
       ['LightningChain', LightningChain],
-      ['ShenBiPunch', ShenBiPunch],
+      ['ShenBiArrow', ShenBiArrow],
+      // 提案 ④b 新增 16 弹种（覆盖 bundle 注册的 23 弹种全集）
+      ['SimpleHitAreaBullet', SimpleHitAreaBullet],
+      ['KnifeBullet', KnifeBullet],
+      ['PikeBullet', PikeBullet],
+      ['StaticFireBall', StaticFireBall],
+      ['VirtualBullet', VirtualBullet],
+      ['SwordBullet', SwordBullet],
+      ['StarBullet', StarBullet],
+      ['FireDragonArrow', FireDragonArrow],
+      ['GroundSpikeBullet', GroundSpikeBullet],
+      ['FireExplosiveArrow', FireExplosiveArrow],
+      ['DaoQiBullet', DaoQiBullet],
+      ['AttachCustomShapeBullet', AttachCustomShapeBullet],
+      ['SimpleHitBullet', SimpleHitBullet],
+      ['LiHuaBullet', LiHuaBullet],
+      ['LightningArrow', LightningArrow],
+      ['FlyPike', FlyPike],
     ]) this.register(key, cls);
   }
 

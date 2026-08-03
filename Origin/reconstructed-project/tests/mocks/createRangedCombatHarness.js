@@ -5,6 +5,7 @@ const { PlacementReservationRegistry } = require('../../src/core/PlacementReserv
 const { UnitFactory } = require('../../src/units/UnitFactory');
 const { UnitRegistry } = require('../../src/units/UnitRegistry');
 const { KnifeAttackTimeline } = require('../../src/combat/KnifeAttackTimeline');
+const { AttackEffectManager } = require('../../src/combat/AttackEffectManager');
 const { DevelopmentAnimationDriver } = require('../../src/combat/dev/DevelopmentAnimationDriver');
 const { ProjectileFactory } = require('../../src/projectiles/ProjectileFactory');
 const { ProjectileManager } = require('../../src/projectiles/ProjectileManager');
@@ -57,6 +58,7 @@ function createRangedCombatHarness(options = {}) {
   const unitPresentation = new DevelopmentUnitPresentation({ laya: Laya, animationDriver });
   const unitAudio = new DevelopmentUnitAudio();
   const knifeEffects = new DevelopmentKnifeEffects();
+  const attackEffectManager = new AttackEffectManager({ objectPool });
   objectPool.registerKey(
     'soldier',
     () => unitPresentation.createSoldierVisual(),
@@ -81,6 +83,7 @@ function createRangedCombatHarness(options = {}) {
       audio: unitAudio,
       enemyManager,
       attackTimeline: knifeAttackTimeline,
+      attackEffectManager,
       projectileManager,
       logger,
       dragThreshold: 10,
@@ -110,6 +113,7 @@ function createRangedCombatHarness(options = {}) {
     placementReservations,
     random: deterministicRandom,
     specialSpawnPolicy,
+    attackEffectManager,
     laya: Laya,
     now: () => Laya.timer.currTimer,
     logger,
@@ -215,6 +219,7 @@ function createRangedCombatHarness(options = {}) {
     animationDriver.resetForTests();
     unitFactory.resetForTests();
     knifeAttackTimeline.resetForTests();
+    attackEffectManager.resetForTests();
     placementReservations.clear();
     enemyHarness.cleanup();
   }
@@ -230,6 +235,7 @@ function createRangedCombatHarness(options = {}) {
     unitAudio,
     knifeEffects,
     knifeAttackTimeline,
+    attackEffectManager,
     unitFactory,
     unitRegistry,
     battleManager,

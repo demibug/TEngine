@@ -86,7 +86,7 @@ class DevelopmentUnitPresentation {
   }
 
   createAnimation(unit, key) {
-    if (!['knife', 'bow'].includes(key)) throw new Error(`Development unit animation ${key} is not restored`);
+    if (!['knife', 'bow', 'pike', 'cavalry'].includes(key)) throw new Error(`Development unit animation ${key} is not restored`);
     this.calls.push(['createAnimation', key]);
     return decorateDevelopmentUnitAnimation(new this.laya.Sprite(), key, unit, this.animationDriver);
   }

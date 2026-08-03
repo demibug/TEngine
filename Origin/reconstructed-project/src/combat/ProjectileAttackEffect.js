@@ -25,6 +25,17 @@ class ProjectileAttackEffect {
     return this;
   }
 
+  adopt({ owner, projectileManager, projectile } = {}) {
+    if (!owner || !projectileManager || !projectile) {
+      throw new TypeError('ProjectileAttackEffect.adopt requires owner, projectileManager and projectile');
+    }
+    this.owner = owner;
+    this.projectileManager = projectileManager;
+    this.projectile = projectile;
+    this.active = Boolean(projectile.active);
+    return this;
+  }
+
   update() {
     if (!this.active) return false;
     if (!this.projectile || !this.projectile.active) this.cleanup('projectile-complete');

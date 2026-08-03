@@ -90,6 +90,9 @@ function createEnemyRuntimeHarness(options = {}) {
     audio,
     effects,
     rewardService: rewards,
+    // 吹飞推进 gameLoop（bundle:31461 nx.La / 31344 nx.wa）：注入同一 GameLoop 单例，
+    // NormalEnemyBase.Xw/Gw 经其 register/unregister 以 80ms 子步长推进吹飞。
+    gameLoop,
     targetResolver: playerLane => playerLane ? playerTarget : opponentTarget,
     logger: options.logger || { log() {}, warn() {}, error() {} },
   };

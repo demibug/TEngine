@@ -42,7 +42,8 @@ class WeaponBase {
     this.attackCount++;
     if(!target) return { attacked:false, reason:'no-target', attackType:this.attackType };
     const effect=this.createAttackEffect(context,{type:this.attackType,damage:context.damage ?? this.owner?.attackDamage ?? this.owner?.attackPower ?? 0,target});
-    return { attacked:true, attackType:this.attackType, effect, ...effect.apply() };
+    const resolved = context.deferApply ? effect.result() : effect.apply();
+    return { attacked:true, attackType:this.attackType, effect, ...resolved };
   }
   getCombatModifiers(){ return { attackPower:this.attackPowerBonus, range:this.attackRangeBonus, attackSpeed:this.attackSpeedBonus }; }
   selectTarget(){ return null; }

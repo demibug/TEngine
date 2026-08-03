@@ -81,6 +81,9 @@ const GameEvents = Object.freeze({
   ENEMY_KILLED_BY: 'ht',
   ENEMY_APPROACH_WARNING: 'kt',
   ENEMY_FINAL_WARNING: 'wt',
+  // 灵魂投射到达事件（bundle 符号 sS["ut"]，字符串键 "ut"）。
+  // 参数：(isPlayerLane, enemyX, enemyY, currentPathIndex)。消费者（召唤方）属提案 ②③，DEFERRED 接入。
+  ENEMY_SOUL_DELIVERED: 'ut',
   SKILL_EFFECT_REQUESTED: 'skill:effect:requested',
   BOSS_SPAWNED: 'boss:spawned',
   BOSS_REMOVED: 'boss:removed',

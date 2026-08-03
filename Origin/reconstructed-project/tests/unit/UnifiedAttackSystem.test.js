@@ -5,8 +5,9 @@ const assert = require('node:assert/strict');
 const { UnitState } = require('../../src/units/UnitBase');
 const { AttackScheduler } = require('../../src/combat/AttackScheduler');
 const { AttackEffectManager } = require('../../src/combat/AttackEffectManager');
-const { PikeAttackEffect } = require('../../src/combat/PikeAttackEffect');
-const { CavalrySweepEffect } = require('../../src/combat/CavalrySweepEffect');
+const { PikeAttackEffect, PIKE_HIT_DELAY_MS, PIKE_EFFECT_DURATION_MS } = require('../../src/combat/PikeAttackEffect');
+const { CavalrySweepEffect, CAVALRY_SWEEP_DELAY_MS } = require('../../src/combat/CavalrySweepEffect');
+const { ProjectileAttackEffect } = require('../../src/combat/ProjectileAttackEffect');
 const { KnifeAttackTimeline } = require('../../src/combat/KnifeAttackTimeline');
 const { ObjectPool } = require('../../src/core/ObjectPool');
 
@@ -50,19 +51,67 @@ test('AttackEffectManager updates pike and cavalry effects and removes them afte
   const owner = { id: 9, side: true, displayObject: { x: 0, y: 0 } };
   const manager = new AttackEffectManager();
   const pike = new PikeAttackEffect().launch({ owner, enemyManager, damage: 10, radius: 50 });
-  const cavalry = new CavalrySweepEffect().launch({ owner, enemyManager, damage: 20, radius: 80, delayMs: 80 });
+  const cavalry = new CavalrySweepEffect().launch({ owner, enemyManager, damage: 20, radius: 80 });
   manager.add(pike);
   manager.add(cavalry);
 
-  manager.update(50);
-  assert.equal(hits.length, 2);
+  manager.update(CAVALRY_SWEEP_DELAY_MS - 1);
+  assert.equal(hits.length, 0);
   assert.equal(manager.activeCount, 2);
-  manager.update(80);
+  manager.update(1);
+  assert.equal(hits.length, 2);
+  manager.update(PIKE_HIT_DELAY_MS - CAVALRY_SWEEP_DELAY_MS - 1);
+  assert.equal(hits.length, 2);
+  manager.update(1);
   assert.equal(hits.length, 4);
-  manager.update(100);
+  manager.update(PIKE_EFFECT_DURATION_MS - PIKE_HIT_DELAY_MS);
   assert.equal(manager.activeCount, 0);
   assert.equal(pike.active, false);
   assert.equal(cavalry.active, false);
+});
+
+test('Pike and cavalry unit attacks use the recovered animation timing', () => {
+  const { SpearSoldier } = require('../../src/units/SpearSoldier');
+  const { CavalrySoldier } = require('../../src/units/CavalrySoldier');
+  const created = [];
+  const manager = {
+    create(ClassType) { const effect = new ClassType(); created.push(effect); return effect; },
+    add() {},
+    cancelOwner() {},
+  };
+  const enemyManager = { queryTargets() { return [{ id: 1, x: 0, y: 0 }]; } };
+  const animation = { playCalls: [], play(...args) { this.playCalls.push(args); } };
+  const base = {
+    enemyManager,
+    attackEffectManager: manager,
+    displayObject: { x: 0, y: 0 },
+    gameData: { map: { gridWidth: 1 } },
+    baseAttackRange: 100,
+    rangeBonusCells: 0,
+    baseAttackPower: 20,
+    animationPlaybackRate: 2,
+    animation,
+  };
+  const spear = Object.assign(new SpearSoldier(), base);
+  const spearEffect = spear.attack();
+  assert.equal(spearEffect.hitAtMs, PIKE_HIT_DELAY_MS / 2);
+  assert.deepEqual(animation.playCalls[0], ['attack', false]);
+
+  const cavalryAnimation = { playCalls: [], play(...args) { this.playCalls.push(args); } };
+  const cavalry = Object.assign(new CavalrySoldier(), {
+    ...base,
+    animation: cavalryAnimation,
+    audio: { calls: [], play(name) { this.calls.push(name); } },
+  });
+  cavalry.attack();
+  assert.equal(created[1].hitAtMs, CAVALRY_SWEEP_DELAY_MS);
+  assert.equal(created[2].hitAtMs, CAVALRY_SWEEP_DELAY_MS);
+  assert.equal(created[1].radius, 50);
+  assert.equal(created[2].radius, 100);
+  assert.equal(created[1].multiplier, 0.5);
+  assert.equal(created[2].multiplier, 0.5);
+  assert.deepEqual(cavalryAnimation.playCalls[0], ['attack', false]);
+  assert.deepEqual(cavalry.audio.calls, ['cavalry_attack']);
 });
 
 test('AttackEffectManager recycles completed effects through ObjectPool', () => {
@@ -77,6 +126,46 @@ test('AttackEffectManager recycles completed effects through ObjectPool', () => 
   assert.equal(manager.activeCount, 0);
   assert.equal(objectPool.sizeByClass(PikeAttackEffect), 1);
   assert.equal(manager.create(PikeAttackEffect), effect);
+});
+
+test('ProjectileAttackEffect follows projectile completion and manager cleanup', () => {
+  const objectPool = new ObjectPool();
+  const manager = new AttackEffectManager({ objectPool });
+  const projectile = {
+    active: true,
+    fireCount: 0,
+    fire() { this.fireCount += 1; },
+  };
+  const projectileManager = {
+    create(config, startPoint) {
+      this.config = config;
+      this.startPoint = startPoint;
+      return projectile;
+    },
+    remove(value) {
+      value.active = false;
+    },
+  };
+  const owner = { id: 12 };
+  const effect = manager.create(ProjectileAttackEffect).launch({
+    owner,
+    projectileManager,
+    config: { type: 'SimpleDynamicArrow' },
+    startPoint: { x: 3, y: 4 },
+  });
+  manager.add(effect);
+
+  assert.equal(projectile.fireCount, 1);
+  assert.equal(projectileManager.config.attacker, owner);
+  assert.deepEqual(projectileManager.startPoint, { x: 3, y: 4 });
+  manager.update(16);
+  assert.equal(manager.activeCount, 1);
+
+  projectile.active = false;
+  manager.update(0);
+  assert.equal(manager.activeCount, 0);
+  assert.equal(objectPool.sizeByClass(ProjectileAttackEffect), 1);
+  assert.equal(manager.create(ProjectileAttackEffect), effect);
 });
 
 test('KnifeAttackTimeline can use the unified manager without changing the 500ms hit timing', () => {

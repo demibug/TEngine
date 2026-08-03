@@ -6,6 +6,7 @@ module.exports = {
   ...require('./AttackEffectManager'),
   ...require('./MeleeAttackEffect'),
   ...require('./ProjectileAttackEffect'),
+  ...require('./WeaponAttackLifecycleEffect'),
   ...require('./KnifeAttackTimeline'),
   ...require('./PikeAttackEffect'),
   ...require('./CavalrySweepEffect'),

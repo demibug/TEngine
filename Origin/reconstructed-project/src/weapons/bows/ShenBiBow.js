@@ -8,7 +8,7 @@ class ShenBiBow extends BowWeaponBase {
   performAttack(t){
     if(this.lastTargetId===t.id){this.stack=Math.min(this.stack+.15,this.maxStack);this.buffPort.modify(this.owner.id,1,this.attackSpeedBuffId,this.stack,true);}
     else{this.buffPort.modify(this.owner.id,1,this.attackSpeedBuffId,0,true);this.stack=0;this.lastTargetId=t.id;}
-    const count=1+(Number(this.owner?.W_)||0),out=[];for(let i=0;i<count;i++)out.push(this.createProjectile('ShenBiPunch',t,{attackSpeedStack:this.stack,shotIndex:i,shotCount:count}));return out;
+    const count=1+(Number(this.owner?.W_)||0),out=[];for(let i=0;i<count;i++)out.push(this.createProjectile('ShenBiArrow',t,{attackSpeedStack:this.stack,shotIndex:i,shotCount:count}));return out;
   }
 }
 module.exports={ShenBiBow};

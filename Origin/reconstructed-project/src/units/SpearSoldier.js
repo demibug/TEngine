@@ -1,6 +1,7 @@
 'use strict';
 
 const { SoldierBase } = require('./SoldierBase');
+const { PikeAttackEffect } = require('../combat/PikeAttackEffect');
 
 /**
  * ROUND-07A-SPEAR
@@ -44,8 +45,15 @@ class SpearSoldier extends SoldierBase {
     const targets=this.enemyManager.queryTargets(this.displayObject.x,this.displayObject.y,this.attackRange,this.side)||[];
     const target=targets[0];
     if(!target)return null;
-    const {PikeAttackEffect}=require('../combat/PikeAttackEffect');
-    const effect=this.attackEffectManager.create(PikeAttackEffect).launch({owner:this,target,enemyManager:this.enemyManager,damage:this.getAttackDamage?this.getAttackDamage():this.baseAttackPower});
+    if (this.animation) this.animation.play('attack', false);
+    const effect=this.attackEffectManager.create(PikeAttackEffect).launch({
+      owner:this,
+      target,
+      enemyManager:this.enemyManager,
+      damage:this.getAttackDamage?this.getAttackDamage():this.baseAttackPower,
+      radius:this.attackRange,
+      playbackRate:this.animationPlaybackRate,
+    });
     this.pendingAttack=effect;
     this.attackEffectManager.add(effect);
     return effect;

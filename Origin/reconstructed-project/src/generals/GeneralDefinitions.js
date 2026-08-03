@@ -67,6 +67,48 @@ const GENERAL_DEFINITIONS = Object.freeze([
 
 const byName = new Map(GENERAL_DEFINITIONS.map(value => [value.name, value]));
 
+// tG.Yp(bundle.strings-decoded.js:11302-11314)。武将基础攻击力,值引用 hu 解码表:
+// hu[14]=14、hu[12]=15、hu[9]=12、hu[3]=13(已 node 独立解码复核)。
+// 武将创建处 bundle:47314 用 Yp.get(name) ?? 10 取值。
+const GENERAL_BASE_ATTACK_POWER = new Map([
+  ['赵云', 14], ['关羽', 15], ['张飞', 15], ['马超', 13],
+  ['黄忠', 13], ['刘备', 13], ['关平', 12], ['关兴', 12],
+  ['张苞', 12], ['张翼', 12], ['黄盖', 12], ['黄祖', 12],
+]);
+
+// tG.Mp(bundle.strings-decoded.js:11168-11272)。按武将索引(与 GENERAL_DEFINITIONS.index 对齐)
+// 存放基础战斗参数与技能字段。武将战斗更新处(bundle:44689)读 Mp[type].kp/_p。
+// range=_p(攻击范围)、interval=kp(攻击间隔)、targetPolicy=xp(目标策略);
+// skillRange=Pp、skillActive=Ap、skillMode=Sp 为技能字段,作为数据携带,本阶段不接线(留待技能提案)。
+// 注:bundle Mp 共 13 条,第 13 条(wp4.5/_p2/kp.8/Pp5.5/Ap!0/Sp"单体")无对应武将,疑模板/未启用,此处不收录。
+const GENERAL_COMBAT_PARAMS = Object.freeze([
+  Object.freeze({ range: 2, interval: 0.8, targetPolicy: 'closest_end', skillRange: 3.5, skillActive: true, skillMode: '快攻贯穿' }),  // 0 赵云
+  Object.freeze({ range: 10, interval: 1, targetPolicy: 'nearest', skillRange: 3.5, skillActive: true, skillMode: '范围' }),          // 1 张飞
+  Object.freeze({ range: 10, interval: 1, targetPolicy: 'nearest', skillRange: 3.5, skillActive: true, skillMode: '单体' }),          // 2 马超
+  Object.freeze({ range: 20, interval: 1, targetPolicy: 'nearest', skillRange: 3.5, skillActive: true, skillMode: '单体' }),          // 3 关羽
+  Object.freeze({ range: 6, interval: 0.8, targetPolicy: 'nearest', skillRange: 5.5, skillActive: true, skillMode: '贯穿' }),          // 4 黄忠
+  Object.freeze({ range: 3, interval: 1, targetPolicy: 'nearest', skillRange: 3.5, skillActive: false, skillMode: '范围' }),          // 5 关平
+  Object.freeze({ range: 7, interval: 1, targetPolicy: 'closest_end', skillRange: 3.5, skillActive: false, skillMode: '单体' }),      // 6 关兴
+  Object.freeze({ range: 7, interval: 1, targetPolicy: 'closest_end', skillRange: 3.5, skillActive: false, skillMode: '单体' }),      // 7 张苞
+  Object.freeze({ range: 7, interval: 1, targetPolicy: 'closest_end', skillRange: 3.5, skillActive: false, skillMode: '单体' }),      // 8 张翼
+  Object.freeze({ range: 8, interval: 1, targetPolicy: 'nearest', skillRange: 3.5, skillActive: false, skillMode: '单体' }),          // 9 黄盖
+  Object.freeze({ range: 10, interval: 0.8, targetPolicy: 'nearest', skillRange: 3.5, skillActive: true, skillMode: '单体' }),        // 10 刘备
+  Object.freeze({ range: 6, interval: 0.8, targetPolicy: 'closest_end', skillRange: 3.5, skillActive: false, skillMode: '单体' }),    // 11 黄祖
+].map((value, index) => Object.freeze({ index, ...value })));
+
+/** 取武将基础攻击力(Yp Map);未知武将回退 10,与 bundle:47314 的 ?? 10 一致。 */
+function getGeneralBaseAttackPower(name) {
+  const value = GENERAL_BASE_ATTACK_POWER.get(name);
+  return Number.isFinite(value) ? value : 10;
+}
+
+/** 取武将基础战斗参数(Mp[index]);未知索引返回范围 0 的安全默认。 */
+function getGeneralCombatParams(index) {
+  const params = GENERAL_COMBAT_PARAMS[index];
+  if (!params) return Object.freeze({ range: 0, interval: 1, targetPolicy: 'nearest' });
+  return params;
+}
+
 function getGeneralDefinition(name) {
   const value = byName.get(name);
   if (!value) throw new Error(`Unknown general: ${name}`);
@@ -111,9 +153,13 @@ module.exports = {
   GENERAL_ATTACK_SPEED_MULTIPLIERS,
   GENERAL_DAMAGE_MULTIPLIERS,
   GENERAL_DEFINITIONS,
+  GENERAL_BASE_ATTACK_POWER,
+  GENERAL_COMBAT_PARAMS,
   getGeneralDefinition,
   getGeneralDefinitionByIndex,
   getGeneralPartWords,
   findGeneralByParts,
   getCompatiblePartWords,
+  getGeneralBaseAttackPower,
+  getGeneralCombatParams,
 };

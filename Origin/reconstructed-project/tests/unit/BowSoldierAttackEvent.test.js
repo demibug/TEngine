@@ -15,6 +15,7 @@ test('BowSoldier creates no arrow before STOPPED and creates one after the 650/1
   h.tick(80, 80);
   assert.equal(h.projectileFactory.creationLog.length, 1);
   assert.equal(h.projectileManager.activeCount, 1);
+  assert.equal(h.attackEffectManager.activeCount, 1);
   assert.equal(h.unitAudio.calls.at(-1), 'bow_attack');
   assert.equal(bow.animation.listenerCount(h.Laya.Event.STOPPED), 0);
   assert.equal(h.projectileManager.activeProjectiles[0].hitStrategy.targetIds[0], mob.id);

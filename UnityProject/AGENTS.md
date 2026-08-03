@@ -8,6 +8,8 @@
 
 `CLAUDE.md` 保持原样以兼容 Claude Code。其中涉及 Claude Code 专用工具、Skill 调用方式或 `.claude/skills/` 的内容不适用于 Codex；Codex 技能统一从 `.codex/skills/` 读取。
 
+ZCode 会话同样以 `.codex/skills/` 为本仓库技能的权威来源：仓库未使用 `.zcode/skills/`，ZCode 不会通过原生自动发现加载这些技能，应按上表手动读取对应 `SKILL.md`。
+
 ## Codex 项目技能
 
 当任务匹配以下条件时，必须在执行任务前读取对应技能目录中的完整 `SKILL.md`，并按照其中的路由继续读取所需的 `references/`、脚本或模板：
