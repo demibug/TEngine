@@ -33,6 +33,363 @@ public partial class Tables
             m_TbItem.ResolveRef(this);
         }
     }
+    /// <summary>
+    /// 小兵基础配置
+    /// </summary>
+    private battle.TbUnit m_TbUnit;
+    public battle.TbUnit TbUnit 
+    {
+        get
+        {
+            if (m_TbUnit == null)
+            {
+                m_TbUnit = new battle.TbUnit(defaultLoader("battle_tbunit"));
+                m_TbUnit.ResolveRef(this);
+            }
+            return m_TbUnit;
+        }
+        set
+        {
+            m_TbUnit = value;
+            m_TbUnit.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 武器符号注册表(逆向快照)
+    /// </summary>
+    private battle.TbWeaponRegistry m_TbWeaponRegistry;
+    public battle.TbWeaponRegistry TbWeaponRegistry 
+    {
+        get
+        {
+            if (m_TbWeaponRegistry == null)
+            {
+                m_TbWeaponRegistry = new battle.TbWeaponRegistry(defaultLoader("battle_tbweaponregistry"));
+                m_TbWeaponRegistry.ResolveRef(this);
+            }
+            return m_TbWeaponRegistry;
+        }
+        set
+        {
+            m_TbWeaponRegistry = value;
+            m_TbWeaponRegistry.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// Boss配置
+    /// </summary>
+    private battle.TbBoss m_TbBoss;
+    public battle.TbBoss TbBoss 
+    {
+        get
+        {
+            if (m_TbBoss == null)
+            {
+                m_TbBoss = new battle.TbBoss(defaultLoader("battle_tbboss"));
+                m_TbBoss.ResolveRef(this);
+            }
+            return m_TbBoss;
+        }
+        set
+        {
+            m_TbBoss = value;
+            m_TbBoss.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// Buff类型配置
+    /// </summary>
+    private battle.TbBuff m_TbBuff;
+    public battle.TbBuff TbBuff 
+    {
+        get
+        {
+            if (m_TbBuff == null)
+            {
+                m_TbBuff = new battle.TbBuff(defaultLoader("battle_tbbuff"));
+                m_TbBuff.ResolveRef(this);
+            }
+            return m_TbBuff;
+        }
+        set
+        {
+            m_TbBuff = value;
+            m_TbBuff.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 技能配置
+    /// </summary>
+    private battle.TbSkill m_TbSkill;
+    public battle.TbSkill TbSkill 
+    {
+        get
+        {
+            if (m_TbSkill == null)
+            {
+                m_TbSkill = new battle.TbSkill(defaultLoader("battle_tbskill"));
+                m_TbSkill.ResolveRef(this);
+            }
+            return m_TbSkill;
+        }
+        set
+        {
+            m_TbSkill = value;
+            m_TbSkill.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 敌人类型配置(逆向快照)
+    /// </summary>
+    private battle.TbEnemy m_TbEnemy;
+    public battle.TbEnemy TbEnemy 
+    {
+        get
+        {
+            if (m_TbEnemy == null)
+            {
+                m_TbEnemy = new battle.TbEnemy(defaultLoader("battle_tbenemy"));
+                m_TbEnemy.ResolveRef(this);
+            }
+            return m_TbEnemy;
+        }
+        set
+        {
+            m_TbEnemy = value;
+            m_TbEnemy.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 武将配置
+    /// </summary>
+    private battle.TbGeneral m_TbGeneral;
+    public battle.TbGeneral TbGeneral 
+    {
+        get
+        {
+            if (m_TbGeneral == null)
+            {
+                m_TbGeneral = new battle.TbGeneral(defaultLoader("battle_tbgeneral"));
+                m_TbGeneral.ResolveRef(this);
+            }
+            return m_TbGeneral;
+        }
+        set
+        {
+            m_TbGeneral = value;
+            m_TbGeneral.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 军衔关卡配置
+    /// </summary>
+    private battle.TbRank m_TbRank;
+    public battle.TbRank TbRank 
+    {
+        get
+        {
+            if (m_TbRank == null)
+            {
+                m_TbRank = new battle.TbRank(defaultLoader("battle_tbrank"));
+                m_TbRank.ResolveRef(this);
+            }
+            return m_TbRank;
+        }
+        set
+        {
+            m_TbRank = value;
+            m_TbRank.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 武器配置(原始)
+    /// </summary>
+    private battle.TbWeapon m_TbWeapon;
+    public battle.TbWeapon TbWeapon 
+    {
+        get
+        {
+            if (m_TbWeapon == null)
+            {
+                m_TbWeapon = new battle.TbWeapon(defaultLoader("battle_tbweapon"));
+                m_TbWeapon.ResolveRef(this);
+            }
+            return m_TbWeapon;
+        }
+        set
+        {
+            m_TbWeapon = value;
+            m_TbWeapon.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 武器名字拆字
+    /// </summary>
+    private battle.TbWeaponText m_TbWeaponText;
+    public battle.TbWeaponText TbWeaponText 
+    {
+        get
+        {
+            if (m_TbWeaponText == null)
+            {
+                m_TbWeaponText = new battle.TbWeaponText(defaultLoader("battle_tbweapontext"));
+                m_TbWeaponText.ResolveRef(this);
+            }
+            return m_TbWeaponText;
+        }
+        set
+        {
+            m_TbWeaponText = value;
+            m_TbWeaponText.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 事件名映射
+    /// </summary>
+    private battle.TbEvent m_TbEvent;
+    public battle.TbEvent TbEvent 
+    {
+        get
+        {
+            if (m_TbEvent == null)
+            {
+                m_TbEvent = new battle.TbEvent(defaultLoader("battle_tbevent"));
+                m_TbEvent.ResolveRef(this);
+            }
+            return m_TbEvent;
+        }
+        set
+        {
+            m_TbEvent = value;
+            m_TbEvent.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 战斗结果字段说明
+    /// </summary>
+    private battle.TbResultSchema m_TbResultSchema;
+    public battle.TbResultSchema TbResultSchema 
+    {
+        get
+        {
+            if (m_TbResultSchema == null)
+            {
+                m_TbResultSchema = new battle.TbResultSchema(defaultLoader("battle_tbresultschema"));
+                m_TbResultSchema.ResolveRef(this);
+            }
+            return m_TbResultSchema;
+        }
+        set
+        {
+            m_TbResultSchema = value;
+            m_TbResultSchema.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 小兵等级倍数
+    /// </summary>
+    private battle.TbUnitLevel m_TbUnitLevel;
+    public battle.TbUnitLevel TbUnitLevel 
+    {
+        get
+        {
+            if (m_TbUnitLevel == null)
+            {
+                m_TbUnitLevel = new battle.TbUnitLevel(defaultLoader("battle_tbunitlevel"));
+                m_TbUnitLevel.ResolveRef(this);
+            }
+            return m_TbUnitLevel;
+        }
+        set
+        {
+            m_TbUnitLevel = value;
+            m_TbUnitLevel.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 波次配置
+    /// </summary>
+    private battle.TbWave m_TbWave;
+    public battle.TbWave TbWave 
+    {
+        get
+        {
+            if (m_TbWave == null)
+            {
+                m_TbWave = new battle.TbWave(defaultLoader("battle_tbwave"));
+                m_TbWave.ResolveRef(this);
+            }
+            return m_TbWave;
+        }
+        set
+        {
+            m_TbWave = value;
+            m_TbWave.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 地图配置
+    /// </summary>
+    private battle.TbMap m_TbMap;
+    public battle.TbMap TbMap 
+    {
+        get
+        {
+            if (m_TbMap == null)
+            {
+                m_TbMap = new battle.TbMap(defaultLoader("battle_tbmap"));
+                m_TbMap.ResolveRef(this);
+            }
+            return m_TbMap;
+        }
+        set
+        {
+            m_TbMap = value;
+            m_TbMap.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 战斗经济配置
+    /// </summary>
+    private battle.TbEconomy m_TbEconomy;
+    public battle.TbEconomy TbEconomy 
+    {
+        get
+        {
+            if (m_TbEconomy == null)
+            {
+                m_TbEconomy = new battle.TbEconomy(defaultLoader("battle_tbeconomy"));
+                m_TbEconomy.ResolveRef(this);
+            }
+            return m_TbEconomy;
+        }
+        set
+        {
+            m_TbEconomy = value;
+            m_TbEconomy.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 弹道类型
+    /// </summary>
+    private battle.TbProjectile m_TbProjectile;
+    public battle.TbProjectile TbProjectile 
+    {
+        get
+        {
+            if (m_TbProjectile == null)
+            {
+                m_TbProjectile = new battle.TbProjectile(defaultLoader("battle_tbprojectile"));
+                m_TbProjectile.ResolveRef(this);
+            }
+            return m_TbProjectile;
+        }
+        set
+        {
+            m_TbProjectile = value;
+            m_TbProjectile.ResolveRef(this);
+        }
+    }
 
     #endregion
 

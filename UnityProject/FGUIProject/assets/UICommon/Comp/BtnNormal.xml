@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component size="173,74" extention="Button">
+  <displayList>
+    <image id="n0_tdew" name="n0" src="tdew0" fileName="Res/b4.png" xy="0,0"/>
+  </displayList>
+  <Button/>
+</component>

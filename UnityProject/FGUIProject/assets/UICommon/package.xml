@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<packageDescription id="5w9iycrv">
+  <resources>
+    <image id="tdew0" name="b4.png" path="/Res/"/>
+    <component id="tdew1" name="BtnNormal.xml" path="/Comp/" exported="true"/>
+  </resources>
+  <publish name="" genCode="true"/>
+</packageDescription>
