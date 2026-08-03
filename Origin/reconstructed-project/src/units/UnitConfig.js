@@ -52,11 +52,11 @@ const BASE_SOLDIER_CONFIGS = Object.freeze([
 
 const ATTACK_SPEED_LEVEL_INCREMENTS = Object.freeze([0, 0.5, 0.4, 0.3, 0.25]);
 const DAMAGE_LEVEL_INCREMENTS = Object.freeze([0, 0.5, 0.4, 0.3, 0.25]);
-const MAX_SOLDIER_LEVEL = 5;
+const MAX_SOLDIER_LEVEL = 3;
 
-// PARTIAL：原 Ip 阈值表中仅首两项在本轮依赖闭包内具有明确语义。
-// 其余等级经验阈值不参与基础刀兵攻击链，保留 null，禁止用猜测数值替代。
-const EXPERIENCE_THRESHOLDS = Object.freeze([0, 10, null, null, null]);
+// 原 Dp 阈值表（bundle:11278 的 this["Dp"]=[0,8,23]），3 元素，对齐 maxLevel=3。
+// 与武将 Ip 表 [0,10,...] 严格区分；4 级及以上在小兵不可达。
+const EXPERIENCE_THRESHOLDS = Object.freeze([0, 8, 23]);
 
 function cumulativeMultipliers(increments) {
   const values = [];

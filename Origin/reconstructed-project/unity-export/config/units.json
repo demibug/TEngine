@@ -1,6 +1,6 @@
 {
   "status": "CORE_COMPLETE",
-  "maxLevel": 5,
+  "maxLevel": 3,
   "damageLevelMultipliers": [
     1,
     1.5,

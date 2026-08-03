@@ -3,7 +3,7 @@
 const fs=require('node:fs');const path=require('node:path');
 const root=path.resolve(__dirname,'..'),out=path.join(root,'unity-export/config');fs.mkdirSync(out,{recursive:true});
 const write=(name,data)=>fs.writeFileSync(path.join(out,name),JSON.stringify(data,null,2));
-const {BASE_SOLDIER_CONFIGS,DAMAGE_LEVEL_MULTIPLIERS,ATTACK_SPEED_LEVEL_MULTIPLIERS}=require('../src/units/UnitConfig');
+const {BASE_SOLDIER_CONFIGS,DAMAGE_LEVEL_MULTIPLIERS,ATTACK_SPEED_LEVEL_MULTIPLIERS,MAX_SOLDIER_LEVEL}=require('../src/units/UnitConfig');
 const {GENERAL_DEFINITIONS}=require('../src/generals/GeneralDefinitions');
 const {BOSS_DEFINITIONS}=require('../src/bosses/BossDefinitions');
 const {BuffDefinitions}=require('../src/buffs/BuffDefinitions');
@@ -12,7 +12,8 @@ const {EnemyDataCore,MapDataCore}=require('../src/data/BattleDataCore');
 const {DeckDefinitions}=require('../src/deck/DeckDefinitions');
 const {GameEvents}=require('../src/core/EventBus');
 const readCatalog=name=>{const p=path.join(root,'analysis/catalogs',name);return fs.existsSync(p)?JSON.parse(fs.readFileSync(p,'utf8')):null;};
-write('units.json',{status:'CORE_COMPLETE',maxLevel:5,damageLevelMultipliers:DAMAGE_LEVEL_MULTIPLIERS,attackSpeedLevelMultipliers:ATTACK_SPEED_LEVEL_MULTIPLIERS,units:BASE_SOLDIER_CONFIGS});
+// maxLevel=3 对齐 bundle Dp 表长度；倍率表保留 5 元素作快照，4-5 级因 maxLevel=3 不可达。
+write('units.json',{status:'CORE_COMPLETE',maxLevel:MAX_SOLDIER_LEVEL,damageLevelMultipliers:DAMAGE_LEVEL_MULTIPLIERS,attackSpeedLevelMultipliers:ATTACK_SPEED_LEVEL_MULTIPLIERS,units:BASE_SOLDIER_CONFIGS});
 write('generals.json',{status:'PARTIAL_CORE_CONFIG',gap:'glyph merge and formal general battle component not fully reconstructed',generals:GENERAL_DEFINITIONS});
 write('enemies.json',readCatalog('enemy-registry.json'));
 write('bosses.json',{status:'CORE_COMPLETE_NO_PRESENTATION',bosses:BOSS_DEFINITIONS});

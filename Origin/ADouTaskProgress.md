@@ -104,8 +104,8 @@
   - [x] 处理多目标命中和清理顺序。
   - [x] 将枪兵、骑兵中直接 `update()` 的攻击回退逻辑替换为统一攻击效果管理。
 - 验收标准：攻击触发、命中、伤害结算、对象回收和多目标清理顺序稳定且可复用。
-- 完成记录：2026-08-03 新增 `AttackScheduler`、`AttackResolver`、`MeleeAttackEffect`、`ProjectileAttackEffect` 和 `AttackEffectManager`；`BattleManager` 接入统一调度和效果更新；枪兵、骑兵和刀兵效果接入统一管理；正式 `ObjectPool` 已用于攻击效果获取/回收；范围命中去重、延迟结算和回收清理已覆盖。原始动画事件对应的枪兵/骑兵精确结算时机仍待补齐。
-- 最后变动：`[完成子项] 2026-08-03` 完成攻击对象池和刀兵统一生命周期接入；P0-04 仍因动画时序和其他兵种适配保持进行中。
+- 完成记录：2026-08-03 新增 `AttackScheduler`、`AttackResolver`、`MeleeAttackEffect`、`ProjectileAttackEffect` 和 `AttackEffectManager`；`BattleManager` 接入统一调度和效果更新；枪兵、骑兵和刀兵效果接入统一管理；正式 `ObjectPool` 已用于攻击效果获取/回收；范围命中去重、延迟结算和回收清理已覆盖。2026-08-03 依据原始抽取恢复枪兵攻击动画前段 90ms 转向 + 270ms 突刺后的 `360ms / 播放倍率` 命中点，以及骑兵两次横扫统一 `150ms` 延迟、各半攻击力和半径/完整范围；开发表现桩已支持枪兵与骑兵动画。2026-08-03 将弓兵在原始 `STOPPED/650ms` 发射点创建的投射物改由 `ProjectileAttackEffect` 登记、更新、回收和单位回收取消。2026-08-03 新增 `WeaponAttackLifecycleEffect`，将武将普通武器的命中结算延迟到统一管理器更新阶段，并将武将弓类产生的投射物登记到同一管理器；武将回收时会取消未完成攻击效果。
+- 最后变动：`[完成子项] 2026-08-03` 完成武将普通武器与弓兵投射物统一生命周期接入；P0-04 仍因原始动画事件精确结算尚未完成而保持进行中。
 
 ## P1：核心扩展
 
@@ -113,7 +113,7 @@
 |---|---|---|---|---|
 | P1-01 | 特殊投射物和剩余武器效果 | 未开始 | 投射物生命周期、命中效果和剩余武器特性可独立调用 | `[新增] 2026-08-03` |
 | P1-02 | 非 Mob0 敌人的专属行为 | 未开始 | 不同敌人类型拥有与报告一致的行为分支 | `[新增] 2026-08-03` |
-| P1-03 | 友军受击、死亡、护甲和护盾 | 未开始 | 友军完整承受伤害并正确处理死亡、护甲、护盾 | `[新增] 2026-08-03` |
+| P1-03 | 友军受击契约确认与武将生命周期 | 部分完成 | 确认友军无受击契约（已忠实实现 `UnsupportedFriendlyUnitDamageError`；原始游戏友军无 HP／护甲／护盾／死亡机制，敌人攻击承受方为阿斗 BattleTarget）；武将 die/recycle 生命周期注入拆分至后续 P0 任务 | `[重定义验收] 2026-08-03` |
 | P1-04 | 完整 AI 策略 | 未开始 | 目标选择、攻击决策和特殊行为满足战斗规则 | `[新增] 2026-08-03` |
 | P1-05 | 卡牌拖拽、农民和完整字形合成交互 | 未开始 | 拖拽、农民操作和字形合成流程可完整执行 | `[新增] 2026-08-03` |
 | P1-06 | 完整等级阈值和部分原始数值 | 未开始 | 等级阈值及缺失原始数值补齐并被战斗逻辑使用 | `[新增] 2026-08-03` |
@@ -151,8 +151,8 @@
   - [x] `ProjectileAttackEffect`
   - [x] `AttackEffectManager`
 - 完成条件：枪兵、骑兵和武将能够通过统一的攻击效果流程发起攻击、结算命中并清理对象。
-- 完成记录：2026-08-03 完成统一攻击组件骨架、对象池、近战效果生命周期和枪兵/骑兵/刀兵接入；刀兵的 500ms 命中仍委托原始动画定时器精确驱动。弓兵投射物、武将攻击效果以及枪兵/骑兵原始动画事件精确结算仍待统一适配。
-- 最后变动：`[完成子项] 2026-08-03` 完成攻击对象池和刀兵接入；阶段 2 继续进行。
+- 完成记录：2026-08-03 完成统一攻击组件骨架、对象池、近战效果生命周期和枪兵/骑兵/刀兵接入；刀兵的 500ms 命中仍委托原始动画定时器精确驱动。2026-08-03 补齐枪兵 `360ms / 播放倍率` 命中与骑兵双横扫 `150ms` 延迟、伤害和范围参数，并让开发表现桩可承载枪兵/骑兵动画。2026-08-03 将弓兵在 `STOPPED` 后创建的投射物纳入 `ProjectileAttackEffect`，由统一管理器负责登记、完成检测、对象池回收和单位回收取消；2026-08-03 将武将普通武器命中包装为 `WeaponAttackLifecycleEffect`，并将武将弓类投射物纳入 `ProjectileAttackEffect`，覆盖延迟结算、管理器更新、效果回收和武将回收取消。
+- 最后变动：`[完成子项] 2026-08-03` 完成武将攻击统一生命周期接入及专项回归用例；阶段 2 仍待补齐原始动画事件精确结算并完成最终验收。
 
 ### 阶段 3：恢复武器逻辑
 
@@ -186,7 +186,7 @@
 - 目标：补齐核心战斗之外但会影响战斗闭环的边界行为。
 - 关联任务：P1-01 至 P1-06。
 - 工作项：
-  - [ ] 友军受击和死亡。
+  - [x] 友军受击契约确认（原始游戏友军无受击／血量／死亡机制，已忠实实现 `UnsupportedFriendlyUnitDamageError` 拒绝）。
   - [ ] 非 Mob0 敌人特殊行为。
   - [ ] 特殊投射物。
   - [ ] Boss 技能边界。
@@ -226,8 +226,12 @@
 | 2026-08-03 | `[完成]` | 完成 P0-01 与阶段 1 剩余生命周期：`GeneralUnit` 增加 `ACTIVE/DEAD/RECYCLED` 状态、幂等 `die/recycle`、武器和技能清理；`GeneralPart` 增加解绑接口；`UnitRegistry.removeUnit()` 支持武将移除，`removeGeneral()` 解除部件归属并防止重复合成。新增 `tests/unit/GeneralLifecycle.test.js`；针对性 15 项逻辑用例全部通过，219 个 `src` JavaScript 文件语法检查通过，未运行 Unity/TEngine 验证。 | P0-01、阶段 1 |
 | 2026-08-03 | `[完成子项]` | 开始阶段 2/P0-04：新增 `AttackScheduler`、`AttackResolver`、`MeleeAttackEffect`、`ProjectileAttackEffect` 和 `AttackEffectManager`；`BattleManager` 接入统一调度/效果更新；枪兵和骑兵不再直接调用攻击效果 `update()`，改由统一管理器负责延迟命中、多目标去重和战斗结束清理。新增 `tests/unit/UnifiedAttackSystem.test.js`；针对性 19 项逻辑用例全部通过，225 个 `src` JavaScript 文件语法检查通过，未运行 Unity/TEngine 验证。原始动画事件精确结算和攻击对象池仍未完成。 | P0-04、阶段 2 |
 | 2026-08-03 | `[完成子项]` | 在正式执行工程补齐攻击效果对象池和刀兵统一生命周期：`AttackEffectManager` 支持通过 `ObjectPool.takeByClass/recoverByClass` 获取/回收效果；枪兵、骑兵改为池化效果；刀兵接入统一管理器但仍使用原始 Laya 定时器精确触发 500ms 命中，避免固定步进造成时序漂移。新增对象池和定时器时序用例；针对性 20 项逻辑用例全部通过，226 个 `src` JavaScript 文件语法检查通过，未运行 Unity/TEngine 验证。 | P0-04、阶段 2 |
+| 2026-08-03 | `[完成子项]` | 依据 `work/bundle.strings-decoded.js:24705-24831` 恢复枪兵/骑兵正式攻击时序：枪兵按播放倍率在 360ms 命中，骑兵两次横扫均延迟 150ms、各使用半攻击力，范围分别为半攻击范围和完整攻击范围；两类单位启动 `attack` 动画，开发表现桩支持 `pike/cavalry`。补充统一攻击系统时序与兵种接入用例，并将旧测试夹具改为注入 `AttackEffectManager`、验证枪兵正式注册。全量 `src` 226 个 JavaScript 文件通过语法检查；`round05` 25 项、`round06` 33 项、统一攻击系统 6 项全部通过，未运行 Unity/TEngine 验证。 | P0-04、阶段 2 |
+| 2026-08-03 | `[完成子项]` | 将 `BowSoldier` 在原始 `STOPPED/650ms` 发射点创建的箭矢改由 `ProjectileAttackEffect` 统一登记和驱动；投射物完成后自动退出效果管理器，弓兵回收时取消未完成投射物；补充弓兵发射、战斗结束、投射物对象池和统一攻击效果用例。全量 `src` 226 个 JavaScript 文件通过语法检查；统一攻击相关 12 项、投射物相关 18 项、`round05` 25 项、`round06` 33 项全部通过，未运行 Unity/TEngine 验证。 | 阶段 2、弓兵攻击生命周期 |
+| 2026-08-03 | `[完成子项]` | 新增 `WeaponAttackLifecycleEffect`，让 `GeneralUnit` 在配置 `AttackEffectManager` 时延迟普通武器命中到管理器更新阶段；武将回收会取消挂起效果；武将弓类由 `GeneralUnit` 将已创建投射物登记为 `ProjectileAttackEffect`，避免重复登记并保持原始投射物生命周期。新增 `GeneralUnifiedAttack.test.js`，武将专项 3 项、统一攻击相关合计 10 项、`round05` 25 项、`round06` 33 项、`test:projectile` 18 项全部通过；`src` 227 个 JavaScript 文件全部通过语法检查；`test:round03` 当前 15 项通过 12 项、失败 3 项，失败集中在既有 BattleScene 首帧/未注册敌人类型/DirectBattle 行为断言；未运行 Unity/TEngine 验证。 | P0-04、阶段 2、武将攻击生命周期 |
+| 2026-08-03 | `[重定义验收/数值修正]` | 修正小兵成长数值还原错误：`UnitConfig` `MAX_SOLDIER_LEVEL` 5→3、`EXPERIENCE_THRESHOLDS` 从误用的武将 `Ip` 表 `[0,10,null,null,null]` 改为 bundle `Dp` 表 `[0,8,23]`（取证 `bundle:11278`/`bundle:40157`），同步 `DeckDefinitions`、`UnitLevelService`、`unity-export/config/units.json` 与生成器 `export-unity-config.js`（`maxLevel` 改用 `MAX_SOLDIER_LEVEL` 常量）；重定义 P1-03 验收，移除伪需求护甲／护盾／完整承受伤害（原始游戏友军无受击契约、不可被击杀，承受方为阿斗 BattleTarget，已忠实实现 `UnsupportedFriendlyUnitDamageError`），武将 die/recycle 生命周期注入拆分至后续 P0 任务。tests/ 无小兵 4-5 级断言，无需调整。全量 227 个 src 文件语法检查通过；`test:friendly-units` 16 项、武将/投射物/弓兵回归合计 14 项、`test:round03` 12/15（3 项失败为既有 BattleScene 首帧/未注册敌人类型/DirectBattle，与本轮无关）全部通过。 | P1-03、小兵成长数值 |
 
 ## 当前阻塞与备注
 
 - 阻塞：暂无。
-- 备注：P0-01、P0-02 和阶段 1 的纯逻辑工作已完成；P0-04/阶段 2 与阶段 3 正在进行，其余任务仍为“未开始”；后续实现、范围调整、验收结果和验证限制变化必须追加到“变更记录”。
+- 备注：P0-01、P0-02 和阶段 1 的纯逻辑工作已完成；P0-04/阶段 2 与阶段 3 正在进行，弓兵投射物及武将普通武器攻击已纳入统一攻击生命周期，下一步是补齐原始动画事件精确结算并进行阶段 2 最终验收；其余任务仍为“未开始”。`test:round03` 当前存在 3 项 BattleScene/DirectBattle 基线失败，未将其误记为本次统一攻击改动已通过；后续实现、范围调整、验收结果和验证限制变化必须追加到“变更记录”。

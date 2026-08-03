@@ -5,6 +5,6 @@ const DeckDefinitions = Object.freeze({
   basePool: BASE_POOL,
   defaultLevel: 1,
   baseUnitCost: 1,
-  maxLevel: 5,
+  maxLevel: 3,
 });
 module.exports = { BASE_POOL, DeckDefinitions };
