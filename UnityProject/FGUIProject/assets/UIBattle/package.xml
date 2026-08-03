@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <packageDescription id="56fffadn">
   <resources>
-    <component id="tdew0" name="BattleStart.xml" path="/" exported="true"/>
+    <component id="tdew0" name="BattleStartPanel.xml" path="/" exported="true"/>
   </resources>
   <publish name="" genCode="true"/>
 </packageDescription>
