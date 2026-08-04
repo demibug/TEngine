@@ -39,6 +39,20 @@ class MeleeAttackEffect {
     return this;
   }
 
+  /**
+   * 动画事件校准钩子（可选，默认 no-op）。
+   * 用途：正式 Spine/Tween 接入后，动画命中事件（如枪兵 Tween 链第三段 onStart）到达时调用，
+   * 允许子类重置 hitAtMs/elapsed 关系以校准剩余命中时机——固定常量在 playbackRate 变速时与真实动画段时长偏移，
+   * 校准钩子让正式动画事件修正偏移。命中结算 MUST 仍由 update()→hit() 规则路径触发，钩子不直接调 hit()。
+   * 基类默认 no-op：不改变现有常量基线行为（hitAtMs/elapsed 不变），仅提供钩子供子类覆盖（如 PikeAttackEffect）。
+   * @param {number} _animationEventMs 动画事件到达时机（ms，相对效果启动）；基类忽略此参数（no-op）。
+   * @returns {boolean} 是否已校准（基类恒返回 false，表示未校准，保持常量基线）。
+   */
+  calibrateHitTiming(_animationEventMs) {
+    // 基类默认 no-op：不重置 hitAtMs/elapsed，保持 launch() 设定的常量基线行为。
+    return false;
+  }
+
   update(deltaMs) {
     if (!this.active) return false;
     this.elapsed += Math.max(0, Number(deltaMs) || 0);

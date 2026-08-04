@@ -1,8 +1,15 @@
 'use strict';
 
 /**
- * DEVELOPMENT_ONLY：在缺失正式 Spine/prefab 时推进非循环动画片段。
- * 正式 BowSoldier 仍只依赖 Laya.Event.STOPPED，不依赖本驱动器类型。
+ * DEVELOPMENT_ONLY：无 Spine/无 Laya 动画运行时回退桩，推进非循环动画片段。
+ *
+ * 回退桩说明：正式环境的 `BowSoldier` 发射点由 `Laya.Event.STOPPED` 正式动画事件驱动
+ * （`_onAttackAnimationStopped`→`launchArrow`）；本驱动器仅在无 Spine/无 Laya 动画运行时
+ * 按时长模拟 STOPPED——`update()` 累加 `elapsedMs >= durationMs` 后调
+ * `animation.event(this.stoppedEvent)`。正式 STOPPED 由动画运行时驱动，dev 桩为回退，
+ * 两者经 `BowSoldier` 同一 `_onAttackAnimationStopped` 入口触发 `launchArrow`，规则层
+ * （`launchArrow`→`ProjectileAttackEffect` 登记/更新/回收）只依赖 STOPPED 到达信号，
+ * 不依赖动画帧本身（对齐 CODEX_HANDOFF 行 440「不让表现动画成为规则唯一触发来源」）。
  */
 class DevelopmentAnimationDriver {
   constructor({ gameLoop, stoppedEvent = 'stopped', logger = console } = {}) {
@@ -72,6 +79,9 @@ class DevelopmentAnimationDriver {
         ownerId: record.owner.id,
         elapsedMs: record.elapsedMs,
       });
+      // 回退桩模拟 STOPPED：`elapsedMs >= durationMs` 后触发 `animation.event(this.stoppedEvent)`，
+      // 模拟正式 Laya/Spine 动画运行时的 STOPPED 事件。该信号经 `BowSoldier._onAttackAnimationStopped`
+      // 统一入口驱动 `launchArrow`，规则层只依赖 STOPPED 到达信号，不依赖动画帧本身。
       animation.event(this.stoppedEvent);
     }
   }

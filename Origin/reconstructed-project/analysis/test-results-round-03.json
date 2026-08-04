@@ -1,0 +1,50 @@
+{
+  "round": 3,
+  "name": "BOOT-TO-BATTLE",
+  "status": "PASS",
+  "firstRun": {
+    "staticStatus": 0,
+    "testStatus": 0,
+    "counts": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "secondRun": {
+    "staticStatus": 0,
+    "testStatus": 0,
+    "counts": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "determinism": {
+    "staticReportHashFirst": "6cb6961d7719d0043c9ae8079aaf741f19184185e425549716a2e403d778dfba",
+    "staticReportHashSecond": "6cb6961d7719d0043c9ae8079aaf741f19184185e425549716a2e403d778dfba",
+    "staticReportIdentical": true,
+    "sourceTreeHashBefore": "7ab76bd24be03be3b7324b894ddd561d5469947ab8fa5dc449b404b3ce6ae650",
+    "sourceTreeHashAfter": "7ab76bd24be03be3b7324b894ddd561d5469947ab8fa5dc449b404b3ce6ae650",
+    "testsDidNotModifySource": true
+  },
+  "immutableHashes": {
+    "originalBundle": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+    "decodedBundle": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+    "originalIndex": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+  },
+  "realNetworkRequests": 0,
+  "nativePlatformCalls": 0,
+  "testFiles": [
+    "tests/unit/BootToBattleCore.test.js",
+    "tests/unit/AnimationEntityPool.test.js",
+    "tests/behavior/BootToMainScene.test.js",
+    "tests/behavior/MainToMatchScene.test.js",
+    "tests/behavior/MatchToBattleScene.test.js",
+    "tests/behavior/DirectBattleDevelopmentMode.test.js",
+    "tests/behavior/BattleFirstFrame.test.js",
+    "tests/behavior/BattleCleanup.test.js"
+  ]
+}

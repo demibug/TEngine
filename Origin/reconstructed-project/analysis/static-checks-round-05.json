@@ -1,0 +1,392 @@
+{
+  "round": 5,
+  "name": "FRIENDLY-UNIT-COMBAT-01",
+  "status": "FAIL",
+  "checksPassed": 68,
+  "checksFailed": 6,
+  "sourceFilesChecked": 408,
+  "checks": [
+    {
+      "name": "immutable-hash:original/bundle.js",
+      "pass": true,
+      "details": {
+        "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+        "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+      }
+    },
+    {
+      "name": "immutable-hash:work/bundle.strings-decoded.js",
+      "pass": true,
+      "details": {
+        "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+        "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+      }
+    },
+    {
+      "name": "immutable-hash:original/index.js",
+      "pass": true,
+      "details": {
+        "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+        "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+      }
+    },
+    {
+      "name": "immutable-hash:src/network/HttpClient.js",
+      "pass": true,
+      "details": {
+        "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+        "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+      }
+    },
+    {
+      "name": "required-file:src/core/GameObjectEventProxy.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/units/UnitConfig.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/units/UnitDragBase.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/units/UnitBase.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/units/SoldierBase.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/units/KnifeSoldier.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/units/UnitFactory.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/units/UnitRegistry.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/units/index.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/combat/KnifeAttackTimeline.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/dev/DevelopmentUnitSpawner.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/dev/DevelopmentUnitServices.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/mocks/createFriendlyUnitCombatHarness.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tools/run-friendly-unit-simulation.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tools/run-friendly-unit.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tools/run-micro-battle.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/MicroBattleCli.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/friendly-unit-classgraph.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/friendly-unit-classgraph.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/friendly-unit-dependency-closure.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/first-friendly-unit-selection.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/first-friendly-unit-stats.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/friendly-unit-lifecycle.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/friendly-unit-pool-reset-contract.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/friendly-target-selection.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/unit-registry.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/FRIENDLY-UNIT-COMBAT-01.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/mappings/FRIENDLY-UNIT-COMBAT-01-symbol-map.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/modules/FRIENDLY-UNIT-COMBAT-01.json",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/modules/FRIENDLY-UNIT-COMBAT-01-method-coverage.json",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior-diff-round-05.md",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/round-05-report.md",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "javascript-syntax",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "local-require-resolution",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "src-commonjs-require-cycles",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "round05-no-direct-wx-tt-call",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "round05-no-real-http-url",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "round05-no-proxy-fallback",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "round05-no-empty-todo-body",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "package-script:test:friendly-unit",
+      "pass": true,
+      "details": "npm run test:round05"
+    },
+    {
+      "name": "package-script:dev:friendly-unit",
+      "pass": true,
+      "details": "node tools/run-friendly-unit.js"
+    },
+    {
+      "name": "package-script:dev:micro-battle",
+      "pass": true,
+      "details": "node tools/run-micro-battle.js"
+    },
+    {
+      "name": "package-script:verify:round05",
+      "pass": true,
+      "details": "node tools/verify-round05.js"
+    },
+    {
+      "name": "package-script:verify:all",
+      "pass": true,
+      "details": "node tools/verify-all.js"
+    },
+    {
+      "name": "micro-battle-output:firstTargetDetectedAt",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "micro-battle-output:firstAttackStateAt",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "micro-battle-output:firstDamageSettledAt",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "micro-battle-output:retargetedAt",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "micro-battle-output:spatialEnemyRecordCount",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "micro-battle-output:friendlyCleanup",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "source-alias-ri-equals-rb",
+      "pass": true,
+      "details": "ri = rb"
+    },
+    {
+      "name": "source-rc-extends-ri",
+      "pass": true,
+      "details": "class extends ri"
+    },
+    {
+      "name": "source-td-extends-rc",
+      "pass": true,
+      "details": "class extends rc"
+    },
+    {
+      "name": "source-rb-extends-qE",
+      "pass": true,
+      "details": "class b extends qE"
+    },
+    {
+      "name": "source-knife-key",
+      "pass": true,
+      "details": "this[\"Q_\"] = \"knife\""
+    },
+    {
+      "name": "source-knife-effect-name",
+      "pass": true,
+      "details": "[\"tS\"]: \"knifeSoliderAttack\""
+    },
+    {
+      "name": "source-knife-audio",
+      "pass": true,
+      "details": "playSound\"](\"knife_attack\")"
+    },
+    {
+      "name": "source-config-knife-range",
+      "pass": true,
+      "details": "[\"wp\"]: 1.5"
+    },
+    {
+      "name": "source-config-knife-damage",
+      "pass": true,
+      "details": "[\"_p\"]: 3"
+    },
+    {
+      "name": "source-config-knife-interval",
+      "pass": true,
+      "details": "[\"kp\"]: .8"
+    },
+    {
+      "name": "source-factory-index-lookup",
+      "pass": true,
+      "details": "tb[\"zx\"][i]"
+    },
+    {
+      "name": "source-battle-manager-unit-attack",
+      "pass": true,
+      "details": "a[\"attack\"]()"
+    },
+    {
+      "name": "reconstructed-knife-values",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "reconstructed-knife-fixed-target-query",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "reconstructed-knife-delay",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "reconstructed-factory-registration",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "reconstructed-registry-map-order",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "friendly-health-not-invented",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "method-coverage-unresolved-zero",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "method-coverage-has-classification",
+      "pass": false,
+      "details": null
+    }
+  ]
+}

@@ -1,0 +1,294 @@
+{
+  "round": 3,
+  "name": "BOOT-TO-BATTLE",
+  "status": "PASS",
+  "checksPassed": 52,
+  "checksFailed": 0,
+  "sourceFilesChecked": 408,
+  "checks": [
+    {
+      "name": "immutable-hash:original/bundle.js",
+      "pass": true,
+      "details": {
+        "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+        "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+      }
+    },
+    {
+      "name": "immutable-hash:work/bundle.strings-decoded.js",
+      "pass": true,
+      "details": {
+        "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+        "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+      }
+    },
+    {
+      "name": "immutable-hash:original/index.js",
+      "pass": true,
+      "details": {
+        "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+        "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+      }
+    },
+    {
+      "name": "required-file:src/bootstrap/GameBootstrap.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/bootstrap/DevelopmentBootstrap.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/core/GameLoop.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/core/SceneManager.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/core/AnimationEntityPool.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/data/PlayerDataCore.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/data/BattleDataCore.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/data/CriticalGameState.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/platform/PlatformAdapter.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/platform/dev/DevelopmentPlatform.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/network/dev/DevelopmentNetworkData.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/scenes/LoadSceneController.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/scenes/MainSceneController.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/scenes/MatchSceneController.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/scenes/BattleSceneController.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/BattleState.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/BattleFlowCoordinator.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/BattleManager.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/EnemyManager.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/EnemyFactory.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/UnitRegistry.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/entities/BattleTarget.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/entities/Mob0Enemy.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/boot-to-battle-callgraph.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/boot-to-battle-callgraph.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/boot-to-battle-symbols.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/minimum-player-state.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/battle-entry-definition.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/deferred-modules.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/BootToMainScene.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/MainToMatchScene.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/MatchToBattleScene.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/DirectBattleDevelopmentMode.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/BattleFirstFrame.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/BattleCleanup.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "javascript-syntax",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "local-require-resolution",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "development-mode-no-wx-tt-call",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "development-network-no-http-url",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "critical-scene-uuid-coverage",
+      "pass": true,
+      "details": {
+        "requiredUuids": [
+          "nFCDlT3GRD-9N62vwVVE4Q",
+          "dKvUsPTsTBGGfiZxHMSqtg",
+          "dxhrI-d-T2icEkklUGt-kQ",
+          "a1VsRozfQfKce35jblVR3w"
+        ],
+        "found": [
+          "a1VsRozfQfKce35jblVR3w",
+          "dKvUsPTsTBGGfiZxHMSqtg",
+          "dxhrI-d-T2icEkklUGt-kQ",
+          "nFCDlT3GRD-9N62vwVVE4Q"
+        ]
+      }
+    },
+    {
+      "name": "wave-count-table",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "boss-round-table",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "battle-timing-constants",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "battle-manager-loop-registration",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "adou-created-twice",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "battle-scene-loop-registration",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "package-scripts",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "callgraph-node-count",
+      "pass": true,
+      "details": {
+        "count": 26
+      }
+    },
+    {
+      "name": "callgraph-required-boundary",
+      "pass": true,
+      "details": null
+    }
+  ]
+}

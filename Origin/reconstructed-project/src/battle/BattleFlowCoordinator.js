@@ -141,6 +141,14 @@ class BattleFlowCoordinator extends SingletonBase {
     if (this.mapTileManager && typeof this.mapTileManager.gameOver === 'function') this.mapTileManager.gameOver();
     if (this.deadEntityRegistry && typeof this.deadEntityRegistry.clear === 'function') this.deadEntityRegistry.clear();
     this.gameData.gameOver(isWin);
+    // 难度升降级（bundle:10544-10568）：胜 isWin=true → Tu(1) 升级、败 isWin=false → Tu(-1) 降级，
+    // 经 rankTableResolver 跨档计算后钳制 0-3 回写 au.aiDifficulty。
+    // 必须在 gameData.gameOver 之后调用：gameData.gameOver → CriticalGameState.gameOver →
+    // BattleState.gameOver 会重置 aiDifficulty=0（src/battle/BattleState.js），若先调 Tu 会被该重置覆盖，
+    // 导致 Tu 升降级结果跨局持久化失效。
+    if (this.aiController && typeof this.aiController.Tu === 'function') {
+      this.aiController.Tu(isWin ? 1 : -1);
+    }
     this.network.reportGameEnd(isWin, { fail: error => this.logger.warn('[Server] end game report failed', error) });
   }
 

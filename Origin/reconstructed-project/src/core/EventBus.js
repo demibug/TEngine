@@ -84,6 +84,10 @@ const GameEvents = Object.freeze({
   // 灵魂投射到达事件（bundle 符号 sS["ut"]，字符串键 "ut"）。
   // 参数：(isPlayerLane, enemyX, enemyY, currentPathIndex)。消费者（召唤方）属提案 ②③，DEFERRED 接入。
   ENEMY_SOUL_DELIVERED: 'ut',
+  // 傀儡路径同步事件（bundle 符号 sS["yt"]，字符串键 "yt"，bundle:31805/32291）。
+  // 由被操控士兵/主控方死亡流程经 oc.event("yt", this["Lm"]) 发出，携带 pathIndex；
+  // Puppet 订阅此事件经 nB(pathIndex) 更新 currentPathIndex（同步到被操控士兵真实路径）。
+  PUPPET_PATH_SYNC: 'yt',
   SKILL_EFFECT_REQUESTED: 'skill:effect:requested',
   BOSS_SPAWNED: 'boss:spawned',
   BOSS_REMOVED: 'boss:removed',

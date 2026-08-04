@@ -1,0 +1,50 @@
+{
+  "status": "COMPLETE_FOR_CORE_RUNTIME",
+  "source": "bundle:11969 (nu 类 constructor, eh/ah/nh 三组同数组, 各 108 元素)",
+  "sourceGroup": "bundle:11963 (nu = function 定义) -> 11969 (eh/ah/nh 字面量数组初始化)",
+  "totalElements": 108,
+  "source_totalElements": "bundle:11969 (eh.length===ah.length===nh.length===108, 实测三组逐元素一致)",
+  "threeGroupsIdentical": true,
+  "source_threeGroupsIdentical": "bundle:11969 this[\"eh\"]/this[\"ah\"]/this[\"nh\"] 三组数组逐元素完全相同 (实测逐字比对)",
+  "categories": {
+    "baseUnits": {
+      "subtotal": 86,
+      "source_subtotal": "bundle:11969 (刀21+弓19+枪18+骑17+铲11=86, 实测计数)",
+      "elements": [
+        { "text": "刀", "count": 21, "category": "baseUnit", "source": "bundle:11969 (eh/ah/nh, 刀 出现 21 次)" },
+        { "text": "弓", "count": 19, "category": "baseUnit", "source": "bundle:11969 (eh/ah/nh, 弓 出现 19 次)" },
+        { "text": "枪", "count": 18, "category": "baseUnit", "source": "bundle:11969 (eh/ah/nh, 枪 出现 18 次)" },
+        { "text": "骑", "count": 17, "category": "baseUnit", "source": "bundle:11969 (eh/ah/nh, 骑 出现 17 次)" },
+        { "text": "铲", "count": 11, "category": "baseUnit", "source": "bundle:11969 (eh/ah/nh, 铲 出现 11 次)" }
+      ]
+    },
+    "generalChars": {
+      "subtotal": 22,
+      "source_subtotal": "bundle:11969 (武将字共 22 项: 刘1+赵2+云1+关1+羽1+平1+兴1+马2+超1+张2+飞1+苞1+翼1+黄2+忠1+盖1+祖1+备1=22, 实测计数)",
+      "elements": [
+        { "text": "刘", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 刘 1 次)" },
+        { "text": "赵", "count": 2, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 赵 2 次)" },
+        { "text": "云", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 云 1 次)" },
+        { "text": "关", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 关 1 次)" },
+        { "text": "羽", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 羽 1 次)" },
+        { "text": "平", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 平 1 次)" },
+        { "text": "兴", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 兴 1 次)" },
+        { "text": "马", "count": 2, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 马 2 次)" },
+        { "text": "超", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 超 1 次)" },
+        { "text": "张", "count": 2, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 张 2 次)" },
+        { "text": "飞", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 飞 1 次)" },
+        { "text": "苞", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 苞 1 次)" },
+        { "text": "翼", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 翼 1 次)" },
+        { "text": "黄", "count": 2, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 黄 2 次)" },
+        { "text": "忠", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 忠 1 次)" },
+        { "text": "盖", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 盖 1 次)" },
+        { "text": "祖", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 以变量 eF 出现 1 次; eF=\"祖\" 取证 bundle:3304 \"eF = \\\"祖\\\"\")" },
+        { "text": "备", "count": 1, "category": "generalChar", "source": "bundle:11969 (eh/ah/nh, 备 1 次)" }
+      ]
+    }
+  },
+  "_forensicNote": "取证来源: work/bundle.strings-decoded.js 第 11969 行 (nu 类 constructor, this[\"eh\"]/this[\"ah\"]/this[\"nh\"] 三组数组, 1-indexed)。三组数组逐元素完全相同, 各 108 元素, 实测逐字比对一致。baseUnits subtotal=86 (刀21+弓19+枪18+骑17+铲11), generalChars subtotal=22 (刘1+赵2+云1+关1+羽1+平1+兴1+马2+超1+张2+飞1+苞1+翼1+黄2+忠1+盖1+祖1+备1), 总和 86+22=108。武将字清单含 18 个去重字符 (刘/赵/云/关/羽/平/兴/马/超/张/飞/苞/翼/黄/忠/盖/祖/备), 重复项为 赵/马/张/黄 各 2, 故 22 项。其中 祖 在 bundle:11969 以混淆变量 eF 形式出现 (非字面量), eF 值经 bundle:3304 \"eF = \\\"祖\\\"\" 取证确认。"
+
+  ,
+  "_deviationFromDesign": "与 proposal/design/spec/tasks 文档分布存在差异, 以 bundle 实测为准: 文档标注 枪×19/骑×18 (baseUnits 88) + 武将字约 17 项 (未明确计数), 实测 bundle:11969 为 枪×18/骑×17 (baseUnits 86) + 武将字 22 项 (含重复), 总和均为 108。差异点: (1) 枪 19→18, (2) 骑 18→17, (3) 武将字文档表述为'约17项'但 design 实际枚举列表 (刘/赵×2/云/关/羽/平/兴/马×2/超/张×2/飞/苞/翼/黄×2/忠/盖/祖/备) 经点数为 22 项, 与 bundle 实测 22 项一致。本配置按 bundle:11969 实测数值填写 (经任务指令'若 bundle 实际计数与文档不符, 以 bundle 为准'确认)。运行时变异 (dP 武将字复制 bundle:46546-46574 / xO 铲注入 bundle:46529-46545) 由 DeckManager 逻辑承载, 本配置仅固化初始牌池, 不固化运行时状态。"
+}

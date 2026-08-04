@@ -60,11 +60,11 @@ const sourceHashBefore = treeHash(['src', 'tests']);
 const staticFirst = run(process.execPath, ['tools/check-round03.js']);
 const staticReportFirst = fs.existsSync(path.join(ROOT, 'analysis/static-checks-round-03.json'))
   ? sha256(path.join(ROOT, 'analysis/static-checks-round-03.json')) : null;
-const testsFirst = run(process.execPath, ['--test', ...TEST_FILES]);
+const testsFirst = run(process.execPath, ['--test', '--test-reporter=tap', ...TEST_FILES]);
 const staticSecond = run(process.execPath, ['tools/check-round03.js']);
 const staticReportSecond = fs.existsSync(path.join(ROOT, 'analysis/static-checks-round-03.json'))
   ? sha256(path.join(ROOT, 'analysis/static-checks-round-03.json')) : null;
-const testsSecond = run(process.execPath, ['--test', ...TEST_FILES]);
+const testsSecond = run(process.execPath, ['--test', '--test-reporter=tap', ...TEST_FILES]);
 const sourceHashAfter = treeHash(['src', 'tests']);
 
 const firstCounts = parseTap(testsFirst.output);

@@ -16,6 +16,8 @@
   "ENEMY_KILLED_BY": "ht",
   "ENEMY_APPROACH_WARNING": "kt",
   "ENEMY_FINAL_WARNING": "wt",
+  "ENEMY_SOUL_DELIVERED": "ut",
+  "PUPPET_PATH_SYNC": "yt",
   "SKILL_EFFECT_REQUESTED": "skill:effect:requested",
   "BOSS_SPAWNED": "boss:spawned",
   "BOSS_REMOVED": "boss:removed",

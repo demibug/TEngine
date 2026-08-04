@@ -1,0 +1,186 @@
+{
+  "round": 4,
+  "name": "ENEMY-RUNTIME-01",
+  "status": "FAIL",
+  "round04": {
+    "firstRun": {
+      "commandStatus": 0,
+      "counts": {
+        "tests": 24,
+        "suites": 0,
+        "pass": 24,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    "secondRun": {
+      "commandStatus": 0,
+      "counts": {
+        "tests": 24,
+        "suites": 0,
+        "pass": 24,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    "testFiles": [
+      "tests/unit/MapPath.test.js",
+      "tests/unit/EnemyMovement.test.js",
+      "tests/unit/EnemySpatialIndex.test.js",
+      "tests/unit/EnemyTargetSelection.test.js",
+      "tests/unit/EnemyAttack.test.js",
+      "tests/unit/EnemyDamage.test.js",
+      "tests/unit/EnemyDeath.test.js",
+      "tests/unit/EnemyPoolReset.test.js",
+      "tests/behavior/Mob0PathToTarget.test.js",
+      "tests/behavior/Mob0AttackBattleTarget.test.js",
+      "tests/behavior/Mob0KilledBeforeArrival.test.js",
+      "tests/behavior/Mob0PairBattle.test.js",
+      "tests/behavior/BattleTargetDestroyed.test.js",
+      "tests/behavior/EnemyCleanupAfterBattle.test.js",
+      "tests/behavior/ReusedMob0HasCleanState.test.js"
+    ]
+  },
+  "staticChecks": {
+    "firstRunStatus": 1,
+    "secondRunStatus": 1,
+    "checksPassed": 69,
+    "checksFailed": 9,
+    "sourceFilesChecked": 408,
+    "reportHashFirst": "3f72e99a15c19cdacdf511e2e5d2c8b5f62c94c6183dc543c62e6e746254ec6e",
+    "reportHashSecond": "3f72e99a15c19cdacdf511e2e5d2c8b5f62c94c6183dc543c62e6e746254ec6e",
+    "deterministic": true
+  },
+  "mob0Simulation": {
+    "firstRun": {
+      "parseError": null,
+      "mode": "DEVELOPMENT_ENEMY_RUNTIME_SIMULATION",
+      "elapsedMs": 29360,
+      "completed": true,
+      "pathTransitionCount": 32,
+      "playerHealth": 2,
+      "opponentHealth": 2,
+      "mob0ClassPool": 2,
+      "mobVisualPool": 2,
+      "networkRequests": 0,
+      "nativePlatformCalls": 0
+    },
+    "secondRun": {
+      "parseError": null,
+      "mode": "DEVELOPMENT_ENEMY_RUNTIME_SIMULATION",
+      "elapsedMs": 29360,
+      "completed": true,
+      "pathTransitionCount": 32,
+      "playerHealth": 2,
+      "opponentHealth": 2,
+      "mob0ClassPool": 2,
+      "mobVisualPool": 2,
+      "networkRequests": 0,
+      "nativePlatformCalls": 0
+    },
+    "deterministic": true
+  },
+  "regressions": {
+    "round03": {
+      "commandStatus": 0,
+      "counts": {
+        "tests": 15,
+        "suites": 0,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "testFiles": [
+        "tests/unit/BootToBattleCore.test.js",
+        "tests/unit/AnimationEntityPool.test.js",
+        "tests/behavior/BootToMainScene.test.js",
+        "tests/behavior/MainToMatchScene.test.js",
+        "tests/behavior/MatchToBattleScene.test.js",
+        "tests/behavior/DirectBattleDevelopmentMode.test.js",
+        "tests/behavior/BattleFirstFrame.test.js",
+        "tests/behavior/BattleCleanup.test.js"
+      ]
+    },
+    "net01": {
+      "commandStatus": 0,
+      "counts": {
+        "tests": 32,
+        "suites": 0,
+        "pass": 32,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "testFiles": [
+        "tests/unit/HttpClient.test.js",
+        "tests/behavior/NET-01.behavior.test.js"
+      ]
+    }
+  },
+  "determinism": {
+    "sourceTreeHashBefore": "a9cb60f08f1dca0996b51f24748ed84a4bdde474b07e4614d5d91dbbb56b964c",
+    "sourceTreeHashAfter": "a9cb60f08f1dca0996b51f24748ed84a4bdde474b07e4614d5d91dbbb56b964c",
+    "sourceTestsToolsUnchanged": true
+  },
+  "immutableHashesBefore": {
+    "originalBundle": {
+      "file": "original/bundle.js",
+      "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "unchanged": true
+    },
+    "decodedBundle": {
+      "file": "work/bundle.strings-decoded.js",
+      "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "unchanged": true
+    },
+    "originalIndex": {
+      "file": "original/index.js",
+      "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "unchanged": true
+    },
+    "httpClient": {
+      "file": "src/network/HttpClient.js",
+      "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+      "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+      "unchanged": true
+    }
+  },
+  "immutableHashesAfter": {
+    "originalBundle": {
+      "file": "original/bundle.js",
+      "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "unchanged": true
+    },
+    "decodedBundle": {
+      "file": "work/bundle.strings-decoded.js",
+      "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "unchanged": true
+    },
+    "originalIndex": {
+      "file": "original/index.js",
+      "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "unchanged": true
+    },
+    "httpClient": {
+      "file": "src/network/HttpClient.js",
+      "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+      "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+      "unchanged": true
+    }
+  },
+  "realNetworkRequests": 0,
+  "nativePlatformCalls": 0
+}

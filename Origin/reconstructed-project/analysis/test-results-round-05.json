@@ -1,0 +1,114 @@
+{
+  "round": 5,
+  "name": "FRIENDLY-UNIT-COMBAT-01",
+  "status": "FAIL",
+  "tests": {
+    "round05First": {
+      "tests": 25,
+      "pass": 25,
+      "fail": 0,
+      "skipped": 0
+    },
+    "round05Second": {
+      "tests": 25,
+      "pass": 25,
+      "fail": 0,
+      "skipped": 0
+    },
+    "round03": {
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0
+    },
+    "round04": {
+      "tests": 24,
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0
+    },
+    "net01": {
+      "tests": 32,
+      "pass": 32,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "staticChecks": {
+    "firstStatus": 1,
+    "secondStatus": 1,
+    "deterministic": true,
+    "hash": "e01a53966d16ce793e093e8d1b2008b6648be982a9e3e08f0278374e005bb276"
+  },
+  "simulation": {
+    "first": {
+      "completed": true,
+      "elapsedMs": 4080,
+      "type": "刀",
+      "damage": 3,
+      "range": 120,
+      "interval": 0.8,
+      "attacks": 4,
+      "settled": 4,
+      "rewards": 2,
+      "logicPool": 2,
+      "visualPool": 2,
+      "networkRequests": 0,
+      "nativePlatformCalls": 0
+    },
+    "second": {
+      "completed": true,
+      "elapsedMs": 4080,
+      "type": "刀",
+      "damage": 3,
+      "range": 120,
+      "interval": 0.8,
+      "attacks": 4,
+      "settled": 4,
+      "rewards": 2,
+      "logicPool": 2,
+      "visualPool": 2,
+      "networkRequests": 0,
+      "nativePlatformCalls": 0
+    },
+    "deterministic": true
+  },
+  "immutableHashesBefore": {
+    "original/bundle.js": {
+      "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+    },
+    "work/bundle.strings-decoded.js": {
+      "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+    },
+    "original/index.js": {
+      "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+    },
+    "src/network/HttpClient.js": {
+      "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+      "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+    }
+  },
+  "immutableHashesAfter": {
+    "original/bundle.js": {
+      "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+      "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+    },
+    "work/bundle.strings-decoded.js": {
+      "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+      "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+    },
+    "original/index.js": {
+      "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+      "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+    },
+    "src/network/HttpClient.js": {
+      "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+      "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+    }
+  },
+  "realNetworkRequests": 0,
+  "nativePlatformCalls": 0
+}

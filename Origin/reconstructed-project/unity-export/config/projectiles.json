@@ -5,23 +5,7 @@
     "FireArrow",
     "HuoFengHuang",
     "LightningChain",
-    "ShenBiArrow",
-    "PikeSnakeBullet",
-    "SimpleHitAreaBullet",
-    "KnifeBullet",
-    "PikeBullet",
-    "StaticFireBall",
-    "VirtualBullet",
-    "SwordBullet",
-    "StarBullet",
-    "FireDragonArrow",
-    "GroundSpikeBullet",
-    "FireExplosiveArrow",
-    "DaoQiBullet",
-    "AttachCustomShapeBullet",
-    "SimpleHitBullet",
-    "LiHuaBullet",
-    "LightningArrow",
-    "FlyPike"
+    "ShenBiPunch",
+    "PikeSnakeBullet"
   ]
 }

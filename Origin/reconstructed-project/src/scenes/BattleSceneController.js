@@ -33,7 +33,9 @@ class BattleSceneController extends SceneControllerBase {
     this.requireNode('end1');
     this.requireNode('end2');
     this._ensurePresentationLayers();
+    this._ensureMapVisualNodes();
 
+    this._createMapRenderer(); // 原 onOpened 的 $q/Vq/Qq/Zq/Kq 调用链
     this._createBattleTargets(); // 原 Gq
 
     if (this.shovelAd) this.shovelAd.on(laya.Event.CLICK, this, this.onShovelClick);
@@ -63,6 +65,50 @@ class BattleSceneController extends SceneControllerBase {
   }
 
   getPresentationLayers() { return { battleWorldLayer:this.battleWorldLayer, skillVfxLayer:this.skillVfxLayer, weatherLayer:this.weatherLayer, overlayLayer:this.overlayLayer, uiLayer:this.uiLayer }; }
+
+  /**
+   * 确保地图视觉节点存在（bundle BattleScene.ls 的 map 子节点树）。
+   * 真实 .ls 反序列化会提供全部节点；dev 桩或部分绑定时用 Sprite/Image 补建，
+   * 与 _ensurePresentationLayers 同模式。节点缺失不阻塞规则层。
+   */
+  _ensureMapVisualNodes() {
+    const laya = this.requireDependency('laya');
+    const map = this.requireNode('map');
+    const ensure = (name, parent, ctor) => {
+      let node = this[name] || (parent && parent.getChildByName && parent.getChildByName(name));
+      if (!node) { node = ctor ? new laya[ctor]() : new laya.Sprite(); node.name = name; if (parent) parent.addChild(node); }
+      this[name] = node; return node;
+    };
+    // map 子节点树（bundle SceneCatalog BattleScene:202-307）
+    this.road = ensure('road', map);
+    this.highGround = ensure('highGround', map);
+    this.bound = ensure('bound', map);
+    this.divide = ensure('divide', map, 'Image');
+    // bg/mapBgImg/mapBgImgNew/mapTitle 在 box 下（bundle:57828-57833）
+    const box = this.box || this;
+    this.bg = this.bg || ensure('bg', box, 'Image');
+    this.mapBgImg = ensure('mapBgImg', box, 'Image');
+    this.mapBgImgNew = ensure('mapBgImgNew', box, 'Image');
+    this.mapTitle = ensure('mapTitle', box, 'Image');
+    this.pathTip0 = ensure('pathTip0', box);
+    this.pathTip1 = ensure('pathTip1', box);
+  }
+
+  /**
+   * 构建地图视觉渲染器（bundle r5 的 $q/Vq/Qq/Zq/Kq 调用链落地）。
+   * 延迟初始化 LayaMapRenderer，绑定节点；onOpened 时调 render()。
+   */
+  _createMapRenderer() {
+    const laya = this.requireDependency('laya');
+    const { LayaMapRenderer } = require('../presentation/LayaMapRenderer');
+    this.mapRenderer = new LayaMapRenderer({ Laya: laya });
+    this.mapRenderer.bindNodes({
+      map: this.requireNode('map'),
+      road: this.road, highGround: this.highGround, bound: this.bound, divide: this.divide,
+      bg: this.bg, mapBgImg: this.mapBgImg, mapBgImgNew: this.mapBgImgNew, mapTitle: this.mapTitle,
+      pathTip0: this.pathTip0, pathTip1: this.pathTip1,
+    });
+  }
 
   /**
    * 原始方法符号：Gq
@@ -142,6 +188,9 @@ class BattleSceneController extends SceneControllerBase {
     this.end1.visible = true;
     this.end2.visible = true;
 
+    // 地图视觉生成（bundle onOpened $q→Vq→Qq→Zq→Kq，bundle:58526）
+    if (this.mapRenderer) this.mapRenderer.render(gameData.map, { end1: this.end1, end2: this.end2 });
+
     if (this.deps.audio) {
       this.deps.audio.playMusic(
         this.mapIndex === 1 || this.mapIndex === 3 ? 'bg_battleScene_3' : 'bg_battleScene_0',
@@ -182,6 +231,7 @@ class BattleSceneController extends SceneControllerBase {
     if (this.deps.placementReservations) this.deps.placementReservations.clear();
     if (this.deps.skillPresentation) this.deps.skillPresentation.gameOver();
     if (this.deps.mapTileManager) this.deps.mapTileManager.gameOver();
+    if (this.mapRenderer) this.mapRenderer.gameOver();
     this.deps.gameLoop.unregister('BattleScene');
     this.deps.laya.timer.clearAll(this);
     if (this.deps.matchPreparation) this.deps.matchPreparation.markBattleStarted(false);

@@ -8,7 +8,7 @@ const {GENERAL_DEFINITIONS}=require('../src/generals/GeneralDefinitions');
 const {BOSS_DEFINITIONS}=require('../src/bosses/BossDefinitions');
 const {BuffDefinitions}=require('../src/buffs/BuffDefinitions');
 const {SKILL_DEFINITIONS}=require('../src/skills/SkillDefinitions');
-const {EnemyDataCore,MapDataCore}=require('../src/data/BattleDataCore');
+const {EnemyDataCore,MapDataCore,MAP_BLOCKS}=require('../src/data/BattleDataCore');
 const {DeckDefinitions}=require('../src/deck/DeckDefinitions');
 const {GameEvents}=require('../src/core/EventBus');
 const readCatalog=name=>{const p=path.join(root,'analysis/catalogs',name);return fs.existsSync(p)?JSON.parse(fs.readFileSync(p,'utf8')):null;};
@@ -22,7 +22,22 @@ write('projectiles.json',readCatalog('projectile-registry.json'));
 write('buffs.json',{status:'CORE_COMPLETE',buffs:Array.from(BuffDefinitions.values())});
 write('skills.json',{status:'CORE_COMPLETE_NO_PRESENTATION',skills:SKILL_DEFINITIONS});
 const enemy=new EnemyDataCore();write('waves.json',{waveUnitCounts:enemy.waveUnitCounts,bossWaveNumbers:enemy.bossWaveNumbers,bossSpawnChances:enemy.bossSpawnChances,spawnStrategyWeights:enemy.spawnStrategyWeights,spawnStrategies:enemy.spawnStrategies});
-const map=new MapDataCore();map.initialize(0);write('maps.json',{gridWidth:map.gridWidth,gridHeight:map.gridHeight,width:map.width,height:map.height,mapIndex:map.mapIndex,blocks:map.blocks||null,playerPath:map.pathForSide(true),opponentPath:map.pathForSide(false)});
+// 地图格网在静态 MAP_BLOCKS 中（MapData 实例只持有当前 mapIndex 的浅克隆，无 blocks 属性），
+// 因此遍历全集导出 4 张地图，每张含格网编码 + 入口/起点/终点 + routeMarkers + 双方路径。
+const map=new MapDataCore();map.initialize(0);
+const blocks=MAP_BLOCKS.map((block,index)=>({
+  mapIndex:index,
+  grid:block.map.map(column=>column.slice()),
+  width:block.map.length,
+  height:block.map[0].length,
+  playerEntry:{...block.playerEntry},playerStart:{...block.playerStart},playerEnd:{...block.playerEnd},
+  opponentEntry:{...block.opponentEntry},opponentStart:{...block.opponentStart},opponentEnd:{...block.opponentEnd},
+  routeMarkers:block.routeMarkers.map(p=>({...p})),
+  enemyTypeIndex:block.enemyTypeIndex,
+  playerPath:map.pathByMapIndex(index,true),
+  opponentPath:map.pathByMapIndex(index,false),
+}));
+write('maps.json',{gridWidth:map.gridWidth,gridHeight:map.gridHeight,cellWidth:map.cellWidth,cellHeight:map.cellHeight,mapCount:MAP_BLOCKS.length,blocks});
 write('battle-economy.json',{initialGold:20,refreshCostStart:10,refreshCostIncrement:2,unitBaseCost:DeckDefinitions.baseUnitCost,handSize:DeckDefinitions.handSize});
 write('events.json',GameEvents);
 write('battle-result-schema.json',{isWin:'boolean',star:'number',gold:'number',battleDuration:'milliseconds',round:'number',playerTargetHealth:'number',opponentTargetHealth:'number',weaponFragments:'array',killCount:'number',bossKillCount:'number',endlessRound:'number',gameMode:'normal|endless',resultState:'WIN|LOSE'});

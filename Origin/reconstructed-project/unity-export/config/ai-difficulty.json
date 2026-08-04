@@ -1,0 +1,24 @@
+{
+  "decisionIntervalMs": [2000, 1500, 1000, 500],
+  "source_decisionIntervalMs": "bundle:49740 fG=[hu[118],hu[122],hu[123],hu[176]]; hu decoded via ht(hs) at bundle:355-386 in work/bundle.strings-decoded.js -> hu[118]=2000,hu[122]=1500,hu[123]=1000,hu[176]=500 (实测解码值)",
+  "ni": [0.001, 0.001, 0.001, 0.001],
+  "source_ni": "bundle:3160 (c[1899]=\"ni\")",
+  "ri": [0.1, 0.2, 0.5, 0.8],
+  "source_ri": "bundle:3160 (c[1900]=\"ri\")",
+  "hi": 10,
+  "source_hi": "bundle:3160 (c[1898]=\"hi\")",
+  "ii": [
+    [0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0],
+    [10, 10, 10, 10, 10, 10],
+    [20, 20, 20, 20, 20, 20]
+  ],
+  "source_ii": "bundle:3155-3159 (c[1494]=\"ii\"); ii[3] 全为 hu[1], hu[1]=20 (实测解码值, ht(hs) bundle:355-386)",
+  "ei": [3, 5, 8, 11, 14, 17],
+  "source_ei": "bundle:3160 (c[1495]=\"ei\")=[3,5,8,hu[7],hu[14],hu[13]]; hu[7]=11,hu[14]=14,hu[13]=17 (实测解码值, ht(hs) bundle:355-386)",
+  "oi": [0, 0, 0, 5],
+  "source_oi": "bundle:3160 (c[1901]=\"oi\")",
+  "itemCooldownMs": 5000,
+  "source_itemCooldownMs": "bundle:50074 hu[101] (YO 冷却); hu[101]=5000 (实测解码值, ht(hs) bundle:355-386)",
+  "_forensicNote": "取证冲突: proposal/design/spec/tasks 将 hu[101]=145808,hu[118]=681,hu[122]=2355,hu[123]=3232,hu[176]=2504 当作已确认值, 但实测 work/bundle.strings-decoded.js 的 ht(hs) 解码及 work/obfuscation-runtime.safe-eval.js 执行一致得到 hu[101]=5000,hu[118]=2000,hu[122]=1500,hu[123]=1000,hu[176]=500; 145808/3232 在 work/ 与 analysis/ 全文未出现, 两组值无比例/换算关系。本文件按实测解码值填写 (经协调者确认)。字段名映射经 analysis/string-decoding-map.jsonl 确认: c[1494]=ii,c[1495]=ei,c[1898]=hi,c[1899]=ni,c[1900]=ri,c[1901]=oi,c[1744]=fG。另 bundle:3160 还含 c[2750]=\"ai\"=[5,2,1] 字段, 不在本任务字段范围内故未纳入。"
+}

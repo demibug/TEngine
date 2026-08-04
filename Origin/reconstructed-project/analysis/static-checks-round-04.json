@@ -1,0 +1,694 @@
+{
+  "round": 4,
+  "name": "ENEMY-RUNTIME-01",
+  "status": "FAIL",
+  "checksPassed": 69,
+  "checksFailed": 9,
+  "sourceFilesChecked": 408,
+  "requireGraphNodes": 265,
+  "checks": [
+    {
+      "name": "immutable-hash:original/bundle.js",
+      "pass": true,
+      "details": {
+        "expected": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595",
+        "actual": "19157bd71fd0bd9bdd79da1ea5e5e6ca8d8d786a406b7ac9dd92692676a0a595"
+      }
+    },
+    {
+      "name": "immutable-hash:work/bundle.strings-decoded.js",
+      "pass": true,
+      "details": {
+        "expected": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b",
+        "actual": "f2d6517d19329955e4c761299dfb2ee7323bc7021c0cb8454c4f379d1cd2141b"
+      }
+    },
+    {
+      "name": "immutable-hash:original/index.js",
+      "pass": true,
+      "details": {
+        "expected": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b",
+        "actual": "4024b47ce0f6832a4aa969a6d7329385f6df4c0bbbfb6f26047fd22920574d1b"
+      }
+    },
+    {
+      "name": "immutable-hash:src/network/HttpClient.js",
+      "pass": true,
+      "details": {
+        "expected": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189",
+        "actual": "bfb3ffeff499ba0077dfbfcf94c3a94215ff09166a84bbb522f698943ed89189"
+      }
+    },
+    {
+      "name": "required-file:src/core/ObjectPool.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/MapData.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/EnemyFactory.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/EnemyManager.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/BattleManager.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/BattleState.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/battle/dev/DevelopmentCombatServices.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/entities/EnemyEventProxy.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/entities/EnemyBase.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/entities/NormalEnemyBase.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/entities/Mob0Enemy.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:src/entities/BattleTarget.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/enemy-runtime-classgraph.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/enemy-runtime-classgraph.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/critical-path/enemy-runtime-dependency-closure.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/mappings/ENEMY-RUNTIME-01-symbol-map.json",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/modules/ENEMY-RUNTIME-01.json",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/modules/ENEMY-RUNTIME-01-method-coverage.json",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/ENEMY-RUNTIME-01.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/enemy-state-machine.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/enemy-lifecycle.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/enemy-pool-reset-contract.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/enemy-target-selection.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior/enemy-spatial-index.md",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/behavior-diff-round-04.md",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "required-file:analysis/round-04-report.md",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/mocks/createEnemyRuntimeHarness.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/unit/MapPath.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/unit/EnemyMovement.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/unit/EnemySpatialIndex.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/unit/EnemyTargetSelection.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/unit/EnemyAttack.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/unit/EnemyDamage.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/unit/EnemyDeath.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/unit/EnemyPoolReset.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/Mob0PathToTarget.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/Mob0AttackBattleTarget.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/Mob0KilledBeforeArrival.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/Mob0PairBattle.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/BattleTargetDestroyed.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/EnemyCleanupAfterBattle.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tests/behavior/ReusedMob0HasCleanState.test.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "required-file:tools/run-mob0-simulation.js",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "javascript-syntax",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "local-require-resolution",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "src-commonjs-require-cycles",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "round04-no-direct-wx-tt-call",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "round04-no-real-http-url",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "round04-no-proxy-fallback",
+      "pass": true,
+      "details": []
+    },
+    {
+      "name": "enemy-state-values",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "enemy-movement-time-unit",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "enemy-contact-timing-and-damage",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "enemy-death-completion-boundary",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "fixed-update-semantics",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "map-grid-size",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "mob0-resource-and-pool-key",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "dual-object-pool-semantics",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "enemy-spatial-index-structures",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "enemy-spatial-query-contract",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "enemy-lifecycle-events",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "battle-target-contact-contract",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "pool-reuse-generation-guard",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "mob0-preserves-same-frame-visual-reference",
+      "pass": true,
+      "details": null
+    },
+    {
+      "name": "map0-confirmed-paths",
+      "pass": true,
+      "details": {
+        "player": [
+          [
+            0,
+            8
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            0,
+            6
+          ],
+          [
+            1,
+            6
+          ],
+          [
+            2,
+            6
+          ],
+          [
+            3,
+            6
+          ],
+          [
+            4,
+            6
+          ],
+          [
+            4,
+            5
+          ],
+          [
+            4,
+            4
+          ],
+          [
+            5,
+            4
+          ],
+          [
+            6,
+            4
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            6
+          ],
+          [
+            7,
+            7
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            7,
+            9
+          ]
+        ],
+        "opponent": [
+          [
+            7,
+            1
+          ],
+          [
+            7,
+            2
+          ],
+          [
+            7,
+            3
+          ],
+          [
+            6,
+            3
+          ],
+          [
+            5,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            3,
+            5
+          ],
+          [
+            2,
+            5
+          ],
+          [
+            1,
+            5
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "playerMatches": true,
+        "opponentMatches": true,
+        "fourDirection": true
+      }
+    },
+    {
+      "name": "enemy-state-export",
+      "pass": true,
+      "details": {
+        "SPAWNING": 0,
+        "MOVING": 1,
+        "SKILL": 2,
+        "STUNNED": 3,
+        "DEAD": 4
+      }
+    },
+    {
+      "name": "method-coverage-accounting",
+      "pass": false,
+      "details": {
+        "accounted": null
+      }
+    },
+    {
+      "name": "method-coverage-unresolved-zero",
+      "pass": false,
+      "details": {}
+    },
+    {
+      "name": "method-coverage-critical-methods",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "module-range-recording",
+      "pass": false,
+      "details": {}
+    },
+    {
+      "name": "module-status-mob0-complete",
+      "pass": false,
+      "details": null
+    },
+    {
+      "name": "symbol-map-critical-coverage",
+      "pass": true,
+      "details": {
+        "requiredSymbols": [
+          "qE",
+          "ro",
+          "pe",
+          "st",
+          "vi",
+          "s4",
+          "tl",
+          "ru",
+          "oS",
+          "s0"
+        ],
+        "found": [
+          "Bm",
+          "Cm",
+          "EL",
+          "Hw",
+          "JS",
+          "Km / Zm",
+          "Le",
+          "Lm",
+          "Lw",
+          "Mw",
+          "Sm / On",
+          "Wm",
+          "Zi / mi",
+          "attack",
+          "gameOver",
+          "hit",
+          "mB",
+          "me",
+          "nm",
+          "oS",
+          "pe",
+          "qE",
+          "qx",
+          "rm",
+          "ro",
+          "ru",
+          "s0",
+          "s4",
+          "ss.NL[0]",
+          "st",
+          "tl",
+          "vi",
+          "wB"
+        ]
+      }
+    },
+    {
+      "name": "symbol-map-confidence-values",
+      "pass": true,
+      "details": {
+        "invalid": []
+      }
+    },
+    {
+      "name": "package-scripts-round04",
+      "pass": true,
+      "details": {
+        "required": [
+          "test:enemy-runtime",
+          "test:mob0",
+          "test:round04",
+          "dev:mob0-simulation",
+          "check:round04",
+          "verify:round04"
+        ],
+        "found": [
+          "assets:sync",
+          "audit:cumulative",
+          "check:net01",
+          "check:origin-assets",
+          "check:round03",
+          "check:round04",
+          "check:round05",
+          "check:round06",
+          "check:round07k",
+          "check:round07l",
+          "check:round07m",
+          "check:round08",
+          "decode:strings",
+          "dev:all",
+          "dev:battle",
+          "dev:boot",
+          "dev:bow-soldier",
+          "dev:core-content",
+          "dev:friendly-unit",
+          "dev:friendly-unit-simulation",
+          "dev:micro-battle",
+          "dev:mob0-simulation",
+          "dev:projectile",
+          "dev:ranged-battle",
+          "dev:single-game",
+          "dev:skill-gameover",
+          "export:unity",
+          "manifest:cumulative",
+          "test:ai-strategy",
+          "test:attack-timing",
+          "test:battle-entry",
+          "test:boot",
+          "test:bow-soldier",
+          "test:decode",
+          "test:enemy-behaviors",
+          "test:enemy-runtime",
+          "test:friendly-combat",
+          "test:friendly-unit",
+          "test:friendly-units",
+          "test:general-skills",
+          "test:mob0",
+          "test:net01",
+          "test:projectile",
+          "test:projectile-types",
+          "test:round03",
+          "test:round04",
+          "test:round05",
+          "test:round06",
+          "test:special-weapons",
+          "verify:all",
+          "verify:round02",
+          "verify:round03",
+          "verify:round04",
+          "verify:round05",
+          "verify:round06"
+        ]
+      }
+    },
+    {
+      "name": "round04-source-extracts",
+      "pass": true,
+      "details": {
+        "count": 9,
+        "files": [
+          "work/round-04-extracts/EnemyBase-ro-19685-20858.js",
+          "work/round-04-extracts/EnemyData-sD-11994-12175.js",
+          "work/round-04-extracts/EnemyEventBase-19600-19684.js",
+          "work/round-04-extracts/EnemyFactory-19184-19260.js",
+          "work/round-04-extracts/EnemyManager-vi-32939-33696.js",
+          "work/round-04-extracts/GenericPool-uu-13380-14360.js",
+          "work/round-04-extracts/MapData-AStar-12194-12847.js",
+          "work/round-04-extracts/Mob0-st-31062-31114.js",
+          "work/round-04-extracts/NormalEnemy-pe-31262-31482.js"
+        ]
+      }
+    }
+  ]
+}

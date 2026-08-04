@@ -1,155 +1,138 @@
 {
-  "status": "CORE_COMBAT_CONFIG",
-  "gap": "base combat params (Yp attack power + Mp range/interval/targetPolicy) recovered; general skills (Mp Pp/Ap/Sp) not yet wired",
-  "source": {
-    "yp": "bundle.strings-decoded.js:11302-11314 (Yp Map, hu-decoded)",
-    "mp": "bundle.strings-decoded.js:11168-11272 (Mp[generalIndex], consumed at bundle:44689)",
-    "experienceThresholds": "bundle.strings-decoded.js:11278 (Ip, hu-decoded [0,10,35,75,130])"
-  },
+  "status": "PARTIAL_CORE_CONFIG",
+  "gap": "glyph merge and formal general battle component not fully reconstructed",
   "generals": [
     {
       "index": 0,
       "name": "赵云",
       "family": "赵",
-      "partWords": ["赵", "云"],
+      "partWords": [
+        "赵",
+        "云"
+      ],
       "weaponType": 1,
-      "baseAttackPower": 14,
-      "attackRange": 2,
-      "attackIntervalSeconds": 0.8,
-      "targetPolicy": "closest_end",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 1,
       "name": "张飞",
       "family": "张",
-      "partWords": ["张", "飞"],
+      "partWords": [
+        "张",
+        "飞"
+      ],
       "weaponType": 1,
-      "baseAttackPower": 15,
-      "attackRange": 10,
-      "attackIntervalSeconds": 1,
-      "targetPolicy": "nearest",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 2,
       "name": "马超",
       "family": "马",
-      "partWords": ["马", "超"],
+      "partWords": [
+        "马",
+        "超"
+      ],
       "weaponType": 1,
-      "baseAttackPower": 13,
-      "attackRange": 10,
-      "attackIntervalSeconds": 1,
-      "targetPolicy": "nearest",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 3,
       "name": "关羽",
       "family": "关",
-      "partWords": ["关", "羽"],
+      "partWords": [
+        "关",
+        "羽"
+      ],
       "weaponType": 2,
-      "baseAttackPower": 15,
-      "attackRange": 20,
-      "attackIntervalSeconds": 1,
-      "targetPolicy": "nearest",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 4,
       "name": "黄忠",
       "family": "黄",
-      "partWords": ["黄", "忠"],
+      "partWords": [
+        "黄",
+        "忠"
+      ],
       "weaponType": 0,
-      "baseAttackPower": 13,
-      "attackRange": 6,
-      "attackIntervalSeconds": 0.8,
-      "targetPolicy": "nearest",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 5,
       "name": "关平",
       "family": "关",
-      "partWords": ["关", "平"],
+      "partWords": [
+        "关",
+        "平"
+      ],
       "weaponType": 2,
-      "baseAttackPower": 12,
-      "attackRange": 3,
-      "attackIntervalSeconds": 1,
-      "targetPolicy": "nearest",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 6,
       "name": "关兴",
       "family": "关",
-      "partWords": ["关", "兴"],
+      "partWords": [
+        "关",
+        "兴"
+      ],
       "weaponType": 2,
-      "baseAttackPower": 12,
-      "attackRange": 7,
-      "attackIntervalSeconds": 1,
-      "targetPolicy": "closest_end",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 7,
       "name": "张苞",
       "family": "张",
-      "partWords": ["张", "苞"],
+      "partWords": [
+        "张",
+        "苞"
+      ],
       "weaponType": 1,
-      "baseAttackPower": 12,
-      "attackRange": 7,
-      "attackIntervalSeconds": 1,
-      "targetPolicy": "closest_end",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 8,
       "name": "张翼",
       "family": "张",
-      "partWords": ["张", "翼"],
+      "partWords": [
+        "张",
+        "翼"
+      ],
       "weaponType": 3,
-      "baseAttackPower": 12,
-      "attackRange": 7,
-      "attackIntervalSeconds": 1,
-      "targetPolicy": "closest_end",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 9,
       "name": "黄盖",
       "family": "黄",
-      "partWords": ["黄", "盖"],
+      "partWords": [
+        "黄",
+        "盖"
+      ],
       "weaponType": 3,
-      "baseAttackPower": 12,
-      "attackRange": 8,
-      "attackIntervalSeconds": 1,
-      "targetPolicy": "nearest",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 10,
       "name": "刘备",
       "family": "刘",
-      "partWords": ["刘", "备"],
+      "partWords": [
+        "刘",
+        "备"
+      ],
       "weaponType": 3,
-      "baseAttackPower": 13,
-      "attackRange": 10,
-      "attackIntervalSeconds": 0.8,
-      "targetPolicy": "nearest",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     },
     {
       "index": 11,
       "name": "黄祖",
       "family": "黄",
-      "partWords": ["黄", "祖"],
+      "partWords": [
+        "黄",
+        "祖"
+      ],
       "weaponType": 0,
-      "baseAttackPower": 12,
-      "attackRange": 6,
-      "attackIntervalSeconds": 0.8,
-      "targetPolicy": "closest_end",
-      "status": "CORE_COMBAT_CONFIG"
+      "status": "PARTIAL_CORE_CONFIG"
     }
   ]
 }

@@ -350,7 +350,16 @@ class DevelopmentBootstrap {
     const levelService = new UnitLevelService({ maxLevel: gameData.friendlyUnits.maxLevel });
     const mergeService = new UnitMergeService({ unitRegistry: unitManager, levelService, logger: this.logger });
     const inputController = new BattleInputController({ deckManager, economy, unitRegistry: unitManager, mergeService, mapTileManager, logger: this.logger });
-    const aiController = new AIController({ gameLoop, gameData, deckManager, inputController, randomSource: this.randomSource, logger: this.logger, decisionIntervalMs: 800, initialUnitTarget: 1 });
+    const aiController = new AIController({
+      gameLoop, gameData, deckManager, inputController,
+      randomSource: this.randomSource, logger: this.logger,
+      // ⑥b/⑥c/⑥d 注入：状态机所需 eventBus/economy/mapData/unitRegistry
+      // （bundle 等价 oc/uo/yq.map/vc，见 AIController 字段映射注释）
+      eventBus, economy, mapData: gameData.map, unitRegistry: unitManager,
+      // DEFERRED_ITEM_SYSTEM / DEFERRED_RANK_TABLE：道具效果分派器与 rank 表
+      // 跨档解析器暂用默认桩（AIController 内部兜底），后续接入真实系统时替换。
+      itemEffectDispatcher: null, itemSlots: null, rankTableResolver: null,
+    });
     const focusController = new DevelopmentLifecycleService('BattleFocusController');
     const preBattleService = new DevelopmentBattleTimingOverride(
       gameData,

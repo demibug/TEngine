@@ -12,13 +12,13 @@ class BattleState {
   constructor(eventBus) {
     if (!eventBus) throw new TypeError('BattleState requires EventBus');
     this.eventBus = eventBus;
-    this.currentRound = 0;                  // li
+    this.currentRound = 0;                  // au.li 波次（玩家与AI共享）
     this.endlessMode = false;               // ci
     this.maxRounds = 20;                    // ui
     this.spawnStrategy = [];                // pi
     this.initialGold = 20;                  // yi
     this.playerRecruitCost = 10;            // fi
-    this.opponentRecruitCost = 10;          // gi
+    this.opponentRecruitCost = 10;          // au.gi AI 刷牌阈值
     this.forceBossNextRound = false;        // di
     this.playerMaxHealth = 3;               // wi
     this._playerHealth = 3;                 // mi
@@ -26,11 +26,11 @@ class BattleState {
     this.standardBattleDelayEnabled = true; // ki
     this.opponentMaxHealth = 3;             // Mi
     this._opponentHealth = 3;               // bi
-    this.opponentGold = 0;
+    this.opponentGold = 0;                  // au.Ji AI 金币
     this.opponentAttackMultiplier = 1;       // xi
     this.delayTime = 10000;
     this.playerPlacementComplete = false;   // Yi
-    this.opponentPlacementComplete = false; // Xi
+    this.opponentPlacementComplete = false; // au.Xi AI布阵已开始
     this.bossRounds = [];
     this.bossDecisionByRound = {};
     this.bossTypeByRound = {};
@@ -41,6 +41,9 @@ class BattleState {
     this.bossKillCount = 0;
     this.weaponFragments = [];
     this.resultStar = 0;
+    this.aiDifficulty = 0;                  // au.Si 难度档 0-3 (bundle:3177)
+    this.playerDuplicateFlag = false;       // au.Fi 玩家侧武将字重复标志，dP 复制武将字后置位，bO 抽到武将字且置位则 splice 移除 (bundle:3202 初始化/46565 置位/46519 消费)
+    this.opponentDuplicateFlag = false;     // au.Oi AI 侧武将字重复标志，语义同 Fi (bundle:3202/46565/46519)
   }
 
   get wave() { return this.currentRound; }
@@ -96,6 +99,9 @@ class BattleState {
     this.playerPlacementComplete = false;
     this.opponentPlacementComplete = false;
     this.forceBossNextRound = false;
+    this.aiDifficulty = 0;                  // au.Si 难度档复位
+    this.playerDuplicateFlag = false;       // au.Fi 武将字重复标志复位 (bundle:3289)
+    this.opponentDuplicateFlag = false;     // au.Oi 武将字重复标志复位 (bundle:3289)
     this.bossRounds.length = 0;
     this.bossDecisionByRound = {};
     this.bossTypeByRound = {};

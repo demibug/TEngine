@@ -125,7 +125,7 @@ const staticFirst = run(process.execPath, ['tools/check-round04.js']);
 const staticReportHashFirst = fs.existsSync(STATIC_REPORT_PATH) ? sha256(STATIC_REPORT_PATH) : null;
 const staticReportFirst = fs.existsSync(STATIC_REPORT_PATH) ? JSON.parse(fs.readFileSync(STATIC_REPORT_PATH, 'utf8')) : null;
 
-const round04First = run(process.execPath, ['--test', ...ROUND04_TEST_FILES]);
+const round04First = run(process.execPath, ['--test', '--test-reporter=tap', ...ROUND04_TEST_FILES]);
 const simulationFirstRun = run(process.execPath, ['tools/run-mob0-simulation.js']);
 const simulationFirst = parseSimulation(simulationFirstRun.stdout);
 
@@ -133,12 +133,12 @@ const staticSecond = run(process.execPath, ['tools/check-round04.js']);
 const staticReportHashSecond = fs.existsSync(STATIC_REPORT_PATH) ? sha256(STATIC_REPORT_PATH) : null;
 const staticReportSecond = fs.existsSync(STATIC_REPORT_PATH) ? JSON.parse(fs.readFileSync(STATIC_REPORT_PATH, 'utf8')) : null;
 
-const round04Second = run(process.execPath, ['--test', ...ROUND04_TEST_FILES]);
+const round04Second = run(process.execPath, ['--test', '--test-reporter=tap', ...ROUND04_TEST_FILES]);
 const simulationSecondRun = run(process.execPath, ['tools/run-mob0-simulation.js']);
 const simulationSecond = parseSimulation(simulationSecondRun.stdout);
 
-const round03Regression = run(process.execPath, ['--test', ...ROUND03_TEST_FILES]);
-const net01Regression = run(process.execPath, ['--test', ...NET01_TEST_FILES]);
+const round03Regression = run(process.execPath, ['--test', '--test-reporter=tap', ...ROUND03_TEST_FILES]);
+const net01Regression = run(process.execPath, ['--test', '--test-reporter=tap', ...NET01_TEST_FILES]);
 
 const sourceTreeAfter = treeHash(['src', 'tests', 'tools']);
 const immutableAfter = immutableSnapshot();

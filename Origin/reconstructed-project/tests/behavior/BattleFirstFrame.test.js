@@ -22,7 +22,10 @@ test('BattleScene first creates two pooled aDou targets; first fixed frame confi
   assert.equal(battle.firstFrameExecuted, true);
   assert.equal(context.gameState.battle.wave, 1);
   assert.equal(context.battleManager.state, BattleManagerState.SPAWNING);
-  assert.equal(context.enemyManager.prepareWaveCount, 1);
+  // 波次配置经 WaveManager 路径（BattleManager._beginWave 恒走 waveManager.beginRound，
+  // prepareWave 为死路径，见 src/battle/BattleManager.js:111-123）。首帧 round=1 应在 planHistory 中留 1 条计划。
+  assert.equal(context.waveManager.planHistory.length, 1);
+  assert.equal(context.waveManager.roundPlans.has(1), true);
   assert.equal(context.enemyManager.count, 0);
 
   await advanceTimer(Laya, 1500, 500);
@@ -41,5 +44,6 @@ test('BattleScene first creates two pooled aDou targets; first fixed frame confi
 test('unrestored enemy types fail explicitly instead of fabricating objects', async () => {
   const { context } = await createBootToBattleHarness({ config: { directBattle: true } });
   assert.throws(() => context.enemyManager.spawn(99, true), /Unknown enemy type index/);
-  assert.throws(() => context.enemyFactory.create('Mob1'), /未为类型 Mob1 注册创建器/);
+  // Mob1 已由 P1-02 注册（src/bootstrap/DevelopmentBootstrap.js:202），改用真实未注册类型 Mob99 验证抛异常契约。
+  assert.throws(() => context.enemyFactory.create('Mob99'), /未为类型 Mob99 注册创建器/);
 });

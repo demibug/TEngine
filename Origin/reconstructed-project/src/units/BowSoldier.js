@@ -96,6 +96,12 @@ class BowSoldier extends SoldierBase {
 
     const start = this._unitCenter();
     this.pendingInitialAngle = this._calculateLaunchAngle(start, this.targetId, 120);
+    // STOPPED 正式动画事件契约：发射点由 `Laya.Event.STOPPED` 触发（`_onAttackAnimationStopped`→`launchArrow`）。
+    // 正式 Laya/Spine 动画运行时接入后，攻击动画播到释放段末（`attackReleaseEventMs=650`）由动画事件驱动 STOPPED；
+    // 无 Spine/无 Laya 动画运行时环境下由 `DevelopmentAnimationDriver` 按时长模拟 STOPPED（dev 桩为无 Spine 回退）。
+    // 正式环境与 dev 回退经同一 `_onAttackAnimationStopped` 入口；规则层（`launchArrow`→`ProjectileAttackEffect`
+    // 登记/更新/回收）只依赖「STOPPED 事件到达」这一契约信号，不依赖动画帧本身（对齐 CODEX_HANDOFF 行 440
+    // 「不让表现动画成为规则唯一触发来源」）。
     this.animation.on(this.laya.Event.STOPPED, this, this._onAttackAnimationStopped);
     this.animation.play('attack', false, true, 0, this.attackReleaseEventMs);
 
@@ -112,6 +118,12 @@ class BowSoldier extends SoldierBase {
     return { targetId: this.targetId, launchAngle: this.pendingInitialAngle };
   }
 
+  /**
+   * STOPPED 事件统一入口：无论 STOPPED 来自正式 Laya/Spine 动画事件还是
+   * `DevelopmentAnimationDriver` 的时长模拟回退，均经此方法移除监听后调 `launchArrow`。
+   * 规则层（`launchArrow`→`ProjectileAttackEffect` 登记/更新/回收）不关心 STOPPED 信号源，
+   * 只依赖「STOPPED 事件到达」这一契约信号，不依赖动画帧本身。
+   */
   _onAttackAnimationStopped() {
     if (!this.animation) return;
     this.animation.offAll(this.laya.Event.STOPPED);

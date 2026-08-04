@@ -115,6 +115,69 @@ class DevelopmentEnemyPresentation {
   }
   resetForPool(enemy) { this.calls.push(['resetForPool', enemy.id]); }
   createFootprint() { return null; }
+  // Zombie 专属表现 stub（bundle:31970-32131 uB/gB/bubble/tB/dB 表现层）。
+  // 开发桩只记录调用 + 创建 mock 节点，不实现真实 Tween/贴图渲染（P2 表现层接入时由 LayaEnemyProduction 承载）。
+  createSwampDecal(enemy) {
+    this.calls.push(['createSwampDecal', enemy.id]);
+    const pB = new this.laya.Image('resources/img/gameObject/enemy/swamp.png');
+    pB.name = 'swampDecal'; pB.size(64, 32); pB.pos(8, 47); pB.alpha = 0; pB.zIndex = -1;
+    enemy.visual.addChild(pB);
+    const yB = new this.laya.Sprite(); yB.name = 'swampMask'; enemy.visual.addChild(yB);
+    yB.graphics.drawRect(0, 0, enemy.visual.width, 0, '#fff');
+    return { pB, yB };
+  }
+  createBubbleParticle(enemy) {
+    this.calls.push(['createBubbleParticle', enemy.id]);
+    const bubble = new this.laya.Sprite(); bubble.size(16, 16); bubble.alpha = 1;
+    enemy.visual.addChild(bubble);
+    return bubble;
+  }
+  recoverBubbleParticle(bubble) {
+    this.calls.push(['recoverBubbleParticle']);
+    if (bubble && typeof bubble.removeSelf === 'function') bubble.removeSelf();
+  }
+  startZombieBreathing(enemy) { this.calls.push(['startZombieBreathing', enemy.id]); }
+  stopZombieBreathing(enemy) {
+    this.calls.push(['stopZombieBreathing', enemy && enemy.id]);
+    if (this.laya.Tween && typeof this.laya.Tween.killAll === 'function' && enemy && enemy.animation) this.laya.Tween.killAll(enemy.animation);
+    if (enemy && enemy.animation && typeof enemy.animation.scale === 'function') enemy.animation.scale(1, 1);
+  }
+  // Cavalry 专属表现 stub（bundle:32390-32467 init/gameOver/fw/mw/tB 表现层）。
+  // 开发桩只记录调用 + 创建/移除 mock 节点，不实现真实 Tween/贴图渲染（P2 表现层接入时由 LayaEnemyProduction 承载）。
+  createCavalryAura(enemy, auraResource) {
+    this.calls.push(['createCavalryAura', enemy.id, auraResource]);
+    let aura = enemy.visual.getChildByName && enemy.visual.getChildByName('cavalryAura');
+    if (!aura) {
+      aura = new this.laya.Image(auraResource);
+      aura.name = 'cavalryAura'; aura.size(80, 30); aura.pos(0, 40); aura.zIndex = -1;
+      enemy.visual.addChild(aura);
+    }
+    return aura;
+  }
+  removeCavalryAura(enemy) {
+    this.calls.push(['removeCavalryAura', enemy && enemy.id]);
+    const aura = enemy && enemy.visual && enemy.visual.getChildByName && enemy.visual.getChildByName('cavalryAura');
+    if (aura && typeof aura.removeSelf === 'function') aura.removeSelf();
+  }
+  startCavalryBreathing(enemy) { this.calls.push(['startCavalryBreathing', enemy.id]); }
+  stopCavalryBreathing(enemy) {
+    this.calls.push(['stopCavalryBreathing', enemy && enemy.id]);
+    if (this.laya.Tween && typeof this.laya.Tween.killAll === 'function' && enemy && enemy.animation) this.laya.Tween.killAll(enemy.animation);
+    if (enemy && enemy.animation && typeof enemy.animation.scale === 'function') enemy.animation.scale(1, 1);
+  }
+  // Puppet 专属表现 stub（bundle:31890-31919 rB 表现层）。
+  // 开发桩只记录调用 + 创建/回收 mock 节点，不实现真实 Tween/贴图渲染（P2 表现层接入时由 LayaEnemyProduction 承载）。
+  createPuppetHeart(enemy) {
+    this.calls.push(['createPuppetHeart', enemy.id]);
+    const heart = new this.laya.Sprite(); heart.size(16, 16); heart.alpha = 1; heart.scaleX = 0; heart.scaleY = 0;
+    return heart;
+  }
+  updatePuppetHeart(enemy, heart, deltaMs) { this.calls.push(['updatePuppetHeart', enemy && enemy.id]); }
+  recoverPuppetHeart(heart) {
+    this.calls.push(['recoverPuppetHeart']);
+    if (heart && typeof heart.removeSelf === 'function') heart.removeSelf();
+    if (heart) heart.alpha = 1;
+  }
 }
 
 class DevelopmentEnemyAudio {

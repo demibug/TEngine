@@ -18,6 +18,7 @@
     "check:round03": "node tools/check-round03.js",
     "verify:round03": "node tools/verify-round03.js",
     "test:enemy-runtime": "node --test tests/unit/MapPath.test.js tests/unit/EnemyMovement.test.js tests/unit/EnemySpatialIndex.test.js tests/unit/EnemyTargetSelection.test.js tests/unit/EnemyAttack.test.js tests/unit/EnemyDamage.test.js tests/unit/EnemyDeath.test.js tests/unit/EnemyPoolReset.test.js",
+    "test:enemy-behaviors": "node --test tests/unit/ZombieBehavior.test.js tests/unit/CavalryBehavior.test.js tests/unit/PuppetBehavior.test.js tests/unit/EnemySoulProjection.test.js tests/unit/EnemyBlowUp.test.js tests/unit/EnemiesJsonValues.test.js tests/unit/DeferredAnnotations.test.js",
     "test:mob0": "node --test tests/behavior/Mob0PathToTarget.test.js tests/behavior/Mob0AttackBattleTarget.test.js tests/behavior/Mob0KilledBeforeArrival.test.js tests/behavior/Mob0PairBattle.test.js tests/behavior/BattleTargetDestroyed.test.js tests/behavior/EnemyCleanupAfterBattle.test.js tests/behavior/ReusedMob0HasCleanState.test.js",
     "test:round04": "npm run test:enemy-runtime && npm run test:mob0",
     "dev:mob0-simulation": "node tools/run-mob0-simulation.js",
@@ -55,7 +56,9 @@
     "check:origin-assets": "node tools/check-origin-assets.js",
     "dev:single-game": "node tools/run-single-game-flow.js",
     "export:unity": "node tools/export-unity-config.js",
-    "check:round08": "node tools/check-round08.js"
+    "check:round08": "node tools/check-round08.js",
+    "test:ai-strategy": "node --test tests/unit/AIStateMachine.test.js tests/unit/AIDifficulty.test.js tests/unit/AIRefreshIncomeItem.test.js tests/unit/AIPlacementWX.test.js tests/unit/AISubcontrollers.test.js tests/unit/AIDifficulty0Equivalence.test.js tests/unit/DeferredAnnotations.test.js",
+    "test:attack-timing": "node --test tests/unit/PikeAttackTimingCalibration.test.js tests/unit/BowSoldierStoppedContract.test.js tests/unit/CavalrySweepVisualPort.test.js tests/unit/PikeTipVisualPort.test.js tests/unit/KnifeAttackTimingDoc.test.js"
   },
   "engines": {
     "node": ">=20"

@@ -1,6 +1,6 @@
 'use strict';
 const { BuffType }=require('../buffs/BuffTypes');
-const { SoulCaptureEffect,SoulSummonEffect,DemolitionEffect,RainStormEffect,FangTianHalberdEffect,DevourEffect,DevourEyesEffect,EnthrallEffect,MadnessEffect,WarlordSealEffect,BattleShoutEffect,HolySwordEffect,ArrowRainEffect,FireArrowBarrageEffect,LeapSlashEffect,SevenInSevenOutEffect,MeteorStrikeEffect }=require('./effects');
+const { SoulCaptureEffect,SoulSummonEffect,DemolitionEffect,RainStormEffect,FangTianHalberdEffect,DevourEffect,DevourEyesEffect,EnthrallEffect,MadnessEffect,WarlordSealEffect,BattleShoutEffect,HolySwordEffect,ArrowRainEffect,FireArrowBarrageEffect,LeapSlashEffect,SevenInSevenOutEffect,MeteorStrikeEffect,InspireEffect,CavalryOrderEffect }=require('./effects');
 class SkillEffectPort {
   constructor(options={}){this.handlers=new Map();this.deferredCalls=[];this.activeEffects=new Set();this.configure(options);this._installCoreHandlers();}
   configure(options={}){
@@ -20,8 +20,10 @@ class SkillEffectPort {
   _installCoreHandlers(){
     this.register('StunPassive',({target,durationMs=2000})=>target&&this.buffManager?this.buffManager.applyBuff(target.id,BuffType.STUN,1,false,durationMs):{status:'NO_TARGET_OR_BUFF_MANAGER'});
     this.register('SoulCapture',ctx=>new SoulCaptureEffect(this.services()).execute(ctx));
-    this.register('Inspire',({alliedEnemies=[],durationMs=5000})=>{const ids=[];for(const target of alliedEnemies){if(!this.buffManager)continue;ids.push(this.buffManager.applyBuff(target.id,BuffType.SCALE,.2,true,durationMs));ids.push(this.buffManager.applyBuff(target.id,BuffType.MAX_HP,.5,true,durationMs));ids.push(this.buffManager.applyBuff(target.id,BuffType.MOVE_SPEED,.3,true,durationMs));}return{status:'APPLIED',ids};});
-    this.register('CavalryOrder',({boss,enemyManager})=>{const manager=enemyManager||this.enemyManager;if(!manager||!boss)return{status:'MISSING_CAVALRY_DEPENDENCY'};const enemies=[];for(let i=0;i<5;i++)enemies.push(manager.spawnByKey('Cavalry',boss.isPlayerLane,false));return{status:'APPLIED',enemyIds:enemies.map(e=>e.id)};});
+    // 鼓舞（张角，bundle:31120-31186）：从 inline lambda 迁出为独立效果类 InspireEffect（task 2.1/2.4）。
+    this.register('Inspire',ctx=>new InspireEffect(this.services()).execute(ctx));
+    // 铁骑号令（华雄，bundle:32753-32802）：从 inline lambda 迁出为独立效果类 CavalryOrderEffect（task 2.2/2.4）。
+    this.register('CavalryOrder',ctx=>new CavalryOrderEffect(this.services()).execute(ctx));
     this.register('SoulSummon',ctx=>new SoulSummonEffect(this.services()).execute(ctx));
     this.register('Demolition',ctx=>new DemolitionEffect(this.services()).execute(ctx));
     this.register('RainStorm',ctx=>new RainStormEffect(this.services()).execute(ctx));
