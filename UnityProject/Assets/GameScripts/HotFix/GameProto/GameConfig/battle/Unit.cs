@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 小兵基础配置
+/// </summary>
 public sealed partial class Unit : Luban.BeanBase
 {
     public Unit(ByteBuf _buf) 
@@ -24,6 +27,7 @@ public sealed partial class Unit : Luban.BeanBase
         AttackIntervalSeconds = _buf.ReadFloat();
         DamageMode = _buf.ReadString();
         TargetPolicy = _buf.ReadString();
+        if(_buf.ReadBool()){ Status = _buf.ReadString(); } else { Status = null; }
     }
 
     public static Unit DeserializeUnit(ByteBuf _buf)
@@ -31,38 +35,18 @@ public sealed partial class Unit : Luban.BeanBase
         return new battle.Unit(_buf);
     }
 
-    /// <summary>
-    /// 索引
-    /// </summary>
     public readonly int Index;
-    /// <summary>
-    /// 显示名
-    /// </summary>
     public readonly string Text;
-    /// <summary>
-    /// 动画键
-    /// </summary>
     public readonly string AnimationKey;
-    /// <summary>
-    /// 攻击距离(格)
-    /// </summary>
     public readonly float RangeCells;
-    /// <summary>
-    /// 攻击力
-    /// </summary>
     public readonly int AttackDamage;
-    /// <summary>
-    /// 攻击间隔(秒)
-    /// </summary>
     public readonly float AttackIntervalSeconds;
-    /// <summary>
-    /// 伤害模式
-    /// </summary>
     public readonly string DamageMode;
-    /// <summary>
-    /// 目标策略
-    /// </summary>
     public readonly string TargetPolicy;
+    /// <summary>
+    /// 状态标注(CORE_COMPLETE)
+    /// </summary>
+    public readonly string Status;
    
     public const int __ID__ = -795481830;
     public override int GetTypeId() => __ID__;
@@ -82,6 +66,7 @@ public sealed partial class Unit : Luban.BeanBase
         + "attackIntervalSeconds:" + AttackIntervalSeconds + ","
         + "damageMode:" + DamageMode + ","
         + "targetPolicy:" + TargetPolicy + ","
+        + "status:" + Status + ","
         + "}";
     }
 }

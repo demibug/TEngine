@@ -1,0 +1,395 @@
+{
+  "$schema": "golden-battle-bundle/v1",
+  "exportTask": "OpenSpec change port-minimal-battle-to-gamebattle task 1.3",
+  "exportedAt": "2026-08-05",
+  "exporter": "execution-subagent",
+  "provenance": {
+    "originRepo": "E:/MyWork/MyTD/TEngine",
+    "originGitCommit": "9b58448e6e0faf09dae19d4349efc31528c92a78",
+    "reconstructedProjectRoot": "Origin/reconstructed-project",
+    "originRoot": "Origin",
+    "note": "还原工程严格只读导出；未修改任何 Origin/ 文件来迁就 C# 结果（基线即如此）。",
+    "frozenJsonConfigDir": "Origin/reconstructed-project/unity-export/config",
+    "hardcodedDataSource": "Origin/reconstructed-project/src/data/BattleDataCore.js（数值与 unity-export/config/waves.json 一致；maps 数据在 src/battle/MapData.js MAP_BLOCKS 常量与 maps.json 等价）"
+  },
+  "decisions": {
+    "0.6": "冻结 JSON 只作为黄金测试 Oracle，Luban 为最终生产配置源",
+    "0.8": "购买放置和刷新命令携带单局 CommandId；同 ID 重复提交返回首次结果",
+    "0.9": "战斗只使用 elapseSeconds 作为逻辑时间源；550ms 外部帧 frameNowMs 观察 550ms，规则位移最多推进 500ms；暂停不以 realElapseSeconds 补偿"
+  },
+  "minimalConfig": {
+    "description": "最简配置子集：1 张地图(map0)、Mob0、1 波次、四兵(刀/弓/枪/骑)、最简牌组(BASE_SOLDIER_TEXTS=['刀','弓','枪','骑'])、SimpleDynamicArrow。数值从冻结 JSON 与代码硬编码常量只读导出。",
+    "map": {
+      "mapIndex": 0,
+      "width": 8,
+      "height": 10,
+      "gridLayout": "列优先 grid[x][y]（x=列 0-7，y=行 0-9）；C# 仅在适配层读取一次，业务层用 GetCell(x,y)/IsInside(x,y)",
+      "cellKindLaneFormat": "字符串 'kind_lane'，如 '1_1'=玩家可建造格、'1_0'=对手可建造格、'0_*'=路径、'2_*'=装饰",
+      "playerStart": { "x": 0, "y": 8 },
+      "playerEnd": { "x": 7, "y": 9 },
+      "opponentStart": { "x": 7, "y": 1 },
+      "opponentEnd": { "x": 0, "y": 0 },
+      "playerBuildableCells": [[3,1],[3,2],[4,1],[4,2],[5,1],[5,2]],
+      "opponentBuildableCells": [[2,7],[2,8],[3,7],[3,8],[4,7],[4,8]],
+      "playerPathLength": 17,
+      "opponentPathLength": 17,
+      "sourceFile": "unity-export/config/maps.json (blocks[0])",
+      "sourceSha256": "c3a7056ae9604c8778d74c524c44e9681950fdb19696b65788e7f8ba9241b6db"
+    },
+    "enemy": {
+      "type": "Mob0",
+      "mapEnemyTypeIndex": 0,
+      "speed": 50,
+      "healthByWave": [10,11,57,44,39,92,138,200,291,421,611,886,1285,1863,2701,3917,5680,8235,11941,17315],
+      "earlyRoundHealthMultipliers": [0.6,0.6,0.6,0.6,0.7,0.7,0.7,0.8,0.8,0.8],
+      "wave1HealthComputation": "wave=1: healthByWave[0]=10 * spawnStrategy[idx0]=1 * earlyMultiplier[playerRound=0]=0.6 = 6.0",
+      "wave1Health": 6.0,
+      "contactDamage": "敌人接触阿斗扣 1 点血（BattleTarget 受击语义）；阿斗初始血量 3",
+      "sourceFiles": {
+        "EnemyDataCore": "src/data/BattleDataCore.js",
+        "EnemyDataCoreSha256": "2f58f32aabe3812d2d14e0a7e29b98b437441e164fb6c57c51e5f219dc8ab9fc",
+        "enemiesJson": "unity-export/config/enemies.json",
+        "enemiesJsonSha256": "051fceb8a1bba384fae7bde56e9538dfa5f39fa8de45edc8b83790242ce932d7"
+      },
+      "note": "enemies.json 只含 type 清单（key/symbol/resource），不含 HP/速度数值；数值在 BattleDataCore 硬编码。两者字段互补，基线即如此。"
+    },
+    "wave": {
+      "waveUnitCounts": [10,11,12,13,15,16,18,19,21,24,26,29,31,35,38,42,46,51,56,61],
+      "bossWaveNumbers": [3,6,9,12,15,20],
+      "bossSpawnChances": [0.1,0.2,0.3,0.5,0.9,1],
+      "spawnStrategyWeights": [5,2,3],
+      "spawnStrategies": [
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [1.1,1.2,1.3,1.2,1.3,1.7,2,1,1.5,1,1,1,1,1,1,1,1,1,1,1],
+        [1,1,1.5,1,1.8,2,1,1,2,1,1,1.3,1,1,1.4,1,1,1.5,1,1]
+      ],
+      "minimalWave1UnitCount": 10,
+      "skipBoss": true,
+      "delayTimeMs": 10000,
+      "maxRounds": 20,
+      "sourceFiles": {
+        "wavesJson": "unity-export/config/waves.json",
+        "wavesJsonSha256": "cda521667ba18edff4ac24dc9a6d78ea7b5f436c6be2f2a3933e79016a0662f3",
+        "BattleDataCoreSha256": "2f58f32aabe3812d2d14e0a7e29b98b437441e164fb6c57c51e5f219dc8ab9fc"
+      },
+      "note": "waves.json 与 BattleDataCore.waveUnitCounts/bossWaveNumbers/spawnStrategyWeights/spawnStrategies 逐元素一致。"
+    },
+    "units": [
+      { "index": 0, "text": "刀", "animationKey": "knife",   "rangeCells": 1.5, "attackDamage": 3, "attackIntervalSeconds": 0.8, "damageMode": "单体",   "targetPolicy": "nearest",      "attackEffect": "KnifeAttackEffect 500ms 延迟命中" },
+      { "index": 1, "text": "弓", "animationKey": "bow",     "rangeCells": 3.5, "attackDamage": 2, "attackIntervalSeconds": 0.8, "damageMode": "单体",   "targetPolicy": "closest_end",  "attackEffect": "ProjectileAttackEffect -> SimpleDynamicArrow" },
+      { "index": 2, "text": "枪", "animationKey": "pike",    "rangeCells": 2.5, "attackDamage": 2, "attackIntervalSeconds": 0.8, "damageMode": "近战枪击", "targetPolicy": "nearest",      "attackEffect": "PikeAttackEffect 360ms 命中" },
+      { "index": 3, "text": "骑", "animationKey": "cavalry", "rangeCells": 2.0, "attackDamage": 2, "attackIntervalSeconds": 0.8, "damageMode": "范围",   "targetPolicy": "nearest",      "attackEffect": "CavalrySweepEffect 150ms 双段" }
+    ],
+    "unitsMeta": {
+      "maxLevel": 3,
+      "damageLevelMultipliers": [1,1.5,2.0999999999999996,2.7299999999999995,3.4124999999999996],
+      "attackSpeedLevelMultipliers": [1,1.5,2.0999999999999996,2.7299999999999995,3.4124999999999996],
+      "sourceFile": "unity-export/config/units.json",
+      "sourceSha256": "4289ab60fdba28f9a2884e6be04085ed83e543307a0d4518ff7e39a03c327a1d"
+    },
+    "deck": {
+      "minimalMode": true,
+      "baseSoldierTexts": ["刀","弓","枪","骑"],
+      "handSize": 5,
+      "defaultLevel": 1,
+      "baseUnitCost": 1,
+      "drawTextSemantics": "minimalMode=true 时 drawText 只从 BASE_SOLDIER_TEXTS(4 元素) 均匀抽取，不抽 108 元素完整牌池；refreshCost/minimalMode 补牌同理",
+      "sourceFiles": {
+        "DeckDefinitions": "src/deck/DeckDefinitions.js",
+        "DeckDefinitionsSha256": "d5f13c9ae13f43800d47e6352656a9ffbea974ed5bd61532c2117976ca8e2626",
+        "deckPoolJson": "unity-export/config/deck-pool.json",
+        "deckPoolJsonSha256": "9fe6d16148fb082d903e5b44a32e36ad550643c02eb6d43789bace171ca321e9"
+      },
+      "note": "deck-pool.json 记录 108 元素完整牌池(最简模式不消费)。最简牌组真值在 DeckDefinitions.BASE_POOL=['刀','弓','枪','骑']。"
+    },
+    "projectile": {
+      "type": "SimpleDynamicArrow",
+      "isOnlyRegisteredType": true,
+      "movementStrategy": "TargetEnemyBezierMovement（二次贝塞尔追踪目标）",
+      "hitStrategy": "HitEnemyStrategy（单体命中扣血并移除箭矢）",
+      "sourceFiles": {
+        "projectilesJson": "unity-export/config/projectiles.json",
+        "projectilesJsonSha256": "89f83e82f03ed5532024ab5d609e12f7174b05ea00df305301b759283dfd2e3c"
+      },
+      "note": "projectiles.json 列出 7 弹种类型名；最简模式只注册 SimpleDynamicArrow（ProjectileFactory.resetForTests 后单独 register）。"
+    },
+    "economy": {
+      "initialGold": 20,
+      "refreshCostStart": 10,
+      "refreshCostIncrement": 2,
+      "unitBaseCost": 1,
+      "handSize": 5,
+      "playerMaxHealth": 3,
+      "opponentMaxHealth": 3,
+      "recruitCostRule": "Math.max(1, card.cost||card.level) —— 最简卡 level=1 故招募花费 1",
+      "refreshCostRule": "playerRecruitCost/opponentRecruitCost 起始 10，每次刷新 +2（BattleState 字段复用为刷新成本）",
+      "sourceFiles": {
+        "battleEconomyJson": "unity-export/config/battle-economy.json",
+        "battleEconomyJsonSha256": "009bbd4e88a65569195223651a1f93d4ca833c6958254103f3b92a78ba2d71cf",
+        "BattleState": "src/battle/BattleState.js",
+        "BattleStateSha256": "b3e546e6cd97ba842073f4e2c69ed76b8757d5c289ad9406f0349f1d7c4013a6",
+        "BattleEconomy": "src/battle/BattleEconomy.js",
+        "BattleEconomySha256": "a30b225054e39e8b8cd639d8cc32be7f43fd86549c97f0a7c4b51ae3aa5dff9d"
+      },
+      "note": "battle-economy.json initialGold=20 与 BattleState.initialGold=20 一致；但 BattleState.playerMaxHealth=3/血量字段不在 battle-economy.json，而在 BattleState 硬编码。基线即如此。"
+    }
+  },
+  "randomSequence": {
+    "description": "确定性随机序列。MinimalBattleBootstrap 默认注入 randomSource=()=>0.5；MinimalBattleLoop.test.js 也用 RANDOM=()=>0.5。",
+    "seedType": "函数式常量随机源（非 PRNG 种子）",
+    "randomFunction": "() => 0.5",
+    "randomSourceSha256_note": "randomSource 为内联箭头函数无独立文件；其消费方 MathRandom 来自 src/core/MathRandom.js",
+    "mathRandomSourceSha256": "6fc2e0c74288dd5e29cac774a046b8910d1ded230a74e3a91121a541efb0343b",
+    "consumerChain": "MathRandom(random) -> BattleManager(random) 用于 weightedIndex(spawnStrategyWeights=[5,2,3])；EnemyManager.setRandomSource；DeckManager(randomSource) 用于 drawText/minimalMode 抽牌；MapTileManager(randomSource)",
+    "producedSequence": {
+      "mechanism": "每次调用 this.random() 恒返回 0.5",
+      "firstNValues": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+      "N": 10,
+      "weightedIndexFirstCall": "weights=[5,2,3], total=10, target=0.5*10=5.0；累计 total: 5<=5 → 命中 index 0（spawnStrategy[0]）",
+      "drawTextFirstCall": "minimalMode: Math.floor(0.5*4)=2 → BASE_SOLDIER_TEXTS[2]='枪'（但 MinimalBattleLoop.test.js 用 setHand 覆盖手牌，故实际放置不依赖此值）",
+      "determinismNote": "因 random() 恒 0.5，所有 weightedIndex/drawText 调用结果确定；C# SeededRandomSource 需以等价方式复现 0.5 序列"
+    },
+    "bootstrapInjectionPoint": "src/bootstrap/MinimalBattleBootstrap.js:334 this.randomSource = options.random || (() => 0.5)",
+    "bootstrapSha256": "d4e1f24c86d7d014824c3097430277abf427cda8e4d0c57a01d0bed0d8036c58",
+    "testInjectionPoint": "tests/unit/MinimalBattleLoop.test.js:22 const RANDOM = () => 0.5",
+    "testSha256": "f778994d53188a9b7b42f0a15667a5917d7e9d41194a7bf82c5e74dd9edb0b4b"
+  },
+  "frameTimeSequence": {
+    "description": "外部帧时间序列导出。来源：MinimalBattleLoop.test.js 的 tick(80) 大步推进 + dual-clock-evidence.test.js 的双时钟证据帧（550ms/16ms）。",
+    "sourceOfTruth": {
+      "GameLoop": "src/core/GameLoop.js",
+      "GameLoopSha256": "a95cf0388dcccc15e16b7ac1120071e5a4e4f90e78876d4b8e97bc79a7c0a92e",
+      "MinimalBattleLoopTest": "tests/unit/MinimalBattleLoop.test.js",
+      "MinimalBattleLoopTestSha256": "f778994d53188a9b7b42f0a15667a5917d7e9d41194a7bf82c5e74dd9edb0b4b",
+      "DualClockEvidenceTest": "tests/unit/dual-clock-evidence.test.js",
+      "DualClockEvidenceTestSha256": "b72d031065485b45f115cac5a8d8b06f18decbcdd9f01ce615ce6f5d8984c41b"
+    },
+    "clockConstants": {
+      "MAX_FRAME_DELTA_MS": 500,
+      "LOGIC_STEP_MS": 80,
+      "logicStepSource": "GameLoop.js:109-110",
+      "frameNowMsSemantics": "currentTimer = Laya.timer.currTimer，子步循环外只读一次（GameLoop.js:46），同帧所有子步观察同一 frameNowMs",
+      "stepMsSemantics": "每子步 step = min(80, remaining)，驱动移动/弹道/效果累计（GameLoop.js:52-53）"
+    },
+    "minimalBattleLoopTickSequence": {
+      "description": "MinimalBattleLoop.test.js 用 Laya.timer.tick(80) 推进，每个 tick 即一次外部帧 delta=80ms",
+      "tickMs": 80,
+      "tickCount_totalToWave1": 160,
+      "tickCount_totalToMovement": 220,
+      "tickCount_battlePhase3": 400,
+      "battleLoopTicks": "每个 tick(80) 产生 1 个子步 step=80ms；测试中 tickN(Laya,n) 循环 n 次 tick(80)",
+      "note": "tick(80) 对应 GameLoop.MAX_FRAME_DELTA_MS 截断后 remaining=80，拆成 1×80ms 子步"
+    },
+    "dualClockEvidenceFrames": [
+      {
+        "id": "evidence-1-2-550ms",
+        "externalFrameDeltaMs": 550,
+        "frameNowMsObserved": 550,
+        "logicAdvanceMsClamped": 500,
+        "substepSplit": [80,80,80,80,80,80,20],
+        "substepCount": 7,
+        "assertion": "同帧所有子步 currTimer=550（size 1）；elapsedGameTime=500（Math.min 截断）；lastTimer=550",
+        "sourceTest": "dual-clock-evidence.test.js test '1.9-证据1+2'"
+      },
+      {
+        "id": "evidence-1-16ms",
+        "externalFrameDeltaMs": 16,
+        "frameNowMsObserved": 16,
+        "logicAdvanceMsClamped": 16,
+        "substepSplit": [16],
+        "substepCount": 1,
+        "assertion": "16ms 不累计到 80ms，立即推进 16ms 单步",
+        "sourceTest": "dual-clock-evidence.test.js test '1.9-证据1强化'"
+      },
+      {
+        "id": "evidence-3-pause",
+        "externalFrameDeltaMs": 0,
+        "frameNowMsObserved": "frozen（真实 Laya pause 置 scale=0 冻结 currTimer）",
+        "logicAdvanceMsClamped": 0,
+        "substepSplit": [],
+        "substepCount": 0,
+        "assertion": "暂停期间不补步；恢复后只推进新帧 80ms 不补暂停真实时间",
+        "sourceTest": "dual-clock-evidence.test.js test '1.9-证据3'"
+      }
+    ],
+    "canonicalExternalFrameSeries": {
+      "description": "C# 对照基线推荐使用的最小外部帧序列（覆盖 16/80/550ms 与暂停）",
+      "frames": [
+        { "deltaMs": 16,  "expectedSubsteps": [16],          "expectedFrameNowMs": 16,  "expectedLogicAdvanceMs": 16 },
+        { "deltaMs": 80,  "expectedSubsteps": [80],          "expectedFrameNowMs": 80,  "expectedLogicAdvanceMs": 80 },
+        { "deltaMs": 550, "expectedSubsteps": [80,80,80,80,80,80,20], "expectedFrameNowMs": 550, "expectedLogicAdvanceMs": 500 },
+        { "deltaMs": 0,   "expectedSubsteps": [],            "expectedFrameNowMs": "frozen", "expectedLogicAdvanceMs": 0, "paused": true }
+      ]
+    }
+  },
+  "inputCommands": {
+    "description": "输入命令序列导出。来源：BattleInputCommand.js 命令类型 + MinimalBattleLoop.test.js placeUnits 的 purchaseAndPlace + REFRESH 语义。决策 0.8 CommandId 语义在此标注。",
+    "commandTypeDef": {
+      "sourceFile": "src/input/BattleInputCommand.js",
+      "sourceSha256": "d2d29d903533926ce7ce9478cd91b1777711502dad8d19ca1a08f540061278bd",
+      "typesInScope": ["PurchaseAndPlace", "Refresh"],
+      "typesOutOfScope": ["BeginDrag","MoveDrag","CommitPlacement","CancelDrag","MoveUnit","MergeUnits"],
+      "note": "本期只覆盖 PurchaseAndPlace 和 Refresh（决策 0.8）；升级/合并/交换/拖拽不在本期命令集合"
+    },
+    "controllerDef": {
+      "sourceFile": "src/input/BattleInputController.js",
+      "sourceSha256": "94a895e352a91e8f7dd1443daef00be32d63b0d5467ee659b06f027ed24ddcf8",
+      "atomicTransactionSteps": "validatePlacement(只读校验) -> economy.payRecruit(扣费) -> unitRegistry.createUnit(创建) -> 放置 -> deckManager.consume(消耗卡牌) -> （consume 内自动补牌）；任一步失败逆序补偿",
+      "commandIdSemantics_0_8": "JS 源无 CommandId 字段（还原工程基线即如此）；决策 0.8 要求 C# 新增单局 CommandId：同 ID 重复提交返回首次结果，不再次扣费/消耗/创建；不同 ID 按独立命令处理。CommandId 为 C# 端新增语义，非还原工程既有字段。"
+    },
+    "goldenInputSequence": [
+      {
+        "step": 1,
+        "commandType": "PurchaseAndPlace",
+        "payload": { "side": true, "slot": 0, "gridX": 4, "gridY": 2 },
+        "cardText": "弓",
+        "commandId_note": "C# 对照时分配 CommandId=1",
+        "source": "MinimalBattleLoop.test.js:89 placeUnits(ctx,true,[['弓',4,2],...]) slot0"
+      },
+      {
+        "step": 2,
+        "commandType": "PurchaseAndPlace",
+        "payload": { "side": true, "slot": 1, "gridX": 3, "gridY": 2 },
+        "cardText": "刀",
+        "commandId_note": "C# 对照时分配 CommandId=2",
+        "source": "MinimalBattleLoop.test.js:89 slot1"
+      },
+      {
+        "step": 3,
+        "commandType": "PurchaseAndPlace",
+        "payload": { "side": true, "slot": 2, "gridX": 5, "gridY": 2 },
+        "cardText": "枪",
+        "commandId_note": "C# 对照时分配 CommandId=3",
+        "source": "MinimalBattleLoop.test.js:89 slot2"
+      },
+      {
+        "step": 4,
+        "commandType": "PurchaseAndPlace",
+        "payload": { "side": true, "slot": 3, "gridX": 3, "gridY": 1 },
+        "cardText": "骑",
+        "commandId_note": "C# 对照时分配 CommandId=4",
+        "source": "MinimalBattleLoop.test.js:89 slot3"
+      }
+    ],
+    "refreshCommand": {
+      "commandType": "Refresh",
+      "payload": { "side": true },
+      "cost": 10,
+      "nextCost": 12,
+      "semantics": "deckManager.refresh(side) 两阶段清槽重抽；minimalMode 从 BASE_SOLDIER_TEXTS 补牌",
+      "commandId_note": "C# 对照时 Refresh 也携带独立 CommandId"
+    },
+    "setHandPrecondition": {
+      "description": "MinimalBattleLoop.test.js 用 deckManager.setHand 强制覆盖 minimalMode 抽到的手牌，确保 4 种兵可达",
+      "call": "ctx.deckManager.setHand(side, ['弓','刀','枪','骑','枪'])（specs 长度 4，补 1 个'枪'到 handSize=5）",
+      "note": "setHand 是测试桩入口，非正式命令；C# 对照应在 DeckManager 初始化后用等价方式预置手牌"
+    }
+  },
+  "keyTrajectoryGoldenOutput": {
+    "description": "关键轨迹黄金输出导出。从 MinimalBattleLoop.test.js 的断言提炼行为契约级轨迹（非逐帧数值——逐帧轨迹在 Phase 3/4/5 由 BattleTraceRecorder 生成）。此处记录测试已验证的关键事实与 phase 顺序，作为 C# 对照黄金输出基线。",
+    "sourceTest": "tests/unit/MinimalBattleLoop.test.js",
+    "sourceTestSha256": "f778994d53188a9b7b42f0a15667a5917d7e9d41194a7bf82c5e74dd9edb0b4b",
+    "updatePhaseOrder": {
+      "perExternalFrame": "0.处理已到期 Laya timer 回调；输入事件在 GameLoop 外同步发生 -> 1.GameLoop 截断 500ms 拆 <=80ms 子步",
+      "perSubstep": "1.EnemyManager.update -> 2.ProjectileManager.update -> 3.DevelopmentAnimationDriver.update -> 4.BattleManager.update(4.1 _updateSpawnState 波次生成 / 4.2 _updateUnitAttacks 单位攻击调度 / 4.3 AttackEffectManager.update) -> 5.后续动态注册回调(UnitBase.update no-op)",
+      "evidence": "GameLoop.js:31-55 Map 插入顺序；MinimalBattleBootstrap.js:757-774 初始化/启动顺序；BattleManager.js:78-84 内部顺序；ProjectileManager.test.js:6-15 断言 enemyMgr<bulletMgr<BattleMgr",
+      "spawnSameSubstepNoMove": "BattleManager 在当前子步生成的敌人 updateCount=0，下一子步才首次移动",
+      "newMeleeEffectSameSubstep": "单位攻击调度在当前子步创建的近战效果，在当前子步后续攻击效果阶段立即累计一次本子步时长",
+      "newArrowNextSubstep": "攻击释放时序在既有弹道推进后创建的新投射物，下一子步才首次移动"
+    },
+    "trajectoryFacts": [
+      {
+        "id": "T1-wave1-spawn",
+        "test": "5.1+5.2",
+        "precondition": "bootBattle() + tickN(160) 即 12800ms",
+        "assertion": "ctx.enemyManager.count > 0（第一波 delayTime=10000ms 后开始生成敌人）",
+        "goldenValue": "enemyManager.count > 0",
+        "sourceLine": "MinimalBattleLoop.test.js:58-59"
+      },
+      {
+        "id": "T2-enemy-movement",
+        "test": "5.1+5.2",
+        "precondition": "累计 tickN(220) 即 17600ms",
+        "assertion": "存在敌人 currentPathIndex>0 且 path.length>0（敌人沿 opponentPath/playerPath 移动）",
+        "goldenValue": "moved.length > 0",
+        "movementSpeed": "speed=50 px/s；每段 80px ÷ 50 ≈ 1600ms/段",
+        "sourceLine": "MinimalBattleLoop.test.js:62-67"
+      },
+      {
+        "id": "T3-adou-health-drop",
+        "test": "5.1+5.2",
+        "precondition": "推进到敌人接触阿斗（路径约 15 段，首敌约 38480ms 接触）",
+        "assertion": "playerHealth+opponentHealth 下降（敌人接触攻击扣阿斗血）",
+        "goldenValue": "healthDropped == true",
+        "contactDamage": 1,
+        "sourceLine": "MinimalBattleLoop.test.js:70-78"
+      },
+      {
+        "id": "T4-place-4-soldiers",
+        "test": "5.3",
+        "precondition": "placeUnits(ctx,true,[['弓',4,2],['刀',3,2],['枪',5,2],['骑',3,1]])",
+        "assertion": "4 种兵全部放置成功，unitManager.count==4",
+        "goldenValue": "results.success=[true,true,true,true]; card.text=['弓','刀','枪','骑']; unitManager.count==4",
+        "sourceLine": "MinimalBattleLoop.test.js:89-92"
+      },
+      {
+        "id": "T5-soldier-attack-kill",
+        "test": "5.3",
+        "precondition": "tickN(400) 即 32000ms，敌人进入弓/枪攻击范围",
+        "assertion": "存在士兵 currentState=='UnitAttack'；battleState.killCount>0；触发 ENEMY_KILLED_BY 事件",
+        "goldenValue": "attacking.length>0; killCount>0; killEvents.length>0",
+        "sourceLine": "MinimalBattleLoop.test.js:101-110"
+      },
+      {
+        "id": "T6-enemy-death-pool",
+        "test": "5.3",
+        "precondition": "同 T5",
+        "assertion": "死亡敌人触发 presentation.resetForPool + objectPool.recoverByKey('mob') 回收表现节点",
+        "goldenValue": "resetForPoolAfter>before; mobRecoverAfter>before",
+        "sourceLine": "MinimalBattleLoop.test.js:113-116"
+      },
+      {
+        "id": "T7-loss-by-player-adou-death",
+        "test": "5.4a",
+        "precondition": "对手侧放兵防御对手阿斗，玩家阿斗不防御",
+        "assertion": "isGameOver=true; lastBattleResult=false（判负）; playerHealth==0; opponentHealth>0",
+        "goldenValue": "isGameOver=true; lastBattleResult=false; playerHealth==0; opponentHealth>0",
+        "idempotencyGuard": "首信号胜出：playerHealth≤0 发 BATTLE_FINISHED(false) 先于 opponentHealth≤0，幂等守卫固定判负",
+        "sourceLine": "MinimalBattleLoop.test.js:122-139"
+      },
+      {
+        "id": "T8-win-by-opponent-adou-death",
+        "test": "5.4b",
+        "precondition": "玩家侧放兵防御玩家阿斗，对手阿斗不防御",
+        "assertion": "isGameOver=true; lastBattleResult=true（判胜）; opponentHealth==0; playerHealth>0",
+        "goldenValue": "isGameOver=true; lastBattleResult=true; opponentHealth==0; playerHealth>0",
+        "idempotencyGuard": "首信号胜出：opponentHealth≤0 发 BATTLE_FINISHED(true) 先于 playerHealth≤0",
+        "sourceLine": "MinimalBattleLoop.test.js:142-160"
+      },
+      {
+        "id": "T9-cleanup-pool",
+        "test": "5.5",
+        "precondition": "战斗结束后调 enemyManager.gameOver()/unitManager.gameOver()/projectileManager.gameOver()/attackEffectManager.gameOver()",
+        "assertion": "enemyManager.count==0; unitManager.count==0; projectileManager.activeCount==0; attackEffectManager.activeCount==0",
+        "goldenValue": "全部归零",
+        "sourceLine": "MinimalBattleLoop.test.js:172-180"
+      },
+      {
+        "id": "T10-restart-next-battle",
+        "test": "5.5",
+        "precondition": "resetSingletonsForTests + 新 bootstrap",
+        "assertion": "isGameOver==false; playerHealth==playerMaxHealth; enemyManager.count==0；tickN(160) 后 enemyManager.count>0",
+        "goldenValue": "下一场可正常启动并出兵",
+        "sourceLine": "MinimalBattleLoop.test.js:186-195"
+      }
+    ],
+    "resultFreezeSemantics": {
+      "rule": "首个 BATTLE_FINISHED 事实胜出（幂等）；TryFreeze 不在伤害调用栈内重入销毁 Manager",
+      "signalSources": "BattleState.playerHealth setter ≤0 发 BATTLE_FINISHED(false)（BattleState.js:61）；opponentHealth setter ≤0 发 BATTLE_FINISHED(true)（:76）；BattleManager 第 20 波清空后发 BATTLE_FINISHED(true)（BattleManager.js:106）",
+      "minimalHandler": "MinimalBattleBootstrap.js:668-678 minimalBattleFinishedHandler 镜像 BattleFlowCoordinator._handleBattleFinished 的 isGameOver 守卫",
+      "cSharpNote": "C# 需以 BattleResultBuilder.TryFreeze 唯一幂等入口实现；JS 此处为最小监听桩，逐帧轨迹在 Phase 3/4/5 由 BattleTraceRecorder 补全"
+    },
+    "note": "本轨迹为测试断言级黄金输出（行为契约），非逐子步数值快照。逐子步位置/HP/事件轨迹将在 Phase 3/4/5 实现后由 BattleTraceRecorder 生成并补充为独立 fixture（task 8.1）。当前 Phase 0 只导出已由 MinimalBattleLoop.test.js 验证的关键事实。"
+  },
+  "bundleHashNote": "本 bundle 文件自身的 SHA-256 不在此自引用（自引用不可稳定计算）；其最终内容哈希记录在同目录 README.md 的 manifest 表中。各来源源文件 SHA-256 已分散记录在上方对应节点的 sourceSha256 字段。"
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component size="300,100" customExtention="GameFUI.FUIWidget">
+  <displayList>
+    <text id="n0_tdew" name="title" xy="0,30" size="300,40" fontSize="26" color="#ffffff" align="center" autoSize="none" text="Battle Start Widget"/>
+  </displayList>
+</component>

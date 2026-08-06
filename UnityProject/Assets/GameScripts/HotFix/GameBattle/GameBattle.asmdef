@@ -1,3 +1,20 @@
 {
-	"name": "GameBattle"
+    "name": "GameBattle",
+    "rootNamespace": "GameBattle",
+    "references": [
+        "GUID:24c092aee38482f4e80715eaa8148782",
+        "GUID:c9a297ec4539fd644a9fd43c8974f15f",
+        "GUID:af760644fe07b7945b1afa1ccb7cff14",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "GUID:e34a5702dd353724aa315fb8011f08c3"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }

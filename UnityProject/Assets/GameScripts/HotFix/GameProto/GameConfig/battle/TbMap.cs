@@ -17,56 +17,38 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbMap
 {
-
-     private readonly battle.Map _data;
-
-     public battle.Map Data => _data;
-
+    private readonly System.Collections.Generic.Dictionary<int, battle.Map> _dataMap;
+    private readonly System.Collections.Generic.List<battle.Map> _dataList;
+    
     public TbMap(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        if (n != 1) throw new SerializationException("table mode=one, but size != 1");
-        _data = global::GameConfig.battle.Map.DeserializeMap(_buf);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.Map>(n);
+        _dataList = new System.Collections.Generic.List<battle.Map>(n);
+        for(int i = n ; i > 0 ; --i)
+        {
+            battle.Map _v;
+            _v = global::GameConfig.battle.Map.DeserializeMap(_buf);
+            _dataList.Add(_v);
+            _dataMap.Add(_v.MapIndex, _v);
+        }
     }
 
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.Map> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyList<battle.Map> DataList => _dataList;
 
-    /// <summary>
-    /// 网格宽
-    /// </summary>
-     public int GridWidth => _data.GridWidth;
-    /// <summary>
-    /// 网格高
-    /// </summary>
-     public int GridHeight => _data.GridHeight;
-    /// <summary>
-    /// 宽
-    /// </summary>
-     public int Width => _data.Width;
-    /// <summary>
-    /// 高
-    /// </summary>
-     public int Height => _data.Height;
-    /// <summary>
-    /// 地图索引
-    /// </summary>
-     public int MapIndex => _data.MapIndex;
-    /// <summary>
-    /// 阻挡点
-    /// </summary>
-     public string Blocks => _data.Blocks;
-    /// <summary>
-    /// 玩家路径
-    /// </summary>
-     public System.Collections.Generic.List<UnityEngine.Vector2Int> PlayerPath => _data.PlayerPath;
-    /// <summary>
-    /// 对手路径
-    /// </summary>
-     public System.Collections.Generic.List<UnityEngine.Vector2Int> OpponentPath => _data.OpponentPath;
-    
+    public battle.Map GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.Map Get(int key) => _dataMap[key];
+    public battle.Map this[int key] => _dataMap[key];
+
     public void ResolveRef(Tables tables)
     {
-        _data.ResolveRef(tables);
+        foreach(var _v in _dataList)
+        {
+            _v.ResolveRef(tables);
+        }
     }
+
 }
 
 }

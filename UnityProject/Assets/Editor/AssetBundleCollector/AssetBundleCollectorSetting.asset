@@ -53,7 +53,7 @@ MonoBehaviour:
         UserData: 
     - GroupName: Configs
       GroupDesc: 
-      AssetTags: 
+      AssetTags: PRELOAD
       ActiveRuleName: EnableGroup
       Collectors:
       - CollectPath: Assets/AssetRaw/Configs

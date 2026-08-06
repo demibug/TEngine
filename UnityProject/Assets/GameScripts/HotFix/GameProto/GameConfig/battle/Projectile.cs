@@ -12,11 +12,16 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 弹道类型
+/// </summary>
 public sealed partial class Projectile : Luban.BeanBase
 {
     public Projectile(ByteBuf _buf) 
     {
         {int n0 = _buf.ReadSize(); Types = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); Types.Add(_e0);}}
+        PrimaryType = _buf.ReadString();
+        ArrowSpeed = _buf.ReadInt();
     }
 
     public static Projectile DeserializeProjectile(ByteBuf _buf)
@@ -24,10 +29,15 @@ public sealed partial class Projectile : Luban.BeanBase
         return new battle.Projectile(_buf);
     }
 
-    /// <summary>
-    /// 弹道类型列表
-    /// </summary>
     public readonly System.Collections.Generic.List<string> Types;
+    /// <summary>
+    /// 本期唯一注册投射物类型(SimpleDynamicArrow)
+    /// </summary>
+    public readonly string PrimaryType;
+    /// <summary>
+    /// 箭矢移动速度(px/s,TargetEnemyMovement 默认 200)
+    /// </summary>
+    public readonly int ArrowSpeed;
    
     public const int __ID__ = -736931585;
     public override int GetTypeId() => __ID__;
@@ -40,6 +50,8 @@ public sealed partial class Projectile : Luban.BeanBase
     {
         return "{ "
         + "types:" + Luban.StringUtil.CollectionToString(Types) + ","
+        + "primaryType:" + PrimaryType + ","
+        + "arrowSpeed:" + ArrowSpeed + ","
         + "}";
     }
 }

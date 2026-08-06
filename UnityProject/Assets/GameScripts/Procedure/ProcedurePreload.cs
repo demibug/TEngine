@@ -123,6 +123,18 @@ namespace Procedure
             }
         }
 
+        // 时序契约（task 1.11 / battle-config-snapshot spec）：
+        // 1. AssetBundleCollectorSetting.asset 的 Configs 组已打 PRELOAD 标签，
+        //    本方法 GetAssetInfos("PRELOAD") 会取到 Assets/AssetRaw/Configs/bytes/ 下的
+        //    battle_*.bytes / item_tbitem.bytes 等配置二进制，由 PreLoad 异步预加载到 YooAsset 缓存。
+        // 2. ConfigSystem.Instance.Load() 的显式调用必须在热更域入口 GameApp.Entrance
+        //    （GameEventHelper.Init() 之后、StartGameLogic() 之前）完成——本文件属主包
+        //    Assembly-CSharp（Assets/GameScripts/Procedure/ 无 asmdef），不得直接引用热更程序集
+        //    GameProto，故不在此处调用 ConfigSystem（避免主包→热更逆向依赖，违反热更边界）。
+        // 3. GameApp.Entrance 由 ProcedureLoadAssembly 反射调用，时序晚于本流程，
+        //    LoadByteBuf 的同步 LoadAsset<TextAsset> 届时命中 PRELOAD 缓存，不触发真实同步 IO。
+        // 4. ConfigSystem.Tables getter 已硬化为未 Load 时抛 InvalidOperationException，
+        //    任何子步懒加载会被立即发现，满足“BattleSimulation 子步不触发同步 IO”。
         private void LoadAllConfig()
         {
             if (_resourceModule.PlayMode == EPlayMode.EditorSimulateMode)

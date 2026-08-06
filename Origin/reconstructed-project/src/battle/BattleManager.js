@@ -145,6 +145,8 @@ class BattleManager extends SingletonBase {
   }
 
   _chooseSpecialSpawnIndex() {
+    // specialSpawnPolicy 可选：未注入时降级为"无特殊生成"（返回 -1），不 throw。
+    if (!this.specialSpawnPolicy) return -1;
     return this.specialSpawnPolicy.shouldMarkSpecialSpawn()
       ? this.random.range(0, this.unitsThisWave, true)
       : -1;
@@ -218,7 +220,8 @@ class BattleManager extends SingletonBase {
   }
 
   _requireConfigured() {
-    for (const name of ['gameData','enemyManager','eventBus','gameLoop','unitManager','placementReservations','random','specialSpawnPolicy']) {
+    // specialSpawnPolicy 改为可选：未注入时 _chooseSpecialSpawnIndex 降级为"无特殊生成"默认值，不 throw。
+    for (const name of ['gameData','enemyManager','eventBus','gameLoop','unitManager','placementReservations','random']) {
       if (!this[name]) throw new Error(`BattleManager requires ${name}`);
     }
   }

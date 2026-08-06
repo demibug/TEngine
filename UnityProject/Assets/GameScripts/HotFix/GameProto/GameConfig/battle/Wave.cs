@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 波次配置
+/// </summary>
 public sealed partial class Wave : Luban.BeanBase
 {
     public Wave(ByteBuf _buf) 
@@ -21,6 +24,7 @@ public sealed partial class Wave : Luban.BeanBase
         {int n0 = _buf.ReadSize(); BossSpawnChances = new System.Collections.Generic.List<float>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { float _e0;  _e0 = _buf.ReadFloat(); BossSpawnChances.Add(_e0);}}
         {int n0 = _buf.ReadSize(); SpawnStrategyWeights = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); SpawnStrategyWeights.Add(_e0);}}
         {int n0 = _buf.ReadSize(); SpawnStrategies = new System.Collections.Generic.List<System.Collections.Generic.List<float>>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { System.Collections.Generic.List<float> _e0;  {int n1 = _buf.ReadSize(); _e0 = new System.Collections.Generic.List<float>(n1);for(var i1 = 0 ; i1 < n1 ; i1++) { float _e1;  _e1 = _buf.ReadFloat(); _e0.Add(_e1);}} SpawnStrategies.Add(_e0);}}
+        SkipBoss = _buf.ReadBool();
     }
 
     public static Wave DeserializeWave(ByteBuf _buf)
@@ -28,26 +32,15 @@ public sealed partial class Wave : Luban.BeanBase
         return new battle.Wave(_buf);
     }
 
-    /// <summary>
-    /// 每波怪物数
-    /// </summary>
     public readonly System.Collections.Generic.List<int> WaveUnitCounts;
-    /// <summary>
-    /// Boss波次号
-    /// </summary>
     public readonly System.Collections.Generic.List<int> BossWaveNumbers;
-    /// <summary>
-    /// Boss出现概率
-    /// </summary>
     public readonly System.Collections.Generic.List<float> BossSpawnChances;
-    /// <summary>
-    /// 生成策略权重
-    /// </summary>
     public readonly System.Collections.Generic.List<int> SpawnStrategyWeights;
-    /// <summary>
-    /// 生成策略表
-    /// </summary>
     public readonly System.Collections.Generic.List<System.Collections.Generic.List<float>> SpawnStrategies;
+    /// <summary>
+    /// 本期显式跳过 Boss
+    /// </summary>
+    public readonly bool SkipBoss;
    
     public const int __ID__ = -795434353;
     public override int GetTypeId() => __ID__;
@@ -64,6 +57,7 @@ public sealed partial class Wave : Luban.BeanBase
         + "bossSpawnChances:" + Luban.StringUtil.CollectionToString(BossSpawnChances) + ","
         + "spawnStrategyWeights:" + Luban.StringUtil.CollectionToString(SpawnStrategyWeights) + ","
         + "spawnStrategies:" + Luban.StringUtil.CollectionToString(SpawnStrategies) + ","
+        + "skipBoss:" + SkipBoss + ","
         + "}";
     }
 }

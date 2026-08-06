@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 敌人类型配置(逆向快照)
+/// </summary>
 public sealed partial class Enemy : Luban.BeanBase
 {
     public Enemy(ByteBuf _buf) 

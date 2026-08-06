@@ -279,7 +279,7 @@ public class EventInterfaceGenerator : ISourceGenerator
         sb.AppendLine();
         sb.AppendLine($"namespace {Definition.NameSpace}");
         sb.AppendLine($"{{");
-        sb.AppendLine($"    public partial class {interfaceName}_Gen : {interfaceName}");
+        sb.AppendLine($"    public partial class {interfaceName}_Gen : {interfaceFullName}");
         sb.AppendLine("    {");
         sb.AppendLine("        private EventDispatcher _dispatcher;");
         sb.AppendLine($"        public {interfaceName}_Gen(EventDispatcher dispatcher)");

@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 武器符号注册表(逆向快照)
+/// </summary>
 public sealed partial class WeaponRegistry : Luban.BeanBase
 {
     public WeaponRegistry(ByteBuf _buf) 

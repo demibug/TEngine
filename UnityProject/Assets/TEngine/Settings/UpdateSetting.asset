@@ -15,6 +15,10 @@ MonoBehaviour:
   projectName: Demo
   HotUpdateAssemblies:
   - GameProto.dll
+  - GameCommon.dll
+  - GameFUI.dll
+  - GamePlay.dll
+  - GameBattle.dll
   - GameLogic.dll
   AOTMetaAssemblies:
   - mscorlib.dll

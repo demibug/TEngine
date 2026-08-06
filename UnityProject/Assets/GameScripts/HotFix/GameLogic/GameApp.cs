@@ -28,6 +28,16 @@ public partial class GameApp
         _hotfixAssembly = (List<Assembly>)objects[0];
         Log.Warning("======= 看到此条日志代表你成功运行了热更新代码 =======");
         Log.Warning("======= Entrance GameApp =======");
+
+        // task 1.11 / task 3.4：在 ProcedurePreload 完成 PRELOAD 预加载后，
+        // 由热更域入口显式调用 ConfigSystem.Load()，构造 Luban Tables。
+        // 必须在任何 BattleModule 配置访问前完成（battle-config-snapshot spec
+        // "Runtime consumes an immutable configuration snapshot"），
+        // 且 BattleSimulation 子步不得触发同步 IO（ConfigSystem.Tables getter
+        // 已硬化为未 Load 时抛异常）。此调用在 GameEventHelper.Init() 之后、
+        // StartGameLogic() 之前完成，保证组合根注册 BattleModule 前配置已就绪。
+        ConfigSystem.Instance.Load();
+
         Utility.Unity.AddDestroyListener(Release);
         Log.Warning("======= StartGameLogic =======");
         StartGameLogic();
@@ -35,6 +45,11 @@ public partial class GameApp
     
     private static void StartGameLogic()
     {
+        // task 2.7：在 GameLogic 唯一组合根显式注册一次 BattleModule。
+        // 必须在任何战斗 UI 或 GameModule.Battle 访问之前调用，且只有 HotFixModules.Register
+        // 允许调用 ModuleSystem.RegisterModule（task 2.7 约束）。
+        HotFixModules.Register();
+
         // GameEvent.Get<ILoginUI>().ShowLoginUI();
         GameModule.UI.ShowUIAsync<BattleMainUI>();
     }

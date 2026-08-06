@@ -1,12 +1,16 @@
 'use strict';
-const { DeckDefinitions } = require('./DeckDefinitions');
+const { DeckDefinitions, BASE_SOLDIER_TEXTS } = require('./DeckDefinitions');
 const { UnitCard } = require('./UnitCard');
 
 /** Engine-independent reconstruction of vN + r0 refresh path. */
 class DeckManager {
-  constructor({ gameData, economy, randomSource = Math.random, logger = console, definitions = DeckDefinitions } = {}) {
+  constructor({ gameData, economy, randomSource = Math.random, logger = console, definitions = DeckDefinitions, minimalMode = false } = {}) {
     if (!gameData || !economy) throw new TypeError('DeckManager requires gameData and BattleEconomy');
     Object.assign(this, { gameData, economy, randomSource, logger, definitions });
+    // 最简战斗模式开关（D1，默认 false 保持完整模式行为不变）：
+    //   true  → drawText 只从 BASE_SOLDIER_TEXTS（刀/弓/枪/骑）抽取，injectShovel 跳过
+    //   false → 走原 poolForSide（108 元素）逻辑，injectShovel 正常执行
+    this.minimalMode = Boolean(minimalMode);
     this.hands = { player: [], opponent: [] };
     this.nextCardId = 1;
     this.started = false;
@@ -85,10 +89,19 @@ class DeckManager {
    * （bundle 中 np.range(0,k.length,true) 即下标随机）。空池兜底 '刀'。
    * 此为简单抽取路径（不 no-repeat）；武将字 no-repeat 抽取见 drawCardNoRepeat(bO)。
    *
+   * D1 最简模式（this.minimalMode=true）：从 BASE_SOLDIER_TEXTS（刀/弓/枪/骑 4 元素）
+   * 抽取，不抽农/铲/武将字，避免 UnitRegistry throw。minimalMode=false 走原 poolForSide。
+   *
    * @param {boolean} side true=玩家侧，false=AI侧
    * @returns {string} 抽到的字（可为 铲/武将字），空池返回 '刀'
    */
   drawText(side) {
+    // D1 最简模式：只从 4 元素基础兵抽取，绕过 108 元素 poolForSide
+    if (this.minimalMode) {
+      const pool = BASE_SOLDIER_TEXTS;
+      const r = Math.max(0, Math.min(0.999999999, Number(this.randomSource()) || 0));
+      return pool[Math.floor(r * pool.length)] || '刀';
+    }
     const pool = this.poolForSide(side);
     const r = Math.max(0, Math.min(0.999999999, Number(this.randomSource()) || 0));
     return pool[Math.floor(r * pool.length)] || '刀';
@@ -174,6 +187,8 @@ class DeckManager {
    * 由 startGame 末尾调用（bundle:46497），亦可在 round 切换时按需调用。
    */
   injectShovel() {
+    // D1 最简模式：跳过铲子注入（牌池不注入额外铲，保持只含基础兵）
+    if (this.minimalMode) return;
     const player = this._player();
     if (!player) return; // player 不可达：安全兜底不注入
     const roundDay = Number(player.roundDay) || 0;

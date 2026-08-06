@@ -9,6 +9,11 @@ const DECK_POOL_CONFIG_PATH = path.join(__dirname, '../../unity-export/config/de
 // 4 元素回退牌池（JSON 加载失败时使用，忠实 v0.8.1 原始 BASE_POOL）
 const BASE_POOL = Object.freeze(['刀', '弓', '枪', '骑']);
 
+// 最简战斗模式基础兵字表（D1）：复用本文件 BASE_POOL（已是 4 元素 ['刀','弓','枪','骑']），
+// 避免与 src/units/UnitConfig.js BASE_SOLDIER_TEXTS 形成双源真值。DeckManager
+// minimalMode=true 时 drawText 从此抽取，不抽农/铲/武将字。
+const BASE_SOLDIER_TEXTS = BASE_POOL;
+
 /**
  * 从 deck-pool.json 加载 108 元素牌池并按 count 展开为扁平数组。
  *
@@ -56,4 +61,4 @@ const DeckDefinitions = Object.freeze({
   baseUnitCost: 1,
   maxLevel: 3,
 });
-module.exports = { BASE_POOL, DECK_POOL, DeckDefinitions };
+module.exports = { BASE_POOL, BASE_SOLDIER_TEXTS, DECK_POOL, DeckDefinitions };

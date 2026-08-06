@@ -1,9 +1,11 @@
 # FairyGUI 模块接入调研与实施建议
 
 > 调研日期：2026-08-04  
-> 状态：设计调研完成，尚未开始实现  
+> 更新日期：2026-08-05（OpenSpec change `integrate-fairygui-module` 任务 7.8）  
+> 状态：Editor-ready。`GameFUI` 基础模块已在 Unity Editor / Editor PlayMode / YooAsset Editor 模式完成纵向闭环；IL2CPP + HybridCLR Player 与生产组合根接入尚未验证。  
 > 用途：作为 TEngine 当前工程接入 FairyGUI（下称 FGUI）的事实基线、设计评审记录与实施清单。  
-> 规则：文中“已验证”来自当前源码；“参考做法”来自 SAUnity；“建议”尚需通过原型或真机包验证。
+> 规则：文中“已验证”来自当前源码；“参考做法”来自 SAUnity；“建议”尚需通过原型或真机包验证。  
+> 实施状态详见第 15 节《Editor 验收结论与后续 change 交接项》。
 
 ## 1. 结论摘要
 
@@ -114,6 +116,11 @@ FUIWindow : GComponent
 
 ### 3.3 GameFUI 当前并不是一个完整模块
 
+> 状态更新（2026-08-05，任务 7.8）：本节描述的是 change `integrate-fairygui-module` 启动前的初始事实。
+> 截至任务 5.2-6.7、7.1-7.6 完成，`GameFUI` 已成为具备 `FUIModule`、`FUIWindow`、`FUIWidget`、
+> `FUIBindingRegistry`、`PackageLoader`、`FUIResourceValidator`、固定层容器和完整窗口状态机的可运行模块；
+> 详见第 15 节《Editor 验收结论与后续 change 交接项》。下文保留原始描述作为基线记录。
+
 当前 `Assets/GameScripts/HotFix/GameFUI/` 主要是 FairyGUI 自动生成代码：
 
 - 生成组件直接继承 `GComponent`；
@@ -125,14 +132,24 @@ FUIWindow : GComponent
 
 这会产生一个核心冲突：生成类已经继承 `GComponent`，业务窗口若还需要继承 `FUIWindow`，C# 单继承无法同时满足。必须调整生成链，让生成的根窗口类继承 `FUIWindow`，而不是在生成后手工修改代码。
 
-### 3.4 当前包资源存在命名风险
+### 3.4 包资源命名与规范清单
 
-`Assets/AssetRaw/FUI` 下观察到以下命名并存：
+已核对 `FGUIProject` 源文件、生成代码、发布二进制内的包元数据、代码引用和 YooAsset Collector：
 
-- `UICommon_fui.bytes` 与 `Common_fui.bytes`
-- `UIBattle_fui.bytes` 与 `BattleUI_fui.bytes`
+- `FGUIProject/assets/UIBattle/package.xml` 的包 ID 为 `56fffadn`，当前发布二进制 `UIBattle_fui.bytes` 内部包名为 `UIBattle`，组件为 `BattleStartPanel`；`UI_BattleStartPanel` 也使用 `UIBattle` 创建对象。
+- `FGUIProject/assets/UICommon/package.xml` 的包 ID 为 `5w9iycrv`，当前发布二进制 `UICommon_fui.bytes` 内部包名为 `UICommon`，并发布外部图集 `UICommon_atlas0.png`。
+- `BattleUI_fui.bytes` 与 `Common_fui.bytes` 使用相同包 ID，但内部包名和组件名仍是历史值 `BattleUI/BattleStart` 与 `Common`；运行时代码没有引用这些历史名字，因此它们是待清理的旧发布产物。
+- 当前 `AssetBundleCollectorConfig.xml` 尚未收集 `Assets/AssetRaw/FUI`，所以上述文件目前没有可用于 YooAsset 加载的 location；加入 `AddressByFileName + PackDirectory` 收集规则后，location 为去掉扩展名的文件名。
 
-生成代码使用的包名是 `UIBattle`。在实现资源定位规则之前，必须确认这些文件分别是什么版本、是否仍被引用、资源地址最终使用包名还是文件名。否则很容易出现“编辑器可开、资源包环境找不到”的问题。
+规范资源清单如下：
+
+| 逻辑包 | 发布文件 | YooAsset location | 来源与用途 |
+|---|---|---|---|
+| `UIBattle` | `UIBattle_fui.bytes` | `UIBattle_fui` | 包描述，包含 `BattleStartPanel`，依赖 `UICommon` |
+| `UICommon` | `UICommon_fui.bytes` | `UICommon_fui` | 公共包描述，包含 `BtnNormal` |
+| `UICommon` | `UICommon_atlas0.png` | `UICommon_atlas0` | `UICommon` 外部图集 |
+
+`BattleUI_fui.bytes`、`Common_fui.bytes` 和 `Common_atlas0.png` 不属于规范资源集；在发布校验能够阻止新旧命名并存后移除。
 
 ### 3.5 模块系统有注册约束
 
@@ -158,6 +175,14 @@ FUIWindow : GComponent
 这意味着“包描述文件已经解析完成”不一定等于“面板所需贴图等资源已经就绪”，Show API 必须定义清楚何时算加载成功。
 
 ### 3.7 热更配置尚未覆盖 GameFUI
+
+> 状态更新（2026-08-05，任务 7.8）：change `integrate-fairygui-module` 的 Non-Goals 明确规定不修改
+> HybridCLR/UpdateSetting/HotFixModules/Obfuz 等共享热更配置。任务 7.7 diff 审查发现这些配置在
+> 本 change 执行期间被其他并行工作（`HotFixModules.Register()` 与 `BattleModule` 注册）触及：
+> `HybridCLRSettings.asset` 与 `UpdateSetting.asset` 已加入 `GameCommon/GameFUI/GamePlay/GameBattle`
+> 条目，`GameApp.cs` 调用了 `HotFixModules.Register()`，`GameLogic.asmdef` 增加了 GameBattle/GameCommon 引用。
+> 这些修改属于后续共享热更 change 的职责边界，不属于本 change 的已验证范围；
+> 后续共享热更 change 必须重新核对这些配置的来源、必要性与正确性。详见第 15.4 节。
 
 当前 HybridCLR 热更程序集和更新 DLL 配置主要包含 `GameProto`、`GameLogic`，没有 `GameFUI`。新增程序集后至少需要核对：
 
@@ -626,7 +651,7 @@ Assets/GameScripts/HotFix/GameFUI/
 RegisterComExtension(name, className, superClassName)
 ```
 
-而 SAUnity 插件使用旧版两参数调用。因此只能借鉴机制，不能原样复制代码。第三个参数的具体值应在当前 Editor 中以一个测试扩展验证；预期用于声明自定义扩展所基于的 FairyGUI 原生类型（面板/组件均为 `GComponent`）。
+而 SAUnity 插件使用旧版两参数调用。因此只能借鉴机制，不能原样复制代码。当前 Editor 的运行时异常已验证：第三个参数不是 FairyGUI 原生类型，而是上一级已注册自定义扩展的 `className`；直接基于默认 `GComponent` 的首级自定义扩展应传 `nil`。
 
 推荐导出规则：
 
@@ -802,19 +827,19 @@ UnityProject/FGUIProject/plugins/组件扩展/
 App.project:RegisterComExtension(
     'Window',
     'GameFUI.FUIWindow',
-    'FairyGUI.GComponent')
+    nil)
 
 App.project:RegisterComExtension(
     'Widget',
     'GameFUI.FUIWidget',
-    'FairyGUI.GComponent')
+    nil)
 ```
 
 三个参数分别表示：
 
 - `name`：FairyGUI Editor“扩展”下拉框中的显示名称；
 - `className`：发布 C# 代码时使用的自定义父类全名；
-- `superClassName`：该自定义扩展基于的 FairyGUI 原生类型；Window/Widget 均基于 `GComponent`。
+- `superClassName`：上一级已注册自定义扩展的 `className`，用于构建自定义扩展继承链；首级扩展传 `nil`。`Window/Widget` 的 C# 类型自身继承 `FairyGUI.GComponent`，不在这里重复传原生类型名。
 
 不建议直接复制参考工程的 `ClearComExtensions()`：它可能清除同一项目中其他插件注册的自定义扩展。除非确认本插件是项目唯一的扩展所有者，否则只注册自己负责的 Window/Widget。
 
@@ -842,6 +867,18 @@ App.project:RegisterComExtension(
 
 如果后续决定不通过生成类元数据自动发现包和组件，而是另行生成强类型注册表，则 `PkgName/ResName` 可以进入注册表，不必强制放进每个类；在确定绑定方案前，不应同时维护两套元数据来源。
 
+#### C. 按发布范围清理自动生成代码
+
+项目级 `发布代码` 插件保留默认生成结构，并根据本轮实际生成文件集合清理过期代码：
+
+- 同名生成文件直接覆盖，不在发布前删除，因此已有 `.cs.meta` 和 Unity GUID 保持不变；
+- 点击“发布全部”时，发布成功后清理 `Assets/GameScripts/HotFix/GameFUI/UIBase` 下未在本轮生成的旧自动生成代码；
+- 发布单个包或选中的多个包时，发布成功后仅清理各自 `UIBase/<包名>` 下未在本轮生成的旧代码；
+- 只有组件改名或永久删除导致旧 `.cs` 不再生成时，才同时删除该旧文件对应的孤立 `.cs.meta`；
+- 发布失败时不清理旧代码或 `.meta`；目录及目录 `.meta` 始终保留，且不删除没有自动生成标记的手写 C# 文件；
+- 不清理 `Assets/AssetRaw/FUI` 的发布资源，资源清理由 FairyGUI Editor 的内置发布流程负责；
+- 代码输出目录必须等于当前工程约定的 `Assets/GameScripts/HotFix/GameFUI/UIBase`，否则插件中止发布，避免错误配置造成越界删除。
+
 ### 14.6 绑定顺序
 
 推荐启动顺序：
@@ -864,44 +901,48 @@ App.project:RegisterComExtension(
 
 ### 14.7 调整后的实施顺序
 
+> 状态更新（2026-08-05，任务 7.8）：以下 P0-P4 清单的完成状态已根据 change `integrate-fairygui-module`
+> 的实际实现结果更新。P0-P3 全部完成；P4 的前三项完成，最后一项“HybridCLR 真机加载顺序验证”
+> 属于后续共享热更 change 的职责，本 change 未验证（见第 15.4 节）。
+
 #### P0：锁定命名与生成契约
 
-- [ ] 确认手写基类使用 `FUIWindow/FUIWidget`；
+- [x] 确认手写基类使用 `FUIWindow/FUIWidget`；
 - [x] 确认生成类继续使用 `UI_` 前缀；
-- [ ] 确认业务类不带 `UI_` 前缀；
-- [ ] 确认包元数据唯一来源是生成类常量还是生成注册表；
+- [x] 确认业务类不带 `UI_` 前缀；
+- [x] 确认包元数据唯一来源是生成类常量还是生成注册表（已定为生成类常量 `URL/PkgName/ResName`）；
 - [x] 不进行 `UI_ -> Base` 重命名，避免无收益的引用迁移。
 
 #### P1：导出插件原型
 
-- [ ] 实现 Window/Widget 两种组件扩展；
-- [ ] 将 `BattleStartPanel` 标记为 Window；
-- [ ] 发布为 `UI_BattleStartPanel : FUIWindow`；
-- [ ] 保留默认字段绑定、CreateInstance 和 Binder；
-- [ ] 若选用类常量方案，生成 `PkgName/ResName`；
-- [ ] 连续发布两次并检查输出稳定。
+- [x] 实现 Window/Widget 两种组件扩展；
+- [x] 将 `BattleStartPanel` 标记为 Window；
+- [x] 发布为 `UI_BattleStartPanel : FUIWindow`；
+- [x] 保留默认字段绑定、CreateInstance 和 Binder；
+- [x] 若选用类常量方案，生成 `PkgName/ResName`；
+- [x] 连续发布两次并检查输出稳定。
 
 #### P2：最小运行时基类
 
-- [ ] 新增 `IFUIWindow/FUIWindow/FUIWidget`；
-- [ ] 只实现构造、显式生命周期入口、OwnerWindow 和 Dispose 骨架；
-- [ ] 不在这一阶段实现完整包卸载、缓存和动画；
-- [ ] 保证生成代码可编译。
+- [x] 新增 `IFUIWindow/FUIWindow/FUIWidget`；
+- [x] 只实现构造、显式生命周期入口、OwnerWindow 和 Dispose 骨架；
+- [x] 不在这一阶段实现完整包卸载、缓存和动画；
+- [x] 保证生成代码可编译。
 
 #### P3：业务继承与绑定闭环
 
-- [ ] 新增 `BattleStartPanel : UI_BattleStartPanel`；
-- [ ] 在首次 CreateObject 前把 URL 绑定到业务类型；
-- [ ] 验证实际创建类型为 `BattleStartPanel`；
-- [ ] 新增一个 Widget 示例，验证嵌套创建和 OwnerWindow 注入；
-- [ ] 验证业务 Window/Widget 与普通 GComponent 可以共存。
+- [x] 新增 `BattleStartPanel : UI_BattleStartPanel`（本 change 使用测试业务类型 `TestBattleStartPanel`）；
+- [x] 在首次 CreateObject 前把 URL 绑定到业务类型；
+- [x] 验证实际创建类型为 `BattleStartPanel`（测试中为 `TestBattleStartPanel`）；
+- [x] 新增一个 Widget 示例，验证嵌套创建和 OwnerWindow 注入（`TestBattleStartWidget`）；
+- [x] 验证业务 Window/Widget 与普通 GComponent 可以共存。
 
 #### P4：接入 FUIModule 和资源系统
 
-- [ ] 将 Window 纳入层级、全屏遮挡、打开/关闭和缓存；
-- [ ] 将 Widget 生命周期绑定到所属 Window；
-- [ ] 接入包租约、依赖和 YooAsset handle；
-- [ ] 完成 HybridCLR 真机加载顺序验证。
+- [x] 将 Window 纳入层级、全屏遮挡、打开/关闭和缓存；
+- [x] 将 Widget 生命周期绑定到所属 Window；
+- [x] 接入包租约、依赖和 YooAsset handle；
+- [ ] 完成 HybridCLR 真机加载顺序验证（后续共享热更 change 负责，见 15.4）。
 
 ### 14.8 本轮决策状态
 
@@ -922,3 +963,116 @@ App.project:RegisterComExtension(
 - 手工修改生成文件；
 - 直接复制 SAUnity 的自动绑定 runtime 或删减版生成器；
 - 在生成类和独立注册表中重复维护不同的包名/组件名。
+
+## 15. Editor 验收结论与后续 change 交接项
+
+> 本节由 OpenSpec change `integrate-fairygui-module` 任务 7.8 在 2026-08-05 补充。
+> 内容来源：change 的 proposal/design/specs、tasks 5.2-6.7 与 7.1-7.6 的实际产出代码、
+> `Assets/GameScripts/HotFix/GameFUI/` 与 `Assets/GameScripts/HotFix/GameFUI.Tests/` 的现存文件。
+> 本节只记录已通过编译与 Editor 测试的事实，不声明 IL2CPP/HybridCLR Player 已验证。
+
+### 15.1 已验证事实（Editor-ready）
+
+以下功能在 Unity Editor 编译、EditMode 测试、Editor PlayMode 测试与 YooAsset Editor 模式中已实现并通过校验：
+
+1. **程序集骨架与依赖边界**：`GameFUI.asmdef` 已创建，只引用 `TEngine.Runtime`、`FairyGUI`、`YooAsset`、`UniTask`（以 GUID 引用），不引用 `GameLogic`、`GamePlay`、`GameBattle`。`AssemblyInfo.cs` 提供 `InternalsVisibleTo` 用于测试程序集注入内存 provider。
+2. **基础契约枚举**：`FUILayer`（Background/Normal/Popup/Guide/Tips/System）、`FUIWindowState`（Absent/Loading/Opening/Open/Hidden/Closing/Cached/Disposed）、`FUICacheMode`（None/Cache）、`FUIPackageUnloadPolicy`（KeepUntilShutdown/Delayed）、`FUISafeAreaMode`（Full/Safe）已固定。
+3. **FUIWindow / FUIWidget 基类**：`FUIWindow : FairyGUI.GComponent` 与 `FUIWidget : FairyGUI.GComponent` 已实现同步生命周期（`OnCreate/OnOpen/OnRefresh/OnHide/OnClose/OnDispose`）、`UserDatas/UserData`、`OpenCancellationToken`、`Context`、幂等 `IsCreated/IsDisposed` 与 Widget 的幂等 `AttachContext/IsAttached/LastAttachOwnerChanged/ResetForReuse`。
+4. **FUIDescriptor 显式注册**：`FUIDescriptor` 为 `readonly struct`，包含 `URL/PackageName/ComponentName/OwnerType/TargetType/Layer/FullScreen/CacheMode/SafeAreaMode/Creator/Attach/Detach`，是运行时创建受管理对象的唯一描述来源。
+5. **FUIBindingRegistry**：实现类型、URL、owner/Package 唯一性校验，支持 Binder → 最终 Widget → 最终 Window 覆盖顺序，并提供 `Freeze` 冻结与 `IsActive` 查询；冻结后新增或冲突注册直接抛 `FUIException`。
+6. **FUIObjectFactoryIntegration**：全局 `UIObjectFactory` 的 creator 只捕获 URL 并查询当前活动 Registry；模块 Shutdown 后调用必须明确失败；不调用全局 `UIObjectFactory.Clear()`。
+7. **IFUIModule / FUIModule / FUI 门面**：`FUI.RegisterModule(IResourceModule, FUIOptions)` 公开注册入口、`FUI.Module` getter（未注册抛异常，不隐式注册）、重复注册保护（进入 ModuleSystem 前拒绝第二次注册）、`RegisterModuleForTesting` internal 测试入口、`ClearModuleForShutdown` 退出清理；`FUI.ShowAsync<T>`/`Hide`/`Close` 转发到 `IFUIModule`。
+8. **ShowAsync 公开契约**：两个重载 `ShowAsync<T>(params object[])` 与 `ShowAsync<T>(CancellationToken, params object[])`，返回非空 Open 窗口；调用方取消只取消自己的等待，共享加载只受模块 lifetime token 控制；失败包装为含窗口类型/URL/包名/状态的 `FUIException`。
+9. **窗口状态机**：`WindowEntry` 实现 Absent→Loading→Opening→Open↔Hidden、Closing→Cached→Opening、Closing→Disposed、Cancelled/Failed→Absent 的显式状态转换；`operation version` 使旧操作完成后只能回滚；同类型请求合并加载与创建，每个有效请求进入 FIFO 刷新队列并先更新 `UserDatas/UserData` 再同步 `OnRefresh`。
+10. **实例与每轮打开生命周期分离**：首次创建顺序 `AttachContext → Descriptor.Attach → AttachWidgetTree → OnCreate`；每轮打开 `Create open CTS → RegisterOpenEvents → OnOpen → OnRefresh`；Hide 不结束 Open 域；Close 取消 Open Token、清事件并执行 `OnClose`；最终释放 `Dispose Widgets → OnDispose → Descriptor.Detach → Dispose GObject → Release lease`。
+11. **固定层容器与安全区**：`FUILayerContainer` 在 `GRoot` 下建立 Background/Normal/Popup/Guide/Tips/System 六个固定层级容器，每层含 Full/Safe 两个子容器；监听 `Stage.onStageResized` 在分辨率、方向或 `Screen.safeArea` 变化时重算 Safe 子容器。
+12. **层内排序与全屏遮挡**：全屏窗口按窗口栈把被遮挡下层窗口的 `visible=false`、`touchable=false` 但保留 Stage 归属；关闭、隐藏或重排后统一恢复；Hide 采用 `visible/touchable=false` 而非移出 Stage，避免误触 `onRemovedFromStage`。
+13. **Widget 幂等 Attach 与受控创建**：初始 Widget 树在 `OnCreate` 前获得 `OwnerWindow`；动态创建/池化复用 Widget 通过受控入口 Attach 并检测 owner 变更；动态受管理 Widget 只允许来自窗口包或已声明依赖。
+14. **包加载“异步预载、同步解析”**：`PackageLoader` 实现 `{PackageName}_fui` 描述 handle 加载、`UIPackage.AddPackage` 与基于已加载 handle 表的同步资源解析器；外部项按 `Path.GetFileNameWithoutExtension(item.file)` 映射规范 location；并发预载包内贴图、音频等外部资源，Acquire 成功前全部进入 Ready。
+15. **包依赖与失败回滚**：递归 Acquire 依赖、同包任务合并、共享依赖租约、依赖环诊断；`LoadOperationLedger` 记录本次新增的包注册、handle、依赖 lease，任一步骤失败时按反向顺序原子回滚，不影响其他调用方已持有的共享记录。
+16. **包卸载策略**：`KeepUntilShutdown` 与 `Delayed` 两种策略；`PackageLease` 幂等释放、重复 Release 拒绝并报告诊断；延迟卸载期重新 Acquire 通过递增待卸载 version 取消旧卸载任务；存活窗口、缓存窗口、创建任务和上层依赖统一纳入包卸载前置检查。
+17. **模块 Shutdown 完整清理**：取消所有进行中的打开操作，按反向顺序关闭并释放窗口，执行 detach，清理本地描述、owner、活动 Registry 和静态模块缓存，把所持包租约交还资源管理能力；不调用全局 `UIObjectFactory.Clear()`。
+18. **FGUI 资源收集与校验**：`AssetBundleCollectorConfig.xml` 新增 `Assets/AssetRaw/FUI` 的 AddressByFileName + PackDirectory 收集规则；`FUIResourceValidator`（`GameFUI.Editor.asmdef`）在构建前校验 `{PackageName}_fui`、内部包名、外部资源前缀、location 唯一性及历史命名冲突。
+19. **FUI 资源规范清单已收敛**：历史 `BattleUI_fui.bytes`、`Common_fui.bytes`、`Common_atlas0.png` 已删除（含 `.meta`）；规范资源为 `UIBattle_fui.bytes`、`UICommon_fui.bytes`、`UICommon_atlas0.png`，location 分别为 `UIBattle_fui`、`UICommon_fui`、`UICommon_atlas0`。
+20. **FGUIProject 导出插件**：`FGUIProject/plugins/组件扩展` 注册 Window/Widget 两种自定义组件扩展并适配三参数 `RegisterComExtension`；`FGUIProject/plugins/发布代码` 以默认 `GenCode_CSharp.lua` 为基线，保留字段绑定、CreateInstance、Binder，新增 `URL/PkgName/ResName` 常量与自动生成标记。
+21. **生成继承链稳定**：`UI_BattleStartPanel : GameFUI.FUIWindow`、`UI_BattleStartWidget : GameFUI.FUIWidget`，连续发布两次输出稳定；`BattleStartPanel.xml` 持久化 Window 自定义扩展标记，`BattleStartWidget.xml` 为新增 Widget 标记。
+22. **测试程序集与测试 owner**：`GameFUI.Tests.asmdef`（Editor only）包含 `TestFUIOwner`、`TestBattleStartPanel`、`TestBattleStartWidget`；测试 owner 使用与未来业务 owner 完全相同的 Binder、Descriptor、Freeze 和 Show API，不引入测试专用运行时旁路；EditMode 与 PlayMode 测试覆盖 Registry、生命周期、包加载、Widget、卸载、UGUI 共存与 YooAsset Editor 寻址。
+23. **UGUI 共存**：`UIModule`（UGUI）保持不变，`FUIModule`（FairyGUI）独立并存；测试验证两套窗口栈可同时存在、分别关闭和模块退出时互不破坏。
+
+### 15.2 最终公共契约（GameFUI.dll 对外表面）
+
+以下契约已固定，后续业务 change 可直接依赖：
+
+- 模块注册：`FUI.RegisterModule(IResourceModule resourceModule, FUIOptions options = null)`；`FUI.Module` getter 未注册抛 `FUIException`；重复注册在进入 ModuleSystem 前被拒绝。
+- 窗口打开：`FUI.ShowAsync<T>(params object[] args)` 与 `FUI.ShowAsync<T>(CancellationToken cancellationToken, params object[] args)`，`where T : FUIWindow`；成功返回非空 Open 窗口；调用取消抛 `OperationCanceledException`，其余失败抛 `FUIException`。
+- 窗口隐藏：`FUI.Hide<T>()` / `FUI.Hide(FUIWindow window)`；只切 `visible/touchable`，不结束 Open 域。
+- 窗口关闭：`FUI.Close<T>()` / `FUI.Close(FUIWindow window)`；递增 operation version，按 CacheMode 决定是否最终释放。
+- 窗口查询：`IFUIModule.GetWindow<T>()`（未创建返回 null）、`IFUIModule.HasWindow<T>()`（返回 bool）。
+- Registry 冻结：`IFUIModule.FreezeBindings()`；所有 owner 完成注册后由装配方显式调用，冻结后新增注册直接报错。
+- 模块退出：`IFUIModule.Shutdown()`；取消所有进行中操作，按反向顺序释放，清空静态缓存，不调用全局 `UIObjectFactory.Clear()`。
+- 窗口基类：`FUIWindow : FairyGUI.GComponent`（`OnCreate/OnOpen/OnRefresh/OnHide/OnClose/OnDispose` 同步、`UserDatas/UserData/OpenCancellationToken/Context`）；`FUIWidget : FairyGUI.GComponent`（`OwnerWindow/Context/OnCreate/OnDispose`、幂等 `AttachContext`、`ResetForReuse`）。
+- 描述与注册：`FUIDescriptor`（不可变 readonly struct）、`FUIBindingRegistry.Register/Freeze/GetRegisteredUrls`。
+- 资源 provider：`IFUIResourceProvider`（最窄内部接口）、`YooAssetFUIResourceProvider`（包装公开 `IResourceModule`）、`InMemoryFUIResourceProvider`（internal 测试入口）。
+- 包租约：`PackageLease`（幂等 Release，重复 Release 报错）。
+- 选项：`FUIOptions`（`UnloadPolicy`、`UnloadDelaySeconds`，默认 KeepUntilShutdown）。
+- 层级：`FUILayer` 枚举（Background=0 ... System=5）、`FUISafeAreaMode`（Full/Safe）。
+
+### 15.3 Editor-ready 状态声明
+
+本 change 的交付结论为 **Editor-ready**，**不是 Player-ready**：
+
+- 已通过：Unity Editor 编译、EditMode 测试、Editor PlayMode 测试、YooAsset Editor 模式纵向验收。
+- 未验证：IL2CPP + HybridCLR 真机包构建、AOT 泛型元数据、程序集加载顺序、Obfuz 混淆、真机资源寻址与裁剪。
+- 本 change 未修改生产 `GameLogic` 组合根对 `FUI.RegisterModule` 的调用；`FUI.RegisterModule` 在本 change 中只直接构造 `FUIModule` 并存储到 `FUI._module`，不实际调用 `ModuleSystem.RegisterModule`。生产组合根的 ModuleSystem 集成由后续 change 负责。
+- 本 change 的 PlayMode 测试 harness 是唯一装配方：显式注入资源能力、注册 UICommon 基础 Binder、由测试 owner 注册最终测试 Window/Widget、冻结 Registry、ShowAsync、退出 Shutdown。
+
+### 15.4 后续 change 交接项
+
+以下事项明确交由后续 change 接管，本 change 未实施或未验证：
+
+#### 15.4.1 BattleModule 接入 FUI
+
+- BattleModule 尚未接入 FUI。本 change 使用仅位于测试程序集的 `TestFUIOwner`、`TestBattleStartPanel`、`TestBattleStartWidget` 验证与未来业务 Module 完全相同的注册契约，不创建或修改 `GameBattle/BattleModule`。
+- 后续 change 需要在 `GameBattle` 中创建真实业务 owner（如 `BattleFUIOwner`）与真实业务窗口（如 `BattleStartPanel : UI_BattleStartPanel`），按 Binder → 最终 Widget → 最终 Window 顺序注册，并冻结 Registry。
+- 后续 change 必须保证 `GameFUI` 先于依赖它的 `GameBattle` 加载，并在生产组合根 `HotFixModules.Register()` 中先注册 `FUIModule`、再注册业务 owner、最后冻结 Registry。
+- 注意：任务 7.7 diff 审查发现本 change 执行期间 `GameBattle.asmdef` 被修改（新增对 `TEngine.Runtime` 与 `GameCommon` 的引用）并新增了 `GameBattle/Module/BattleModule.cs` 等文件。这些修改属于后续 `battle-hotfix-integration` 等 change 的职责边界，不属于本 change 的已验证范围；后续 change 必须重新核对这些修改的来源、必要性与正确性。
+
+#### 15.4.2 共享热更配置接入
+
+- 本 change 的 Non-Goals 明确不修改 HybridCLR/UpdateSetting/HotFixModules/Obfuz/DLL 复制等共享热更配置。
+- 任务 7.7 diff 审查发现以下共享热更配置在本 change 执行期间被其他并行工作触及，但这些修改不属于本 change 的已验证范围：
+  - `ProjectSettings/HybridCLRSettings.asset` 的 `hotUpdateAssemblies` 新增 `GameCommon/GameFUI/GamePlay/GameBattle` 条目。
+  - `Assets/TEngine/Settings/UpdateSetting.asset` 的 `HotUpdateAssemblies` 新增对应 `.dll` 条目。
+  - `Assets/GameScripts/HotFix/GameLogic/GameApp.cs` 新增 `ConfigSystem.Instance.Load()` 与 `HotFixModules.Register()` 调用。
+  - `Assets/GameScripts/HotFix/GameLogic/GameModule.cs` 新增 `GameModule.Battle` 缓存访问。
+  - `Assets/GameScripts/HotFix/GameLogic/GameLogic.asmdef` 新增对 `GameBattle` 与 `GameCommon` 的引用。
+  - `Assets/GameScripts/HotFix/GameCommon/GameCommon.asmdef` 新增对 `TEngine.Runtime` 的引用。
+  - 新增 `Assets/GameScripts/HotFix/GameLogic/Module/HotFixModules.cs`（注册 `BattleModule`，不含 `FUIModule` 注册）。
+- 后续共享热更 change 必须重新核对这些配置的来源、必要性与正确性，并负责：
+  - 将 `GameFUI.dll` 纳入 `HybridCLRSettings` 热更程序集与 `UpdateSetting.HotUpdateAssemblies`，且加载顺序在依赖它的 `GamePlay`、`GameBattle`、`GameLogic` 之前。
+  - 在 `HotFixModules.Register()` 中加入 `FUI.RegisterModule(...)` 调用并传入生产 `IResourceModule`，先于业务模块注册。
+  - 核验 `FairyGUI.dll` 是否需要进入 `AOTMetaAssemblies`，并补全 `List<FUIWindow>`、`UniTask<FUIWindow>` 等泛型引用。
+  - 核验 `GameFUI.dll` 与 `GameLogic.dll`/`GameBattle.dll` 的加载顺序，避免继承类型解析失败。
+  - 核验 Obfuz 混淆对 `FUIWindow`/`FUIWidget`/`FUIBindingRegistry` 等公共契约的影响。
+  - 将 FairyGUI Package 资源纳入 YooAsset 版本清单与 Player 构建流程。
+
+#### 15.4.3 IL2CPP Player 验收
+
+- IL2CPP + HybridCLR Player 验收作为后续共享热更 change 的门禁，不是本 change 的完成条件。
+- 后续 change 必须在真实 IL2CPP 构建中验证：
+  - 依赖程序集先于使用者加载（`GameFUI` 先于 `GameBattle`/`GamePlay`/`GameLogic`）。
+  - `GameLogic` 仍为 `LogicMainDllName` 主入口。
+  - 重复模块注册被拒绝（`FUI.RegisterModule` 的重复注册保护在 ModuleSystem 前）。
+  - IL2CPP 裁剪不裁剪掉 `FUIWindow`/`FUIWidget`/`FUIBindingRegistry` 等必要类型。
+  - AOT 泛型元数据无缺失（含 `UniTask<T>`、`List<T>` 等泛型引用）。
+  - 真机资源寻址与 Editor 模式一致（`UIBattle_fui`/`UICommon_fui`/`UICommon_atlas0`）。
+  - 真机 `UIPackage.AddPackage` 与 `RemovePackage` 行为与 Editor 一致。
+
+### 15.5 已知风险与回滚
+
+- **共享热更配置被并行工作触及**：见 15.4.2。后续 change 必须核对来源与必要性；本 change 的 GameFUI 运行时与测试不依赖这些修改即可在 Editor 中独立闭环。
+- **`UIObjectFactory` 是全局静态注册表且没有按 URL 注销接口**：本 change 通过每包唯一 owner、绑定顺序、首次创建前冻结、creator 只捕获 URL 并查询活动 Registry 来规避；Shutdown 清理本地 Registry 与活动 Registry 静态引用，不调用全局 `UIObjectFactory.Clear()`。
+- **Editor 成功不能证明 HybridCLR/IL2CPP Player 正确**：本 change 明确标记为 Editor-ready，不声明 Player-ready。
+- **测试 owner 与未来真实业务 Module 存在装配差异**：测试 owner 使用与未来业务 owner 完全相同的 Binder、Descriptor、Freeze 和 Show API，不引入测试专用运行时旁路。
+- **UGUI 与 FGUI 双栈增加过渡期开销**：两套栈保持独立，不建立统一超大门面；按业务域迁移，保留随时停止注册 FGUI 的回滚能力。
+- **回滚方式**：停止运行 Editor 测试装配并移除 `GameFUI` 新增运行时、`GameFUI.Tests`、`GameFUI.Editor`、Collector FUI Group、`FGUIProject/plugins` 项目插件即可；现有 UGUI `UIModule`、窗口和资源路径不受影响。历史资源 `BattleUI_*`/`Common_*` 删除需要连同原 `.meta` 从版本控制恢复。

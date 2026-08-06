@@ -2,6 +2,7 @@
 <packageDescription id="56fffadn">
   <resources>
     <component id="tdew0" name="BattleStartPanel.xml" path="/" exported="true"/>
+    <component id="tdew2" name="BattleStartWidget.xml" path="/" exported="true"/>
   </resources>
   <publish name="" genCode="true"/>
 </packageDescription>

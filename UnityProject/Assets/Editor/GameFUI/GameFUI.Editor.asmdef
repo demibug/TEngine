@@ -1,0 +1,18 @@
+{
+    "name": "GameFUI.Editor",
+    "rootNamespace": "GameFUI.Editor",
+    "references": [
+        "GUID:473ed939a7a3445bb96ab45d14c81c88"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

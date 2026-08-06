@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 小兵等级倍数
+/// </summary>
 public sealed partial class UnitLevel : Luban.BeanBase
 {
     public UnitLevel(ByteBuf _buf) 

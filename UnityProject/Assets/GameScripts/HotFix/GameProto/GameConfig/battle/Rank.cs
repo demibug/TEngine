@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 军衔关卡配置
+/// </summary>
 public sealed partial class Rank : Luban.BeanBase
 {
     public Rank(ByteBuf _buf) 

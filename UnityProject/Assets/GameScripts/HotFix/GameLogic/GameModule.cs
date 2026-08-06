@@ -1,4 +1,5 @@
-﻿using GameLogic;
+﻿using GameBattle;
+using GameLogic;
 using TEngine;
 using Object = UnityEngine.Object;
 
@@ -84,6 +85,22 @@ public class GameModule
     public static ILocalizationModule Localization => _localization ??= Get<ILocalizationModule>();
     
     private static ILocalizationModule _localization;
+
+    /// <summary>
+    /// 获取战斗模块（task 2.7 缓存访问）。
+    /// </summary>
+    /// <remarks>
+    /// <para><b>缓存访问（task 2.7）：</b></para>
+    /// <para>通过 <see cref="Get{T}"/> 缓存 <c>ModuleSystem.GetModule&lt;IBattleModule&gt;()</c>
+    /// 的返回值，避免重复查找。BattleModule 由 <c>HotFixModules.Register</c> 在组合根
+    /// 显式注册一次（task 2.7 唯一注册入口），此处仅做延迟缓存访问，不调用
+    /// <c>ModuleSystem.RegisterModule</c>。</para>
+    /// <para>对应 specs/battle-hotfix-integration "Battle module registration is idempotent"：
+    /// 组合根注册后，此处访问返回同一注册实例。</para>
+    /// </remarks>
+    public static IBattleModule Battle => _battle ??= Get<IBattleModule>();
+
+    private static IBattleModule _battle;
     #endregion
     
     /// <summary>
@@ -114,5 +131,9 @@ public class GameModule
         _scene = null;
         _timer = null;
         _localization = null;
+        // task 2.7：清理 BattleModule 缓存引用。
+        // ModuleSystem.Shutdown 会逆序调用各模块 Shutdown（含 BattleModule.Shutdown），
+        // 此处只清空缓存访问引用，不重复释放模块内部资源。
+        _battle = null;
     }
 }

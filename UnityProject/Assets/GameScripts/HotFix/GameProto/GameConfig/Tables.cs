@@ -390,6 +390,48 @@ public partial class Tables
             m_TbProjectile.ResolveRef(this);
         }
     }
+    /// <summary>
+    /// 敌人运行时数值(公式输入,task 3.1 新增)
+    /// </summary>
+    private battle.TbEnemyStats m_TbEnemyStats;
+    public battle.TbEnemyStats TbEnemyStats 
+    {
+        get
+        {
+            if (m_TbEnemyStats == null)
+            {
+                m_TbEnemyStats = new battle.TbEnemyStats(defaultLoader("battle_tbenemystats"));
+                m_TbEnemyStats.ResolveRef(this);
+            }
+            return m_TbEnemyStats;
+        }
+        set
+        {
+            m_TbEnemyStats = value;
+            m_TbEnemyStats.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 最简牌组配置(task 3.1 新增,spec 6.5 均匀四兵)
+    /// </summary>
+    private battle.TbDeck m_TbDeck;
+    public battle.TbDeck TbDeck 
+    {
+        get
+        {
+            if (m_TbDeck == null)
+            {
+                m_TbDeck = new battle.TbDeck(defaultLoader("battle_tbdeck"));
+                m_TbDeck.ResolveRef(this);
+            }
+            return m_TbDeck;
+        }
+        set
+        {
+            m_TbDeck = value;
+            m_TbDeck.ResolveRef(this);
+        }
+    }
 
     #endregion
 

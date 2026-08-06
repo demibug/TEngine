@@ -30,10 +30,15 @@ public partial class TbProjectile
     }
 
 
-    /// <summary>
-    /// 弹道类型列表
-    /// </summary>
      public System.Collections.Generic.List<string> Types => _data.Types;
+    /// <summary>
+    /// 本期唯一注册投射物类型(SimpleDynamicArrow)
+    /// </summary>
+     public string PrimaryType => _data.PrimaryType;
+    /// <summary>
+    /// 箭矢移动速度(px/s,TargetEnemyMovement 默认 200)
+    /// </summary>
+     public int ArrowSpeed => _data.ArrowSpeed;
     
     public void ResolveRef(Tables tables)
     {

@@ -1,0 +1,11 @@
+{
+  "name": "发布代码",
+  "displayName": "发布代码",
+  "description": "按发布范围清理 FairyGUI 自动生成代码",
+  "version": "1.0",
+  "author": {
+    "name": "TEngine"
+  },
+  "icon": "",
+  "main": "main.lua"
+}

@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 事件名映射
+/// </summary>
 public sealed partial class Event : Luban.BeanBase
 {
     public Event(ByteBuf _buf) 

@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 地图配置
+/// </summary>
 public sealed partial class Map : Luban.BeanBase
 {
     public Map(ByteBuf _buf) 
@@ -24,6 +27,18 @@ public sealed partial class Map : Luban.BeanBase
         if(_buf.ReadBool()){ Blocks = _buf.ReadString(); } else { Blocks = null; }
         {int n0 = _buf.ReadSize(); PlayerPath = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); PlayerPath.Add(_e0);}}
         {int n0 = _buf.ReadSize(); OpponentPath = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); OpponentPath.Add(_e0);}}
+        CellWidth = _buf.ReadInt();
+        CellHeight = _buf.ReadInt();
+        MapCount = _buf.ReadInt();
+        {int n0 = _buf.ReadSize(); Grid = new System.Collections.Generic.List<System.Collections.Generic.List<string>>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { System.Collections.Generic.List<string> _e0;  {int n1 = _buf.ReadSize(); _e0 = new System.Collections.Generic.List<string>(n1);for(var i1 = 0 ; i1 < n1 ; i1++) { string _e1;  _e1 = _buf.ReadString(); _e0.Add(_e1);}} Grid.Add(_e0);}}
+        PlayerEntry = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
+        PlayerStart = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
+        PlayerEnd = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
+        OpponentEntry = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
+        OpponentStart = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
+        OpponentEnd = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
+        {int n0 = _buf.ReadSize(); RouteMarkers = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); RouteMarkers.Add(_e0);}}
+        EnemyTypeIndex = _buf.ReadInt();
     }
 
     public static Map DeserializeMap(ByteBuf _buf)
@@ -31,38 +46,62 @@ public sealed partial class Map : Luban.BeanBase
         return new battle.Map(_buf);
     }
 
-    /// <summary>
-    /// 网格宽
-    /// </summary>
     public readonly int GridWidth;
-    /// <summary>
-    /// 网格高
-    /// </summary>
     public readonly int GridHeight;
-    /// <summary>
-    /// 宽
-    /// </summary>
     public readonly int Width;
-    /// <summary>
-    /// 高
-    /// </summary>
     public readonly int Height;
-    /// <summary>
-    /// 地图索引
-    /// </summary>
     public readonly int MapIndex;
-    /// <summary>
-    /// 阻挡点
-    /// </summary>
     public readonly string Blocks;
-    /// <summary>
-    /// 玩家路径
-    /// </summary>
     public readonly System.Collections.Generic.List<UnityEngine.Vector2Int> PlayerPath;
-    /// <summary>
-    /// 对手路径
-    /// </summary>
     public readonly System.Collections.Generic.List<UnityEngine.Vector2Int> OpponentPath;
+    /// <summary>
+    /// 格子像素宽
+    /// </summary>
+    public readonly int CellWidth;
+    /// <summary>
+    /// 格子像素高
+    /// </summary>
+    public readonly int CellHeight;
+    /// <summary>
+    /// 地图总数
+    /// </summary>
+    public readonly int MapCount;
+    /// <summary>
+    /// 列优先 grid[x][y] 格子编码 kind_lane
+    /// </summary>
+    public readonly System.Collections.Generic.List<System.Collections.Generic.List<string>> Grid;
+    /// <summary>
+    /// 玩家入口坐标
+    /// </summary>
+    public readonly UnityEngine.Vector2Int PlayerEntry;
+    /// <summary>
+    /// 玩家路径起点
+    /// </summary>
+    public readonly UnityEngine.Vector2Int PlayerStart;
+    /// <summary>
+    /// 玩家路径终点
+    /// </summary>
+    public readonly UnityEngine.Vector2Int PlayerEnd;
+    /// <summary>
+    /// 对手入口坐标
+    /// </summary>
+    public readonly UnityEngine.Vector2Int OpponentEntry;
+    /// <summary>
+    /// 对手路径起点
+    /// </summary>
+    public readonly UnityEngine.Vector2Int OpponentStart;
+    /// <summary>
+    /// 对手路径终点
+    /// </summary>
+    public readonly UnityEngine.Vector2Int OpponentEnd;
+    /// <summary>
+    /// 表现层路径标记(含越界标记)
+    /// </summary>
+    public readonly System.Collections.Generic.List<UnityEngine.Vector2Int> RouteMarkers;
+    /// <summary>
+    /// 本图敌人类型索引
+    /// </summary>
+    public readonly int EnemyTypeIndex;
    
     public const int __ID__ = 2052541190;
     public override int GetTypeId() => __ID__;
@@ -82,6 +121,18 @@ public sealed partial class Map : Luban.BeanBase
         + "blocks:" + Blocks + ","
         + "playerPath:" + Luban.StringUtil.CollectionToString(PlayerPath) + ","
         + "opponentPath:" + Luban.StringUtil.CollectionToString(OpponentPath) + ","
+        + "cellWidth:" + CellWidth + ","
+        + "cellHeight:" + CellHeight + ","
+        + "mapCount:" + MapCount + ","
+        + "grid:" + Luban.StringUtil.CollectionToString(Grid) + ","
+        + "playerEntry:" + PlayerEntry + ","
+        + "playerStart:" + PlayerStart + ","
+        + "playerEnd:" + PlayerEnd + ","
+        + "opponentEntry:" + OpponentEntry + ","
+        + "opponentStart:" + OpponentStart + ","
+        + "opponentEnd:" + OpponentEnd + ","
+        + "routeMarkers:" + Luban.StringUtil.CollectionToString(RouteMarkers) + ","
+        + "enemyTypeIndex:" + EnemyTypeIndex + ","
         + "}";
     }
 }

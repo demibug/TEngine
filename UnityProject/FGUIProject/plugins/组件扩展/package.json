@@ -1,0 +1,11 @@
+{
+  "name": "组件扩展",
+  "displayName": "组件扩展",
+  "description": "注册 Window 和 Widget 项目级组件扩展",
+  "version": "1.0",
+  "author": {
+    "name": "TEngine"
+  },
+  "icon": "",
+  "main": "main.lua"
+}

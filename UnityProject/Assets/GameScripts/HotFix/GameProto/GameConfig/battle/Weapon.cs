@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 武器配置(原始)
+/// </summary>
 public sealed partial class Weapon : Luban.BeanBase
 {
     public Weapon(ByteBuf _buf) 

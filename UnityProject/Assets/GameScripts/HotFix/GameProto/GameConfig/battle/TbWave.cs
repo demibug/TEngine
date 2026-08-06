@@ -30,26 +30,15 @@ public partial class TbWave
     }
 
 
-    /// <summary>
-    /// 每波怪物数
-    /// </summary>
      public System.Collections.Generic.List<int> WaveUnitCounts => _data.WaveUnitCounts;
-    /// <summary>
-    /// Boss波次号
-    /// </summary>
      public System.Collections.Generic.List<int> BossWaveNumbers => _data.BossWaveNumbers;
-    /// <summary>
-    /// Boss出现概率
-    /// </summary>
      public System.Collections.Generic.List<float> BossSpawnChances => _data.BossSpawnChances;
-    /// <summary>
-    /// 生成策略权重
-    /// </summary>
      public System.Collections.Generic.List<int> SpawnStrategyWeights => _data.SpawnStrategyWeights;
-    /// <summary>
-    /// 生成策略表
-    /// </summary>
      public System.Collections.Generic.List<System.Collections.Generic.List<float>> SpawnStrategies => _data.SpawnStrategies;
+    /// <summary>
+    /// 本期显式跳过 Boss
+    /// </summary>
+     public bool SkipBoss => _data.SkipBoss;
     
     public void ResolveRef(Tables tables)
     {

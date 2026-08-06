@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// Boss配置
+/// </summary>
 public sealed partial class Boss : Luban.BeanBase
 {
     public Boss(ByteBuf _buf) 

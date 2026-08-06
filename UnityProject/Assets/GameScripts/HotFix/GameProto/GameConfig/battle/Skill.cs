@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 技能配置
+/// </summary>
 public sealed partial class Skill : Luban.BeanBase
 {
     public Skill(ByteBuf _buf) 

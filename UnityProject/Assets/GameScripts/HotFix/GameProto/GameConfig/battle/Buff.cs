@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// Buff类型配置
+/// </summary>
 public sealed partial class Buff : Luban.BeanBase
 {
     public Buff(ByteBuf _buf) 

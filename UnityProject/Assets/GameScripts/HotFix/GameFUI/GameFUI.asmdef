@@ -1,0 +1,19 @@
+{
+    "name": "GameFUI",
+    "rootNamespace": "GameFUI",
+    "references": [
+        "GUID:24c092aee38482f4e80715eaa8148782",
+        "GUID:8c8f9d96103e94a7da84b012fd7e9f13",
+        "GUID:e34a5702dd353724aa315fb8011f08c3",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

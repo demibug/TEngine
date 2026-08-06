@@ -9,6 +9,7 @@ namespace UIBattle
         public static void BindAll()
         {
             UIObjectFactory.SetPackageItemExtension(UI_BattleStartPanel.URL, typeof(UI_BattleStartPanel));
+            UIObjectFactory.SetPackageItemExtension(UI_BattleStartWidget.URL, typeof(UI_BattleStartWidget));
         }
     }
 }

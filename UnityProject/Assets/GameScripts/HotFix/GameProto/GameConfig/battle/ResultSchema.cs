@@ -12,6 +12,9 @@ using Luban;
 
 namespace GameConfig.battle
 {
+/// <summary>
+/// 战斗结果字段说明
+/// </summary>
 public sealed partial class ResultSchema : Luban.BeanBase
 {
     public ResultSchema(ByteBuf _buf) 

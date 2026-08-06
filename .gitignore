@@ -21,3 +21,4 @@ Tools/GameEventSourceGenerator/*/obj
 
 #openspec
 openspec/
+node_modules

@@ -1,0 +1,28 @@
+{
+    "name": "GameFUI.Tests",
+    "rootNamespace": "GameFUI.Tests",
+    "references": [
+        "GUID:24c092aee38482f4e80715eaa8148782",
+        "GUID:473ed939a7a3445bb96ab45d14c81c88",
+        "GUID:8c8f9d96103e94a7da84b012fd7e9f13",
+        "GUID:e34a5702dd353724aa315fb8011f08c3",
+        "GUID:f51ebe6a0ceec4240a699833d6309b23",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
