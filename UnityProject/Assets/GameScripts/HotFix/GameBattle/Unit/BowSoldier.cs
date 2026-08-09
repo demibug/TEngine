@@ -191,12 +191,42 @@ namespace GameBattle
             }
 
             // 取第一个目标（对应 JS targets[0]）。
-            int targetId = targets[0].Id;
+            EnemyTargetDto target = targets[0];
+            int targetId = target.Id;
 
+            // 弓兵角色转向：按目标与自身的 X 差设置朝向（纯表现状态，供表现层同步）。
+            SetBodyFacing(target.X >= CenterX);
+
+            // 登记延迟释放效果：攻击动画到第 17 帧开始时触发射箭。
+            // 箭矢不在此刻创建，由 BowReleaseEffect 在释放延迟后调用 LaunchArrow 实际发射。
+            // 这样箭矢出现时机与按有效攻击间隔播放的攻击动画释放点对齐。
+            var releaseEffect = new BowReleaseEffect();
+            releaseEffect.Launch(
+                this,
+                targetId,
+                CenterX,
+                CenterY,
+                AttackIntervalSeconds);
+
+            // 登记到攻击效果管理器（对应 JS attackEffectManager.add(effect)）。
+            AttackEffectManager.Add(releaseEffect);
+        }
+
+        /// <summary>
+        /// 创建并发射箭矢（对应 JS <c>launchArrow</c>）。
+        /// </summary>
+        /// <param name="targetId">目标敌人运行时 ID。</param>
+        /// <param name="centerX">发射起点逻辑 X（本单位中心）。</param>
+        /// <param name="centerY">发射起点逻辑 Y（本单位中心）。</param>
+        /// <remarks>
+        /// <para>由 <see cref="BowReleaseEffect"/> 在释放延迟到达时调用（对齐原工程
+        /// STOPPED 事件 → launchArrow）。逻辑与旧版 PerformAttack 的同步射箭部分一致：
+        /// Acquire 箭矢 → Fire → 创建 ProjectileAttackEffect → AttackEffectManager.Add。</para>
+        /// </remarks>
+        internal void LaunchArrow(int targetId, float centerX, float centerY)
+        {
             // 创建箭矢（对应 JS projectileManager.create → ProjectileFactory.Acquire）。
             // speedScale=1.75, curveHeight=120 对应 BowSoldier 默认值。
-            // creationFrameMs=0：由调用方/ProjectileManager 在 Update 时传入 frameNowMs，
-            //   ProjectileFactory.Acquire 内部 MarkCreationFrame 记录创建帧。
             SimpleDynamicArrow arrow = _projectileFactory.Acquire(
                 targetId,
                 Id,
@@ -207,7 +237,7 @@ namespace GameBattle
                 curveHeight: 120f);
 
             // 从本单位逻辑中心发射箭矢（对应 JS projectile.fire(startX, startY)）。
-            arrow.Fire(CenterX, CenterY);
+            arrow.Fire(centerX, centerY);
 
             // 创建投射物攻击效果并桥接到 ProjectileManager（对应 JS ProjectileAttackEffect.launch）。
             var effect = new ProjectileAttackEffect();

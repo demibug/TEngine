@@ -83,10 +83,11 @@ namespace GameBattle
     /// <c>ProjectileAttackEffect.js:39-43</c> 的 update() 一致——它本身不调 movement.update，
     /// 只检查 projectile.active 状态。</para>
     ///
-    /// <para><b>取消（task 5.8）：</b>
-    /// <see cref="Cancel"/> 委托到 <see cref="ProjectileManager.Remove"/>，取消投射物。
-    /// 这让效果系统可以通过 <see cref="AttackEffectManager.CancelOwner"/> 批量取消同所有者
-    /// 的全部攻击效果（包括投射物），无需直接操作 <see cref="ProjectileManager"/>。</para>
+    /// <para><b>取消（task 5.8 + 最终方案）：</b>
+    /// <see cref="Cancel"/> 解除对源单位与投射物的对象引用，但<b>不</b>移除已发射投射物——
+    /// 投射物继续由 <see cref="ProjectileManager"/> 推进，不因源单位上下场/合并源回池而消失。
+    /// Settling 静默清理时由 BattleRuntime 直接调用 <see cref="ProjectileManager.Clear"/>
+    /// 回收全部空中弹道。</para>
     ///
     /// <para><b>池化（task 4.1）：</b>实现 <see cref="IPoolableBattleObject"/>，
     /// <see cref="ResetState"/> 清除全部可变状态，回收后等价于新构造。</para>
@@ -260,17 +261,12 @@ namespace GameBattle
                 return;
             }
 
-            // 委托 ProjectileManager 移除投射物（对应 JS projectileManager.remove(projectile, reason)）。
-            // ProjectileManager.Remove 入移除队列，遍历结束后统一回收。
-            if (_projectile != null && _projectileManager != null)
-            {
-                _projectileManager.Remove(_projectile, reason);
-            }
-
+            // 已发射的投射物：只解除引用，不移除，继续由 ProjectileManager 推进。
+            // 源单位上下场/成为合并源回池时，箭矢不因此消失（最终方案）。
+            // Settling 静默清理时由 BattleRuntime 步骤 4 直接调用 ProjectileManager.Clear 回收。
             _active = false;
             _projectile = null;
-            // 保留 _owner 和 _projectileManager 引用，供 AttackEffectManager 诊断与移除队列处理。
-            // ResetState 会清空全部引用。
+            // 保留 _owner 和 _projectileManager 引用供诊断；ResetState 会清空全部引用。
         }
 
         // ====================================================================

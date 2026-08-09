@@ -187,6 +187,9 @@ namespace GameBattle
         /// <summary>对手方攻击倍率（本期固定 1）。</summary>
         private readonly int _opponentAttackMultiplier;
 
+        /// <summary>等级数值服务（最终方案：Acquire 时注入，供 ApplyLevel 重算倍率）。</summary>
+        private readonly UnitLevelService _levelService;
+
         // ====================================================================
         // 诊断日志（对应 UnitFactory.js creationLog）
         // ====================================================================
@@ -254,6 +257,47 @@ namespace GameBattle
             ProjectileManager projectileManager,
             float cellSize,
             int opponentAttackMultiplier)
+            : this(
+                idAllocator,
+                knifePool, bowPool, spearPool, cavalryPool,
+                enemyManager, attackResolver, attackEffectManager,
+                projectileFactory, projectileManager,
+                cellSize, opponentAttackMultiplier,
+                levelService: null)
+        {
+        }
+
+        /// <summary>
+        /// 构造只识别四个强类型兵种 ID 的单位工厂。
+        /// </summary>
+        /// <param name="idAllocator">运行时 ID 分配器。每局新建，从 1 单调递增。不可为 null。</param>
+        /// <param name="knifePool">刀兵对象池。不可为 null。</param>
+        /// <param name="bowPool">弓兵对象池。不可为 null。</param>
+        /// <param name="spearPool">枪兵对象池。不可为 null。</param>
+        /// <param name="cavalryPool">骑兵对象池。不可为 null。</param>
+        /// <param name="enemyManager">敌人管理器。不可为 null。</param>
+        /// <param name="attackResolver">攻击解析服务。不可为 null。</param>
+        /// <param name="attackEffectManager">攻击效果管理器。不可为 null。</param>
+        /// <param name="projectileFactory">投射物工厂（弓兵专用）。不可为 null。</param>
+        /// <param name="projectileManager">投射物管理器（弓兵专用）。不可为 null。</param>
+        /// <param name="cellSize">格子尺寸（像素，对应 map.gridWidth=80）。</param>
+        /// <param name="opponentAttackMultiplier">对手方攻击倍率（本期固定 1）。</param>
+        /// <param name="levelService">等级数值服务（最终方案：Acquire 时注入，可为 null）。</param>
+        /// <exception cref="ArgumentNullException">任一必需参数为 null。</exception>
+        internal UnitFactory(
+            RuntimeIdAllocator idAllocator,
+            BattleObjectPool<KnifeSoldier> knifePool,
+            BattleObjectPool<BowSoldier> bowPool,
+            BattleObjectPool<SpearSoldier> spearPool,
+            BattleObjectPool<CavalrySoldier> cavalryPool,
+            EnemyManager enemyManager,
+            AttackResolver attackResolver,
+            AttackEffectManager attackEffectManager,
+            ProjectileFactory projectileFactory,
+            ProjectileManager projectileManager,
+            float cellSize,
+            int opponentAttackMultiplier,
+            UnitLevelService levelService)
         {
             _idAllocator = idAllocator ?? throw new ArgumentNullException(nameof(idAllocator));
             _knifePool = knifePool ?? throw new ArgumentNullException(nameof(knifePool));
@@ -267,6 +311,7 @@ namespace GameBattle
             _projectileManager = projectileManager ?? throw new ArgumentNullException(nameof(projectileManager));
             _cellSize = cellSize > 0 ? cellSize : 80f;
             _opponentAttackMultiplier = opponentAttackMultiplier > 0 ? opponentAttackMultiplier : 1;
+            _levelService = levelService;
         }
 
         // ====================================================================
@@ -408,6 +453,40 @@ namespace GameBattle
             _createLog.Add(type);
             return unit;
         }
+
+        /// <summary>
+        /// 按 <see cref="BattleUnit"/> 获取一个士兵并应用局内等级（最终方案）。
+        /// </summary>
+        /// <param name="unit">局内单位权威数据（兵种、阵营、等级）。</param>
+        /// <param name="config">单位配置快照（供 InitializeStats 读取数值）。</param>
+        /// <param name="unitWidth">逻辑宽度（用于中心点计算）。</param>
+        /// <param name="unitHeight">逻辑高度。</param>
+        /// <returns>已分配新运行时 ID、已 Configure/Init/InitStats/ApplyLevel 的士兵。</returns>
+        /// <remarks>
+        /// <para>委托旧的强类型 <see cref="Acquire(SoldierType, UnitConfigSnapshot, bool, float, float)"/>
+        /// 创建并初始化，之后注入等级服务并调用 <see cref="SoldierBase.ApplyLevel"/> 应用
+        /// 局内等级倍率（伤害/攻速）。四兵统一走基类等级初始化，不分别复制倍率逻辑
+        /// （最终方案"四个兵种统一走基类等级初始化"）。</para>
+        /// </remarks>
+        internal SoldierBase Acquire(BattleUnit unit, UnitConfigSnapshot config, float unitWidth, float unitHeight)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            SoldierBase soldier = Acquire(unit.SoldierType, config, unit.Side, unitWidth, unitHeight);
+
+            soldier.ConfigureLevel(_levelService);
+            soldier.ApplyLevel(unit.Level);
+
+            return soldier;
+        }
+
+        /// <summary>
+        /// 是否已注入等级服务（诊断用）。
+        /// </summary>
+        internal bool HasLevelService => _levelService != null;
 
         // ====================================================================
         // Release —— 归还士兵到池（先 Reset 再入池，旧 ID/目标引用失效）

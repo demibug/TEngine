@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
+using Cysharp.Threading.Tasks;
+using GameCommon.Battle;
 using GameLogic;
 #if ENABLE_OBFUZ
 using Obfuz;
@@ -51,7 +53,22 @@ public partial class GameApp
         HotFixModules.Register();
 
         // GameEvent.Get<ILoginUI>().ShowLoginUI();
-        GameModule.UI.ShowUIAsync<BattleMainUI>();
+        ShowBattleEntryAsync().Forget();
+    }
+
+    /// <summary>
+    /// 在业务模块注册完成后显示 FairyGUI 战斗入口。
+    /// </summary>
+    private static async UniTask ShowBattleEntryAsync()
+    {
+        try
+        {
+            await GameModule.Battle.ShowEntryAsync(BattleLoadoutDto.CreateMinimalDefault());
+        }
+        catch (System.Exception ex)
+        {
+            Log.Error($"[GameApp] 打开 BattleStartPanel 失败：{ex}");
+        }
     }
     
     private static void Release()

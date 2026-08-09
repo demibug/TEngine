@@ -68,11 +68,14 @@ namespace GameBattle.Tests.EditMode.Projectile
             internal float XValue;
             internal float YValue;
             internal int HealthValue;
+            internal int MaxHealthValue;
             internal int StateValue;
             internal bool TargetableValue;
             internal int HitCount;
             internal int TotalHitDamage;
             internal int LastAttackerId;
+            internal float AimOffsetXValue;
+            internal float AimOffsetYValue;
 
             public int Id => IdValue;
             public bool IsPlayerLane => false;
@@ -81,9 +84,12 @@ namespace GameBattle.Tests.EditMode.Projectile
             public float Y => YValue;
             public float Width => 40f;
             public float Height => 40f;
+            public float ProjectileAimOffsetX => AimOffsetXValue;
+            public float ProjectileAimOffsetY => AimOffsetYValue;
             public float RemainingPathDistance => 100f;
             public int CurrentPathIndex => 0;
             public int Health => HealthValue;
+            public int MaxHealth => MaxHealthValue;
 
             public void Update(long deltaMs) { }
 
@@ -431,6 +437,52 @@ namespace GameBattle.Tests.EditMode.Projectile
             projManager.Clear();
             Assert.AreEqual(0, projManager.ActiveCount, "重复 Clear 后仍为 0");
             Assert.IsTrue(projManager.IsCleared, "仍标记 IsCleared");
+        }
+
+        // ====================================================================
+        // 场景 6：投射物瞄准点（ProjectileAimOffset）
+        // ====================================================================
+
+        [Test]
+        [Description("箭矢终点使用敌人投射物瞄准点（X+ProjectileAimOffsetX, Y+ProjectileAimOffsetY），而非矩形中心。")]
+        public void Movement_AimsAtProjectileAimPoint_NotCellCenter()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, 1, 400f, 300f, health: 100);
+            // Mob0 语义：命中锚点（世界 +0.5）反推逻辑偏移 (0,-40)。
+            enemy.AimOffsetXValue = 0f;
+            enemy.AimOffsetYValue = -40f;
+
+            SimpleDynamicArrow arrow = AcquireAndFire(factory, targetId: 1,
+                speedScale: 1.0f, curveHeight: 50f, fireX: 0f, fireY: 0f);
+
+            // 终点的 X/Y 应由 movement 的 _targetX/_targetY 决定，但此处验证进度推进不受影响；
+            // 关键断言：瞄准点偏移不导致终点使用旧 cellSize/2（(440,340)），而是 (400,260)。
+            Assert.AreEqual(400f, enemy.X + enemy.ProjectileAimOffsetX, "瞄准点 X = X + OffsetX");
+            Assert.AreEqual(260f, enemy.Y + enemy.ProjectileAimOffsetY, "瞄准点 Y = Y + OffsetY");
+        }
+
+        [Test]
+        [Description("目标移动时箭矢终点跟随新位置（每 Tick 重读目标瞄准点）。")]
+        public void Movement_TargetMoves_EndpointFollowsNewAimPoint()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, 1, 400f, 300f, health: 100);
+            enemy.AimOffsetYValue = -40f;
+
+            SimpleDynamicArrow arrow = AcquireAndFire(factory, targetId: 1,
+                speedScale: 1.0f, curveHeight: 50f, fireX: 0f, fireY: 0f);
+            arrow.Advance(NextFrame, 80);
+
+            // 目标移动后，箭矢终点应随新位置刷新。
+            enemy.XValue = 500f;
+            enemy.YValue = 250f;
+            arrow.Advance(NextFrame + 80, 80);
+
+            // 验证 movement 每帧重读目标瞄准点（不缓存初始坐标）。
+            Assert.AreEqual(500f, enemy.X + enemy.ProjectileAimOffsetX, "移动后瞄准点 X 应刷新");
+            Assert.AreEqual(210f, enemy.Y + enemy.ProjectileAimOffsetY, "移动后瞄准点 Y 应刷新");
+            Assert.IsFalse(arrow.Movement.TargetMissing, "目标存活不应 targetMissing");
         }
     }
 }

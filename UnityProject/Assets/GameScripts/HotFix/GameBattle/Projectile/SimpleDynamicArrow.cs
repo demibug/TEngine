@@ -82,6 +82,22 @@ namespace GameBattle
         /// <summary>绑定的命中策略（供 ProjectileManager 触发命中）。</summary>
         internal HitEnemyStrategy HitStrategy => _hitStrategy;
 
+        /// <summary>
+        /// 目标敌人运行时 ID（task 8.1 轨迹采集）。
+        /// <para>从 <see cref="Movement"/>.<see cref="TargetEnemyBezierMovement.TargetId"/> 读取真实值。
+        /// 目标未设置或已失效时返回 -1，供黄金轨迹对照工具判断
+        /// "Arrow target dies during flight" 场景（spec battle-parity-verification）。</para>
+        /// <para>移动策略未绑定（池回收后）时返回基类默认 -1。</para>
+        /// </summary>
+        internal override int TargetId
+        {
+            get
+            {
+                int id = _movement != null ? _movement.TargetId : InvalidId;
+                return id > 0 ? id : InvalidId;
+            }
+        }
+
         // ====================================================================
         // 构造
         // ====================================================================

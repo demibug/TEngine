@@ -153,7 +153,7 @@ namespace GameBattle.Tests.EditMode.Golden
             new UnitConfig { Index = 3, Text = "骑", AnimationKey = "cavalry", RangeCells = 2.0f, AttackDamage = 2, AttackIntervalSeconds = 0.8f, DamageMode = "范围",   TargetPolicy = "nearest",     AttackEffect = "CavalrySweepEffect 150ms 双段" },
         };
 
-        /// <summary>最简牌组（DeckDefinitions.BASE_POOL）。</summary>
+        /// <summary>最简牌组（RecruitDefinitions.BASE_POOL）。</summary>
         public static class DeckConfig
         {
             public const bool MinimalMode = true;

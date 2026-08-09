@@ -123,6 +123,12 @@ namespace GameBattle
         /// <summary>逻辑高度（对应 visual.height）。</summary>
         float Height { get; }
 
+        /// <summary>投射物瞄准点 X 偏移（相对 X；表现锚点，默认 0 表示矩形左边缘）。</summary>
+        float ProjectileAimOffsetX { get; }
+
+        /// <summary>投射物瞄准点 Y 偏移（相对 Y；表现锚点，默认 0 表示矩形上边缘）。</summary>
+        float ProjectileAimOffsetY { get; }
+
         /// <summary>剩余路径距离（对应 remainingPathDistance，Infinity 表示未初始化）。</summary>
         float RemainingPathDistance { get; }
 
@@ -131,6 +137,12 @@ namespace GameBattle
 
         /// <summary>当前血量（对应 health）。</summary>
         int Health { get; }
+
+        /// <summary>
+        /// 最大血量（对应 maxHealthBase，由子类初始化时设置）。
+        /// <para>供表现层计算真实血量比例（current / max），替代存活/死亡二值。</para>
+        /// </summary>
+        int MaxHealth { get; }
 
         /// <summary>
         /// 推进一帧（对应 enemy.update(deltaMs)）。
@@ -323,6 +335,23 @@ namespace GameBattle
         /// </summary>
         private readonly List<int> _removeQueue = new List<int>();
 
+        /// <summary>敌人完成登记后的低频表现事实。</summary>
+        internal event Action<int, bool, float, float> EnemySpawned;
+
+        /// <summary>敌人从活动集合移除后的低频表现事实。</summary>
+        internal event Action<int, bool> EnemyRemoved;
+
+        /// <summary>敌人血量变化后的低频表现事实。</summary>
+        /// <remarks>
+        /// <para>仅在敌人真正受击扣血后触发（低频，非每帧），参数依次为
+        /// runtimeId / currentHealth / maxHealth / delta（delta 为负=受伤）。
+        /// 由 <see cref="EnemyBase.Hit"/> 成功扣血后经本事件转发给表现层，
+        /// 供敌人头顶血条按真实比例更新并触发"显示—延时隐藏"。</para>
+        /// <para>死亡时（血量归零）也会触发一次，此时 currentHealth=0，
+        /// 表现层据此立即隐藏血条并复位。</para>
+        /// </remarks>
+        internal event Action<int, int, int, int> EnemyHealthChanged;
+
         // ====================================================================
         // 冻结标志（决策 0.4）
         // ====================================================================
@@ -417,6 +446,15 @@ namespace GameBattle
             _enemiesById[id] = enemy;
             _orderedIds.Add(id);
             IndexEnemy(id, enemy);
+
+            // 注入血量变化回调：受击扣血后经本管理器统一转发低频表现事实。
+            if (enemy is EnemyBase enemyBase)
+            {
+                enemyBase.SetHealthChangedCallback((changedId, current, max, delta) =>
+                    EnemyHealthChanged?.Invoke(changedId, current, max, delta));
+            }
+
+            EnemySpawned?.Invoke(id, enemy.IsPlayerLane, enemy.X, enemy.Y);
         }
 
         /// <summary>
@@ -427,7 +465,7 @@ namespace GameBattle
         /// <para>从 _enemiesById、_orderedIds、空间索引中移除。若 ID 不存在则为空操作（幂等）。</para>
         /// <para>通常由 <see cref="ProcessRemoveQueue"/> 统一调用，不建议在遍历中直接调用。</para>
         /// </remarks>
-        internal void Unregister(int id)
+        internal void Unregister(int id, bool? playDeathEffect = null)
         {
             if (!_enemiesById.TryGetValue(id, out IEnemyEntity enemy))
             {
@@ -438,6 +476,7 @@ namespace GameBattle
             UnindexEnemy(id);
             _enemiesById.Remove(id);
             _orderedIds.Remove(id);
+            EnemyRemoved?.Invoke(id, playDeathEffect ?? (enemy.CurrentState == StateDead));
         }
 
         // ====================================================================
@@ -1050,6 +1089,20 @@ namespace GameBattle
         }
 
         /// <summary>
+        /// 请求移除敌人（供敌人死亡回调注入）。
+        /// </summary>
+        /// <remarks>
+        /// <para>由 <see cref="EnemyBase"/> 在血量归零时通过注入的回调调用本方法，
+        /// 内部委托 <see cref="ForceRemove"/> 入队。入队后由 <see cref="ProcessRemoveQueue"/>
+        /// 在遍历结束后统一处理，避免在伤害调用栈内重入销毁集合（决策 0.4）。</para>
+        /// <para>幂等：ID 不存在或已入队则跳过（<see cref="ForceRemove"/> 语义）。</para>
+        /// </remarks>
+        internal void RequestRemoveEnemy(int id)
+        {
+            ForceRemove(id);
+        }
+
+        /// <summary>
         /// 处理移除队列：统一注销所有待移除敌人。
         /// </summary>
         /// <remarks>
@@ -1157,6 +1210,8 @@ namespace GameBattle
                 if (_enemiesById.TryGetValue(id, out IEnemyEntity enemy))
                 {
                     enemy.GameOver();
+                    // 结算清理是静默回收，不播放死亡表现。
+                    Unregister(id, playDeathEffect: false);
                 }
             }
 

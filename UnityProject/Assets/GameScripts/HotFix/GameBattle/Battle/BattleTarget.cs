@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TEngine;
 
 namespace GameBattle
 {
@@ -166,6 +167,12 @@ namespace GameBattle
         /// </remarks>
         private BattleResultBuilder _resultBuilder;
 
+        /// <summary>
+        /// 本局低频事实信号中枢。受击后发布生命变化，供 UI 与世界表现层只读消费。
+        /// Reset 后置 null，不影响伤害与胜负冻结的直接调用链。
+        /// </summary>
+        private BattleInternalSignalHub _signalHub;
+
         // ====================================================================
         // 单局可变状态
         // ====================================================================
@@ -207,6 +214,7 @@ namespace GameBattle
             _state = null;
             _manager = null;
             _resultBuilder = null;
+            _signalHub = null;
             _isPlayerLaneTarget = false;
             _targetState = TargetState.Created;
         }
@@ -302,6 +310,7 @@ namespace GameBattle
         /// <param name="manager">战斗规则协调器（非 null），用于生命归零时触发胜负冻结。</param>
         /// <param name="resultBuilder">结果冻结器（非 null），用于检查 <see cref="BattleResultBuilder.IsFrozen"/> 拒绝迟到伤害。</param>
         /// <param name="isPlayerLaneTarget">true=玩家方路径终点目标，false=对手方。</param>
+        /// <param name="signalHub">本局生命变化事实信号；可为 null（纯逻辑测试）。</param>
         /// <exception cref="ArgumentNullException">
         /// <paramref name="state"/>、<paramref name="manager"/> 或
         /// <paramref name="resultBuilder"/> 为 null。
@@ -333,11 +342,13 @@ namespace GameBattle
             BattleState state,
             BattleManager manager,
             BattleResultBuilder resultBuilder,
-            bool isPlayerLaneTarget)
+            bool isPlayerLaneTarget,
+            BattleInternalSignalHub signalHub = null)
         {
             _state = state ?? throw new ArgumentNullException(nameof(state));
             _manager = manager ?? throw new ArgumentNullException(nameof(manager));
             _resultBuilder = resultBuilder ?? throw new ArgumentNullException(nameof(resultBuilder));
+            _signalHub = signalHub;
             _isPlayerLaneTarget = isPlayerLaneTarget;
             _targetState = TargetState.Active;
             _damageLog.Clear();
@@ -368,6 +379,7 @@ namespace GameBattle
             _state = null;
             _manager = null;
             _resultBuilder = null;
+            _signalHub = null;
             _isPlayerLaneTarget = false;
             _targetState = TargetState.Pooled;
             _damageLog.Clear();
@@ -526,6 +538,12 @@ namespace GameBattle
 
             // 记录伤害日志（对应原 JS this.damageLog.push({...})）。
             int after = Health;
+            _signalHub?.HealthChanged.Publish(
+                new HealthChangedFact(_isPlayerLaneTarget, after, -amount));
+            Log.Info(
+                $"[BattleDiagnostic] 终点受击 " +
+                $"target={(_isPlayerLaneTarget ? "Player" : "Opponent")} " +
+                $"sourceId={sourceRuntimeId} damage={amount} health={before}->{after}");
             _damageLog.Add(new TargetDamageRecord(
                 amount: amount,
                 before: before,

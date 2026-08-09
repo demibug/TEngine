@@ -32,6 +32,7 @@ namespace GameBattle.Tests.EditMode.Projectile
             internal float XValue;
             internal float YValue;
             internal int HealthValue;
+            internal int MaxHealthValue;
             internal int StateValue;
             internal bool TargetableValue;
             internal int LastHitDamage;
@@ -44,9 +45,12 @@ namespace GameBattle.Tests.EditMode.Projectile
             public float Y => YValue;
             public float Width => 40f;
             public float Height => 40f;
+            public float ProjectileAimOffsetX => 0f;
+            public float ProjectileAimOffsetY => 0f;
             public float RemainingPathDistance => 100f;
             public int CurrentPathIndex => 0;
             public int Health => HealthValue;
+            public int MaxHealth => MaxHealthValue;
 
             public void Update(long deltaMs) { }
 
@@ -595,15 +599,15 @@ namespace GameBattle.Tests.EditMode.Projectile
                 speedScale: 1.0f, curveHeight: 50f, fireX: 0f, fireY: 0f);
 
             // 推进使位置沿贝塞尔曲线移动
-            // 终点 = (400+40, 300+40) = (440, 340)（中心 = enemy + cellSize/2）
-            // 控制点 = ((0+440)/2, (0+340)/2 - 50) = (220, 120)
+            // 终点 = (400+0, 300+0) = (400, 300)（瞄准点 = enemy.X + ProjectileAimOffsetX）
+            // 控制点 = ((0+400)/2, (0+300)/2 - 50) = (200, 100)
             arrow.Advance(NextFrame, 80);
             arrow.Advance(NextFrame + 80, 80);
             arrow.Advance(NextFrame + 160, 80);
 
-            // 位置应在起点和终点之间（X 在 0~440 之间）
+            // 位置应在起点和终点之间（X 在 0~400 之间）
             Assert.Greater(arrow.X, 0f, "推进后 X 应大于起点 0");
-            Assert.Less(arrow.X, 440f, "推进后 X 应小于终点 440");
+            Assert.Less(arrow.X, 400f, "推进后 X 应小于终点 400");
         }
     }
 }

@@ -410,6 +410,18 @@ namespace GameBattle
         /// <para>EnemyBase.MaxHealthBase 为 protected，本属性提供 internal 别名供测试验证。</para>
         /// </summary>
         internal int MaxHealthBaseValue => MaxHealthBase;
+
+        /// <inheritdoc/>
+        /// <remarks>
+        /// <para>Mob0 命中锚点（Prefab HitEffectPoint=(0,+0.5) 世界单位）反推的逻辑偏移：
+        /// Unity 世界向上 +0.5 → 逻辑 Y-down 坐标 -40px，X 为 0。</para>
+        /// <para>TODO：迁移到敌人表现配置/Luban（ProjectileAimOffsetX/Y 按体型独立配置）。</para>
+        /// </remarks>
+        public override float ProjectileAimOffsetX => 0f;
+
+        /// <inheritdoc/>
+        /// <remarks>见 <see cref="ProjectileAimOffsetX"/> 注释；Y 偏移 -40 对应命中点低于矩形上边缘。</remarks>
+        public override float ProjectileAimOffsetY => -40f;
     }
 
     // ========================================================================

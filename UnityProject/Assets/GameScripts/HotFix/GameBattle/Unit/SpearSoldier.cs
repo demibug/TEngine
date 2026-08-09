@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace GameBattle
 {
     // ============================================================================
@@ -132,6 +134,24 @@ namespace GameBattle
         /// </remarks>
         protected internal override void PerformAttack()
         {
+            // 仅用于武器朝向的目标查询（对应 JS selectTarget → resolver.queryTargets）。
+            // 取第一个目标，计算枪兵中心指向目标的角度，只写入纯表现状态供武器表现层同步。
+            // 不改变 PikeAttackEffect 的范围伤害、命中半径与时序。
+            List<EnemyTargetDto> targets = AttackResolver.QueryTargets(
+                EnemyManager,
+                CenterX, CenterY,
+                AttackRange,
+                Side,
+                CellSize, CellSize);
+            if (targets != null && targets.Count > 0)
+            {
+                EnemyTargetDto target = targets[0];
+                // DisplayAngle 语义：0°朝上、90°朝右（与 ProjectileMath 一致，供表现层换算）。
+                float angleDegrees = (float)ProjectileMath.DisplayAngle(
+                    CenterX, CenterY, target.X, target.Y);
+                SetWeaponAim(angleDegrees);
+            }
+
             // 创建枪兵攻击效果并启动（对应 JS attack → PikeAttackEffect.launch）。
             // radius=AttackRange 对应 JS radius:this.attackRange（SpearSoldier.js:54）。
             var effect = new PikeAttackEffect();

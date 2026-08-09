@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -8,7 +9,10 @@ using FairyGUI;
 using GameFUI;
 using GameFUI.Tests.EditMode;
 using NUnit.Framework;
+using TEngine;
 using UnityEngine;
+using UnityEditor;
+using UnityEngine.TestTools;
 using UIBattle;
 using YooAsset;
 
@@ -18,6 +22,24 @@ namespace GameFUI.Tests.PlayMode
     /// 任务 7.4：在 YooAsset Editor 模式（EditorSimulateMode）通过实际 Collector 与资源模块
     /// 验证描述、贴图、依赖包的规范 location，并验证首屏不得出现异步占位闪烁。
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>本文件 diff 边界归属（任务 8.6 复核用）</b>：
+    /// <list type="bullet">
+    /// <item>场景 a/b（Collector/CheckLocationValid 验证）属任务 7.4 原有产出；</item>
+    /// <item>场景 c（<c>ShowAsync_RealYooAsset_EditorSimulateMode_ClosesLoop</c>）与
+    ///   <c>CreateRealResourceModuleForEditorSimulateMode</c> 属任务 8.4 新增，
+    ///   8.4 新增改动 = 场景 c 闭环测试 + <see cref="PlayModeTestHarness.SetupWithRealYooAsset"/> 装配入口；</item>
+    /// <item><c>GameFUI.Tests.asmdef</c> 的 GameLogic 引用（GUID:6e76b075）属任务 8.5，
+    ///   GameFUI.Editor 引用（GUID:e8cdc169）属任务 8.2，二者均非 8.4 所需（8.4 仅依赖
+    ///   TEngine.Runtime/GameFUI/FairyGUI/UniTask/YooAsset，asmdef 中已存在）；</item>
+    /// <item><see cref="PlayModeTestHarness"/> 的 UGUI 模块装配方法（SetupUGUIModule 等）属任务 8.5，
+    ///   本文件不涉及。</item>
+    /// </list>
+    /// asmdef 为 JSON 无法内嵌注释，<see cref="PlayModeTestHarness"/> 在 8.4/8.5 间共享，
+    /// 二者的 diff 边界标注留待任务 8.6 统一处理。
+    /// </para>
+    /// </remarks>
     /// <remarks>
     /// 设计依据：
     /// - spec fairygui-hot-update-delivery / Requirement: FGUI 资源纳入 YooAsset 收集和校验；
@@ -45,31 +67,36 @@ namespace GameFUI.Tests.PlayMode
     /// 通过 <see cref="ResourcePackage.CheckLocationValid"/> 验证规范 location 可被资源模块寻址。
     /// </item>
     /// <item>
-    /// <b>首屏无闪烁验证</b>：使用 <see cref="PlayModeTestHarness.SetupForShowAsync"/> 装配
-    /// （内存 provider，与真实装配使用完全相同的 Binder/Descriptor/Freeze/Show 契约），
-    /// 调用 <see cref="FUIModule.ShowAsync{T}"/> 并 await，断言返回时刻窗口已 onStage、visible、
-    /// 处于 <see cref="FUIWindowState.Open"/>，且包记录已 Ready、外部图集 handle 已就绪——
-    /// 即 ShowAsync 的完成屏障保证首屏不出现异步占位闪烁（design.md 决策8）。
+    /// <b>真实 YooAsset ShowAsync 闭环验证（任务 8.4）</b>：反射实例化真实
+    /// <c>TEngine.ResourceModule</c>（internal sealed，EditorSimulateMode 初始化 DefaultPackage），
+    /// 通过公开 <see cref="FUI.RegisterModule(IResourceModule, FUIOptions)"/> 注册真实资源能力
+    /// （FUIModule 内部包装为 <see cref="YooAssetFUIResourceProvider"/>），由测试 owner 注册最终测试
+    /// Window/Widget 后 FreezeBindings，再 await <see cref="FUI.ShowAsync{T}"/> 完成纵向闭环。
+    /// 断言 <c>UIBattle_fui</c>、<c>UICommon_fui</c>、<c>UICommon_atlas0</c> 真实加载就绪
+    /// （PackageRecord.State==Ready、handle 为 <see cref="YooAssetHandleWrapper"/> 且 IsDone、
+    /// AssetObject 为真实 Texture2D 非空）、窗口 Open/onStage/visible、依赖包通过规范 location Acquire。
+    /// <b>不得仅以 <see cref="ResourcePackage.CheckLocationValid"/> 或内存 provider 替代真实加载</b>
+    /// （任务 8.4 明令禁止）。
     /// </item>
     /// </list>
     /// </para>
     /// <para>
-    /// <b>为何不通过真实 YooAsset 加载包加载做完整 ShowAsync 闭环</b>：
-    /// 本任务允许修改的文件仅限本测试文件，不得修改 <see cref="PlayModeTestHarness"/>。
-    /// 真实 YooAsset 资源模块初始化需要 <c>ResourceModule</c>（位于 TEngine.Runtime）并通过
-    /// <c>ModuleSystem.RegisterModule</c> 注册，而 <c>FUI.RegisterModule(IResourceModule)</c>
-    /// 公开入口需要真实 IResourceModule 实例——这会牵涉修改 harness 或生产组合根，超出本任务边界。
-    /// 因此本测试分两段验证：
-    /// (1) 用真实 Collector + 真实 ResourcePackage 验证 location 规范（YooAsset Editor 模式寻址能力）；
-    /// (2) 用内存 provider 装配验证 ShowAsync 完成时的资源就绪屏障与窗口可见性（不闪烁契约）。
-    /// 两段合起来覆盖 spec Scenario 的全部断言：规范 location 可寻址 + 与内存适配器测试的类型/生命周期契约一致。
+    /// <b>真实加载链路（任务 8.4）</b>：本测试不再用内存 provider 验"首屏无闪烁"，而是走生产同构的
+    /// 真实链路：真实 IResourceModule -&gt; <see cref="YooAssetFUIResourceProvider"/> -&gt; YooAsset
+    /// EditorSimulateMode -&gt; 实际 Collector 模拟构建产物。ShowAsync 的资源就绪屏障（design.md 决策8）
+    /// 在真实异步加载下成立，即 await 返回时描述、图集、依赖包均已真实就绪，首屏不出现异步占位闪烁。
+    /// 7.4 此前用内存 provider 完成屏障的写法已被本测试替换为真实 YooAsset 闭环
+    /// （7.4 重新勾选依据即本测试通过）。
     /// </para>
     /// <para>
     /// <b>复用证据</b>：
     /// <list type="bullet">
-    /// <item>复用 <see cref="PlayModeTestHarness.SetupForShowAsync"/>（7.1 产出，装配 ShowAsync 就绪模块）；</item>
+    /// <item>复用 <see cref="PlayModeTestHarness.SetupWithRealYooAsset"/>（8.4 新增，真实 IResourceModule 装配入口，
+    ///   与 <see cref="PlayModeTestHarness.SetupForShowAsync"/> 唯一差异是资源能力来源）；</item>
     /// <item>复用 <see cref="PlayModeTestHarness.Cleanup"/>（7.1 产出，全局清理）；</item>
-    /// <item>复用 <see cref="PlayModeTestHarness.CreateProviderWithUIBattleAndUICommon"/>（7.1 产出，预设描述与图集）；</item>
+    /// <item>复用 <see cref="PlayModeTestHarness.CreateTypeBasedCreator"/>（7.1 产出，非空 creator 构造）；</item>
+    /// <item>复用 <see cref="YooAssetFUIResourceProvider"/>（4.3 产出，包装 IResourceModule 的真实 provider）；</item>
+    /// <item>复用 <see cref="YooAssetHandleWrapper"/>（4.3 产出，真实 AssetHandle 包装，用于断言真实加载链路）；</item>
     /// <item>复用 <see cref="PackageLoader.FindRecord"/>（4.4 产出，internal 查询包记录）；</item>
     /// <item>复用 <see cref="PackageRecord"/> / <see cref="PackageRecord.AssetHandles"/> / <see cref="PackageRecord.DescHandle"/>
     ///   （4.4 产出，public 字段查询资源就绪状态）；</item>
@@ -79,9 +106,11 @@ namespace GameFUI.Tests.PlayMode
     /// </list>
     /// </para>
     /// <para>
-    /// 边界约束：本测试不修改任何 Runtime/Resource .cs 文件，不修改 harness，不修改 YooAsset Collector 配置，
-    /// 不修改 CSV，不依赖 GameLogic/GamePlay/GameBattle，不创建或修改 BattleModule。
-    /// 通过反射访问 YooAsset.Editor 类型只读取 Collector 配置与运行结果，不写入。
+    /// 边界约束：本测试不修改任何 Runtime/Resource .cs 文件，不修改其他 PlayMode/EditMode 测试文件，
+    /// 不修改 YooAsset Collector 配置，不修改 CSV，不依赖 GameLogic/GamePlay/GameBattle，不创建或修改 BattleModule。
+    /// 任务 8.4 允许在 <see cref="PlayModeTestHarness"/> 新增真实资源装配入口（<see cref="PlayModeTestHarness.SetupWithRealYooAsset"/>），
+    /// 已在该文件中添加；GameFUI.Tests.asmdef 已引用 TEngine.Runtime + YooAsset，真实 IResourceModule 可访问，无需改 asmdef。
+    /// 通过反射访问 YooAsset.Editor / TEngine.Runtime 内部类型只读取 Collector 配置与运行结果，不写入。
     /// </para>
     /// </remarks>
     [TestFixture]
@@ -132,11 +161,19 @@ namespace GameFUI.Tests.PlayMode
         [SetUp]
         public void SetUp()
         {
-            // 确保 FairyGUI Stage/GRoot 已初始化（Editor PlayMode 下需要主动触发）。
-            GRoot.inst.SetSize(1920, 1080);
+            // 诊断：记录 SetUp 执行（用于 batchmode 下确认测试是否被执行）。
+            DiagWrite(GetDiagPath(), $"SetUp 开始 {DateTime.Now:HH:mm:ss.fff}");
+
+            // Stage 会调用 DontDestroyOnLoad，只能在 Play Mode 中初始化。
+            if (Application.isPlaying)
+            {
+                PlayModeTestHarness.EnsureGRootInitialized();
+            }
 
             // 清空 GameFUI 与 FairyGUI 全局状态基线（幂等）。
             PlayModeTestHarness.Cleanup();
+
+            DiagWrite(GetDiagPath(), $"SetUp 完成 {DateTime.Now:HH:mm:ss.fff}");
         }
 
         /// <summary>
@@ -304,129 +341,383 @@ namespace GameFUI.Tests.PlayMode
         }
 
         // ============================================================
-        // 场景 c：首屏不得出现异步占位闪烁——ShowAsync 完成屏障验证
+        // 场景 c：真实 YooAsset ShowAsync 闭环验证（任务 8.4）
         // ============================================================
 
         /// <summary>
-        /// 首屏无闪烁验证：await <see cref="FUIModule.ShowAsync{T}"/> 返回时刻，
-        /// 窗口已 onStage、visible、处于 <see cref="FUIWindowState.Open"/>，
-        /// 且包记录已 Ready、外部图集 handle 已就绪、窗口内受管理 Widget 与原生 Button 已构造完成。
+        /// 真实 YooAsset 闭环验证（任务 8.4）：在 EditorSimulateMode 下用真实 IResourceModule + 真实
+        /// <see cref="FUI.ShowAsync{T}"/> 完成 UIBattle 窗口纵向闭环，断言描述、贴图、依赖包真实加载就绪
+        /// 且首屏无异步占位闪烁。不得仅以 <see cref="ResourcePackage.CheckLocationValid"/> 或内存 provider 替代。
         /// </summary>
         /// <remarks>
-        /// design.md 决策8：Show 的资源就绪屏障与 FairyGUI 的懒加载回调解耦——
-        /// Show 成功表示包和依赖资源已经 Ready、最终类型已经构造、上下文与 Widget 已 Attach、
-        /// 同步 OnCreate/OnOpen/OnRefresh 已完成且窗口处于 Open。
-        ///
-        /// spec fairygui-window-runtime / Requirement: Editor-first 端到端验收——
-        /// 系统 SHALL 创建最终测试业务类型、显示已就绪的 UICommon 图集资源，
-        /// 并允许完成 Hide、Close、Cache 和 Dispose 验收。
-        ///
+        /// 任务 8.4：7.4 此前用内存 provider 验"首屏无闪烁"，真实 YooAsset 加载下的 ShowAsync 闭环未直接测试。
+        /// 本测试改用真实 IResourceModule（反射实例化 <c>TEngine.ResourceModule</c>，EditorSimulateMode 初始化
+        /// DefaultPackage），通过公开 <see cref="FUI.RegisterModule(IResourceModule, FUIOptions)"/> 注册
+        /// （由 FUIModule 内部包装为 <see cref="YooAssetFUIResourceProvider"/>），由测试 owner 注册最终测试
+        /// Window/Widget 后 FreezeBindings，再 await <see cref="FUI.ShowAsync{T}"/> 完成纵向闭环。
         /// <para>
-        /// 验证项（在 await ShowAsync 返回后立即断言，不得出现"先显示占位再异步填充"的闪烁）：
+        /// spec fairygui-hot-update-delivery / Scenario: YooAsset Editor 模式寻址——
+        /// Editor 测试通过实际 Collector 和资源模块加载 UIBattle 与 UICommon，
+        /// 系统 SHALL 使用规范逻辑包名和 location，且结果 SHALL 与内存资源适配器测试的类型和生命周期契约一致。
+        /// </para>
+        /// <para>
+        /// spec fairygui-package-loading / Requirement: Acquire 成功代表资源已经可用于首屏构造——
+        /// 包 Acquire 接口 SHALL 是真实可等待操作。成功返回时，目标包及依赖的描述均已注册，
+        /// 窗口首屏可能使用的外部资源已经完成加载，并可由 FairyGUI 在对象构造期间同步取得。
+        /// </para>
+        /// <para>
+        /// 验证项（在 await <see cref="FUI.ShowAsync{T}"/> 返回后立即断言，不得出现"先显示占位再异步填充"的闪烁）：
         /// <list type="bullet">
-        /// <item>窗口状态为 <see cref="FUIWindowState.Open"/>（非 Loading/Opening）；</item>
-        /// <item>窗口已挂载到 Stage（<see cref="GObject.onStage"/> 为 true）；</item>
-        /// <item>窗口 visible 为 true（未被 Hide 或全屏遮挡）；</item>
-        /// <item>UIBattle 与 UICommon 包记录状态均为 <see cref="PackageLoadState.Ready"/>；</item>
-        /// <item>UICommon 包的 <see cref="PackageRecord.AssetHandles"/> 包含 UICommon_atlas0
-        ///   （图集在 Show 完成前已预载，不会出现贴图迟到导致的白屏闪烁）；</item>
-        /// <item>UICommon 与 UIBattle 包的 <see cref="PackageRecord.DescHandle"/> 非空
-        ///   （描述文件在 Show 完成前已加载）；</item>
-        /// <item>窗口内受管理 Widget（<see cref="TestBattleStartPanel.TestWidget"/>）与原生 Button
-        ///   （<see cref="TestBattleStartPanel.NativeButton"/>）均已构造且非空——
-        ///   这是"内容已就绪非占位"的结构契约。</item>
+        /// <item>真实加载证据：UICommon_atlas0 的 handle 为 <see cref="YooAssetHandleWrapper"/>（真实 YooAsset 句柄包装），
+        ///   而非 <c>InMemoryAssetHandle</c>——证明走真实 YooAsset 加载链路而非内存 provider；</item>
+        /// <item>UIBattle/UICommon 包记录状态均为 <see cref="PackageLoadState.Ready"/>，
+        ///   DescHandle 非空且为 <see cref="YooAssetHandleWrapper"/>（描述文件真实加载就绪）；</item>
+        /// <item>UICommon_atlas0 handle <see cref="IFUIAssetHandle.IsDone"/> 且 AssetObject 为真实
+        ///   <see cref="Texture2D"/>（贴图真实加载就绪，非内存占位）；</item>
+        /// <item>窗口状态 <see cref="FUIWindowState.Open"/>、onStage、visible（首屏就绪，无占位闪烁）；</item>
+        /// <item>UIBattle DependencyLeases 包含 UICommon（依赖包通过规范 location 真实 Acquire）；</item>
+        /// <item>窗口内受管理 Widget 与原生 Button 均构造完成（内容就绪非占位骨架）。</item>
         /// </list>
         /// </para>
         /// <para>
-        /// 装配使用 <see cref="PlayModeTestHarness.SetupForShowAsync"/>（内存 provider）：
-        /// 内存 provider 与真实 YooAsset provider 实现同一 <see cref="IFUIResourceProvider"/> 契约，
-        /// 且 ShowAsync 的完成屏障逻辑（状态机、包加载、实例构造、生命周期）完全相同，
-        /// 因此在内存 provider 下验证的"无闪烁"契约与真实资源模块下的行为一致
-        /// （spec：结果 SHALL 与内存资源适配器测试的类型和生命周期契约一致）。
+        /// 装配使用 <see cref="PlayModeTestHarness.SetupWithRealYooAsset"/>（真实 IResourceModule + 公开
+        /// <see cref="FUI.RegisterModule(IResourceModule, FUIOptions)"/>），复用 UIBattleBinder/TestFUIOwner
+        /// owner 契约与 <see cref="PlayModeTestHarness.CreateTypeBasedCreator"/>，与
+        /// <see cref="PlayModeTestHarness.SetupForShowAsync"/> 唯一差异是资源能力来源（真实 IResourceModule 而非内存 provider）。
         /// </para>
         /// </remarks>
-        [Test]
-        [Description("首屏无闪烁：ShowAsync 返回时窗口已 onStage/visible/Open，包记录 Ready，图集 handle 已就绪。")]
-        [Timeout(15000)] // 内存 provider 加载应秒级完成，15 秒超时防止异常挂死。
-        public async UniTask ShowAsync_NoAsyncPlaceholderFlicker_OnFirstScreen()
+        [UnityTest]
+        [Description("真实 YooAsset 闭环：EditorSimulateMode + 真实 IResourceModule + FUI.ShowAsync 完成首屏就绪验收。")]
+        [Timeout(30000)] // EditorSimulateMode 模拟构建 + 真实加载可能耗时，30 秒超时防止挂死（参考场景 b）。
+        public IEnumerator ShowAsync_RealYooAsset_EditorSimulateMode_ClosesLoop()
         {
-            // 1. 装配 ShowAsync 就绪模块（内存 provider，与真实装配使用相同 Binder/Descriptor/Freeze/Show 契约）。
-            FUIModule module = PlayModeTestHarness.SetupForShowAsync();
+            // GameFUI.Tests 是 Editor-only 测试程序集，由 EditMode Test Runner 发现；
+            // 进入 Play Mode 后再初始化 FairyGUI Stage 并执行真实纵向闭环。
+            yield return new EnterPlayMode();
 
-            // 2. 发起 ShowAsync 并 await。返回时刻应已满足资源就绪屏障。
-            TestBattleStartPanel window = await module.ShowAsync<TestBattleStartPanel>();
+            PlayModeTestHarness.EnsureGRootInitialized();
+            PlayModeTestHarness.Cleanup();
 
-            // 3. 断言返回值非空且为最终业务类型。
-            Assert.IsNotNull(window, "ShowAsync 应返回非空最终业务窗口。");
-            Assert.IsInstanceOf<TestBattleStartPanel>(window, "ShowAsync 应返回最终测试业务类型 TestBattleStartPanel。");
+            yield return RunRealYooAssetEditorSimulateModeAsync().ToCoroutine();
 
-            // 4. 断言窗口状态为 Open（不是 Loading/Opening——后者表示资源未就绪，会出现占位闪烁）。
-            Assert.IsTrue(module._windowEntries.TryGetValue(typeof(TestBattleStartPanel), out WindowEntry entry),
-                "ShowAsync 完成后应存在 TestBattleStartPanel 的 WindowEntry。");
-            Assert.AreEqual(FUIWindowState.Open, entry.State,
-                $"ShowAsync 返回时窗口状态应为 Open，实际：{entry.State}。非 Open 状态意味着资源未就绪，会出现占位闪烁。");
+            PlayModeTestHarness.Cleanup();
+            yield return new ExitPlayMode();
+        }
 
-            // 5. 断言窗口已挂载到 Stage 且可见——首屏不出现"先空后填充"。
-            Assert.IsTrue(window.onStage,
-                "ShowAsync 返回时窗口应已 onStage。若未 onStage，说明窗口尚未被 AddChild 到层级容器，会出现延迟显示。");
-            Assert.IsTrue(window.visible,
-                "ShowAsync 返回时窗口应 visible=true。若 visible=false，首屏不可见，违背首屏就绪语义。");
+        /// <summary>
+        /// 执行真实 YooAsset 纵向验收逻辑，由 PlayMode UnityTest 和诊断入口共同复用。
+        /// </summary>
+        private static async UniTask RunRealYooAssetEditorSimulateModeAsync()
+        {
+            // 诊断文件：Unity batchmode 下测试日志不输出到 -logFile，需手动写入诊断文件以获取失败详情。
+            string diagPath = GetDiagPath();
+            DiagWrite(diagPath, $"=== 测试开始 {DateTime.Now:HH:mm:ss.fff} ===");
 
-            // 6. 断言包记录已 Ready——资源加载在 Show 完成前已全部就绪。
-            PackageRecord uiBattleRecord = PackageLoader.FindRecord(PlayModeTestHarness.UIBattlePkg);
-            Assert.IsNotNull(uiBattleRecord, "ShowAsync 完成后应存在 UIBattle 的 PackageRecord。");
-            Assert.AreEqual(PackageLoadState.Ready, uiBattleRecord.State,
-                $"UIBattle 包记录状态应为 Ready，实际：{uiBattleRecord.State}。非 Ready 表示描述或外部资源未就绪，会出现占位闪烁。");
-
-            PackageRecord uiCommonRecord = PackageLoader.FindRecord(PlayModeTestHarness.UICommonPkg);
-            Assert.IsNotNull(uiCommonRecord, "ShowAsync 完成后应存在 UICommon 依赖包记录（UIBattle 依赖 UICommon）。");
-            Assert.AreEqual(PackageLoadState.Ready, uiCommonRecord.State,
-                $"UICommon 依赖包记录状态应为 Ready，实际：{uiCommonRecord.State}。依赖未就绪会导致窗口内容缺失或闪烁。");
-
-            // 6.1 断言依赖包的规范 location：UIBattle 的 DependencyLeases 应包含 UICommon 的租约，
-            //     且 UICommon 包记录的 PackageName 与规范逻辑包名一致——证明依赖包通过规范 location 加载。
-            Assert.GreaterOrEqual(uiBattleRecord.DependencyLeases.Count, 1,
-                "UIBattle 包应至少持有一个依赖租约（UICommon）。无依赖租约说明依赖未通过规范流程 Acquire。");
-            bool hasUICommonLease = false;
-            foreach (PackageLease lease in uiBattleRecord.DependencyLeases)
+            try
             {
-                if (lease.Record != null && lease.Record.PackageName == UIBattleDependency)
+                // 1. 创建真实 IResourceModule（反射实例化 ResourceModule，EditorSimulateMode 初始化 DefaultPackage）。
+                //    走真实加载链路：IResourceModule -> YooAssetFUIResourceProvider -> YooAsset EditorSimulateMode。
+                DiagWrite(diagPath, "步骤1: 创建真实 IResourceModule...");
+                IResourceModule resourceModule = await CreateRealResourceModuleForEditorSimulateMode();
+                DiagWrite(diagPath, $"步骤1完成: resourceModule={resourceModule?.GetType().Name}, DefaultPackageName={resourceModule?.DefaultPackageName}");
+
+                // 2. 通过公开 FUI.RegisterModule(IResourceModule) 装配模块（真实资源能力，非内存 provider）。
+                //    SetupWithRealYooAsset 内部调用 FUI.RegisterModule(IResourceModule, FUIOptions)（公开入口），
+                //    FUIModule 把 IResourceModule 包装为 YooAssetFUIResourceProvider。
+                DiagWrite(diagPath, "步骤2: SetupWithRealYooAsset...");
+                FUIModule module = PlayModeTestHarness.SetupWithRealYooAsset(resourceModule);
+                DiagWrite(diagPath, $"步骤2完成: module={module?.GetType().Name}");
+
+                // 3. 通过真实 FUI.ShowAsync 完成纵向闭环（门面静态入口，转发到已注册模块）。
+                DiagWrite(diagPath, "步骤3: FUI.ShowAsync<TestBattleStartPanel>...");
+                TestBattleStartPanel window = await FUI.ShowAsync<TestBattleStartPanel>();
+                DiagWrite(diagPath, $"步骤3完成: window={window?.GetType().Name}, onStage={window?.onStage}, visible={window?.visible}");
+
+                // 4. 断言返回值非空且为最终业务类型。
+                Assert.IsNotNull(window, "FUI.ShowAsync 应返回非空最终业务窗口。");
+                Assert.IsInstanceOf<TestBattleStartPanel>(window, "FUI.ShowAsync 应返回最终测试业务类型 TestBattleStartPanel。");
+                DiagWrite(diagPath, "断言4通过: 返回值非空且为最终业务类型。");
+
+                // 5. 断言窗口状态为 Open（首屏就绪，非 Loading/Opening——后者表示资源未就绪，会出现占位闪烁）。
+                Assert.IsTrue(module._windowEntries.TryGetValue(typeof(TestBattleStartPanel), out WindowEntry entry),
+                    "FUI.ShowAsync 完成后应存在 TestBattleStartPanel 的 WindowEntry。");
+                DiagWrite(diagPath, $"断言5: entry.State={entry.State}");
+                Assert.AreEqual(FUIWindowState.Open, entry.State,
+                    $"FUI.ShowAsync 返回时窗口状态应为 Open，实际：{entry.State}。" +
+                    "非 Open 状态意味着资源未就绪，会出现占位闪烁。");
+
+                // 6. 断言窗口已挂载到 Stage 且可见——首屏不出现"先空后填充"。
+                Assert.IsTrue(window.onStage,
+                    "FUI.ShowAsync 返回时窗口应已 onStage。若未 onStage，说明窗口尚未被 AddChild 到层级容器，会出现延迟显示。");
+                Assert.IsTrue(window.visible,
+                    "FUI.ShowAsync 返回时窗口应 visible=true。若 visible=false，首屏不可见，违背首屏就绪语义。");
+                DiagWrite(diagPath, "断言6通过: 窗口 onStage 且 visible。");
+
+                // 7. 断言包记录已 Ready——真实资源加载在 Show 完成前已全部就绪。
+                PackageRecord uiBattleRecord = PackageLoader.FindRecord(PlayModeTestHarness.UIBattlePkg);
+                Assert.IsNotNull(uiBattleRecord, "FUI.ShowAsync 完成后应存在 UIBattle 的 PackageRecord。");
+                DiagWrite(diagPath, $"断言7: uiBattleRecord.State={uiBattleRecord.State}");
+                Assert.AreEqual(PackageLoadState.Ready, uiBattleRecord.State,
+                    $"UIBattle 包记录状态应为 Ready，实际：{uiBattleRecord.State}。" +
+                    "非 Ready 表示描述或外部资源未就绪，会出现占位闪烁。");
+
+                PackageRecord uiCommonRecord = PackageLoader.FindRecord(PlayModeTestHarness.UICommonPkg);
+                Assert.IsNotNull(uiCommonRecord, "FUI.ShowAsync 完成后应存在 UICommon 依赖包记录（UIBattle 依赖 UICommon）。");
+                DiagWrite(diagPath, $"断言7b: uiCommonRecord.State={uiCommonRecord.State}");
+                Assert.AreEqual(PackageLoadState.Ready, uiCommonRecord.State,
+                    $"UICommon 依赖包记录状态应为 Ready，实际：{uiCommonRecord.State}。依赖未就绪会导致窗口内容缺失或闪烁。");
+
+                // 8. 真实加载证据：断言 atlas handle 为 YooAssetHandleWrapper（真实 YooAsset 句柄），而非 InMemoryAssetHandle。
+                //    这证明包加载走真实 IResourceModule -> YooAssetFUIResourceProvider -> YooAsset 链路，非内存 provider。
+                //    任务 8.4 明令禁止仅以内存 provider 替代真实加载。
+                Assert.IsTrue(uiCommonRecord.AssetHandles.ContainsKey(UICommonAtlasLocation),
+                    $"UICommon 包的 AssetHandles 应包含贴图 location '{UICommonAtlasLocation}'。" +
+                    "图集未预载会导致首屏贴图迟到，出现白屏闪烁（design.md 决策8：资源就绪屏障与懒加载解耦）。");
+                IFUIAssetHandle atlasHandle = uiCommonRecord.AssetHandles[UICommonAtlasLocation];
+                DiagWrite(diagPath, $"断言8: atlasHandle类型={atlasHandle?.GetType().Name}, IsDone={atlasHandle?.IsDone}");
+                Assert.IsInstanceOf<YooAssetHandleWrapper>(atlasHandle,
+                    "UICommon_atlas0 的 handle 应为 YooAssetHandleWrapper（真实 YooAsset 句柄包装），" +
+                    "而非 InMemoryAssetHandle。若为内存 handle，说明未走真实 YooAsset 加载链路" +
+                    "（任务 8.4 禁止内存 provider 替代真实加载）。");
+
+                // 9. 断言 atlas handle 真实就绪：IsDone 且 AssetObject 为真实 Texture2D（非内存占位）。
+                Assert.IsNotNull(atlasHandle, "UICommon_atlas0 的 handle 不应为 null。");
+                Assert.IsTrue(atlasHandle.IsDone,
+                    "UICommon_atlas0 的 handle 应处于 IsDone 状态。未完成表示贴图仍在异步加载，会出现占位闪烁。");
+                Assert.IsNotNull(atlasHandle.AssetObject,
+                    "UICommon_atlas0 的 AssetObject 应非空（真实 Texture2D 已加载）。空对象会导致贴图无法渲染。");
+                Assert.IsInstanceOf<Texture2D>(atlasHandle.AssetObject,
+                    "UICommon_atlas0 的 AssetObject 应为 Texture2D（真实贴图资源），实际类型：" +
+                    (atlasHandle.AssetObject == null ? "null" : atlasHandle.AssetObject.GetType().Name) + "。");
+                DiagWrite(diagPath, "断言9通过: atlas handle 真实就绪。");
+
+                // 10. 断言描述文件 handle 已真实加载（DescHandle 非空，且为真实 YooAsset 句柄）。
+                Assert.IsNotNull(uiBattleRecord.DescHandle,
+                    "UIBattle 包的描述文件 handle 应已加载（非空）。描述未就绪会导致 CreateObjectFromURL 失败或占位。");
+                Assert.IsInstanceOf<YooAssetHandleWrapper>(uiBattleRecord.DescHandle,
+                    "UIBattle DescHandle 应为 YooAssetHandleWrapper（真实 YooAsset 句柄）。");
+                Assert.IsNotNull(uiCommonRecord.DescHandle,
+                    "UICommon 包的描述文件 handle 应已加载（非空）。依赖描述未就绪会导致依赖包加载失败。");
+                DiagWrite(diagPath, "断言10通过: 描述文件 handle 真实加载。");
+
+                // 11. 断言依赖包通过规范 location 真实 Acquire：UIBattle DependencyLeases 包含 UICommon 的租约，
+                //     且 UICommon 包记录的 PackageName 与规范逻辑包名一致——证明依赖包通过规范 location 加载。
+                Assert.GreaterOrEqual(uiBattleRecord.DependencyLeases.Count, 1,
+                    "UIBattle 包应至少持有一个依赖租约（UICommon）。无依赖租约说明依赖未通过规范流程 Acquire。");
+                bool hasUICommonLease = false;
+                foreach (PackageLease lease in uiBattleRecord.DependencyLeases)
                 {
-                    hasUICommonLease = true;
-                    break;
+                    if (lease.Record != null && lease.Record.PackageName == UIBattleDependency)
+                    {
+                        hasUICommonLease = true;
+                        break;
+                    }
+                }
+                Assert.IsTrue(hasUICommonLease,
+                    "UIBattle 的 DependencyLeases 应包含 UICommon 的租约。依赖包通过规范 location（UICommon_fui）" +
+                    "真实 Acquire 后，其 PackageName 应为 UICommon（spec：包名作为逻辑身份）。");
+                DiagWrite(diagPath, "断言11通过: 依赖包通过规范 location 真实 Acquire。");
+
+                // 12. 断言窗口内容已构造完成（受管理 Widget 与原生 Button 均非空）——结构契约证明非占位。
+                Assert.IsTrue(window.HasGComponentButtonWidgetCoexistence(),
+                    "FUI.ShowAsync 返回时窗口内受管理 Widget 与原生 Button 应均已构造且非空。" +
+                    "若为空，说明 Widget 树 Attach 或构造未完成，窗口显示为占位骨架。");
+                Assert.IsNotNull(window.TestWidget, "TestWidget 应非空（受管理 Widget 已 Attach）。");
+                Assert.IsNotNull(window.NativeButton, "NativeButton 应非空（原生 Button 已绑定）。");
+                Assert.IsTrue(window.TestWidget.onStage,
+                    "受管理 Widget 应已 onStage。Widget 未挂载会导致内容缺失。");
+                Assert.IsTrue(window.NativeButton.onStage,
+                    "原生 Button 应已 onStage。Button 未挂载会导致内容缺失。");
+                DiagWrite(diagPath, "断言12通过: 窗口内容构造完成。");
+
+                DiagWrite(diagPath, $"=== 测试全部通过 {DateTime.Now:HH:mm:ss.fff} ===");
+            }
+            catch (Exception ex)
+            {
+                // 捕获异常并写入诊断文件，便于 batchmode 下定位失败原因。
+                DiagWrite(diagPath, $"!!! 测试失败: {ex.GetType().Name}: {ex.Message}");
+                DiagWrite(diagPath, $"!!! 堆栈:\n{ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    DiagWrite(diagPath, $"!!! 内部异常: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                    DiagWrite(diagPath, $"!!! 内部异常堆栈:\n{ex.InnerException.StackTrace}");
+                }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 获取诊断文件路径（基于 Application.dataPath 构建绝对路径，避免工作目录不确定性）。
+        /// </summary>
+        private static string GetDiagPath()
+        {
+            // 使用硬编码项目路径作为兜底，确保 batchmode 下路径可用。
+            try
+            {
+                // Application.dataPath 返回 项目路径/Assets，向上取项目根目录下的 Temp。
+                string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                return Path.Combine(projectRoot, "Temp", "8.4-test-diagnostic.log");
+            }
+            catch
+            {
+                return @"E:\MyWork\MyTD\TEngine\UnityProject\Temp\8.4-test-diagnostic.log";
+            }
+        }
+
+        /// <summary>
+        /// 写入诊断信息到指定文件（追加模式），用于 Unity batchmode 下获取测试执行详情。
+        /// </summary>
+        /// <param name="path">诊断文件路径。</param>
+        /// <param name="message">诊断消息。</param>
+        private static void DiagWrite(string path, string message)
+        {
+            try
+            {
+                // 同时写入主路径和兜底路径，确保至少一个能成功。
+                string dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+                File.AppendAllText(path, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
+
+                // 兜底路径：如果主路径与硬编码路径不同，也写入硬编码路径。
+                string fallback = @"E:\MyWork\MyTD\TEngine\UnityProject\Temp\8.4-test-diagnostic.log";
+                if (path != fallback)
+                {
+                    string fallbackDir = Path.GetDirectoryName(fallback);
+                    if (!string.IsNullOrEmpty(fallbackDir) && !Directory.Exists(fallbackDir))
+                    {
+                        Directory.CreateDirectory(fallbackDir);
+                    }
+                    File.AppendAllText(fallback, $"[{DateTime.Now:HH:mm:ss.fff}] {message}\n");
                 }
             }
-            Assert.IsTrue(hasUICommonLease,
-                "UIBattle 的 DependencyLeases 应包含 UICommon 的租约。依赖包通过规范 location（UICommon_fui）加载后，" +
-                "其 PackageName 应为 UICommon（spec：包名作为逻辑身份，与 {PackageName}_fui 描述 location 一致）。");
+            catch
+            {
+                // 诊断写入失败不影响测试执行。
+            }
+        }
 
-            // 7. 断言描述文件 handle 已加载（描述在 Show 完成前就绪，非懒加载）。
-            Assert.IsNotNull(uiBattleRecord.DescHandle,
-                "UIBattle 包的描述文件 handle 应已加载（非空）。描述未就绪会导致 CreateObjectFromURL 失败或占位。");
-            Assert.IsNotNull(uiCommonRecord.DescHandle,
-                "UICommon 包的描述文件 handle 应已加载（非空）。依赖描述未就绪会导致依赖包加载失败。");
+        // ============================================================
+        // -executeMethod 入口：绕过 Unity Test Framework batchmode bug 直接运行测试
+        // ============================================================
 
-            // 8. 断言外部图集 handle 已预载到 AssetHandles（图集在 Show 完成前就绪，不会出现白屏闪烁）。
-            Assert.IsTrue(uiCommonRecord.AssetHandles.ContainsKey(UICommonAtlasLocation),
-                $"UICommon 包的 AssetHandles 应包含贴图 location '{UICommonAtlasLocation}'。" +
-                "图集未预载会导致首屏贴图迟到，出现白屏闪烁（design.md 决策8：资源就绪屏障与懒加载解耦）。");
-            IFUIAssetHandle atlasHandle = uiCommonRecord.AssetHandles[UICommonAtlasLocation];
-            Assert.IsNotNull(atlasHandle, "UICommon_atlas0 的 handle 不应为 null。");
-            Assert.IsTrue(atlasHandle.IsDone,
-                "UICommon_atlas0 的 handle 应处于 IsDone 状态。未完成表示贴图仍在异步加载，会出现占位闪烁。");
-            Assert.IsNotNull(atlasHandle.AssetObject,
-                "UICommon_atlas0 的 AssetObject 应非空（Texture2D 已加载）。空对象会导致贴图无法渲染。");
+        /// <summary>
+        /// 诊断：Unity Test Framework 1.6.0 在 batchmode 下 EditMode 测试不执行（框架 bug），
+        /// 用 -executeMethod 直接调用测试逻辑，结果写入 Temp/8.4-execute-result.txt。
+        /// 用法：Unity.exe -batchmode -projectPath ... -executeMethod GameFUI.Tests.PlayMode.YooAssetEditorVerificationTests.ExecuteTest8_4
+        /// </summary>
+        public static void ExecuteTest8_4()
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            string resultPath = Path.Combine(projectRoot, "Temp", "8.4-execute-result.txt");
+            ExecuteTest8_4Async(resultPath).Forget(OnExecuteTest8_4Failed);
+        }
 
-            // 9. 断言窗口内容已构造完成（受管理 Widget 与原生 Button 均非空）——结构契约证明非占位。
-            Assert.IsTrue(window.HasGComponentButtonWidgetCoexistence(),
-                "ShowAsync 返回时窗口内受管理 Widget 与原生 Button 应均已构造且非空。" +
-                "若为空，说明 Widget 树 Attach 或构造未完成，窗口显示为占位骨架。");
-            Assert.IsNotNull(window.TestWidget, "TestWidget 应非空（受管理 Widget 已 Attach）。");
-            Assert.IsNotNull(window.NativeButton, "NativeButton 应非空（原生 Button 已绑定）。");
-            Assert.IsTrue(window.TestWidget.onStage,
-                "受管理 Widget 应已 onStage。Widget 未挂载会导致内容缺失。");
-            Assert.IsTrue(window.NativeButton.onStage,
-                "原生 Button 应已 onStage。Button 未挂载会导致内容缺失。");
+        private static bool s_test8_4_done;
+        private static int s_test8_4_exitCode;
+
+        private static async UniTask ExecuteTest8_4Async(string resultPath)
+        {
+            s_test8_4_done = false;
+            s_test8_4_exitCode = 2;
+
+            // 注册 update 回调，测试完成后退出 Unity
+            EditorApplication.update += () =>
+            {
+                if (s_test8_4_done)
+                {
+                    EditorApplication.Exit(s_test8_4_exitCode);
+                }
+            };
+
+            try
+            {
+                // 写入开始标记
+                string startMessage = $"STARTED {DateTime.Now:HH:mm:ss.fff}";
+                Debug.Log($"[GameFUI 8.4] {startMessage}，结果文件：{resultPath}");
+                TryWriteExecuteResult(resultPath, startMessage, true);
+
+                // 初始化 GRoot（SetUp 等价）
+                PlayModeTestHarness.EnsureGRootInitialized();
+                PlayModeTestHarness.Cleanup();
+
+                // 创建测试实例并直接调用测试方法（绕过 NUnit/TestFramework）
+                await RunRealYooAssetEditorSimulateModeAsync();
+
+                // 测试通过
+                string passMessage = $"PASSED {DateTime.Now:HH:mm:ss.fff}";
+                Debug.Log($"[GameFUI 8.4] {passMessage}");
+                TryWriteExecuteResult(resultPath, passMessage, false);
+                s_test8_4_exitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                // 测试失败，写入完整异常信息
+                Debug.LogException(ex);
+                string failMessage =
+                    $"FAILED {DateTime.Now:HH:mm:ss.fff}\n{ex.GetType().Name}: {ex.Message}\n\nStackTrace:\n{ex.StackTrace}";
+                if (ex.InnerException != null)
+                {
+                    failMessage +=
+                        $"\nInnerException: {ex.InnerException.GetType().Name}: {ex.InnerException.Message}\n{ex.InnerException.StackTrace}";
+                }
+                Debug.LogError($"[GameFUI 8.4] {failMessage}");
+                TryWriteExecuteResult(resultPath, failMessage, false);
+                s_test8_4_exitCode = 2;
+            }
+            finally
+            {
+                // TearDown 等价：清理全局状态
+                try
+                {
+                    PlayModeTestHarness.Cleanup();
+                }
+                catch
+                {
+                    // 清理失败不影响结果
+                }
+                s_test8_4_done = true;
+            }
+        }
+
+        /// <summary>
+        /// 记录 executeMethod 验收结果。诊断文件写入失败不得覆盖真实测试结果。
+        /// </summary>
+        private static void TryWriteExecuteResult(string resultPath, string message, bool overwrite)
+        {
+            try
+            {
+                string directory = Path.GetDirectoryName(resultPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                if (overwrite)
+                {
+                    File.WriteAllText(resultPath, message + "\n");
+                }
+                else
+                {
+                    File.AppendAllText(resultPath, message + "\n");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[GameFUI 8.4] 写入诊断文件失败：{resultPath}\n{ex}");
+            }
+        }
+
+        /// <summary>
+        /// 捕获 executeMethod 入口自身未观察到的异常，确保 Unity 能以失败码退出。
+        /// </summary>
+        private static void OnExecuteTest8_4Failed(Exception exception)
+        {
+            Debug.LogException(exception);
+            s_test8_4_exitCode = 2;
+            s_test8_4_done = true;
         }
 
         // ============================================================
@@ -644,6 +935,114 @@ namespace GameFUI.Tests.PlayMode
             {
                 YooAssets.Initialize();
             }
+        }
+
+        /// <summary>
+        /// 创建真实 <see cref="IResourceModule"/>（反射实例化 TEngine.Runtime 的 internal ResourceModule），
+        /// 并在 YooAsset EditorSimulateMode 下初始化 DefaultPackage（使用实际 Collector 模拟构建结果）。
+        /// </summary>
+        /// <returns>已初始化 DefaultPackage 的真实 IResourceModule 实例。</returns>
+        /// <remarks>
+        /// <para>
+        /// <b>为何反射实例化</b>：<c>TEngine.ResourceModule</c> 为 internal sealed，GameFUI.Tests 不直接引用其类型，
+        /// 故通过反射实例化。GameFUI.Tests.asmdef 已引用 TEngine.Runtime（含 ResourceModule），真实 IResourceModule 可访问。
+        /// </para>
+        /// <para>
+        /// <b>为何跳过 ResourceModule.Initialize()</b>：Initialize() 内部调用
+        /// <c>ModuleSystem.GetModule&lt;IObjectPoolModule&gt;()</c> 设置对象池，需要完整 ModuleSystem 基础设施。
+        /// <see cref="YooAssetFUIResourceProvider"/> 实际只使用 IResourceModule 的三个方法：
+        /// <see cref="IResourceModule.LoadAssetAsyncHandle{T}"/>、<see cref="IResourceModule.CheckLocationValid"/>、
+        /// <see cref="IResourceModule.HasAsset"/>。这三者在 ResourceModule 中均路由到 YooAssets 静态/ResourcePackage
+        /// 全局注册表（不经过对象池），因此跳过 Initialize() 不影响 GameFUI 包加载链路。
+        /// </para>
+        /// <para>
+        /// <b>为何调用真实 InitPackage</b>：仅调用 <c>package.InitializeAsync</c> 只会创建 Editor 文件系统，
+        /// 不保证激活资源清单；<see cref="IResourceModule.InitPackage"/> 在
+        /// <c>needInitMainFest=true</c> 时还会请求版本并更新 Manifest，确保后续真实 AssetHandle 加载可用。
+        /// 测试临时把 EditorPlayMode 设为 EditorSimulateMode，并在初始化结束后恢复原值。
+        /// </para>
+        /// <para>
+        /// <b>幂等性</b>：YooAssets.Initialize 与 package 创建/初始化均幂等。若场景 b 已初始化 DefaultPackage，
+        /// 本方法复用之（跳过重复初始化），仅补设默认包。
+        /// </para>
+        /// </remarks>
+        private static async UniTask<IResourceModule> CreateRealResourceModuleForEditorSimulateMode()
+        {
+            // 1. 初始化 YooAssets 全局系统（幂等）。
+            InitializeYooAssetsForEditorMode();
+
+            // 2. 创建或复用 DefaultPackage（EditorSimulateMode）。
+            ResourcePackage package = YooAssets.TryGetPackage(DefaultPackageName);
+            if (package == null)
+            {
+                package = YooAssets.CreatePackage(DefaultPackageName);
+            }
+
+            // 设为默认包：ResourceModule.CheckLocationValid/LoadAssetAsyncHandle 在 packageName 为空时
+            // 路由到 YooAssets 静态接口（使用默认包），必须设置才能使真实 IResourceModule 的默认包路径可用。
+            YooAssets.SetDefaultPackage(package);
+
+            // 3. 反射实例化 TEngine.ResourceModule（internal sealed），不调用 Initialize()。
+            Type resourceModuleType = LoadTEngineRuntimeResourceModuleType();
+            Assert.IsNotNull(resourceModuleType,
+                "应能从已加载程序集反射获取 TEngine.ResourceModule 类型（TEngine.Runtime 程序集）。");
+
+            object instance = Activator.CreateInstance(resourceModuleType, nonPublic: true);
+            Assert.IsNotNull(instance, "应能反射实例化 TEngine.ResourceModule（默认无参构造，internal 可见）。");
+
+            IResourceModule resourceModule = (IResourceModule)instance;
+            resourceModule.DefaultPackageName = DefaultPackageName;
+
+            // 4. 复用真实资源模块初始化路径，并请求/激活 EditorSimulateMode 构建清单。
+            const string editorPlayModeKey = "EditorPlayMode";
+            bool hadEditorPlayMode = EditorPrefs.HasKey(editorPlayModeKey);
+            int previousEditorPlayMode = EditorPrefs.GetInt(editorPlayModeKey, (int)EPlayMode.EditorSimulateMode);
+            EditorPrefs.SetInt(editorPlayModeKey, (int)EPlayMode.EditorSimulateMode);
+
+            try
+            {
+                InitializationOperation initOp = await resourceModule.InitPackage(
+                    DefaultPackageName,
+                    needInitMainFest: true);
+
+                Assert.IsNotNull(initOp, "ResourceModule.InitPackage 应返回初始化操作。");
+                Assert.AreEqual(EOperationStatus.Succeed, initOp.Status,
+                    $"DefaultPackage 在 EditorSimulateMode 初始化应成功，错误：{initOp.Error}。");
+            }
+            finally
+            {
+                if (hadEditorPlayMode)
+                {
+                    EditorPrefs.SetInt(editorPlayModeKey, previousEditorPlayMode);
+                }
+                else
+                {
+                    EditorPrefs.DeleteKey(editorPlayModeKey);
+                }
+            }
+
+            return resourceModule;
+        }
+
+        /// <summary>
+        /// 从已加载程序集反射获取 <c>TEngine.ResourceModule</c> 类型（internal sealed，位于 TEngine.Runtime 程序集）。
+        /// </summary>
+        /// <returns>ResourceModule 类型；未找到返回 null。</returns>
+        /// <remarks>
+        /// 遍历已加载程序集按全名查找，避免硬编码程序集名（与 <see cref="LoadYooAssetEditorAssembly"/> 的兜底策略一致）。
+        /// </remarks>
+        private static Type LoadTEngineRuntimeResourceModuleType()
+        {
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type type = assembly.GetType("TEngine.ResourceModule");
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            return null;
         }
     }
 }

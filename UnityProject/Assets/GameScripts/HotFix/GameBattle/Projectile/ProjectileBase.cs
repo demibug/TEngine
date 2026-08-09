@@ -188,6 +188,15 @@ namespace GameBattle
         /// <summary>攻击者运行时 ID（对应 attacker.id）。无攻击者传 -1。</summary>
         internal int AttackerId => _attackerId;
 
+        /// <summary>
+        /// 目标敌人运行时 ID（供轨迹记录采集，task 8.1）。
+        /// <para>基类返回 <see cref="InvalidId"/>（-1）；由具体子类（如
+        /// <see cref="SimpleDynamicArrow"/>）重写为从移动策略暴露真实目标 ID。
+        /// 无目标或目标已失效时返回 -1，供黄金轨迹对照工具判断目标失效场景
+        /// （spec battle-parity-verification "Arrow target dies during flight"）。</para>
+        /// </summary>
+        internal virtual int TargetId => InvalidId;
+
         /// <summary>是否已激活/飞行中（对应 active）。</summary>
         internal bool IsActive => _active;
 

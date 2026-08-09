@@ -142,6 +142,32 @@ MonoBehaviour:
         FilterRuleName: CollectAll
         AssetTags: 
         UserData: 
+    - GroupName: FUI
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/FUI
+        CollectorGUID: 40829bb5c941c454784c5f6c7b0a4f28
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+    - GroupName: Battle
+      GroupDesc:
+      AssetTags:
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Battle
+        CollectorGUID: cbee2df56d26403eabbe2974d188ec86
+        CollectorType: 0
+        AddressRuleName: BattleAssetAddressRule
+        PackRuleName: PackDirectory
+        FilterRuleName: BattleDerivedAssetFilter
+        AssetTags:
+        UserData:
     - GroupName: UIRaw
       GroupDesc: 
       AssetTags: 

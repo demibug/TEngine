@@ -421,7 +421,6 @@ namespace GameBattle.Tests.EditMode
         [Description("调用方取消不能绕过内部清理：取消时仍执行回滚。")]
         public async Task Cancellation_DoesNotBypassCleanup()
         {
-            bool scopeReleased = false;
             var scopeReleasedFlag = new bool[] { false };
             var entryStarted = new UniTaskCompletionSource();
             var entryCancelRequested = new UniTaskCompletionSource<bool>();
@@ -657,6 +656,36 @@ namespace GameBattle.Tests.EditMode
             Assert.DoesNotThrow(() => module.Shutdown());
             Assert.AreEqual(BattleModuleState.Idle, module.State,
                 "Shutdown 后应回到 Idle。");
+        }
+
+        [Test]
+        [Description("战斗入口参数应把装载信息和窗口取消令牌原样传给开始命令。")]
+        public async Task BattleStartEntryArgs_ForwardsLoadoutAndCancellation()
+        {
+            BattleLoadoutDto loadout = CreateLoadout();
+            bool called = false;
+            BattleLoadoutDto receivedLoadout = default;
+            CancellationToken receivedToken = default;
+
+            var entryArgs = new BattleStartEntryArgs(
+                loadout,
+                (requestedLoadout, cancellationToken) =>
+                {
+                    called = true;
+                    receivedLoadout = requestedLoadout;
+                    receivedToken = cancellationToken;
+                    return UniTask.FromResult(BattleOperationResult.Ok(BattleModuleState.Running));
+                });
+
+            using var cancellationSource = new CancellationTokenSource();
+            BattleOperationResult result = await entryArgs.StartAsync(
+                entryArgs.Loadout,
+                cancellationSource.Token);
+
+            Assert.IsTrue(called);
+            Assert.AreEqual(loadout.MapId, receivedLoadout.MapId);
+            Assert.AreEqual(cancellationSource.Token, receivedToken);
+            Assert.IsTrue(result.IsSuccess);
         }
 
         // ====================================================================

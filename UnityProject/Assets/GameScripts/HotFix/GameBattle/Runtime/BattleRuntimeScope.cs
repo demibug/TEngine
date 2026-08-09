@@ -15,8 +15,8 @@ namespace GameBattle
     //   CombatServices 与隐式全局单例（design 决策 5：删除 SingletonBase /
     //   CombatServices / GameObjectEventProxy）。
     //
-    // 跟踪的六类所有权（对应 spec “Runtime quiescence and cleanup have one
-    //   ordered owner” 与 “Partial initialization is recoverable”）：
+    // 跟踪的所有权类别（对应 spec "Runtime quiescence and cleanup have one
+    //   ordered owner" 与 "Partial initialization is recoverable"）：
     //   1. CancellationTokenSource —— 运行时 Token，取消异步操作与表现回调。
     //   2. GameEvent 局部监听 —— 通过 GameEventMgr 批量注册的 int 事件监听，
     //      Release 时 Clear 一次性解除（event-system.md 推荐：非 UI 类用
@@ -29,6 +29,9 @@ namespace GameBattle
     //      （resource-api.md：LoadAssetAsync 与 UnloadAsset 必须配对）。
     //   6. 池租借 —— BattleObjectPool 的 Acquire/Release 对称租借
     //      （task 4.1 IPoolableBattleObject，本期由 Scope 统一登记释放动作）。
+    //   7. 内部信号中枢 —— BattleInternalSignalHub 的单局信号订阅，Clear 批量解除。
+    //   8. Scene 租约 —— task 7.6 战斗 Scene，经 GameModule.Scene.UnloadAsync 释放。
+    //   9. FUI Package 租约 —— task 7.6 GameFUI PackageLease，Release 递减引用计数。
     //
     // 释放语义：
     //   - 幂等：重复 Dispose / Rollback 安全，每条登记只释放一次。
@@ -39,7 +42,8 @@ namespace GameBattle
     /// <summary>
     /// 单局运行时所有权作用域。
     /// <para>跟踪一局战斗中取得的全部可释放所有权（CTS、GameEvent 局部监听、到期动作、
-    /// 表现回调、资源租约、池租借），并提供幂等逆序释放与失败初始化回滚。</para>
+    /// 表现回调、资源租约、池租借、内部信号订阅、Scene 租约、FUI Package 租约），
+    /// 并提供幂等逆序释放与失败初始化回滚。</para>
     /// <para>本类型替代还原工程的字符串服务容器 <c>CombatServices</c> 与隐式全局单例：
     /// 所有权显式登记、显式释放，不依赖全局查找（design 决策 5）。</para>
     /// </summary>
@@ -101,6 +105,15 @@ namespace GameBattle
 
             /// <summary> 池租借（BattleObjectPool Acquire/Release）。 </summary>
             PoolRental,
+
+            /// <summary> 单局内部信号订阅（BattleInternalSignalHub 批量解除）。 </summary>
+            InternalSignalHub,
+
+            /// <summary> 战斗 Scene 租约（GameModule.Scene.LoadSceneAsync 加载，GameModule.Scene.UnloadAsync 释放）。 </summary>
+            SceneLease,
+
+            /// <summary> FUI Package 租约（GameFUI PackageLease，Release 递减引用计数）。 </summary>
+            FuiPackageLease,
 
             /// <summary> 通用可释放对象（IDisposable 或自定义释放动作兜底）。 </summary>
             Generic,
@@ -293,6 +306,68 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(releaseAction));
             }
             Track(OwnershipKind.PoolRental, tag, releaseAction);
+        }
+
+        /// <summary>
+        /// 登记一个 <see cref="BattleInternalSignalHub"/> 的所有权。
+        /// <para>释放时调用 <see cref="BattleInternalSignalHub.Clear"/> 一次性解除全部信号订阅
+        /// （task 7.1）。对应 spec "Event subscriptions follow runtime lifetime"：
+        /// 所有非 UI 战斗监听 MUST 由所属运行时批量跟踪并在重开、退出和 Shutdown 时解除。
+        /// Clear 本身幂等。</para>
+        /// <para>本登记由 <see cref="BattleRuntimeFactory"/> 在构造 SignalHub 后立即登记到 Scope，
+        /// 保证失败回滚或 Dispose 时信号订阅被批量解除，旧运行时对象不会被回调
+        /// （spec "Restart after listeners were registered"）。</para>
+        /// </summary>
+        /// <param name="hub">本局内部信号中枢；不可为 null。</param>
+        /// <param name="tag">可选诊断标签。</param>
+        internal void TrackSignalHub(BattleInternalSignalHub hub, string tag = null)
+        {
+            if (hub == null)
+            {
+                throw new ArgumentNullException(nameof(hub));
+            }
+            Track(OwnershipKind.InternalSignalHub, tag, hub.Clear);
+        }
+
+        /// <summary>
+        /// 登记一个战斗 Scene 租约的所有权（task 7.6）。
+        /// <para>用于通过 <c>ModuleSystem.GetModule&lt;ISceneModule&gt;().LoadSceneAsync</c> 加载的战斗场景。
+        /// 释放时调用 <paramref name="unloadAction"/> 异步卸载场景（调用方提供
+        /// <c>() => GameModule.Scene.UnloadAsync(sceneLocation)</c> 或等效释放动作）。
+        /// 幂等：释放动作内部本身安全。</para>
+        /// <para><b>所有权（决策 0.11 / spec battle-hotfix-integration）：</b>BattleModule 只释放自己加载的 Scene，
+        /// 不释放应用级配置或其他模块加载的场景。本登记确保失败回滚/Exit 时战斗 Scene 被卸载。</para>
+        /// </summary>
+        /// <param name="unloadAction">卸载该场景的释放动作；不可为 null。该动作应异步执行卸载但本方法不 await。</param>
+        /// <param name="tag">可选诊断标签（如场景 location）。</param>
+        internal void TrackSceneLease(Action unloadAction, string tag = null)
+        {
+            if (unloadAction == null)
+            {
+                throw new ArgumentNullException(nameof(unloadAction));
+            }
+            Track(OwnershipKind.SceneLease, tag, unloadAction);
+        }
+
+        /// <summary>
+        /// 登记一个 FUI Package 租约的所有权（task 7.6）。
+        /// <para>用于通过 GameFUI <c>PackageLoader.AcquireAsync</c> 获取的 <c>PackageLease</c>。
+        /// 释放时调用 <paramref name="releaseAction"/> 递减引用计数（调用方提供
+        /// <c>() => packageLease.Release()</c>）。</para>
+        /// <para><b>所有权（决策 0.11 / spec battle-hotfix-integration）：</b>BattleModule 只释放自己获取的 FUI 租约。
+        /// GameFUI 的共享包记录由 GameFUI 模块自身管理，本登记只负责递减 BattleModule 持有的引用。</para>
+        /// <para>注意：GameBattle asmdef 不引用 GameFUI，因此本方法接收的是释放动作委托，
+        /// 而非直接引用 <c>PackageLease</c> 类型。调用方（BattleModule 经抽象端口）负责包装。</para>
+        /// </summary>
+        /// <param name="releaseAction">释放该 FUI 包租约的动作；不可为 null。应调用 PackageLease.Release()。</param>
+        /// <param name="tag">可选诊断标签（如包名）。</param>
+        internal void TrackFuiPackageLease(Action releaseAction, string tag = null)
+        {
+            if (releaseAction == null)
+            {
+                throw new ArgumentNullException(nameof(releaseAction));
+            }
+            Track(OwnershipKind.FuiPackageLease, tag, releaseAction);
         }
 
         /// <summary>

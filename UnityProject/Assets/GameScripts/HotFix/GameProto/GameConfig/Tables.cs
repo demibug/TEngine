@@ -432,6 +432,27 @@ public partial class Tables
             m_TbDeck.ResolveRef(this);
         }
     }
+    /// <summary>
+    /// 兵种表现 Profile(美术锚点偏移)
+    /// </summary>
+    private battle.TbSoldierVisual m_TbSoldierVisual;
+    public battle.TbSoldierVisual TbSoldierVisual 
+    {
+        get
+        {
+            if (m_TbSoldierVisual == null)
+            {
+                m_TbSoldierVisual = new battle.TbSoldierVisual(defaultLoader("battle_tbsoldiervisual"));
+                m_TbSoldierVisual.ResolveRef(this);
+            }
+            return m_TbSoldierVisual;
+        }
+        set
+        {
+            m_TbSoldierVisual = value;
+            m_TbSoldierVisual.ResolveRef(this);
+        }
+    }
 
     #endregion
 

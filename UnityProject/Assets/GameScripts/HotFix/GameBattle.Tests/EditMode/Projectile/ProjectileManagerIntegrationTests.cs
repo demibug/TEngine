@@ -55,6 +55,7 @@ namespace GameBattle.Tests.EditMode.Projectile
             internal float XValue;
             internal float YValue;
             internal int HealthValue;
+            internal int MaxHealthValue;
             internal int StateValue;
             internal bool TargetableValue;
             internal int HitCount;
@@ -68,9 +69,12 @@ namespace GameBattle.Tests.EditMode.Projectile
             public float Y => YValue;
             public float Width => 40f;
             public float Height => 40f;
+            public float ProjectileAimOffsetX => 0f;
+            public float ProjectileAimOffsetY => 0f;
             public float RemainingPathDistance => 100f;
             public int CurrentPathIndex => 0;
             public int Health => HealthValue;
+            public int MaxHealth => MaxHealthValue;
 
             public void Update(long deltaMs) { }
 

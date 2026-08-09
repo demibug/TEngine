@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component size="720,1280" customExtention="GameFUI.FUIWindow">
+  <controller name="cResult" pages="0,Win,1,Lose" selected="0"/>
+  <displayList>
+    <component id="n0_ho21" name="btnRestart" src="tdew1" fileName="Comp/BtnNormal.xml" pkg="5w9iycrv" xy="60,1119">
+      <Button title="Restart"/>
+    </component>
+    <component id="n1_ho21" name="btnExit" src="tdew1" fileName="Comp/BtnNormal.xml" pkg="5w9iycrv" xy="431,1121">
+      <Button title="Exit"/>
+    </component>
+  </displayList>
+</component>

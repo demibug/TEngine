@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component size="720,1280" customExtention="GameFUI.FUIWindow">
+  <controller name="cState" pages="0,Ready,1,Starting,2,Error" selected="0"/>
   <displayList>
-    <component id="n0_tdew" name="btn" src="tdew1" fileName="Comp/BtnNormal.xml" pkg="5w9iycrv" xy="273,603"/>
-    <component id="n1_tdew" name="widgetStart" src="tdew2" fileName="BattleStartWidget.xml" xy="210,720"/>
+    <component id="n0_tdew" name="btn" src="tdew1" fileName="Comp/BtnNormal.xml" pkg="5w9iycrv" xy="273,603">
+      <Button title="Start"/>
+    </component>
+    <component id="n1_tdew" name="widgetStart" src="tdew2" fileName="Res/BattleStartWidget.xml" xy="210,720"/>
   </displayList>
 </component>

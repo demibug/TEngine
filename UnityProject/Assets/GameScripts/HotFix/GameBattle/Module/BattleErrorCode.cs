@@ -89,7 +89,8 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 战斗 Scene 加载失败。对应 spec 场景 "Resource loading fails during entry"。
+        /// 历史独立战斗 Scene 加载失败码。为保持已发布数值稳定而保留；
+        /// 当前单场景流程不再产生此错误码。
         /// </summary>
         SceneLoadFailed = 30,
 

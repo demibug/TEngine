@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component size="720,1280" customExtention="GameFUI.FUIWindow">
+  <displayList>
+    <component id="n0_mxwi" name="btnExit" src="tdew1" fileName="Comp/BtnNormal.xml" pkg="5w9iycrv" xy="42,78">
+      <relation target="" sidePair="left-left,top-top"/>
+      <Button title="Exit" titleFontSize="20"/>
+    </component>
+    <component id="n1_mxwi" name="btnRefresh" src="tdew1" fileName="Comp/BtnNormal.xml" pkg="5w9iycrv" xy="266,1138">
+      <relation target="" sidePair="center-center,bottom-bottom"/>
+      <Button title="Refresh"/>
+    </component>
+  </displayList>
+</component>

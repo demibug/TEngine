@@ -93,12 +93,12 @@ namespace GameBattle
         private int _spentGold;
 
         /// <summary>
-        /// 玩家方刷新次数（对应 BattleEconomy.js:13 refreshCount.player）。
+        /// 玩家方征兵次数（对应最终方案征兵费用递增）。
         /// </summary>
         private int _playerRefreshCount;
 
         /// <summary>
-        /// 对手方刷新次数（对应 BattleEconomy.js:13 refreshCount.opponent）。
+        /// 对手方征兵次数（对应最终方案征兵费用递增）。
         /// </summary>
         private int _opponentRefreshCount;
 
@@ -145,10 +145,10 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 获取指定方的当前刷新费用（对应 BattleEconomy.js:23 refreshCost）。
+        /// 获取指定方的当前征兵费用（对应最终方案征兵费用）。
         /// </summary>
         /// <param name="isPlayerSide">true=玩家方，false=对手方。</param>
-        /// <returns>当前刷新费用。</returns>
+        /// <returns>当前征兵费用。</returns>
         internal int GetRefreshCost(bool isPlayerSide)
         {
             return isPlayerSide ? _state.PlayerRecruitCost : _state.OpponentRecruitCost;
@@ -167,10 +167,10 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 获取指定方的刷新次数。
+        /// 获取指定方的征兵次数。
         /// </summary>
         /// <param name="isPlayerSide">true=玩家方，false=对手方。</param>
-        /// <returns>累计刷新次数。</returns>
+        /// <returns>累计征兵次数。</returns>
         internal int GetRefreshCount(bool isPlayerSide)
         {
             return isPlayerSide ? _playerRefreshCount : _opponentRefreshCount;
@@ -241,11 +241,27 @@ namespace GameBattle
         }
 
         // ====================================================================
-        // 刷新费用
+        // 征兵费用
         // ====================================================================
 
         /// <summary>
-        /// 支付刷新费用并递增下次费用（对应 BattleEconomy.js:32-40 payRefresh）。
+        /// 无副作用预检：指定方能否支付当前整批征兵费用（修复 P0）。
+        /// </summary>
+        /// <param name="isPlayerSide">true=玩家方，false=对手方。</param>
+        /// <returns>余额 >= 当前征兵费用时返回 true。</returns>
+        /// <remarks>
+        /// <para>只读校验，不修改任何状态（不扣费、不递增费用、不累计次数）。</para>
+        /// <para>调用方（BattleInputController）在生成征兵批次前调用，余额不足时
+        /// <b>不生成批次、不推进征兵随机数</b>（修复 P0）。</para>
+        /// </remarks>
+        internal bool CanPayRecruitBatch(bool isPlayerSide)
+        {
+            int cost = GetRefreshCost(isPlayerSide);
+            return CanAfford(isPlayerSide, cost);
+        }
+
+        /// <summary>
+        /// 支付整批征兵费用并递增下次费用（对应最终方案征兵费用递增）。
         /// </summary>
         /// <param name="isPlayerSide">true=玩家方，false=对手方。</param>
         /// <returns>
@@ -253,14 +269,15 @@ namespace GameBattle
         /// 余额不足时返回失败，不修改状态。
         /// </returns>
         /// <remarks>
-        /// <para>对应还原工程 <c>payRefresh</c>：扣除当前
-        /// <c>playerRecruitCost/opponentRecruitCost</c>，成功后递增
-        /// <c>+refreshCostIncrement</c>，并累计刷新次数。</para>
+        /// <para>对应最终方案"征兵"：清除全部待上场单位并重新填满 1 级四兵，消耗馒头。
+        /// 配置中的 <c>RefreshCostStart/RefreshCostIncrement</c> 暂不修改 Luban Schema，
+        /// 只在适配层映射为征兵费用（<see cref="EconomyConfigSnapshot"/> 字段名保留）。</para>
+        /// <para>扣除当前征兵费用后递增 <c>+refreshCostIncrement</c>，并累计征兵次数。</para>
         /// </remarks>
-        internal EconomyResult TryPayRefresh(bool isPlayerSide)
+        internal EconomyResult TryPayRecruitBatch(bool isPlayerSide)
         {
             int cost = GetRefreshCost(isPlayerSide);
-            EconomyResult result = TrySpend(isPlayerSide, cost, "refresh");
+            EconomyResult result = TrySpend(isPlayerSide, cost, "recruit");
 
             if (!result.Success)
             {
@@ -279,40 +296,7 @@ namespace GameBattle
                 _opponentRefreshCount += 1;
             }
 
-            return EconomyResult.SucceededWithNextCost(cost, "refresh", nextCost);
-        }
-
-        // ====================================================================
-        // 招募费用
-        // ====================================================================
-
-        /// <summary>
-        /// 计算卡牌招募费用（对应 BattleEconomy.js:41 recruitCost）。
-        /// </summary>
-        /// <param name="cardCost">卡牌费用。</param>
-        /// <param name="cardLevel">卡牌等级（fallback，当 cardCost <= 0 时使用）。</param>
-        /// <returns>招募费用，不低于 1。</returns>
-        /// <remarks>
-        /// 对应还原工程 <c>recruitCost(card)</c>：<c>Math.max(1, card.cost || card.level || 1)</c>。
-        /// C# 移植拆分为显式参数，不依赖 card 对象。
-        /// </remarks>
-        internal static int RecruitCost(int cardCost, int cardLevel)
-        {
-            int cost = cardCost > 0 ? cardCost : (cardLevel > 0 ? cardLevel : 1);
-            return Math.Max(1, cost);
-        }
-
-        /// <summary>
-        /// 支付招募费用（对应 BattleEconomy.js:42 payRecruit）。
-        /// </summary>
-        /// <param name="isPlayerSide">true=玩家方，false=对手方。</param>
-        /// <param name="cardCost">卡牌费用。</param>
-        /// <param name="cardLevel">卡牌等级（fallback）。</param>
-        /// <returns>扣费结果。</returns>
-        internal EconomyResult TryPayRecruit(bool isPlayerSide, int cardCost, int cardLevel)
-        {
-            int cost = RecruitCost(cardCost, cardLevel);
-            return TrySpend(isPlayerSide, cost, "recruit");
+            return EconomyResult.SucceededWithNextCost(cost, "recruit", nextCost);
         }
 
         // ====================================================================

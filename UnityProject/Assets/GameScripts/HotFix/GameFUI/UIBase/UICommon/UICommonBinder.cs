@@ -8,6 +8,7 @@ namespace UICommon
     {
         public static void BindAll()
         {
+            UIObjectFactory.SetPackageItemExtension(UI_BtnNormal.URL, typeof(UI_BtnNormal));
         }
     }
 }

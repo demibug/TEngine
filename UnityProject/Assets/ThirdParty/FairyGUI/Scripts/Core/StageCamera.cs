@@ -48,7 +48,7 @@ namespace FairyGUI
         public static int screenSizeVer = 1;
 
         public const string Name = "Stage Camera";
-        public const string LayerName = "UI";
+        public const string LayerName = "FUI";
 
         public static float DefaultCameraSize = 5;
         public static float DefaultUnitsPerPixel = 0.02f;
@@ -153,11 +153,7 @@ namespace FairyGUI
         /// </summary>
         public static void CheckMainCamera()
         {
-            if (GameObject.Find(Name) == null)
-            {
-                int layer = LayerMask.NameToLayer(LayerName);
-                CreateCamera(Name, 1 << layer);
-            }
+            EnsureCamera();
 
             HitTestContext.cachedMainCamera = Camera.main;
         }
@@ -167,11 +163,34 @@ namespace FairyGUI
         /// </summary>
         public static void CheckCaptureCamera()
         {
-            if (GameObject.Find(Name) == null)
+            EnsureCamera();
+        }
+
+        static Camera EnsureCamera()
+        {
+            int layer = LayerMask.NameToLayer(LayerName);
+            if (layer < 0)
+                throw new InvalidOperationException("请在 TagManager 中定义名为 '" + LayerName + "' 的 Layer。");
+
+            int cullingMask = 1 << layer;
+            GameObject cameraObject = GameObject.Find(Name);
+            if (cameraObject == null)
             {
-                int layer = LayerMask.NameToLayer(LayerName);
-                CreateCamera(Name, 1 << layer);
+                Camera camera = CreateCamera(Name, cullingMask);
+                main = camera;
+                return camera;
             }
+
+            Camera existingCamera = cameraObject.GetComponent<Camera>();
+            if (existingCamera == null)
+                throw new InvalidOperationException("名为 '" + Name + "' 的对象缺少 Camera 组件。");
+
+            if (cameraObject.GetComponent<StageCamera>() == null)
+                throw new InvalidOperationException("名为 '" + Name + "' 的对象缺少 StageCamera 组件。");
+
+            existingCamera.cullingMask = cullingMask;
+            main = existingCamera;
+            return existingCamera;
         }
 
         /// <summary>

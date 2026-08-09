@@ -213,8 +213,10 @@ namespace Procedure
             finally
             {
                 _loadAssemblyComplete = _loadAssemblyWait && 0 == _loadAssetCount;
+                // 无论 Assembly.Load 成功还是失败，都归还本次 DLL TextAsset 租约。
+                // catch 会重新抛出异常，因此卸载必须位于 finally，不能放在其后。
+                _resourceModule.UnloadAsset(textAsset);
             }
-            _resourceModule.UnloadAsset(textAsset);
         }
 
         /// <summary>
@@ -287,8 +289,9 @@ namespace Procedure
             finally
             {
                 _loadMetadataAssemblyComplete = _loadMetadataAssemblyWait && 0 == _loadMetadataAssetCount;
+                // AOT metadata 加载失败同样不得泄漏 TextAsset；finally 保证只释放一次。
+                _resourceModule.UnloadAsset(textAsset);
             }
-            _resourceModule.UnloadAsset(textAsset);
         }
     }
 }

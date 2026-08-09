@@ -27,8 +27,8 @@ namespace GameCommon.Battle
     /// 事件组：EEventGroup.GroupLogic（战斗属逻辑层；EEventGroup 仅 GroupUI/GroupLogic 两值，
     /// 不新增枚举值以免修改 TEngine，见 1.6 spike §3.3）。
     ///
-    /// 注意：本接口为正式公共事件体系（task 2.3/7.2）。task 1.6 的 IBattlePublicEventSpike
-    /// 为 spike 占位，保留不动，本任务不删除以避免与其它任务冲突。
+    /// 注意：本接口为正式公共事件体系（task 2.3/7.2）。task 1.6 的临时
+    /// IBattlePublicEventSpike 已在 task 8.9 收口时删除，不再参与生产注册或发送。
     /// </remarks>
     [EventInterface(EEventGroup.GroupLogic)]
     public interface IBattlePublicEvent

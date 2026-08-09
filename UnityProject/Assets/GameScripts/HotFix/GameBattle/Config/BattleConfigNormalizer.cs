@@ -43,14 +43,15 @@ namespace GameBattle
         /// <summary>
         /// 把还原工程字符串编码 "kind_lane" 解析为 <see cref="GridCell"/>。
         /// </summary>
-        /// <param name="code">格子编码，如 "1_1"=玩家可建造, "1_0"=对手可建造, "0_*"=通道, "2_*"=阻挡。</param>
+        /// <param name="code">格子编码，如 "1_0"=本机玩家可建造, "1_1"=对手可建造, "0_*"=通道, "2_*"=阻挡。</param>
         /// <returns>规范化格子属性。</returns>
         /// <remarks>
         /// <para>编码格式来自 <c>MapData.js</c> MAP_BLOCKS 和 <c>golden-battle-bundle.json</c>
-        /// cellKindLaneFormat："字符串 'kind_lane'，如 '1_1'=玩家可建造格、'1_0'=对手可建造格、
+        /// cellKindLaneFormat："字符串 'kind_lane'"。源数据的 lane 表示地图半场，
+        /// 当前竖屏本机视角下 lane=0 位于下半场，归本机玩家；lane=1 位于上半场，归对手。
         /// '0_*'=路径、'2_*'=装饰"。</para>
         /// <para>kind: 0=通道(Passage), 1=可建造(Buildable), 2=阻挡(Blocked)。
-        /// lane: 1=玩家(Player), 0=对手(Opponent)；只有 Buildable 格有阵营归属。</para>
+        /// 只有 Buildable 格有阵营归属。</para>
         /// </remarks>
         internal static GridCell DecodeCell(string code)
         {
@@ -73,7 +74,7 @@ namespace GameBattle
             };
 
             BuildableSide side = cellKind == GridCellKind.Buildable
-                ? (lane == 1 ? BuildableSide.Player : BuildableSide.Opponent)
+                ? (lane == 0 ? BuildableSide.Player : BuildableSide.Opponent)
                 : BuildableSide.None;
 
             return new GridCell(cellKind, side);

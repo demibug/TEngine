@@ -61,6 +61,11 @@ namespace GameFUI
         private readonly FUIOptions _options;
 
         /// <summary>
+        /// 可选安全区输入，仅由 internal 测试装配注入；生产为 null 并读取平台 Screen.safeArea。
+        /// </summary>
+        private readonly Func<UnityEngine.Rect> _safeAreaProvider;
+
+        /// <summary>
         /// 模块是否已 Shutdown。Shutdown 后任何公开操作应失败，不得留下后续回调
         /// （spec：模块退出完整清理）。
         /// </summary>
@@ -137,6 +142,37 @@ namespace GameFUI
         internal readonly Dictionary<Type, WindowEntry> _windowEntries = new Dictionary<Type, WindowEntry>();
 
         /// <summary>
+        /// Closing 期间到达的 Show 请求的待决重开记录集合（任务 8.3）。
+        /// </summary>
+        /// <remarks>
+        /// spec: Closing 期间再次 Show——新 Show SHALL 等待本轮 Close 完成后再从 Cached 或 Absent 重新打开。
+        /// <para>
+        /// 当 ShowAsyncCore 在 entry.State==Closing 时执行（通过 OnClose 回调内重入 module.ShowAsync 构造），
+        /// 不抛异常、不复活旧打开域，而是注册一个待决重开请求，返回挂起的 UniTask&lt;FUIWindow&gt;。
+        /// CloseEntryCore 在 InvokeOnClose 返回、状态推进到 Cached/Disposed 后检查本字典并处理待决请求。
+        /// </para>
+        /// <para>
+        /// 存放在 FUIModule 侧（而非 WindowEntry）是因为 WindowEntry.cs 不在本 change 的可改清单内，
+        /// 且 pending reopen 的生命周期由 FUIModule 的 Close/Show 流程驱动，放在模块侧语义清晰。
+        /// </para>
+        /// <para>
+        /// 单线程主线程调度，无需加锁。键为窗口类型 Type，与 _windowEntries 一致。
+        /// </para>
+        /// </remarks>
+        internal readonly Dictionary<Type, PendingReopenRequest> _pendingReopens = new Dictionary<Type, PendingReopenRequest>();
+
+        /// <summary>
+        /// 待决重开请求：关联 ShowAsyncCore 返回的挂起 UniTask 完成源与请求参数（任务 8.3）。
+        /// </summary>
+        internal struct PendingReopenRequest
+        {
+            /// <summary>待决 UniTask 的完成源，由 CloseEntryCore 尾端 resolve。</summary>
+            public UniTaskCompletionSource<FUIWindow> Tcs;
+            /// <summary>本次 Show 请求的用户参数快照，用于 None 模式迁移到新 entry 的 FIFO 队列。</summary>
+            public object[] Args;
+        }
+
+        /// <summary>
         /// 构造 FUIModule，注入已包装好的资源 provider 与选项。
         /// </summary>
         /// <param name="resourceProvider">最窄资源 provider，不得为 null。</param>
@@ -146,11 +182,15 @@ namespace GameFUI
         /// 公开注册形态固定为 <c>FUI.RegisterModule(IResourceModule, FUIOptions)</c>，不增加第二个公开重载
         /// （design.md 决策1）。
         /// </remarks>
-        internal FUIModule(IFUIResourceProvider resourceProvider, FUIOptions options)
+        internal FUIModule(
+            IFUIResourceProvider resourceProvider,
+            FUIOptions options,
+            Func<UnityEngine.Rect> safeAreaProvider = null)
         {
             // provider 由调用方保证非空（FUI.RegisterModule / 测试入口负责校验并包装）。
             _resourceProvider = resourceProvider;
             _options = options ?? new FUIOptions();
+            _safeAreaProvider = safeAreaProvider;
             _registry = new FUIBindingRegistry();
 
             // 6.4 装配阶段接线：把公开 FUIOptions 的卸载策略与延迟时间传给 PackageLoader.Configure，
@@ -241,12 +281,15 @@ namespace GameFUI
         /// </summary>
         /// <remarks>
         /// 所有 owner 完成显式注册后由装配方调用（design.md 决策2）。
-        /// 本方法执行三步：
-        /// 1. 创建 <see cref="FUILayerContainer"/>：在 GRoot 下按 <see cref="FUILayer"/> 顺序建立
+        /// 本方法按固定屏障顺序执行：
+        /// 1. 校验 <see cref="FUIOptions"/> 的设计宽高；
+        /// 2. 调用 <see cref="GRoot.SetContentScaleFactor(int,int,UIContentScaler.ScreenMatchMode)"/>
+        ///    应用设计分辨率和匹配策略；
+        /// 3. 创建 <see cref="FUILayerContainer"/>：在 GRoot 下按 <see cref="FUILayer"/> 顺序建立
         ///    Background、Normal、Popup、Guide、Tips、System 六个固定层级容器（design.md 决策7），
         ///    使后续 Show 的窗口只挂载到所属层级容器，不在 GRoot 顶层与其他系统对象混合排序；
-        /// 2. <see cref="FUIBindingRegistry.Freeze"/>：冻结后任何新增或冲突注册直接抛 <see cref="FUIException"/>；
-        /// 3. <see cref="FUIObjectFactoryIntegration.InstallPackageItemExtensions"/>：为已注册的全部组件 URL
+        /// 4. <see cref="FUIBindingRegistry.Freeze"/>：冻结后任何新增或冲突注册直接抛 <see cref="FUIException"/>；
+        /// 5. <see cref="FUIObjectFactoryIntegration.InstallPackageItemExtensions"/>：为已注册的全部组件 URL
         ///    安装只捕获 URL 的无状态 creator，使 FairyGUI 创建受管理对象时查询当前活动 Registry 的描述，
         ///    返回最末端业务类型而非生成基类（spec：业务类型覆盖生成类型）。
         /// 首次创建任何受管理对象前必须完成冻结与 creator 安装。
@@ -261,18 +304,27 @@ namespace GameFUI
         {
             ThrowIfShutdown();
 
-            // 1. 创建固定层级容器：在 GRoot 下建立六个固定层，窗口只挂载到所属层级容器（design.md 决策7）。
+            // 1. 在访问 GRoot 或创建任何显示对象前校验设计分辨率，保证失败原子性。
+            _options.ValidateScreenAdaptation();
+
+            // 2. 在创建层容器和受管理窗口前应用统一设计分辨率与匹配策略。
+            GRoot.inst.SetContentScaleFactor(
+                _options.DesignWidth,
+                _options.DesignHeight,
+                ConvertScreenMatchMode(_options.ScreenMatchMode));
+
+            // 3. 创建固定层级容器：在 GRoot 下建立六个固定层，窗口只挂载到所属层级容器（design.md 决策7）。
             //    层级容器在 FreezeBindings 阶段创建，保证后续 Show 前已就绪；GRoot.inst 在装配阶段可用。
             if (_layerContainer == null)
             {
-                _layerContainer = new FUILayerContainer();
+                _layerContainer = new FUILayerContainer(_safeAreaProvider);
                 _layerContainer.Create();
             }
 
-            // 2. 冻结注册表：冻结后新增注册直接报错，运行期只读查询生效（IsActive 为 true）。
+            // 4. 冻结注册表：冻结后新增注册直接报错，运行期只读查询生效（IsActive 为 true）。
             _registry.Freeze();
 
-            // 3. 安装全局无状态 creator：creator 只捕获 URL，不捕获 Registry 实例或可释放运行时对象，
+            // 5. 安装全局无状态 creator：creator 只捕获 URL，不捕获 Registry 实例或可释放运行时对象，
             //    被调用时通过 FUIObjectFactoryIntegration.ActiveRegistry 静态访问器查询当前活动 Registry。
             //    URL 列表直接从注册表获取（GetRegisteredUrls），覆盖所有注册路径
             //    （RegisterDescriptor 与直接 Register），保证装配流程一致性。
@@ -448,6 +500,16 @@ namespace GameFUI
                     RollbackLoadedInstance(entry);
                 }
             }
+
+            // 任务 8.3：取消所有待决重开请求（Closing 期间 Show 的挂起 UniTask）。
+            // 模块 Shutdown 时无法完成重开，以 OperationCanceledException resolve 待决 tcs，
+            // 使 ShowAsyncCore 的 await 收到取消（模块生命周期取消语义，design.md 决策4）。
+            // 这不是"Closing 期间 Show 抛异常"——此时模块确实在退出，无法重开。
+            foreach (KeyValuePair<Type, PendingReopenRequest> pendingPair in _pendingReopens)
+            {
+                pendingPair.Value.Tcs.TrySetCanceled(ModuleLifetimeToken);
+            }
+            _pendingReopens.Clear();
 
             _windowEntries.Clear();
         }
@@ -909,6 +971,13 @@ namespace GameFUI
                     FUIWindowState stateBeforeCached = entry.State;
                     entry.TransitionTo(FUIWindowState.Cached);
                     LogWindowStateTransition(entry, stateBeforeCached);
+
+                    // 任务 8.3：Closing 期间到达的 Show 的待决重开处理（Cache 模式）。
+                    // OnClose 回调内可能通过重入 module.ShowAsync 注册了 pending reopen（entry 处于 Closing 时）。
+                    // 此时 entry 已到达 Cached，同步从 Cached 重开（复用 ExecuteOpenLifecycle 的 Cached 重开路径）。
+                    // args 已在 entry.PendingRefreshArgs 中（ShowAsyncCore 入队时未被清除，Cached 不换 entry）。
+                    // 旧打开域不复活：ExecuteOpenLifecycle 创建新 OpenCts/事件域，不复用 Closing 前的旧域。
+                    TryProcessPendingReopenForCachedEntry(entry, descriptor);
                 }
                 else
                 {
@@ -917,10 +986,18 @@ namespace GameFUI
                     entry.TransitionTo(FUIWindowState.Disposed);
                     LogWindowStateTransition(entry, stateBeforeDisposed);
                     RollbackLoadedInstance(entry);
+
+                    // 任务 8.3：Closing 期间到达的 Show 的待决重开处理（None 模式）。
+                    // 旧 entry 已 Disposed + Rollback（旧 lease 已释放）。
+                    // None 模式重开需异步从新 Absent entry 重建（包加载），CloseEntryCore 是同步 void 不能 await，
+                    // 故用 UniTaskVoid fire-and-forget 异步处理。
+                    // args 从 PendingReopenRequest 迁移到新 entry 的 FIFO 队列（旧 entry 队列随 Disposed 丢失）。
+                    TryProcessPendingReopenForDisposedEntry(entry, descriptor);
                 }
 
                 // 5.11：Close 完成后统一重新计算全屏遮挡（design.md 决策7；spec: 关闭顶部全屏窗口后恢复下层）。
                 // 关闭的窗口不再处于 Open，若它是遮挡下层的全屏窗口，下层将恢复可见。
+                // Cache 模式 pending reopen 已同步重开，RecomputeFullScreenOcclusion 会覆盖重开后的遮挡状态。
                 RecomputeFullScreenOcclusion();
 
                 return;
@@ -945,6 +1022,137 @@ namespace GameFUI
                 // 5.11：Cached 窗口最终释放后统一重新计算全屏遮挡（幂等，Cached 窗口本就不在显示树，通常无变化）。
                 RecomputeFullScreenOcclusion();
                 return;
+            }
+        }
+
+        /// <summary>
+        /// 检查并处理 Cache 模式下的待决重开请求（任务 8.3）。
+        /// 在 CloseEntryCore 的 Cache 分支 TransitionTo(Cached) 之后调用。
+        /// </summary>
+        /// <param name="entry">已到达 Cached 的窗口条目。</param>
+        /// <param name="descriptor">窗口描述。</param>
+        /// <remarks>
+        /// 若 OnClose 回调内重入 ShowAsync 注册了 pending reopen，此时 entry 已 Cached，
+        /// 同步从 Cached 重开：Cached -> Opening -> Open（复用 ExecuteOpenLifecycle）。
+        /// 旧打开域不复活：ExecuteOpenLifecycle 创建新 OpenCts/事件域，不复用 Closing 前的旧域。
+        /// args 已在 entry.PendingRefreshArgs 中（ShowAsyncCore 入队时未被清除，Cached 不换 entry）。
+        /// resolve tcs 后 ShowAsyncCore 延续在 UniTask 调度上恢复并返回窗口。
+        /// </remarks>
+        private void TryProcessPendingReopenForCachedEntry(WindowEntry entry, FUIDescriptor descriptor)
+        {
+            Type windowType = entry.WindowType;
+            if (!_pendingReopens.TryGetValue(windowType, out PendingReopenRequest pending))
+            {
+                return;
+            }
+
+            _pendingReopens.Remove(windowType);
+
+            // Cached -> Opening（合法转换，WindowEntry 状态机已定义）。
+            FUIWindowState stateBeforeReopen = entry.State;
+            entry.TransitionTo(FUIWindowState.Opening);
+            LogWindowStateTransition(entry, stateBeforeReopen);
+
+            // 复用 ExecuteOpenLifecycle 完成 Opening -> Open（创建新 OpenCts/事件域、RegisterOpenEvents、OnOpen）。
+            ExecuteOpenLifecycle(entry, descriptor);
+
+            // 处理 FIFO 队列中的 args（ShowAsyncCore 入队的刷新参数）。
+            // 每个 args 先 SetUserDatas 再 InvokeOnRefresh（spec: 有效请求按到达顺序执行刷新）。
+            ProcessRefreshQueue(entry);
+
+            // resolve 待决 UniTask，ShowAsyncCore 延续在 UniTask 调度上恢复。
+            // TrySetResult 不内联调用延续（UniTask 通过 PlayerLoop 调度），CloseEntryCore 可安全继续返回。
+            pending.Tcs.TrySetResult(entry.Window);
+        }
+
+        /// <summary>
+        /// 检查并触发 None 模式下的待决重开请求（任务 8.3）。
+        /// 在 CloseEntryCore 的 None 分支 TransitionTo(Disposed)+Rollback 之后调用。
+        /// </summary>
+        /// <param name="oldEntry">已 Disposed 的旧窗口条目。</param>
+        /// <param name="descriptor">窗口描述。</param>
+        /// <remarks>
+        /// 若 OnClose 回调内重入 ShowAsync 注册了 pending reopen，此时旧 entry 已 Disposed+Rollback。
+        /// None 模式重开需异步从新 Absent entry 重建（包加载），CloseEntryCore 是同步 void 不能 await，
+        /// 故用 UniTaskVoid fire-and-forget 异步处理（<see cref="ProcessPendingReopenForDisposedEntryAsync"/>）。
+        /// args 从 PendingReopenRequest 迁移到新 entry 的 FIFO 队列（旧 entry 队列随 Disposed 丢失）。
+        /// 旧 lease 已由 RollbackLoadedInstance 释放，重开获取新 lease（无泄漏）。
+        /// </remarks>
+        private void TryProcessPendingReopenForDisposedEntry(WindowEntry oldEntry, FUIDescriptor descriptor)
+        {
+            Type windowType = oldEntry.WindowType;
+            if (!_pendingReopens.TryGetValue(windowType, out PendingReopenRequest pending))
+            {
+                return;
+            }
+
+            _pendingReopens.Remove(windowType);
+
+            // fire-and-forget 异步重开：CloseEntryCore 是同步 void，不能 await。
+            // 异步方法内部 await UniTask.NextFrame 让 CloseEntryCore 完成返回后再重建 entry。
+            ProcessPendingReopenForDisposedEntryAsync(windowType, descriptor, pending).Forget();
+        }
+
+        /// <summary>
+        /// None 模式待决重开的异步实现：从新 Absent entry 重建并 resolve 待决 UniTask（任务 8.3）。
+        /// </summary>
+        /// <param name="windowType">窗口类型。</param>
+        /// <param name="descriptor">窗口描述。</param>
+        /// <param name="pending">待决重开请求（含 tcs 与 args）。</param>
+        /// <remarks>
+        /// 流程：
+        /// 1. await UniTask.NextFrame：让 CloseEntryCore 完成返回，避免重入状态机；
+        /// 2. GetOrCreateEntry：旧 entry 已 Disposed，检测后重建新 Absent entry；
+        /// 3. 迁移 args 到新 entry 的 FIFO 队列；
+        /// 4. Absent -> Loading，创建 SharedCreateTask；
+        /// 5. 复用 ExecuteLoadAndOpenAsync 完成包加载、实例创建、首次打开生命周期；
+        /// 6. ProcessRefreshQueue 处理 FIFO args；
+        /// 7. resolve tcs，ShowAsyncCore 延续恢复并返回窗口。
+        /// 失败时 tcs.TrySetException 向 ShowAsyncCore 传播异常。
+        /// 模块 Shutdown 时 lifetimeToken 取消，ExecuteLoadAndOpenAsync 抛 OCE，tcs 收到取消。
+        /// </remarks>
+        private async UniTaskVoid ProcessPendingReopenForDisposedEntryAsync(
+            Type windowType,
+            FUIDescriptor descriptor,
+            PendingReopenRequest pending)
+        {
+            try
+            {
+                // 让 CloseEntryCore 完成返回，避免在 Close 调用栈上重入状态机。
+                await UniTask.NextFrame(ModuleLifetimeToken);
+
+                ThrowIfShutdown();
+
+                // 重建新 Absent entry（GetOrCreateEntry 检测 Disposed 并重建）。
+                WindowEntry newEntry = GetOrCreateEntry(windowType, descriptor);
+
+                // 迁移 pending args 到新 entry 的 FIFO 队列（旧 entry 队列随 Disposed 丢失）。
+                newEntry.PendingRefreshArgs.Enqueue(pending.Args);
+
+                // 捕获版本快照（新 entry 版本为 0）。
+                long operationVersion = newEntry.OperationVersion;
+
+                // Absent -> Loading，创建 SharedCreateTask（与 ShowAsyncCore 的 Absent 分支一致）。
+                FUIWindowState stateBeforeLoading = newEntry.State;
+                newEntry.TransitionTo(FUIWindowState.Loading);
+                LogWindowStateTransition(newEntry, stateBeforeLoading);
+                UniTaskCompletionSource<FUIWindow> sharedTask = new UniTaskCompletionSource<FUIWindow>();
+                newEntry.SharedCreateTask = sharedTask;
+
+                // 复用 ExecuteLoadAndOpenAsync 完成包加载、实例创建、首次打开生命周期。
+                FUIWindow window = await ExecuteLoadAndOpenAsync(
+                    newEntry, descriptor, ModuleLifetimeToken, operationVersion, sharedTask);
+
+                // 处理 FIFO 队列中的 args。
+                ProcessRefreshQueue(newEntry);
+
+                // resolve 待决 UniTask，ShowAsyncCore 延续恢复并返回窗口。
+                pending.Tcs.TrySetResult(window);
+            }
+            catch (Exception ex)
+            {
+                // 失败时向 ShowAsyncCore 传播异常（包括 Shutdown 时的 OCE）。
+                pending.Tcs.TrySetException(ex);
             }
         }
 
@@ -1157,7 +1365,9 @@ namespace GameFUI
             bool isLoader = false;
             bool isCachedReopen = false;
             bool isHiddenRedispatch = false;
+            bool isPendingReopen = false;
             UniTaskCompletionSource<FUIWindow> sharedTask = entry.SharedCreateTask;
+            FUIWindow window = null;
 
             if (entry.State == FUIWindowState.Absent)
             {
@@ -1197,18 +1407,49 @@ namespace GameFUI
             }
             else if (entry.State == FUIWindowState.Closing)
             {
-                // Closing 期间的新 Show 排在 Close 之后，不复活旧打开域
-                // （spec: Closing 期间再次 Show——新 Show SHALL 等待本轮 Close 完成后再从 Cached 或 Absent 重新打开）。
-                // 5.6 已实现同步 Close：Close 会同步推进到 Cached/Disposed，因此 Show 不应观察到 Closing 状态。
-                // 此处为防御性占位：若因时序异常到达 Closing，抛出包含上下文的 FUIException，避免在未就绪状态下错误推进。
-                throw new FUIException(
-                    $"ShowAsync 失败：窗口 {windowType.FullName} 正在 Closing，无法在此期间 Show。" +
-                    $"URL={descriptor.URL}, 包名={descriptor.PackageName}, " +
-                    $"当前状态={entry.State}, 当前操作版本={entry.OperationVersion}。" +
-                    "请等待 Close 完成后再重新 Show。");
-            }
+                // Closing 期间到达的 Show：等待本轮 Close 完成后重开，不抛任何异常（任务 8.3 返工修复）。
+                // spec: Closing 期间再次 Show——新 Show SHALL 等待本轮 Close 完成后再从 Cached 或 Absent 重新打开，
+                // 不得中途复活旧打开域。不得对该有效请求抛防御性 FUIException 或 OperationCanceledException。
+                //
+                // 可达性：CloseEntryCore 是同步 void，在 InvokeOnClose(:896) 回调内业务可通过公开 API
+                // 调用 module.ShowAsync<T>()，此时 CloseEntryCore 正在执行栈上、entry 处于 Closing(:885 之后)。
+                // ShowAsyncCore 重入执行读到 entry.State==Closing，命中本分支。这是 spec 要求的"Closing 期间 Show"场景。
+                //
+                // 非死锁设计（关键）：
+                //   - 创建 UniTaskCompletionSource<FUIWindow> 作为待决完成源，与 args 一起存入 _pendingReopens。
+                //   - await reopenTcs.Task 挂起 ShowAsyncCore（UniTask 挂起不阻塞当前调用栈），
+                //     ShowAsyncCore 返回挂起的 UniTask<FUIWindow> 给 OnClose 内的业务调用方，
+                //     调用栈释放回 InvokeOnClose -> CloseEntryCore 继续同步推进。
+                //   - CloseEntryCore 在 InvokeOnClose 返回、TransitionTo(Cached/Disposed) 后检查 _pendingReopens：
+                //       Cache 模式：同步 ExecuteOpenLifecycle(Cached->Opening->Open) + ProcessRefreshQueue + resolve tcs；
+                //       None 模式：旧 entry 已 Disposed，用 UniTaskVoid 异步从新 Absent entry 重建（GetOrCreateEntry），
+                //         完成后 resolve tcs（CloseEntryCore 是同步 void，不能 await，故 fire-and-forget）。
+                //   - tcs resolve 后 ShowAsyncCore 延续在 UniTask 调度上恢复（非内联），此时 window 已处于 Open。
+                //
+                // 保证：
+                //   - 旧 Open 域不复活：重开创建新 OpenCts/事件域（ExecuteOpenLifecycle/ExecuteLoadAndOpenAsync 各自新建），
+                //     不复用 Closing 前的旧域；
+                //   - 租约无泄漏：旧 lease 由 CloseEntryCore/RollbackLoadedInstance 释放，重开获取新 lease；
+                //   - FIFO 不丢 args：args 已在 :1139 入队旧 entry；
+                //       Cache 模式 entry 不换，args 留在原队列；
+                //       None 模式旧 entry 随 Disposed 被替换，args 快照存入 PendingReopenRequest 迁移到新 entry 队列。
+                isPendingReopen = true;
+                UniTaskCompletionSource<FUIWindow> reopenTcs = new UniTaskCompletionSource<FUIWindow>();
+                _pendingReopens[windowType] = new PendingReopenRequest
+                {
+                    Tcs = reopenTcs,
+                    Args = argsSnapshot,
+                };
 
-            FUIWindow window;
+                // await 挂起：ShowAsyncCore 返回挂起 UniTask，调用栈释放回 CloseEntryCore。
+                // CloseEntryCore 尾端 resolve 后，本延续在 UniTask 调度上恢复。
+                // 模块 Shutdown 时 ClearWindowEntriesForShutdown 会以 OCE resolve 本 tcs（模块生命周期取消语义）。
+                window = await reopenTcs.Task;
+
+                // resolve 后 window 是重开后的实例。entry 需重新获取：
+                // None 模式旧 entry 已 Disposed 并被 GetOrCreateEntry 替换为新 entry。
+                entry = GetOrCreateEntry(windowType, descriptor);
+            }
 
             if (isLoader)
             {
@@ -1228,6 +1469,14 @@ namespace GameFUI
                 // 只恢复 visible/touchable 并转换状态，之后由 ProcessRefreshQueue 统一处理刷新。
                 window = entry.Window;
                 RestoreVisibilityAndTransitionToOpen(entry, descriptor);
+            }
+            else if (isPendingReopen)
+            {
+                // Closing 期间 Show 的延续：window 已由 reopenTcs.Task 设置（重开后的实例），
+                // entry 已在 await 返回后重新获取。重开的 ProcessRefreshQueue 已由
+                // CloseEntryCore（Cache 模式）或 ProcessPendingReopenForDisposedEntry（None 模式）完成，
+                // 此处 ProcessRefreshQueue 为幂等空操作（队列已清空）。
+                // 不推进状态、不取租约、不执行生命周期（旧打开域不复活）。
             }
             else if (entry.State == FUIWindowState.Loading)
             {
@@ -1273,7 +1522,10 @@ namespace GameFUI
                 throw new FUIException($"ShowAsync 失败：窗口 {windowType.FullName} 实例为空。");
             }
 
-            if (entry.IsOperationStale(operationVersion))
+            // 版本过期校验：isPendingReopen 跳过——重开后的 entry 是全新的（None 模式）或
+            // 经历了 Close 递增 + 重开（Cache 模式），其 OperationVersion 必然与 Closing 前的快照不同，
+            // 但这是 spec 期望的"等待 Close 完成后重开"语义，不是过期操作。
+            if (!isPendingReopen && entry.IsOperationStale(operationVersion))
             {
                 // 刷新期间版本过期（如其他操作递增了版本），本次返回取消。
                 throw new OperationCanceledException(
@@ -1421,8 +1673,7 @@ namespace GameFUI
                 // 任务 6.3 验证：AddChild 只是显示树操作，不触发 onAddedToStage 作为 Open 信号——
                 // 状态转换由下方第 11 步显式 TransitionTo(Open) 驱动，与 Stage 事件解耦
                 // （design.md 决策6：onAddedToStage/onRemovedFromStage 不作为唯一 Open/Close 信号）。
-                GComponent container = _layerContainer.GetSubContainer(descriptor.Layer, descriptor.SafeAreaMode);
-                container.AddChild(window);
+                MountWindow(entry, descriptor);
                 // 5.11：挂载后显式置顶，保证即使 AddChild 因 sortingOrder 等机制未置末尾也能正确排序。
                 BringWindowToTop(entry);
 
@@ -1510,11 +1761,7 @@ namespace GameFUI
 
             // 重新挂载到层容器（Cached 时可能已被移出显示树）。
             // 任务 6.3 验证：AddChild 只是显示树操作，不触发状态转换——状态由下方 TransitionTo(Open) 显式驱动。
-            GComponent container = _layerContainer.GetSubContainer(descriptor.Layer, descriptor.SafeAreaMode);
-            if (window.parent != container)
-            {
-                container.AddChild(window);
-            }
+            MountWindow(entry, descriptor);
             // 5.11：重新打开后显式置顶，保证缓存窗口重开后渲染在同级最顶层（层内排序）。
             BringWindowToTop(entry);
 
@@ -2053,6 +2300,46 @@ namespace GameFUI
 
             _layerContainer.BringToTopInContainer(
                 entry.Window, entry.Descriptor.Layer, entry.Descriptor.SafeAreaMode);
+        }
+
+        /// <summary>
+        /// 把窗口挂载到描述指定的 Full/Safe 子容器，并应用全屏窗口布局。
+        /// </summary>
+        /// <param name="entry">包含窗口实例的运行时条目。</param>
+        /// <param name="descriptor">窗口注册描述。</param>
+        /// <remarks>
+        /// 首次打开与缓存重开统一经过本入口。全屏窗口以目标子容器为坐标原点，
+        /// 立即使用容器当前尺寸并建立 Size Relation；非全屏窗口只挂载，不修改资源尺寸和位置。
+        /// </remarks>
+        private void MountWindow(WindowEntry entry, FUIDescriptor descriptor)
+        {
+            FUIWindow window = entry.Window;
+            GComponent container = _layerContainer.GetSubContainer(
+                descriptor.Layer,
+                descriptor.SafeAreaMode);
+            GComponent previousParent = window.parent;
+
+            if (descriptor.FullScreen && previousParent != null && previousParent != container)
+            {
+                window.RemoveRelation(previousParent, RelationType.Size);
+            }
+
+            if (window.parent != container)
+            {
+                container.AddChild(window);
+            }
+
+            if (!descriptor.FullScreen)
+            {
+                return;
+            }
+
+            // 先移除再重建同一目标关系，使缓存重开按容器当前状态重新建立基线，
+            // 同时避免重复执行挂载时累加等价的 Width/Height 关系。
+            window.RemoveRelation(container, RelationType.Size);
+            window.SetXY(0f, 0f);
+            window.SetSize(container.width, container.height);
+            window.AddRelation(container, RelationType.Size);
         }
 
         /// <summary>
@@ -2637,6 +2924,20 @@ namespace GameFUI
             if (_isShutdown)
             {
                 throw new FUIException("GameFUI 模块已 Shutdown，禁止后续操作。");
+            }
+        }
+
+        private static UIContentScaler.ScreenMatchMode ConvertScreenMatchMode(
+            FUIScreenMatchMode screenMatchMode)
+        {
+            switch (screenMatchMode)
+            {
+                case FUIScreenMatchMode.MatchWidth:
+                    return UIContentScaler.ScreenMatchMode.MatchWidth;
+                case FUIScreenMatchMode.MatchHeight:
+                    return UIContentScaler.ScreenMatchMode.MatchHeight;
+                default:
+                    return UIContentScaler.ScreenMatchMode.MatchWidthOrHeight;
             }
         }
 

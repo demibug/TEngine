@@ -32,8 +32,8 @@ namespace GameBattle
     /// </summary>
     /// <remarks>
     /// <para><b>设计依据（design.md:207 / spec "Input commands are atomic"）：</b></para>
-    /// <para>正常校验失败（余额不足、非法格子、预留冲突等）MUST 返回结构化结果而非异常。
-    /// 本枚举提供稳定、可编程判断的拒绝原因，覆盖本期购买放置和刷新命令的可能失败路径。</para>
+    /// <para>正常校验失败（余额不足、非法槽位、目标不匹配等）MUST 返回结构化结果而非异常。
+    /// 本枚举提供稳定、可编程判断的拒绝原因，覆盖本期征兵和换槽/合并命令的可能失败路径。</para>
     ///
     /// <para><b>稳定性约束（参照 BattleErrorCode）：</b></para>
     /// <list type="bullet">
@@ -96,14 +96,63 @@ namespace GameBattle
         UnknownUnitType = 15,
 
         // ====================================================================
-        // 刷新命令失败原因
+        // 征兵命令失败原因
         // ====================================================================
 
         /// <summary>
-        /// 金币不足，无法支付刷新消耗。
-        /// <para>对应还原工程 BattleEconomy 刷新扣费校验。</para>
+        /// 金币不足，无法支付征兵消耗。
+        /// <para>对应最终方案征兵流程的扣费步骤失败：失败不清槽、不扣费。</para>
         /// </summary>
-        InsufficientGoldForRefresh = 20,
+        InsufficientGoldForRecruit = 20,
+
+        // ====================================================================
+        // 换槽/合并命令失败原因
+        // ====================================================================
+
+        /// <summary>
+        /// 源槽位非法（无效槽位标识或不存在）。
+        /// </summary>
+        InvalidSourceSlot = 21,
+
+        /// <summary>
+        /// 目标槽位非法（无效槽位标识或不存在）。
+        /// </summary>
+        InvalidTargetSlot = 22,
+
+        /// <summary>
+        /// 源槽为空，无单位可移动。
+        /// </summary>
+        SourceSlotEmpty = 23,
+
+        /// <summary>
+        /// 源槽与目标槽相同。
+        /// </summary>
+        SameSlot = 24,
+
+        /// <summary>
+        /// 源单位与目标单位阵营不同，不可合并。
+        /// </summary>
+        CrossSideMerge = 25,
+
+        /// <summary>
+        /// 目标单位不满足合并条件（不同兵种或不同等级）。
+        /// </summary>
+        TargetMismatch = 26,
+
+        /// <summary>
+        /// 目标单位已满级，不可继续合并。
+        /// </summary>
+        MaxLevelReached = 27,
+
+        /// <summary>
+        /// 换槽/合并事务的战斗实例准备失败（配置缺失/工厂失败等），槽位不变化。
+        /// </summary>
+        BattleInstancePrepareFailed = 28,
+
+        /// <summary>
+        /// 槽位事务版本冲突（计划生成后被其他事务修改），需重试。
+        /// </summary>
+        TransactionVersionConflict = 29,
 
         // ====================================================================
         // 命令状态/时序失败原因
@@ -111,7 +160,7 @@ namespace GameBattle
 
         /// <summary>
         /// 命令类型不在本期支持范围内。
-        /// <para>本期只支持 BuyPlace 和 Refresh（design.md:206）。</para>
+        /// <para>本期只支持 Recruit 和 DropUnit。</para>
         /// </summary>
         UnsupportedCommand = 30,
 

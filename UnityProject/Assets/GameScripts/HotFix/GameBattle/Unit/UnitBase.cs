@@ -319,8 +319,35 @@ namespace GameBattle
         /// <summary>单位显示名（对应 unitText）。</summary>
         protected string UnitText => _unitText;
 
-        /// <summary>当前等级（对应 level）。</summary>
-        protected int Level => _level;
+        /// <summary>
+        /// 局内单位等级（最终方案"开放局内只读等级"）。
+        /// <para>由 <see cref="SetUnitLevel"/> 设置，供表现层/等级服务读取。
+        /// 等级变化通过等级服务应用数值倍率（伤害/攻速）。</para>
+        /// </summary>
+        internal int UnitLevel => _level;
+
+        /// <summary>
+        /// 设置局内单位等级（最终方案"初始化时接受指定等级"）。
+        /// </summary>
+        /// <param name="level">目标等级（至少 1）。</param>
+        internal void SetUnitLevel(int level)
+        {
+            _level = level > 0 ? level : 1;
+        }
+
+        /// <summary>
+        /// 导出攻击冷却状态（毫秒），供上下场时保存。
+        /// </summary>
+        internal long ExportAttackCooldown() => _lastAttackTimeMs;
+
+        /// <summary>
+        /// 导入攻击冷却状态（毫秒），供重新上场时恢复。
+        /// </summary>
+        /// <param name="lastAttackTimeMs">上次攻击时间戳（毫秒）。</param>
+        internal void ImportAttackCooldown(long lastAttackTimeMs)
+        {
+            _lastAttackTimeMs = lastAttackTimeMs;
+        }
 
         /// <summary>逻辑位置 X（供子类设置放置位置）。</summary>
         protected float XField

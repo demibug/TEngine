@@ -94,7 +94,7 @@ namespace GameFUI.Tests.EditMode
             PackageLoader.Configure(FUIPackageUnloadPolicy.KeepUntilShutdown, 5f);
 
             // 确保 FairyGUI Stage/GRoot 已初始化（EditMode 下需要主动触发）。
-            GRoot.inst.SetSize(1920, 1080);
+            _ = GRoot.inst;
         }
 
         /// <summary>

@@ -2,7 +2,14 @@
 <packageDescription id="56fffadn">
   <resources>
     <component id="tdew0" name="BattleStartPanel.xml" path="/" exported="true"/>
-    <component id="tdew2" name="BattleStartWidget.xml" path="/" exported="true"/>
+    <component id="tdew2" name="BattleStartWidget.xml" path="/Res/"/>
+    <component id="mxwi3" name="BattleHudPanel.xml" path="/" exported="true"/>
+    <component id="mxwi4" name="BattleCardItem.xml" path="/Comp/" exported="true"/>
+    <component id="ho215" name="BattleResultPanel.xml" path="/" exported="true"/>
+    <image id="card0" name="CardKnife.png" path="/Res/Card/"/>
+    <image id="card1" name="CardBow.png" path="/Res/Card/"/>
+    <image id="card2" name="CardSpear.png" path="/Res/Card/"/>
+    <image id="card3" name="CardCavalry.png" path="/Res/Card/"/>
   </resources>
   <publish name="" genCode="true"/>
 </packageDescription>

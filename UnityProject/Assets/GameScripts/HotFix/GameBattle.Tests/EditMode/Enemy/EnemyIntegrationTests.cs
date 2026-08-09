@@ -112,6 +112,12 @@ namespace GameBattle.Tests.EditMode.Enemy
             /// <summary>上次接触是否生效（contactTarget 返回 true）。</summary>
             public bool LastContactResult;
 
+            /// <summary>死亡请求移除回调累计次数（对应 EnemyDeathRequestHandler 触发次数）。</summary>
+            public int DeathRequestedCount;
+
+            /// <summary>上次死亡请求移除的敌人 ID。</summary>
+            public int LastDeathRequestedEnemyId;
+
             /// <summary>
             /// 配置测试依赖并注入记录回调。自动包装 contactTarget 以记录接触次数。
             /// </summary>
@@ -143,7 +149,14 @@ namespace GameBattle.Tests.EditMode.Enemy
                     onEnemyKilled(killedId, attackerId, reward, isPlayerLane);
                 };
 
-                Configure(map, CellSize, wrappedContact, wrappedKill);
+                // 记录死亡请求移除回调次数与参数。
+                EnemyDeathRequestHandler wrappedDeath = (killedId) =>
+                {
+                    DeathRequestedCount++;
+                    LastDeathRequestedEnemyId = killedId;
+                };
+
+                Configure(map, CellSize, wrappedContact, wrappedKill, wrappedDeath);
             }
 
             /// <summary>暴露 Init 供测试调用。</summary>
@@ -650,6 +663,66 @@ namespace GameBattle.Tests.EditMode.Enemy
             Assert.IsTrue(enemy.TestInPool, "GameOver 首次生效，inPool=true。");
             mgr.ProcessRemoveQueue();
             Assert.AreEqual(0, mgr.Count, "移除后集合为空。");
+        }
+
+        [Test]
+        [Description("Register 后敌人 Hit 扣血，EnemyHealthChanged 事件携带当前/最大/变化量转发。"
+            + " 集成验证：EnemyBase.Hit → SetHealthChangedCallback → EnemyManager.EnemyHealthChanged。")]
+        public void Register_Hit_ForwardsEnemyHealthChanged()
+        {
+            MapData map = BuildLinearPathMapData();
+            var mgr = new EnemyManager(GridSize);
+
+            // 记录事件转发的参数。
+            int forwardedCount = 0;
+            int lastCurrent = 0;
+            int lastMax = 0;
+            int lastDelta = 0;
+            mgr.EnemyHealthChanged += (id, current, max, delta) =>
+            {
+                forwardedCount++;
+                lastCurrent = current;
+                lastMax = max;
+                lastDelta = delta;
+            };
+
+            var enemy = CreateMovingEnemy(
+                map, contactTarget: (_, _, _) => true,
+                onEnemyKilled: null, id: 1, maxHealth: 100, frameNowMs: 1000);
+            mgr.Register(enemy);
+
+            enemy.Hit(30, attackerId: 10);
+
+            Assert.AreEqual(1, forwardedCount, "Register 注入回调后，Hit 扣血应转发一次事件。");
+            Assert.AreEqual(70, lastCurrent, "转发当前血量=70。");
+            Assert.AreEqual(100, lastMax, "转发最大血量=100。");
+            Assert.AreEqual(-30, lastDelta, "转发变化量=-30。");
+        }
+
+        [Test]
+        [Description("敌人血量归零时 EnemyHealthChanged 转发 current=0，供表现层立即隐藏血条。")]
+        public void Register_HitKills_ForwardsZeroHealth()
+        {
+            MapData map = BuildLinearPathMapData();
+            var mgr = new EnemyManager(GridSize);
+
+            int forwardedCount = 0;
+            int lastCurrent = -1;
+            mgr.EnemyHealthChanged += (id, current, max, delta) =>
+            {
+                forwardedCount++;
+                lastCurrent = current;
+            };
+
+            var enemy = CreateMovingEnemy(
+                map, contactTarget: (_, _, _) => true,
+                onEnemyKilled: null, id: 1, maxHealth: 100, frameNowMs: 1000);
+            mgr.Register(enemy);
+
+            enemy.Hit(100, attackerId: 10);
+
+            Assert.AreEqual(1, forwardedCount, "致死一击转发一次事件。");
+            Assert.AreEqual(0, lastCurrent, "致死一击转发当前血量=0。");
         }
 
         // ====================================================================

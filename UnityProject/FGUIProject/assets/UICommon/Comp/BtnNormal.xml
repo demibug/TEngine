@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component size="173,74" extention="Button">
   <displayList>
-    <image id="n0_tdew" name="n0" src="tdew0" fileName="Res/b4.png" xy="0,0"/>
+    <image id="n0_tdew" name="bg" src="tdew0" fileName="Res/b4.png" xy="0,0"/>
+    <text id="n1_hmqg" name="title" xy="15,15" size="146,42" fontSize="30" align="center" vAlign="middle" autoSize="none" text=""/>
   </displayList>
   <Button/>
 </component>

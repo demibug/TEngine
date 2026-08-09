@@ -53,15 +53,29 @@ namespace GameBattle
         private readonly RuntimeIdAllocator _idAllocator;
 
         /// <summary>
+        /// 槽位面板（最终方案：提供槽位只读快照）。可为 null（旧路径降级）。
+        /// </summary>
+        private readonly UnitSlotBoard _slotBoard;
+
+        /// <summary>
         /// 构造只读视图。
         /// </summary>
         /// <param name="state">权威状态（非 null）。</param>
         /// <param name="idAllocator">ID 分配器（非 null）。</param>
-        internal BattleReadModel(BattleState state, RuntimeIdAllocator idAllocator)
+        /// <param name="slotBoard">槽位面板（最终方案，可为 null）。</param>
+        internal BattleReadModel(BattleState state, RuntimeIdAllocator idAllocator, UnitSlotBoard slotBoard = null)
         {
             _state = state ?? throw new System.ArgumentNullException(nameof(state));
             _idAllocator = idAllocator ?? throw new System.ArgumentNullException(nameof(idAllocator));
+            _slotBoard = slotBoard;
         }
+
+        /// <summary>
+        /// 槽位只读快照（最终方案：供 UI/表现层查询待上场与战场槽）。
+        /// </summary>
+        /// <returns>槽位只读快照；槽位面板未注入时返回空快照（旧路径）。</returns>
+        internal UnitSlotSnapshot SlotSnapshot()
+            => _slotBoard != null ? _slotBoard.Snapshot() : default;
 
         // ====================================================================
         // 标量只读属性 —— 直接委托 BattleState，不缓存

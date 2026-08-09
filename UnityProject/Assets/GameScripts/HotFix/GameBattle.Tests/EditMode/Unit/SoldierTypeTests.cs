@@ -83,6 +83,7 @@ namespace GameBattle.Tests.EditMode.Unit
             internal float XValue;
             internal float YValue;
             internal int HealthValue;
+            internal int MaxHealthValue;
             internal int StateValue;
             internal bool TargetableValue = true;
             internal int HitCount;
@@ -96,9 +97,12 @@ namespace GameBattle.Tests.EditMode.Unit
             public float Y => YValue;
             public float Width => 40f;
             public float Height => 40f;
+            public float ProjectileAimOffsetX => 0f;
+            public float ProjectileAimOffsetY => 0f;
             public float RemainingPathDistance => 100f;
             public int CurrentPathIndex => 0;
             public int Health => HealthValue;
+            public int MaxHealth => MaxHealthValue;
 
             public void Update(long deltaMs) { }
 
@@ -171,10 +175,11 @@ namespace GameBattle.Tests.EditMode.Unit
         // 士兵初始化辅助（暴露 internal API 供测试）
         // ====================================================================
 
-        /// <summary>测试用单位配置：攻击范围 5 格（400px），攻击力 30，间隔 1.5s。</summary>
-        private static UnitConfigSnapshot CreateSoldierConfig(int index, string text, string animKey) =>
+        /// <summary>测试用单位配置：攻击范围 5 格（400px），攻击力 30。</summary>
+        private static UnitConfigSnapshot CreateSoldierConfig(
+            int index, string text, string animKey, float attackIntervalSeconds = 1.5f) =>
             new UnitConfigSnapshot(index, text, animKey, rangeCells: 5f,
-                attackDamage: AttackDamage, attackIntervalSeconds: 1.5f,
+                attackDamage: AttackDamage, attackIntervalSeconds: attackIntervalSeconds,
                 damageMode: "normal", targetPolicy: "first");
 
         /// <summary>
@@ -204,13 +209,14 @@ namespace GameBattle.Tests.EditMode.Unit
             AttackEffectManager effectManager,
             ProjectileFactory factory,
             ProjectileManager projManager,
-            float pixelX = 400f, float pixelY = 300f)
+            float pixelX = 400f, float pixelY = 300f,
+            float attackIntervalSeconds = 1.5f)
         {
             var soldier = new BowSoldier();
             soldier.Configure(enemyManager, resolver, effectManager, factory, projManager, CellSize, 1);
             soldier.AssignRuntimeIdForTest(RuntimeId);
             soldier.InitForTest("弓", true, UnitWidth, UnitHeight);
-            soldier.InitStats(CreateSoldierConfig(1, "弓", "bow"));
+            soldier.InitStats(CreateSoldierConfig(1, "弓", "bow", attackIntervalSeconds));
             soldier.ActivateAt(pixelX, pixelY);
             return soldier;
         }
@@ -334,21 +340,27 @@ namespace GameBattle.Tests.EditMode.Unit
             var effectManager = new AttackEffectManager();
             CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
 
-            BowSoldier soldier = SetupBowSoldier(enemyManager, resolver, effectManager, factory, projManager);
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
 
             Assert.AreEqual(0, effectManager.ActiveCount, "攻击前应无活动效果");
             Assert.AreEqual(0, projManager.ActiveCount, "攻击前应无活动投射物");
 
             soldier.Attack();
 
-            // 应登记一个 ProjectileAttackEffect。
-            Assert.AreEqual(1, effectManager.ActiveCount, "BowSoldier 应创建并登记 1 个效果");
+            // 攻击瞬间只登记延迟释放效果，箭矢尚未创建。
+            Assert.AreEqual(1, effectManager.ActiveCount, "BowSoldier 应登记 1 个延迟释放效果");
             IReadOnlyList<IAttackEffect> snapshot = effectManager.GetEffectsSnapshot();
-            Assert.IsInstanceOf<ProjectileAttackEffect>(snapshot[0],
-                "效果类型应为 ProjectileAttackEffect");
+            Assert.IsInstanceOf<BowReleaseEffect>(snapshot[0],
+                "攻击瞬间应为 BowReleaseEffect（延迟释放）");
+            Assert.AreEqual(0, projManager.ActiveCount, "释放延迟前不应创建投射物");
 
-            // 应有一个活动投射物登记到 ProjectileManager。
-            Assert.AreEqual(1, projManager.ActiveCount, "应创建 1 个活动投射物");
+            // 0.8s × 17 / 30 = 453.33ms，向上取整为 454ms，确保不会早于第 17 帧。
+            effectManager.Update(453);
+            Assert.AreEqual(0, projManager.ActiveCount, "第 17 帧前不应创建投射物");
+            effectManager.Update(1);
+            Assert.AreEqual(1, projManager.ActiveCount, "第 17 帧开始时应创建 1 个活动投射物");
         }
 
         [Test]
@@ -600,6 +612,165 @@ namespace GameBattle.Tests.EditMode.Unit
                 "SpearSoldier 不应位于 UnityEngine 程序集");
             Assert.IsFalse(cavalry.GetType().Assembly.FullName.Contains("UnityEngine"),
                 "CavalrySoldier 不应位于 UnityEngine 程序集");
+        }
+
+        [Test]
+        [Description("运行时攻速倍率变化时重算有效攻击间隔。")]
+        public void SoldierBase_AttackInterval_FollowsAttackSpeedMultiplier()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            BowSoldier soldier = SetupBowSoldier(enemyManager, resolver, effectManager, factory, projManager);
+
+            Assert.AreEqual(1.5f, soldier.AttackIntervalSeconds, "初始攻击间隔应使用基础值");
+
+            soldier.SetAttackSpeedMultiplier(1.5f);
+            Assert.AreEqual(1f, soldier.AttackIntervalSeconds, 0.0001f,
+                "攻速倍率 1.5 时有效攻击间隔应为基础值除以 1.5");
+        }
+
+        [Test]
+        [Description("攻击动画 30 帧在有效攻击间隔内完整播放，且出箭时序在各种攻速倍率下保持第 17 帧比例。")]
+        public void BowAttackTiming_FrameDurationAndReleaseRemainAlignedAcrossSpeedMultipliers()
+        {
+            float[] multipliers = { 1f, 1.5f, 2.1f };
+            for (int index = 0; index < multipliers.Length; index++)
+            {
+                float multiplier = multipliers[index];
+                float effectiveInterval = 0.8f / multiplier;
+                float frameDuration = SoldierSpriteAnimator.CalculateAttackFrameDuration(
+                    effectiveInterval, frameCount: 30);
+                Assert.AreEqual(effectiveInterval, frameDuration * 30f, 0.0001f,
+                    $"倍率 {multiplier} 下 30 帧应完整覆盖一个攻击间隔");
+
+                ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+                var projectileManager = new ProjectileManager(factory);
+                var resolver = new AttackResolver();
+                var effectManager = new AttackEffectManager();
+                CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+                BowSoldier soldier = SetupBowSoldier(
+                    enemyManager, resolver, effectManager, factory, projectileManager,
+                    attackIntervalSeconds: 0.8f);
+                soldier.SetAttackSpeedMultiplier(multiplier);
+                soldier.Attack();
+
+                long releaseDelayMs = (long)Math.Ceiling(effectiveInterval * 1000d * 17d / 30d);
+                effectManager.Update(releaseDelayMs - 1L);
+                Assert.AreEqual(0, projectileManager.ActiveCount,
+                    $"倍率 {multiplier} 下第 17 帧前不应创建箭矢");
+                effectManager.Update(1L);
+                Assert.AreEqual(1, projectileManager.ActiveCount,
+                    $"倍率 {multiplier} 下第 17 帧开始时应创建箭矢");
+            }
+        }
+
+        [Test]
+        [Description("表现同步首次看到已攻击单位时不漏播攻击动画。")]
+        public void BattlePresenter_FirstObservedAttackTime_TriggersAnimation()
+        {
+            Assert.IsTrue(BattlePresenter.ShouldPlayUnitAttackAnimation(
+                    hasPreviousTime: false, previousTime: 0L, attackTimeMs: 800L),
+                "首次同步到非零攻击时间应触发攻击动画");
+            Assert.IsFalse(BattlePresenter.ShouldPlayUnitAttackAnimation(
+                    hasPreviousTime: true, previousTime: 800L, attackTimeMs: 800L),
+                "相同攻击时间不应重复触发攻击动画");
+        }
+
+        [Test]
+        [Description("弓兵攻击后进入 Idle 清除朝向表现意图（HasBodyFacing），使表现层恢复默认朝向。")]
+        public void BowSoldier_EnterIdle_ClearsBodyFacingIntent()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            // 攻击设置朝向意图（选中目标后 SetBodyFacing）。
+            soldier.Attack();
+            Assert.IsTrue(soldier.HasBodyFacing, "攻击后应设置朝向意图");
+
+            // 模拟 AttackScheduler 锁定目标切到 Attack，随后目标丢失切回 Idle。
+            soldier.SetState(AttackUnitState.Attack);
+            Assert.IsTrue(soldier.HasBodyFacing, "进入 Attack 态不应清除朝向意图");
+            soldier.SetState(AttackUnitState.Idle);
+            Assert.IsFalse(soldier.HasBodyFacing, "进入 Idle 应清除朝向意图，避免旧朝向残留");
+        }
+
+        [Test]
+        [Description("枪兵攻击后进入 Idle 清除武器瞄准意图（HasWeaponAim）。")]
+        public void SpearSoldier_EnterIdle_ClearsWeaponAimIntent()
+        {
+            var enemyManager = new EnemyManager(GridSize, null);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            CreateAndRegisterEnemy(enemyManager, id: 1, x: 420f, y: 300f);
+
+            SpearSoldier soldier = SetupSpearSoldier(enemyManager, resolver, effectManager);
+
+            // 攻击设置武器瞄准意图（PerformAttack 中 SetWeaponAim）。
+            soldier.Attack();
+            Assert.IsTrue(soldier.HasWeaponAim, "攻击后应设置武器瞄准意图");
+
+            // 模拟 AttackScheduler 锁定目标切到 Attack，随后目标丢失切回 Idle。
+            soldier.SetState(AttackUnitState.Attack);
+            Assert.IsTrue(soldier.HasWeaponAim, "进入 Attack 态不应清除瞄准意图");
+            soldier.SetState(AttackUnitState.Idle);
+            Assert.IsFalse(soldier.HasWeaponAim, "进入 Idle 应清除瞄准意图，避免旧瞄准角残留");
+        }
+
+        [Test]
+        [Description("弓兵 ResetState 后朝向与瞄准意图清零，池复用无残留。")]
+        public void SoldierBase_ResetState_ClearsVisualIntent()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+            soldier.Attack();
+            soldier.SetState(AttackUnitState.Attack);
+            Assert.IsTrue(soldier.HasBodyFacing, "攻击后应设置朝向意图");
+
+            soldier.ResetState();
+
+            Assert.IsFalse(soldier.HasBodyFacing, "ResetState 应清除朝向意图");
+            Assert.IsFalse(soldier.HasWeaponAim, "ResetState 应清除瞄准意图");
+        }
+
+        [Test]
+        [Description("弓兵攻击后取消所有者（死亡）：未发射的 BowReleaseEffect 被取消，不创建箭矢。")]
+        public void BowRelease_CancelOwner_PreventsArrowCreation()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+            soldier.Attack();
+
+            Assert.AreEqual(1, effectManager.ActiveCount, "攻击后应登记延迟释放效果");
+
+            // 弓兵回收：GameOver 应取消其全部效果。
+            Assert.IsTrue(soldier.GameOver(), "首次回收应成功");
+
+            // 推进效果管理器到超过释放延迟，箭矢不应创建。
+            effectManager.Update(700);
+            Assert.AreEqual(0, projManager.ActiveCount, "取消后即使超过释放延迟也不应创建箭矢");
         }
     }
 }

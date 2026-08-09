@@ -468,6 +468,32 @@ namespace GameBattle
         }
 
         // ====================================================================
+        // 波次刷怪接入委托（task 6.10 闭环返工：接入 EnemyManager.Spawn）
+        // --------------------------------------------------------------------
+        // design.md 目录表限制 BattleManager 不直接持有 EnemyManager/EnemyFactory，
+        // 但 _spawnPairWhenDue 必须真正创建敌人才能让闭环完成"波次结算"。
+        // 解决方式：由 BattleRuntimeFactory 在组装阶段注入刷怪委托，
+        // BattleManager 只负责按 spawnInterval 调用委托，不持有具体 Manager 引用。
+        // 委托签名 (isPlayerLane, typeIndex)：生成一个指定阵营与类型的敌人。
+        // 本期 typeIndex 固定 0（Mob0），多类型延后到后续 change。
+        // ====================================================================
+
+        /// <summary>
+        /// 波次刷怪委托：由 <see cref="BattleRuntimeFactory"/> 注入，负责实际创建敌人
+        /// 并登记到 <see cref="EnemyManager"/>。
+        /// <para><b>接入原因（task 6.10 闭环返工）：</b>
+        /// 原 <see cref="SpawnPairWhenDue"/> 只推进 <c>_spawnIndex</c> 状态机，
+        /// 不调用 EnemyManager.Spawn，导致闭环中敌人从未实际生成，
+        /// 测试只能通过 maxRounds 超时触发冻结而非实际战斗结算。</para>
+        /// <para><b>职责边界（design.md:170）：</b>
+        /// 本类型不直接持有 EnemyManager/EnemyFactory（职责受限），
+        /// 通过委托解耦：BattleManager 只按 spawnInterval 调用委托，
+        /// 委托实现负责 Acquire → Configure → InitializeStats → Init → Register。</para>
+        /// <para>委托可为 null：无注入时 <see cref="SpawnPairWhenDue"/> 只推进状态机（兼容旧测试）。</para>
+        /// </summary>
+        internal Action<bool, int> OnSpawnEnemy { get; set; }
+
+        // ====================================================================
         // 波次开始与刷怪（对应 BattleManager.js:111-145）
         // ====================================================================
 
@@ -526,10 +552,12 @@ namespace GameBattle
         /// <item>spawnIndex += 1。</item>
         /// <item>spawnIndex &gt;= unitsThisWave 时 → WaitingAfterWave + 重置 spawnIndex。</item>
         /// </list>
-        /// <para><b>本期刷怪委托 WaveManager</b>：还原工程在无 WaveManager 时直接调
-        /// enemyManager.spawn，有 WaveManager 时调 waveManager.spawnNormalPair。
-        /// C# 移植统一由 WaveManager 负责；EnemyManager 刷怪入口由 task 4.x 接入后
-        /// 在 WaveManager 内部调用，本类型不直接持有 EnemyManager 引用（职责受限）。</para>
+        /// <para><b>本期刷怪委托接入（task 6.10 闭环返工）：</b>
+        /// 还原工程在无 WaveManager 时直接调 enemyManager.spawn，有 WaveManager 时调
+        /// waveManager.spawnNormalPair。C# 移植改为由 <see cref="OnSpawnEnemy"/> 委托
+        /// 实际创建敌人（Acquire → Configure → Init → Register），
+        /// 委托由 BattleRuntimeFactory 在组装阶段注入。本类型不直接持有
+        /// EnemyManager/EnemyFactory（职责受限 design.md:170）。</para>
         /// <para><b>不持有 EnemyManager（task 3.10 职责受限）：</b>
         /// 本类型只持有 WaveManager 引用，不直接持有 EnemyManager/UnitRegistry/
         /// AttackEffectManager 等。敌人/单位/攻击效果的生命周期由各自 Manager 负责，
@@ -537,12 +565,17 @@ namespace GameBattle
         /// </remarks>
         private void SpawnPairWhenDue()
         {
-            // 本期 EnemyManager 尚未接入（task 4.x），WaveManager.BeginRound 已生成计划，
-            // 实际敌人创建由后续 Phase 的 EnemyManager 承担。
-            // 此处只推进 spawnIndex 状态机，不直接创建敌人。
-            //
-            // TODO Phase 3 task 4.x：EnemyManager 接入后，由 WaveManager 在 spawnNormalPair
-            //   内部调用 EnemyManager.Spawn，本类型仍不直接持有 EnemyManager。
+            // task 6.10 闭环返工：调用 OnSpawnEnemy 委托真正创建敌人。
+            // 委托由 BattleRuntimeFactory 注入，负责 Acquire → Configure →
+            // InitializeStats → Init → Register 全流程。
+            // 委托为 null 时（兼容旧测试）只推进 spawnIndex 状态机，不创建敌人。
+            if (OnSpawnEnemy != null)
+            {
+                // 玩家方与对手方各生成一个 Mob0（对应 spawnNormalPair 语义）。
+                // typeIndex 固定 0（Mob0），多类型延后到后续 change。
+                OnSpawnEnemy.Invoke(true, 0);
+                OnSpawnEnemy.Invoke(false, 0);
+            }
 
             _spawnIndex += 1;
 

@@ -61,9 +61,12 @@ namespace GameBattle.Tests.EditMode.Combat
             public float Y { get; set; }
             public float Width { get; set; } = 40f;
             public float Height { get; set; } = 40f;
+            public float ProjectileAimOffsetX => 0f;
+            public float ProjectileAimOffsetY => 0f;
             public float RemainingPathDistance { get; set; } = float.PositiveInfinity;
             public int CurrentPathIndex { get; set; }
             public int Health { get; set; }
+            public int MaxHealth { get; set; }
             public bool Targetable { get; set; } = true;
 
             /// <summary>Hit 调用累计伤害（验证伤害提交）。</summary>

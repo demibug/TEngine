@@ -45,7 +45,7 @@ namespace GameBattle
     //   - task 6.1 约束：实现纯逻辑 SoldierBase，回收后不得保留目标、冷却、事件、命令或
     //     表现引用。暴露攻击触发钩子供 task 6.2 兵种连接攻击效果。
     //   - task 1.5 延后：UnitLevelService/UnitMergeService 本期不创建。Level 固定 1，
-    //     levelUp 不触发数值重算。addStatModifier/rangeBonusCells/attackSpeedBonus 保留
+    //     levelUp 不触发数值重算。addStatModifier/rangeBonusCells/attackSpeedMultiplier 保留
     //     字段但本期 Mob0 无 buff 场景，ResetState 仍清零保证池复用无污染。
     //
     // 与攻击效果的契约（task 5.4 MeleeAttackEffect.cs IAttackEffectOwner）：
@@ -122,8 +122,8 @@ namespace GameBattle
     ///
     /// <para><b>池化（task 4.1）：</b>
     /// 经 UnitBase 继承 IPoolableBattleObject。本类型覆写 <see cref="ResetState"/>
-    /// 清除 SoldierBase 专属字段（targets/addAttackPower/rangeBonusCells/attackSpeedBonus/
-    /// animationPlaybackRate/typeIndex/baseAttack*），再调 base.ResetState 清除基类字段。</para>
+    /// 清除 SoldierBase 专属字段（targets/addAttackPower/rangeBonusCells/attackSpeedMultiplier/
+    /// typeIndex/baseAttack*），再调 base.ResetState 清除基类字段。</para>
     ///
     /// <para><b>本类型为 internal abstract：</b>只供 GameBattle 内部 4 兵种（task 6.2）
     /// 继承使用，不对其他程序集暴露，不可直接实例化。</para>
@@ -139,14 +139,17 @@ namespace GameBattle
         /// <summary>基础攻击力（对应 baseAttackPower/m_，UnitBase.js:44）。由 InitializeStats 设置。</summary>
         private int _baseAttackPower;
 
+        /// <summary>1 级基础攻击力（最终方案：保存 1 级基础值供 ApplyLevel 重算）。</summary>
+        private int _baseAttackPowerLevel1;
+
         /// <summary>附加攻击力（对应 addAttackPower，SoldierBase.js:16）。本期 buff 暂缓，ResetState 清零。</summary>
         private int _addAttackPower;
 
         /// <summary>范围加成格数（对应 rangeBonusCells，SoldierBase.js:17）。本期 buff 暂缓，ResetState 清零。</summary>
         private float _rangeBonusCells;
 
-        /// <summary>攻速加成（对应 attackSpeedBonus，SoldierBase.js:18）。本期 buff 暂缓，ResetState 清零。</summary>
-        private float _attackSpeedBonus;
+        /// <summary>攻击速度倍率。1 表示基础攻速，值越大攻击间隔越短。</summary>
+        private float _attackSpeedMultiplier = 1f;
 
         /// <summary>基础攻击范围（像素，对应 baseAttackRange/w_，UnitBase.js:45）。由 InitializeStats 设置。</summary>
         /// <remarks>
@@ -157,6 +160,12 @@ namespace GameBattle
 
         /// <summary>基础攻击间隔（秒，对应 baseAttackIntervalSeconds/v_，UnitBase.js:46）。</summary>
         private float _baseAttackIntervalSeconds;
+
+        /// <summary>1 级基础攻击间隔（秒，最终方案：保存 1 级基础值供 ApplyLevel 重算）。</summary>
+        private float _baseAttackIntervalSecondsLevel1;
+
+        /// <summary>等级数值服务（最终方案：由 ConfigureLevel 注入，供 ApplyLevel 重算倍率）。</summary>
+        private UnitLevelService _levelService;
 
         // --- 目标与兵种标识 ---
 
@@ -177,8 +186,19 @@ namespace GameBattle
         /// <summary>动画键（对应 animationKey，SoldierBase.js:25）。如 "knife"/"bow"/"pike"/"cavalry"。</summary>
         private string _animationKey;
 
-        /// <summary>动画播放速率（对应 animationPlaybackRate/j_，SoldierBase.js:19）。供表现端口读取。</summary>
-        private float _animationPlaybackRate;
+        // --- 纯表现状态（供表现层读取，不持有 Unity 引用） ---
+
+        /// <summary>角色本体是否朝右（弓兵攻击转向用，false=朝左）。</summary>
+        private bool _bodyFacingRight;
+
+        /// <summary>角色本体是否已设置朝向（弓兵攻击转向用，false=未攻击保持默认）。</summary>
+        private bool _hasBodyFacing;
+
+        /// <summary>武器是否已有朝向角度（枪兵武器瞄准用，false=无目标保持默认）。</summary>
+        private bool _hasWeaponAim;
+
+        /// <summary>武器瞄准角度（度，DisplayAngle 语义：0°朝上/90°朝右）。</summary>
+        private float _weaponAimDegrees;
 
         // --- 注入依赖（Configure 时设置） ---
 
@@ -256,6 +276,46 @@ namespace GameBattle
             set => _animationKey = value;
         }
 
+        /// <summary>角色本体是否朝右（供表现层读取；弓兵攻击时由 <see cref="SetBodyFacing"/> 设置）。</summary>
+        internal bool BodyFacingRight => _bodyFacingRight;
+
+        /// <summary>角色本体是否已设置朝向（供表现层读取；false=未攻击过，保持 Prefab 默认朝向）。</summary>
+        internal bool HasBodyFacing => _hasBodyFacing;
+
+        /// <summary>武器是否已有朝向角度（供表现层读取；枪兵攻击时由 <see cref="SetWeaponAim"/> 设置）。</summary>
+        internal bool HasWeaponAim => _hasWeaponAim;
+
+        /// <summary>武器瞄准角度（度，DisplayAngle 语义：0°朝上/90°朝右；供表现层读取）。</summary>
+        internal float WeaponAimDegrees => _weaponAimDegrees;
+
+        /// <summary>
+        /// 设置角色本体朝向（弓兵攻击转向用）。
+        /// </summary>
+        /// <param name="facingRight">true=朝右；false=朝左。</param>
+        /// <remarks>
+        /// <para>纯表现状态：不持有 Unity 引用，只记录朝向供表现层同步。
+        /// 由弓兵在 <see cref="BowSoldier.PerformAttack"/> 选中目标后调用。</para>
+        /// </remarks>
+        protected internal void SetBodyFacing(bool facingRight)
+        {
+            _bodyFacingRight = facingRight;
+            _hasBodyFacing = true;
+        }
+
+        /// <summary>
+        /// 设置武器瞄准角度（枪兵武器朝向用）。
+        /// </summary>
+        /// <param name="angleDegrees">角度（度，DisplayAngle 语义：0°朝上/90°朝右）。</param>
+        /// <remarks>
+        /// <para>纯表现状态：不持有目标引用或 Unity Transform，只记录角度供表现层同步。
+        /// 由枪兵在 <see cref="SpearSoldier.PerformAttack"/> 选中目标后调用。</para>
+        /// </remarks>
+        protected internal void SetWeaponAim(float angleDegrees)
+        {
+            _weaponAimDegrees = angleDegrees;
+            _hasWeaponAim = true;
+        }
+
         /// <summary>当前攻击伤害（对应 SoldierBase.js:125-128 attackDamage getter）。</summary>
         /// <remarks>
         /// <para>对应 JS <c>attackDamage = (baseAttackPower + addAttackPower) * (side ? 1 : opponentAttackMultiplier)</c>。</para>
@@ -270,6 +330,9 @@ namespace GameBattle
                 return Side ? baseValue : baseValue * _opponentAttackMultiplier;
             }
         }
+
+        /// <summary>当前攻击伤害（测试访问器，供等级数值测试断言）。</summary>
+        internal int AttackDamageForTest => AttackDamage;
 
         /// <summary>敌人管理器（供 4 兵种在 PerformAttack 中查询目标）。</summary>
         protected EnemyManager EnemyManager => _enemyManager;
@@ -321,21 +384,27 @@ namespace GameBattle
         private void ResetSoldierDefaults()
         {
             _baseAttackPower = 0;
+            _baseAttackPowerLevel1 = 0;
             _addAttackPower = 0;
             _rangeBonusCells = 0f;
-            _attackSpeedBonus = 0f;
+            _attackSpeedMultiplier = 1f;
             _baseAttackRange = 0f;
             _baseAttackIntervalSeconds = 1f;
+            _baseAttackIntervalSecondsLevel1 = 1f;
 
             _targets.Clear();
 
             _typeIndex = -1;
             _animationKey = null;
-            _animationPlaybackRate = 1f;
+            _bodyFacingRight = false;
+            _hasBodyFacing = false;
+            _hasWeaponAim = false;
+            _weaponAimDegrees = 0f;
 
             _enemyManager = null;
             _attackResolver = null;
             _attackEffectManager = null;
+            _levelService = null;
             _cellSize = 0f;
             _opponentAttackMultiplier = 1;
         }
@@ -393,6 +462,22 @@ namespace GameBattle
         }
 
         // ====================================================================
+        // ConfigureLevel —— 注入等级数值服务（最终方案）
+        // ====================================================================
+
+        /// <summary>
+        /// 注入等级数值服务，供 <see cref="ApplyLevel"/> 重算伤害/攻速倍率。
+        /// </summary>
+        /// <param name="levelService">等级数值服务（可为 null；null 时等级应用退化为无倍率）。</param>
+        /// <remarks>
+        /// 由 <see cref="UnitFactory.Acquire"/> 在 Configure 之后调用（四兵统一注入）。
+        /// </remarks>
+        protected internal void ConfigureLevel(UnitLevelService levelService)
+        {
+            _levelService = levelService;
+        }
+
+        // ====================================================================
         // InitializeStats —— 从配置初始化攻击数值
         // --------------------------------------------------------------------
         // 对应 SoldierBase.js:37-49 initializeUnit（从 friendlyUnits.getByText 读取配置）。
@@ -418,8 +503,8 @@ namespace GameBattle
         /// <para><b>同步 UnitBase 字段：</b>本方法同步设置 UnitBase 的 AttackRangeField/
         /// AttackIntervalSecondsField，使 IAttackUnit 契约返回正确值。
         /// AttackRange = baseAttackRange + rangeBonusCells * cellSize（本期 rangeBonusCells=0）。
-        /// AttackIntervalSeconds = baseAttackIntervalSeconds / (1 + attackSpeedBonus)
-        /// （本期 attackSpeedBonus=0）。</para>
+        /// AttackIntervalSeconds = baseAttackIntervalSeconds / attackSpeedMultiplier。
+        /// 初始 attackSpeedMultiplier=1。</para>
         /// <para><b>调用顺序：</b>UnitFactory.Acquire → AssignRuntimeId → Configure →
         /// Init(unitText, side, width, height) → InitializeStats(config) →
         /// SetPlacement/ActivatePlacement（task 6.3）。</para>
@@ -437,29 +522,102 @@ namespace GameBattle
             _typeIndex = config.Index;
             _animationKey = config.AnimationKey;
             _baseAttackPower = config.AttackDamage;
+            _baseAttackPowerLevel1 = config.AttackDamage;
             _baseAttackRange = config.RangeCells * _cellSize;
             _baseAttackIntervalSeconds = config.AttackIntervalSeconds;
+            _baseAttackIntervalSecondsLevel1 = config.AttackIntervalSeconds;
 
             // 同步 UnitBase 的 IAttackUnit 契约字段。
             // AttackRange = baseAttackRange + rangeBonusCells * cellSize（本期 rangeBonusCells=0）。
             AttackRangeField = _baseAttackRange + _rangeBonusCells * _cellSize;
-            // AttackIntervalSeconds = base / (1 + attackSpeedBonus)（本期 attackSpeedBonus=0）。
+            // AttackIntervalSeconds = base / attackSpeedMultiplier（初始为 1）。
             AttackIntervalSecondsField = ComputeAttackIntervalSeconds();
+        }
+
+        // ====================================================================
+        // ApplyLevel —— 应用等级数值（最终方案）
+        // ====================================================================
+
+        /// <summary>
+        /// 按当前等级立即重算伤害与攻击间隔（最终方案"统一应用等级数值"）。
+        /// </summary>
+        /// <param name="level">目标等级（1..MaxLevel）。</param>
+        /// <remarks>
+        /// <para><b>公式（最终方案）：</b></para>
+        /// <code>
+        /// damage   = baseDamage(1 级) × DamageMultiplier[level-1]
+        /// interval = baseInterval(1 级) ÷ AttackSpeedMultiplier[level-1]
+        /// </code>
+        /// <para><b>整数伤害四舍五入：</b>C# 整数伤害统一采用
+        /// <see cref="UnitLevelService.ResolveDamage"/>（MidpointRounding.AwayFromZero），
+        /// 避免各兵种自行转换。</para>
+        /// <para><b>同步 UnitBase 等级字段：</b>调用 <see cref="UnitBase.SetUnitLevel"/>。
+        /// 上下场不重置已有攻击冷却（冷却由 UnitBase 单独导入导出）。</para>
+        /// </remarks>
+        internal void ApplyLevel(int level)
+        {
+            SetUnitLevel(level);
+
+            int damage = _baseAttackPowerLevel1;
+            float interval = _baseAttackIntervalSecondsLevel1;
+            if (_levelService != null)
+            {
+                damage = _levelService.ResolveDamage(_baseAttackPowerLevel1, level);
+                interval = _levelService.ResolveAttackInterval(_baseAttackIntervalSecondsLevel1, level);
+            }
+
+            // 基础攻击力（供 AttackDamage 计算）。_addAttackPower 本期恒 0。
+            _baseAttackPower = damage;
+            _baseAttackIntervalSeconds = interval;
+            AttackRangeField = _baseAttackRange + _rangeBonusCells * _cellSize;
+            AttackIntervalSecondsField = ComputeAttackIntervalSeconds();
+        }
+
+        /// <summary>
+        /// 取消尚未释放的攻击（近战延迟效果、弓兵发射延迟等），保留已发射投射物。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>最终方案"上下场或成为合并源时取消尚未释放的攻击"：</b></para>
+        /// <para>单位上下场或成为合并源被移除时，尚未结算的攻击（如近战延迟效果、
+        /// <see cref="BowReleaseEffect"/> 释放延迟）全部取消；已发射的箭矢由
+        /// <see cref="ProjectileManager"/> 继续推进，不因源单位回池而消失。</para>
+        /// <para>经 <see cref="AttackEffectManager.CancelOwner"/> 取消全部以本单位为
+        /// Owner 的效果。取消的是未结算效果（Cancel 不造成伤害），不触碰已发射投射物
+        /// （ProjectileAttackEffect.Cancel 会在发射后解除对源单位的引用，见 task 5.8）。</para>
+        /// </remarks>
+        internal void CancelUnreleasedAttacks()
+        {
+            if (_attackEffectManager != null)
+            {
+                _attackEffectManager.CancelOwner(this, "unit-slot-moved");
+            }
         }
 
         /// <summary>
         /// 计算当前攻击间隔（秒，对应 SoldierBase.js:134-141 attackIntervalSeconds getter）。
         /// </summary>
-        /// <returns>攻击间隔（秒）= baseAttackIntervalSeconds / (1 + attackSpeedBonus)。</returns>
+        /// <returns>攻击间隔（秒）= baseAttackIntervalSeconds / attackSpeedMultiplier。</returns>
         /// <remarks>
-        /// <para>对应 JS <c>attackIntervalSeconds</c> getter。C# 移植改为无副作用计算
-        /// （JS getter 内重算 animationPlaybackRate 并写入 animation，C# 不持有动画引用）。</para>
-        /// <para>attackSpeedBonus &lt; 0 时视为 0（对应 JS <c>if (this.attackSpeedBonus &lt; 0) this.attackSpeedBonus = 0</c>）。</para>
+        /// <para>逻辑层只维护攻击间隔；表现层通过同步该值计算攻击动画逐帧时长。</para>
         /// </remarks>
         private float ComputeAttackIntervalSeconds()
         {
-            float bonus = _attackSpeedBonus < 0f ? 0f : _attackSpeedBonus;
-            return _baseAttackIntervalSeconds / (1f + bonus);
+            float multiplier = _attackSpeedMultiplier > 0f ? _attackSpeedMultiplier : 1f;
+            return _baseAttackIntervalSeconds / multiplier;
+        }
+
+        /// <summary>
+        /// 设置当前攻击速度倍率，并立即重算有效攻击间隔。
+        /// </summary>
+        /// <remarks>
+        /// <para>供升级、Buff 等运行时数值系统调用。表现层在下一次同步时读取
+        /// <see cref="UnitBase.AttackIntervalSeconds"/>，使后续攻击动画和出箭时序使用新倍率。</para>
+        /// </remarks>
+        /// <param name="multiplier">攻击速度倍率；小于等于 0 时按 1 处理。</param>
+        internal void SetAttackSpeedMultiplier(float multiplier)
+        {
+            _attackSpeedMultiplier = multiplier > 0f ? multiplier : 1f;
+            AttackIntervalSecondsField = ComputeAttackIntervalSeconds();
         }
 
         // ====================================================================
@@ -528,12 +686,22 @@ namespace GameBattle
         /// <remarks>
         /// <para>对应 JS：<c>IDLE→playIdleAnimation</c>、<c>ATTACK→applyAttackPlaybackRate</c>。
         /// C# 移植为纯逻辑层，不持有动画引用，具体动画播放由表现端口根据状态同步。</para>
+        /// <para><b>进入 Idle 清除表现意图：</b>AttackScheduler 在目标丢失时
+        /// <see cref="UnitBase.SetState(AttackUnitState.Idle)"/>，本方法清除
+        /// <see cref="_hasBodyFacing"/> 与 <see cref="_hasWeaponAim"/>，使表现层
+        /// 下次同步时不再收到旧朝向/旧瞄准角，配合 BattleViewSynchronizer 的状态边沿
+        /// 复位完成待机表现恢复。不清理战斗数值或攻击冷却。</para>
         /// <para>子类（4 兵种，task 6.2）可覆写本方法扩展状态进入行为，但 MUST 调用 base。</para>
         /// </remarks>
         protected override void OnEnterState(AttackUnitState nextState)
         {
-            // 纯逻辑层：不持有动画引用。
+            // 进入待机：清除朝向/瞄准等纯表现意图，避免旧表现残留（纯逻辑层不持有动画引用）。
             // JS 的 playIdleAnimation/applyAttackPlaybackRate 由表现端口承担。
+            if (nextState == AttackUnitState.Idle)
+            {
+                _hasBodyFacing = false;
+                _hasWeaponAim = false;
+            }
         }
 
         /// <inheritdoc/>
@@ -639,8 +807,8 @@ namespace GameBattle
         ///   本单位发起的活动攻击效果已在 GameOver 中经 CancelOwner 取消，此处只清引用。</item>
         /// <item><b>表现引用：</b>本类型不持有 animation/displayObject（纯逻辑）。</item>
         /// <item><b>攻击数值：</b>_baseAttackPower/_addAttackPower/_baseAttackRange/
-        ///   _baseAttackIntervalSeconds/_rangeBonusCells/_attackSpeedBonus 清零/默认。</item>
-        /// <item><b>兵种标识：</b>_typeIndex=-1, _animationKey=null, _animationPlaybackRate=1。</item>
+        ///   _baseAttackIntervalSeconds/_rangeBonusCells/_attackSpeedMultiplier 清零/默认。</item>
+        /// <item><b>兵种标识：</b>_typeIndex=-1, _animationKey=null。</item>
         /// </list>
         /// <para><b>幂等性：</b>多次调用安全。</para>
         /// <para><b>不抛出：</b>实现 MUST NOT 抛出异常。</para>

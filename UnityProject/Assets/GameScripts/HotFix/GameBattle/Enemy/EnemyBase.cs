@@ -103,6 +103,17 @@ namespace GameBattle
     internal delegate void EnemyKilledHandler(int killedEnemyId, int attackerId, int experienceReward, bool isPlayerLane);
 
     /// <summary>
+    /// 敌人死亡请求移除回调（对应还原工程 gameOver/回收通知）。
+    /// </summary>
+    /// <remarks>
+    /// <para>EnemyBase 在血量归零进入 DEAD 时通过本委托通知管理器请求移除，
+    /// 避免直接引用 EnemyManager（design 决策 4：一致性操作使用直接调用）。
+    /// 由 BattleRuntimeFactory 装配时委托到 EnemyManager.RequestRemoveEnemy。</para>
+    /// <para>参数：killedEnemyId（已死亡敌人的运行时 ID）。</para>
+    /// </remarks>
+    internal delegate void EnemyDeathRequestHandler(int killedEnemyId);
+
+    /// <summary>
     /// 纯逻辑敌人生命周期基类：初始化、沿路径移动、受击、接触目标、死亡、重置。
     /// </summary>
     /// <remarks>
@@ -280,6 +291,9 @@ namespace GameBattle
         /// <summary>敌人击杀奖励回调（委托到 BattleEconomy/BattleManager，避免直接引用）。</summary>
         private EnemyKilledHandler _onEnemyKilled;
 
+        /// <summary>敌人死亡请求移除回调（委托到 EnemyManager.RequestRemoveEnemy，避免直接引用）。</summary>
+        private EnemyDeathRequestHandler _onDeathRequested;
+
         /// <summary>当前帧时间戳（毫秒，对应 laya.timer.currTimer）。接触冷却读此值。</summary>
         /// <remarks>
         /// 由 <see cref="ConfigureFrameNow"/> 在每子步前设置，对齐 BattleSimulation.FrameNowMs
@@ -289,6 +303,13 @@ namespace GameBattle
 
         /// <summary>是否已 Configure（对应 _configured，EnemyBase.js:122）。</summary>
         private bool _configured;
+
+        /// <summary>
+        /// 血量变化回调（受击扣血成功后触发，供 EnemyManager 转发低频表现事实）。
+        /// <para>参数依次为：运行时 ID / 当前血量 / 最大血量 / 变化量（负=受伤）。
+        /// 由 <see cref="SetHealthChangedCallback"/> 注入，避免本类型直接引用 EnemyManager。</para>
+        /// </summary>
+        private Action<int, int, int, int> _onHealthChanged;
 
         // ====================================================================
         // IEnemyEntity 只读属性（供 EnemyManager 访问）
@@ -317,6 +338,14 @@ namespace GameBattle
         public float Height => _height;
 
         /// <inheritdoc/>
+        /// <remarks>默认 0（矩形左边缘为瞄准点 X）。子类按体型/命中锚点 override。</remarks>
+        public virtual float ProjectileAimOffsetX => 0f;
+
+        /// <inheritdoc/>
+        /// <remarks>默认 0（矩形上边缘为瞄准点 Y）。子类按体型/命中锚点 override。</remarks>
+        public virtual float ProjectileAimOffsetY => 0f;
+
+        /// <inheritdoc/>
         public float RemainingPathDistance => _remainingPathDistance;
 
         /// <inheritdoc/>
@@ -324,6 +353,10 @@ namespace GameBattle
 
         /// <inheritdoc/>
         public int Health => _currentHealth;
+
+        /// <inheritdoc/>
+        /// <remarks>供表现层计算真实血量比例（current / max）。由子类 InitializeStats 设置。</remarks>
+        public int MaxHealth => _maxHealthBase;
 
         // ====================================================================
         // 保护属性（供子类 Mob0Enemy 访问）
@@ -474,8 +507,10 @@ namespace GameBattle
             _cellSize = 0f;
             _contactTarget = null;
             _onEnemyKilled = null;
+            _onDeathRequested = null;
             _frameNowMs = 0;
             _configured = false;
+            _onHealthChanged = null;
         }
 
         // ====================================================================
@@ -489,6 +524,7 @@ namespace GameBattle
         /// <param name="cellSize">格子尺寸（px，对应 map.gridWidth=80）。</param>
         /// <param name="contactTarget">接触目标回调（不可为 null，委托到 BattleTarget）。</param>
         /// <param name="onEnemyKilled">击杀奖励回调（不可为 null，委托到 BattleEconomy/BattleManager）。</param>
+        /// <param name="onDeathRequested">死亡请求移除回调（不可为 null，委托到 EnemyManager）。</param>
         /// <exception cref="ArgumentNullException">任一必需参数为 null。</exception>
         /// <remarks>
         /// <para>对应还原工程 <c>EnemyBase.configure({...})</c>（EnemyBase.js:133-182）。
@@ -503,7 +539,8 @@ namespace GameBattle
             MapData map,
             float cellSize,
             ContactBattleTargetHandler contactTarget,
-            EnemyKilledHandler onEnemyKilled)
+            EnemyKilledHandler onEnemyKilled,
+            EnemyDeathRequestHandler onDeathRequested)
         {
             if (map == null)
             {
@@ -520,10 +557,16 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(onEnemyKilled));
             }
 
+            if (onDeathRequested == null)
+            {
+                throw new ArgumentNullException(nameof(onDeathRequested));
+            }
+
             _map = map;
             _cellSize = cellSize > 0 ? cellSize : 80f;
             _contactTarget = contactTarget;
             _onEnemyKilled = onEnemyKilled;
+            _onDeathRequested = onDeathRequested;
             _configured = true;
         }
 
@@ -535,6 +578,22 @@ namespace GameBattle
         internal void ConfigureFrameNow(long frameNowMs)
         {
             _frameNowMs = frameNowMs;
+        }
+
+        /// <summary>
+        /// 注入血量变化回调。由 EnemyManager 在登记敌人后调用，受击扣血成功后触发。
+        /// </summary>
+        /// <param name="onHealthChanged">
+        /// 血量变化回调（参数：运行时 ID / 当前血量 / 最大血量 / 变化量）。
+        /// 传 null 表示清除回调（池回收时）。</param>
+        /// <remarks>
+        /// <para>不并入 <see cref="Configure"/>：Configure 在 spawn 时由外部反射调用，
+        /// 而本回调在登记阶段（EnemyManager.Register）注入，二者职责分离。
+        /// 回调只读血量值，不回写规则状态（design 决策 4：一致性操作使用直接调用）。</para>
+        /// </remarks>
+        internal void SetHealthChangedCallback(Action<int, int, int, int> onHealthChanged)
+        {
+            _onHealthChanged = onHealthChanged;
         }
 
         // ====================================================================
@@ -998,6 +1057,7 @@ namespace GameBattle
             }
 
             // 扣血，不低于 0（EnemyBase.js:460-461）。
+            int previousHealth = _currentHealth;
             _currentHealth = Math.Max(0, _currentHealth - damage);
 
             // 记录伤害贡献者（EnemyBase.js:471-472），同一攻击者只记录一次。
@@ -1005,6 +1065,9 @@ namespace GameBattle
             {
                 _damageContributors.Add(attackerId);
             }
+
+            // 触发低频血量变化事实（供表现层血条更新）。只读血量值，不回写规则状态。
+            _onHealthChanged?.Invoke(_id, _currentHealth, _maxHealthBase, _currentHealth - previousHealth);
 
             // 血量归零进入 DEAD（EnemyBase.js:470）。
             if (_currentHealth <= 0)
@@ -1015,6 +1078,10 @@ namespace GameBattle
                 // 奖励值：特殊敌人 10，普通敌人 1。
                 int experienceReward = _isSpecial ? 10 : 1;
                 _onEnemyKilled?.Invoke(_id, attackerId, experienceReward, _isPlayerLane);
+
+                // 通知管理器请求移除（入队，遍历结束后统一处理）。
+                // 对应还原工程 gameOver/回收通知；避免在伤害调用栈内重入销毁集合。
+                _onDeathRequested?.Invoke(_id);
             }
 
             return true;

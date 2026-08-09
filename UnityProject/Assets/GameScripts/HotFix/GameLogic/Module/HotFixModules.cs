@@ -1,4 +1,5 @@
 using GameBattle;
+using GameFUI;
 using TEngine;
 
 // ============================================================================
@@ -51,6 +52,11 @@ public static class HotFixModules
     private static IBattleModule _battleModule;
 
     /// <summary>
+    /// 已登记到 ModuleSystem 的 GameFUI 模块。
+    /// </summary>
+    private static IFUIModule _fuiModule;
+
+    /// <summary>
     /// 显式注册一次 BattleModule（task 2.7 唯一注册入口）。
     /// </summary>
     /// <returns>已注册的 <see cref="IBattleModule"/> 实例。</returns>
@@ -82,15 +88,30 @@ public static class HotFixModules
             return _battleModule;
         }
 
-        // 创建 BattleModule 实例。BattleModule 提供无参构造（task 2.6），
-        // 由 TEngine ModuleSystem 通过 RegisterModule 登记并调用 OnInit。
+        // 生产装配顺序固定为 GameFUI -> GameBattle -> FreezeBindings。
+        // FUIModule 先登记到 ModuleSystem，使全局 Shutdown 按逆序先清理
+        // BattleModule 所有的战斗窗口，再清理 GameFUI 基础设施。
+        FUI.RegisterModule(GameModule.Resource, new FUIOptions
+        {
+            DesignWidth = 720,
+            DesignHeight = 1280,
+            ScreenMatchMode = FUIScreenMatchMode.MatchWidthOrHeight,
+        });
+        _fuiModule = ModuleSystem.RegisterModule<IFUIModule>((Module)FUI.Module);
+
+        // 创建 BattleModule 实例。OnInit 由唯一 BattleModule 注册
+        // UIBattle Binder、最终 Widget 与最终 Window。
         BattleModule module = new BattleModule();
 
         // 唯一允许调用 ModuleSystem.RegisterModule 的地方（task 2.7 约束）。
         // 注册后 ModuleSystem 调用 module.OnInit()。
         _battleModule = ModuleSystem.RegisterModule<IBattleModule>(module);
 
-        Log.Info("[HotFixModules] BattleModule 注册完成。");
+        // 所有业务 owner 注册完成后由组合根统一冻结；
+        // GameLogic 不枚举任何具体战斗窗口。
+        _fuiModule.FreezeBindings();
+
+        Log.Info("[HotFixModules] GameFUI 与 BattleModule 注册完成，Registry 已冻结。");
         return _battleModule;
     }
 }

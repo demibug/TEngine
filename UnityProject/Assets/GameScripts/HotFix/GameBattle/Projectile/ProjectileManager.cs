@@ -188,6 +188,12 @@ namespace GameBattle
         /// <summary>投射物工厂，供 Acquire/Release 池回收。不可为 null。</summary>
         private readonly ProjectileFactory _factory;
 
+        /// <summary>投射物完成登记后的低频表现事实。</summary>
+        internal event Action<int, float, float> ProjectileFired;
+
+        /// <summary>投射物释放前的低频表现事实。</summary>
+        internal event Action<int> ProjectileRemoved;
+
         // ====================================================================
         // 冻结标志（决策 0.4 / Settling）
         // ====================================================================
@@ -276,6 +282,7 @@ namespace GameBattle
             }
 
             _projectiles.Add(projectile);
+            ProjectileFired?.Invoke(projectile.ProjectileId, projectile.X, projectile.Y);
         }
 
         // ====================================================================
@@ -518,8 +525,12 @@ namespace GameBattle
         /// <param name="reason">移除原因。</param>
         private void ReleaseProjectile(ProjectileBase projectile, string reason)
         {
+            int projectileId = projectile.ProjectileId;
             // 从活动集合移除（对应 JS activeProjectiles.splice）。
             _projectiles.Remove(projectile);
+
+            // 必须在归还对象池前发布；ResetState 会清空投射物运行时 ID。
+            ProjectileRemoved?.Invoke(projectileId);
 
             // 经工厂回收（对应 JS projectileFactory.recover(projectile)）。
             // ProjectileFactory.Release 先调 Recover（投射物自身状态回收），

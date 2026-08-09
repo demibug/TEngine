@@ -1,5 +1,8 @@
 ﻿using System;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace TEngine
 {
@@ -116,6 +119,10 @@ namespace TEngine
         private void Awake()
         {
             _instance = this;
+#if UNITY_EDITOR
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+#endif
             InitTextHelper();
             InitLogHelper();
             Log.Info("Unity Version: {0}", Application.unityVersion);
@@ -161,10 +168,25 @@ namespace TEngine
 
         private void OnDestroy()
         {
-#if !UNITY_EDITOR
+#if UNITY_EDITOR
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+#else
             ModuleSystem.Shutdown();
 #endif
         }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// 在编辑器开始销毁运行时对象前关闭模块，保证模块仍可按所有权顺序释放资源。
+        /// </summary>
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingPlayMode)
+            {
+                ModuleSystem.Shutdown();
+            }
+        }
+#endif
 
         /// <summary>
         /// 暂停游戏。

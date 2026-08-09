@@ -1,77 +1,59 @@
 namespace GameBattle
 {
     // ============================================================================
-    // 任务 6.6：BattleInputCommand —— 本期强类型购买放置和刷新命令
+    // 输入命令：BattleInputCommand —— 征兵（Recruit）与换槽/合并（DropUnit）命令
     // ----------------------------------------------------------------------------
-    // 职责（design.md:206 / specs/battle-simulation/spec.md "Input commands are atomic"）：
-    //   定义本期仅覆盖的两种不可变输入命令：购买放置（BuyPlace）和刷新（Refresh）。
-    //   升级、合并、移动、交换和拖拽命令随对应功能另行引入（design.md:206 明确排除）。
+    // 职责（最终方案"核心架构"一节）：
+    //   输入层只提交两个命令：Recruit(side) 与 DropUnit(sourceSlotId, targetSlotId)。
+    //   本期删除旧购买放置（BuyPlace）命令，Refresh 命令更名为领域名称 Recruit（征兵）。
     //
     //   每条命令携带单局 CommandId（决策 0.8）：同一 ID 重复提交返回首次结果，
     //   不再次扣费、消耗卡牌或创建单位；不同 ID 即使 payload 相同也按独立命令处理。
-    //   CommandId 的去重存储与首次结果缓存由 BattleInputController（task 6.7/6.8）在
-    //   Runtime 生命周期内维护，本类型只定义命令与值载荷，不承担去重逻辑。
+    //   CommandId 的去重存储与首次结果缓存由 BattleInputController 维护。
     //
-    //   所有输入在 Unity 主线程通过 Runtime 串行队列执行（design.md:206 / task 6.6）。
-    //   串行队列本身由 task 6.7/6.8 的 BattleInputController 实现，本任务只定义命令/结果
-    //   数据结构，不实现队列。
+    //   所有输入在 Unity 主线程通过 Runtime 串行队列执行。本类型只定义命令与值载荷，
+    //   不承担去重或执行逻辑。
     //
     // 不可变性：
     //   1. 命令类型为 enum，值载荷为 readonly struct，构造后不可修改。
     //   2. 不持有可变集合或可变 object 引用。
     //   3. CommandId 为单局内唯一标识，由调用方（UI 适配层）在主线程构造时赋值。
     //
-    // 复用：
-    //   - GridPosition（task 3.6 产物）：购买放置命令的格子坐标复用现有强类型值对象，
-    //     保持 X=列、Y=行语义一致，不重复定义坐标结构。
-    //   - 命令类型枚举参照还原工程 BattleInputCommand.js 的 BattleInputCommandType，
-    //     但只保留本期 BuyPlace 与 Refresh 两种，不引入未实现的 BeginDrag/MoveDrag/
-    //     CommitPlacement/CancelDrag/MoveUnit/MergeUnits（design.md:206 / task 6.4 排除）。
+    // 载荷类型安全：
+    //   命令的 CommandType 决定载荷的合法强类型：
+    //     - Recruit  → RecruitPayload（阵营）
+    //     - DropUnit → DropUnitPayload（源槽位 ID、目标槽位 ID）
+    //   调用方通过工厂方法 CreateRecruit / CreateDropUnit 构造，保证类型与载荷匹配。
     // ============================================================================
 
     /// <summary>
-    /// 本期输入命令类型枚举。仅覆盖购买放置和刷新两种命令。
+    /// 本期输入命令类型枚举。仅覆盖征兵和换槽/合并两种命令。
     /// </summary>
-    /// <remarks>
-    /// <para><b>覆盖范围（design.md:206 / task 6.6）：</b></para>
-    /// <para>本期只覆盖购买放置（<see cref="BuyPlace"/>）和刷新（<see cref="Refresh"/>）两种命令。
-    /// 升级、合并、移动、交换和拖拽命令随对应功能另行引入，不在本期枚举中出现
-    /// （task 6.4 明确解除 BattleInputController 对升级/合并服务的依赖）。</para>
-    ///
-    /// <para><b>与还原工程的对应：</b></para>
-    /// <para>还原工程 <c>BattleInputCommandType</c> 含 8 种命令（PurchaseAndPlace/BeginDrag/
-    /// MoveDrag/CommitPlacement/CancelDrag/MoveUnit/MergeUnits/Refresh）。本期只取其中两种：
-    /// PurchaseAndPlace → <see cref="BuyPlace"/>，Refresh → <see cref="Refresh"/>。
-    /// 命名从 "PurchaseAndPlace" 简化为 "BuyPlace"，语义不变，符合 CLAUDE.md 简短易懂命名原则。</para>
-    ///
-    /// <para><b>稳定性约束：</b>已发布枚举值名称与数值不得变更；新增命令类型只能追加到末尾。</para>
-    /// </remarks>
     public enum BattleInputCommandType
     {
         /// <summary>
-        /// 购买并放置单位命令。对应还原工程 PurchaseAndPlace。
-        /// <para>载荷为 <see cref="BuyPlacePayload"/>：阵营、卡槽索引、放置坐标。</para>
-        /// <para>原子语义（spec "Input commands are atomic"）：要么完成全部校验、扣费、创建、
-        /// 放置、消耗和补牌，要么恢复到执行前状态。</para>
+        /// 征兵命令（原 Refresh 更名）。对应最终方案 Recruit(side)。
+        /// <para>载荷为 <see cref="RecruitPayload"/>：阵营。</para>
+        /// <para>原子语义：验证馒头 → 扣费 → 清除全部待上场单位 → 重新填满 1 级四兵。
+        /// 失败时不扣费、不清槽。</para>
         /// </summary>
-        BuyPlace = 0,
+        Recruit = 0,
 
         /// <summary>
-        /// 刷新牌组命令。对应还原工程 Refresh。
-        /// <para>载荷为 <see cref="RefreshPayload"/>：阵营。</para>
-        /// <para>原子语义：扣费刷新消耗并重新洗牌补满手牌，失败时恢复刷新消耗。</para>
+        /// 换槽/合并命令。对应最终方案 DropUnit(sourceSlotId, targetSlotId)。
+        /// <para>载荷为 <see cref="DropUnitPayload"/>：源槽位 ID、目标槽位 ID。</para>
+        /// <para>内部根据目标槽是否为空决定执行换槽还是合并；全程不访问经济模块。</para>
         /// </summary>
-        Refresh = 1,
+        DropUnit = 1,
     }
 
     /// <summary>
-    /// 不可变购买放置命令值载荷。
+    /// 不可变征兵命令值载荷。
     /// </summary>
     /// <remarks>
-    /// <para>对应还原工程 <c>PurchaseAndPlacePayload(bool PlayerSide, int Slot, GridPosition Position)</c>。</para>
-    /// <para>不可变值类型，构造后不可修改；不持有可变集合或可变引用。</para>
+    /// 对应最终方案 Recruit(side) 的阵营参数。不可变值类型，构造后不可修改。
     /// </remarks>
-    public readonly struct BuyPlacePayload
+    public readonly struct RecruitPayload
     {
         /// <summary>
         /// 是否玩家方。true 表示玩家方，false 表示对手方。
@@ -79,85 +61,72 @@ namespace GameBattle
         public readonly bool PlayerSide;
 
         /// <summary>
-        /// 手牌卡槽索引（从 0 开始）。标识被消耗的具体卡牌。
-        /// </summary>
-        public readonly int Slot;
-
-        /// <summary>
-        /// 放置目标格子坐标。复用 <see cref="GridPosition"/> 强类型值对象（X=列、Y=行）。
-        /// </summary>
-        public readonly GridPosition Position;
-
-        /// <summary>
-        /// 构造不可变购买放置载荷。
+        /// 构造不可变征兵载荷。
         /// </summary>
         /// <param name="playerSide">是否玩家方。</param>
-        /// <param name="slot">手牌卡槽索引。</param>
-        /// <param name="position">放置目标格子坐标。</param>
-        public BuyPlacePayload(bool playerSide, int slot, GridPosition position)
+        public RecruitPayload(bool playerSide)
         {
             PlayerSide = playerSide;
-            Slot = slot;
-            Position = position;
         }
 
         /// <inheritdoc/>
         public override string ToString()
-            => $"BuyPlace(PlayerSide={PlayerSide}, Slot={Slot}, Position={Position})";
+            => $"Recruit(PlayerSide={PlayerSide})";
     }
 
     /// <summary>
-    /// 不可变刷新牌组命令值载荷。
+    /// 不可变换槽/合并命令值载荷。
     /// </summary>
     /// <remarks>
-    /// <para>对应还原工程 Refresh 命令的阵营参数。</para>
-    /// <para>不可变值类型，构造后不可修改。</para>
+    /// 对应最终方案 DropUnit(sourceSlotId, targetSlotId)。不可变值类型，构造后不可修改。
     /// </remarks>
-    public readonly struct RefreshPayload
+    public readonly struct DropUnitPayload
     {
         /// <summary>
-        /// 是否玩家方。true 表示玩家方，false 表示对手方。
+        /// 源槽位固定标识（UnitSlotId.Id）。
         /// </summary>
-        public readonly bool PlayerSide;
+        public readonly int SourceSlotId;
 
         /// <summary>
-        /// 构造不可变刷新载荷。
+        /// 目标槽位固定标识（UnitSlotId.Id）。
         /// </summary>
-        /// <param name="playerSide">是否玩家方。</param>
-        public RefreshPayload(bool playerSide)
+        public readonly int TargetSlotId;
+
+        /// <summary>
+        /// 构造不可变换槽/合并载荷。
+        /// </summary>
+        /// <param name="sourceSlotId">源槽位固定标识。</param>
+        /// <param name="targetSlotId">目标槽位固定标识。</param>
+        public DropUnitPayload(int sourceSlotId, int targetSlotId)
         {
-            PlayerSide = playerSide;
+            SourceSlotId = sourceSlotId;
+            TargetSlotId = targetSlotId;
         }
 
         /// <inheritdoc/>
         public override string ToString()
-            => $"Refresh(PlayerSide={PlayerSide})";
+            => $"DropUnit(SourceSlotId={SourceSlotId}, TargetSlotId={TargetSlotId})";
     }
 
     /// <summary>
     /// 不可变战斗输入命令。携带单局 <see cref="CommandId"/> 与强类型值载荷。
     /// </summary>
     /// <remarks>
-    /// <para><b>不可变性（design.md:206 / task 6.6）：</b></para>
-    /// <para>本结构为 readonly struct，全部字段为 readonly，构造后不可修改。
-    /// 不持有可变集合或可变 object 引用。</para>
+    /// <para><b>不可变性：</b>本结构为 readonly struct，全部字段为 readonly，
+    /// 构造后不可修改。不持有可变集合或可变 object 引用。</para>
     ///
-    /// <para><b>CommandId 语义（决策 0.8）：</b></para>
-    /// <para>每条命令携带单局 CommandId。同一 ID 重复提交返回首次结果，不再次扣费、消耗卡牌或
-    /// 创建单位；不同 ID 即使 payload 相同也按独立命令处理。CommandId 的去重与首次结果缓存
-    /// 由 BattleInputController（task 6.7/6.8）在 Runtime 生命周期内维护，随 Runtime 清空。
-    /// 本类型只定义 CommandId 字段，不承担去重逻辑。</para>
+    /// <para><b>CommandId 语义（决策 0.8）：</b>
+    /// 每条命令携带单局 CommandId。同一 ID 重复提交返回首次结果，不再次扣费、消耗卡牌
+    /// 或创建单位；不同 ID 即使 payload 相同也按独立命令处理。CommandId 的去重与首次结果
+    /// 缓存由 BattleInputController 在 Runtime 生命周期内维护。</para>
     ///
-    /// <para><b>主线程串行执行（design.md:206 / task 6.6）：</b></para>
-    /// <para>所有输入在 Unity 主线程通过 Runtime 串行队列执行。串行队列由 task 6.7/6.8 实现，
+    /// <para><b>主线程串行执行：</b>所有输入在 Unity 主线程通过 Runtime 串行队列执行。
     /// 本类型只是被队列消费的不可变数据载体，不内嵌执行逻辑。</para>
     ///
-    /// <para><b>载荷类型安全：</b></para>
-    /// <para><see cref="CommandType"/> 决定载荷的合法强类型：<see cref="BattleInputCommandType.BuyPlace"/>
-    /// 对应 <see cref="BuyPlacePayload"/>，<see cref="BattleInputCommandType.Refresh"/> 对应
-    /// <see cref="RefreshPayload"/>。调用方通过工厂方法 <see cref="CreateBuyPlace"/> /
-    /// <see cref="CreateRefresh"/> 构造，保证类型与载荷匹配；不使用裸 object 载荷（参照
-    /// BattleLoadoutDto/BattleResultDto 排除可变 object 的不可变性约束）。</para>
+    /// <para><b>载荷类型安全：</b><see cref="CommandType"/> 决定载荷的合法强类型：
+    /// <see cref="BattleInputCommandType.Recruit"/> 对应 <see cref="RecruitPayload"/>，
+    /// <see cref="BattleInputCommandType.DropUnit"/> 对应 <see cref="DropUnitPayload"/>。
+    /// 调用方通过工厂方法 <see cref="CreateRecruit"/> / <see cref="CreateDropUnit"/> 构造。</para>
     /// </remarks>
     public readonly struct BattleInputCommand
     {
@@ -174,58 +143,53 @@ namespace GameBattle
         public readonly BattleInputCommandType CommandType;
 
         /// <summary>
-        /// 购买放置载荷。仅当 <see cref="CommandType"/> 为 <see cref="BattleInputCommandType.BuyPlace"/> 时有效。
+        /// 征兵载荷。仅当 <see cref="CommandType"/> 为 <see cref="BattleInputCommandType.Recruit"/> 时有效。
         /// </summary>
-        public readonly BuyPlacePayload BuyPlacePayload;
+        public readonly RecruitPayload RecruitPayload;
 
         /// <summary>
-        /// 刷新载荷。仅当 <see cref="CommandType"/> 为 <see cref="BattleInputCommandType.Refresh"/> 时有效。
+        /// 换槽/合并载荷。仅当 <see cref="CommandType"/> 为 <see cref="BattleInputCommandType.DropUnit"/> 时有效。
         /// </summary>
-        public readonly RefreshPayload RefreshPayload;
+        public readonly DropUnitPayload DropUnitPayload;
 
         private BattleInputCommand(
             int commandId,
             BattleInputCommandType commandType,
-            BuyPlacePayload buyPlacePayload,
-            RefreshPayload refreshPayload)
+            RecruitPayload recruitPayload,
+            DropUnitPayload dropUnitPayload)
         {
             CommandId = commandId;
             CommandType = commandType;
-            BuyPlacePayload = buyPlacePayload;
-            RefreshPayload = refreshPayload;
+            RecruitPayload = recruitPayload;
+            DropUnitPayload = dropUnitPayload;
         }
 
         /// <summary>
-        /// 构造购买放置命令。
+        /// 构造征兵命令。
         /// </summary>
         /// <param name="commandId">单局命令唯一标识。</param>
         /// <param name="playerSide">是否玩家方。</param>
-        /// <param name="slot">手牌卡槽索引。</param>
-        /// <param name="position">放置目标格子坐标。</param>
-        /// <returns>不可变购买放置命令。</returns>
-        public static BattleInputCommand CreateBuyPlace(
-            int commandId,
-            bool playerSide,
-            int slot,
-            GridPosition position)
+        /// <returns>不可变征兵命令。</returns>
+        public static BattleInputCommand CreateRecruit(int commandId, bool playerSide)
             => new BattleInputCommand(
                 commandId,
-                BattleInputCommandType.BuyPlace,
-                new BuyPlacePayload(playerSide, slot, position),
+                BattleInputCommandType.Recruit,
+                new RecruitPayload(playerSide),
                 default);
 
         /// <summary>
-        /// 构造刷新命令。
+        /// 构造换槽/合并命令。
         /// </summary>
         /// <param name="commandId">单局命令唯一标识。</param>
-        /// <param name="playerSide">是否玩家方。</param>
-        /// <returns>不可变刷新命令。</returns>
-        public static BattleInputCommand CreateRefresh(int commandId, bool playerSide)
+        /// <param name="sourceSlotId">源槽位固定标识。</param>
+        /// <param name="targetSlotId">目标槽位固定标识。</param>
+        /// <returns>不可变换槽/合并命令。</returns>
+        public static BattleInputCommand CreateDropUnit(int commandId, int sourceSlotId, int targetSlotId)
             => new BattleInputCommand(
                 commandId,
-                BattleInputCommandType.Refresh,
+                BattleInputCommandType.DropUnit,
                 default,
-                new RefreshPayload(playerSide));
+                new DropUnitPayload(sourceSlotId, targetSlotId));
 
         /// <summary>
         /// 判断两个命令是否相等。CommandId 与 CommandType 与全部载荷字段均相同才相等。
@@ -233,8 +197,8 @@ namespace GameBattle
         public bool Equals(BattleInputCommand other)
             => CommandId == other.CommandId
                && CommandType == other.CommandType
-               && BuyPlacePayload.Equals(other.BuyPlacePayload)
-               && RefreshPayload.Equals(other.RefreshPayload);
+               && RecruitPayload.Equals(other.RecruitPayload)
+               && DropUnitPayload.Equals(other.DropUnitPayload);
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => obj is BattleInputCommand other && Equals(other);
@@ -246,20 +210,16 @@ namespace GameBattle
             {
                 int hash = CommandId;
                 hash = (hash * 397) ^ (int)CommandType;
-                hash = (hash * 397) ^ BuyPlacePayload.GetHashCode();
-                hash = (hash * 397) ^ RefreshPayload.GetHashCode();
+                hash = (hash * 397) ^ RecruitPayload.GetHashCode();
+                hash = (hash * 397) ^ DropUnitPayload.GetHashCode();
                 return hash;
             }
         }
 
-        /// <summary>
-        /// 相等运算符。
-        /// </summary>
+        /// <summary>相等运算符。</summary>
         public static bool operator ==(BattleInputCommand left, BattleInputCommand right) => left.Equals(right);
 
-        /// <summary>
-        /// 不等运算符。
-        /// </summary>
+        /// <summary>不等运算符。</summary>
         public static bool operator !=(BattleInputCommand left, BattleInputCommand right) => !left.Equals(right);
 
         /// <inheritdoc/>
@@ -267,10 +227,10 @@ namespace GameBattle
         {
             switch (CommandType)
             {
-                case BattleInputCommandType.BuyPlace:
-                    return $"[BattleInputCommand Id={CommandId} Type=BuyPlace {BuyPlacePayload}]";
-                case BattleInputCommandType.Refresh:
-                    return $"[BattleInputCommand Id={CommandId} Type=Refresh {RefreshPayload}]";
+                case BattleInputCommandType.Recruit:
+                    return $"[BattleInputCommand Id={CommandId} Type=Recruit {RecruitPayload}]";
+                case BattleInputCommandType.DropUnit:
+                    return $"[BattleInputCommand Id={CommandId} Type=DropUnit {DropUnitPayload}]";
                 default:
                     return $"[BattleInputCommand Id={CommandId} Type={CommandType}]";
             }

@@ -1417,5 +1417,260 @@ namespace GameBattle.Tests.EditMode.Golden
                 "Luban 快照对照阻塞待解除（见 LubanSnapshot_MatchesGoldenBaseline_FieldByField）。\n" +
                 "spec \"Every migration phase has a blocking acceptance gate\"：未解除前不得标记 Phase 3 完成。");
         }
+
+        // ====================================================================
+        // task 8.3：TraceComparator / FieldToleranceRules 冒烟测试
+        // ----------------------------------------------------------------------------
+        // 验证 TraceComparator 的五维度对照能力和 FieldToleranceRules 的容差配置：
+        //   1. 相同快照对照无偏离
+        //   2. 离散状态偏离被精确检出
+        //   3. Runtime ID 偏离被精确检出
+        //   4. 数量偏离被精确检出
+        //   5. 浮点字段在容差内不报偏离、超出容差报偏离并记录实际差值
+        //   6. 首个偏离位置输出包含路径/期望/实际/容差/差值
+        //   7. phase 顺序对照能力
+        // ====================================================================
+
+        /// <summary>
+        /// 构造最小测试用 BattleTraceSnapshot（供 TraceComparator 冒烟测试使用）。
+        /// </summary>
+        private static GameBattle.BattleTraceSnapshot CreateMinimalTraceSnapshot()
+        {
+            var state = new GameBattle.BattleStateSnapshot(
+                currentRound: 1,
+                playerHealth: 3,
+                playerMaxHealth: 3,
+                playerGold: 20,
+                opponentHealth: 3,
+                opponentMaxHealth: 3,
+                opponentGold: 20,
+                killCount: 0,
+                bossKillCount: 0,
+                isGameOver: false,
+                contactOccurred: false,
+                startTimeMs: 0,
+                resultStar: 0,
+                lastRuntimeId: 0);
+
+            var enemy = new GameBattle.BattleTraceSnapshot.EnemyTraceRow(
+                id: 1, isPlayerLane: false, state: 1,
+                x: 3.5f, y: 2.0f, health: 10, pathIndex: 0,
+                remainingPathDistance: 14.5f);
+
+            return new GameBattle.BattleTraceSnapshot(
+                frameNowMs: 80, stepMs: 80, elapsedGameTimeMs: 80,
+                updatePhase: (int)GameBattle.BattleUpdatePhase.Enemy,
+                state: state,
+                enemies: new[] { enemy },
+                projectiles: System.Array.Empty<GameBattle.BattleTraceSnapshot.ProjectileTraceRow>(),
+                attackEffects: System.Array.Empty<GameBattle.BattleTraceSnapshot.AttackEffectTraceRow>(),
+                playerHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                opponentHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                poolStats: System.Array.Empty<GameBattle.BattleTraceSnapshot.PoolStatTraceRow>(),
+                isFrozen: false, isResultFrozen: false, finalResult: null);
+        }
+
+        [Test]
+        [Description("task 8.3：相同 BattleTraceSnapshot 对照无偏离。")]
+        public void TraceComparator_IdenticalSnapshots_NoDifferences()
+        {
+            var snapshot = CreateMinimalTraceSnapshot();
+            var report = TraceComparator.Compare(snapshot, snapshot);
+
+            Assert.IsFalse(report.HasDifferences,
+                "相同快照对照不应有偏离：\n" + report.Report());
+        }
+
+        [Test]
+        [Description("task 8.3：离散状态偏离被精确检出（playerHealth 差异）。")]
+        public void TraceComparator_DiscreteStateDiff_DetectedExactly()
+        {
+            var expected = CreateMinimalTraceSnapshot();
+            // 构造 playerHealth=2 的实际快照
+            var actualState = new GameBattle.BattleStateSnapshot(
+                currentRound: 1, playerHealth: 2, playerMaxHealth: 3,
+                playerGold: 20, opponentHealth: 3, opponentMaxHealth: 3,
+                opponentGold: 20, killCount: 0, bossKillCount: 0,
+                isGameOver: false, contactOccurred: false,
+                startTimeMs: 0, resultStar: 0, lastRuntimeId: 0);
+            var actual = new GameBattle.BattleTraceSnapshot(
+                frameNowMs: 80, stepMs: 80, elapsedGameTimeMs: 80,
+                updatePhase: (int)GameBattle.BattleUpdatePhase.Enemy,
+                state: actualState,
+                enemies: expected.Enemies,
+                projectiles: System.Array.Empty<GameBattle.BattleTraceSnapshot.ProjectileTraceRow>(),
+                attackEffects: System.Array.Empty<GameBattle.BattleTraceSnapshot.AttackEffectTraceRow>(),
+                playerHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                opponentHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                poolStats: System.Array.Empty<GameBattle.BattleTraceSnapshot.PoolStatTraceRow>(),
+                isFrozen: false, isResultFrozen: false, finalResult: null);
+
+            var report = TraceComparator.Compare(expected, actual);
+
+            Assert.IsTrue(report.HasDifferences, "离散状态偏离应被检出");
+            Assert.IsNotNull(report.FirstDifference, "首个偏离位置不应为 null");
+            StringAssert.Contains("playerHealth", report.FirstDifference.FieldPath,
+                "首个偏离路径应包含 playerHealth");
+        }
+
+        [Test]
+        [Description("task 8.3：Runtime ID 偏离被精确检出（enemy.Id 差异）。")]
+        public void TraceComparator_RuntimeIdDiff_DetectedExactly()
+        {
+            var expected = CreateMinimalTraceSnapshot();
+            var wrongEnemy = new GameBattle.BattleTraceSnapshot.EnemyTraceRow(
+                id: 99, isPlayerLane: false, state: 1,
+                x: 3.5f, y: 2.0f, health: 10, pathIndex: 0,
+                remainingPathDistance: 14.5f);
+            var actual = new GameBattle.BattleTraceSnapshot(
+                frameNowMs: 80, stepMs: 80, elapsedGameTimeMs: 80,
+                updatePhase: (int)GameBattle.BattleUpdatePhase.Enemy,
+                state: expected.State,
+                enemies: new[] { wrongEnemy },
+                projectiles: System.Array.Empty<GameBattle.BattleTraceSnapshot.ProjectileTraceRow>(),
+                attackEffects: System.Array.Empty<GameBattle.BattleTraceSnapshot.AttackEffectTraceRow>(),
+                playerHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                opponentHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                poolStats: System.Array.Empty<GameBattle.BattleTraceSnapshot.PoolStatTraceRow>(),
+                isFrozen: false, isResultFrozen: false, finalResult: null);
+
+            var report = TraceComparator.Compare(expected, actual);
+
+            Assert.IsTrue(report.HasDifferences, "Runtime ID 偏离应被检出");
+            StringAssert.Contains("enemies[0].id", report.FirstDifference.FieldPath,
+                "首个偏离路径应包含 enemies[0].id");
+        }
+
+        [Test]
+        [Description("task 8.3：浮点字段在容差内不报偏离（位置差 1e-5 < 1e-4 容差）。")]
+        public void TraceComparator_FloatWithinTolerance_NoDifference()
+        {
+            var expected = CreateMinimalTraceSnapshot();
+            // 位置差 0.00001 < 容差 0.0001，不应报偏离
+            var enemy = new GameBattle.BattleTraceSnapshot.EnemyTraceRow(
+                id: 1, isPlayerLane: false, state: 1,
+                x: 3.5f + 1e-5f, y: 2.0f, health: 10, pathIndex: 0,
+                remainingPathDistance: 14.5f);
+            var actual = new GameBattle.BattleTraceSnapshot(
+                frameNowMs: 80, stepMs: 80, elapsedGameTimeMs: 80,
+                updatePhase: (int)GameBattle.BattleUpdatePhase.Enemy,
+                state: expected.State,
+                enemies: new[] { enemy },
+                projectiles: System.Array.Empty<GameBattle.BattleTraceSnapshot.ProjectileTraceRow>(),
+                attackEffects: System.Array.Empty<GameBattle.BattleTraceSnapshot.AttackEffectTraceRow>(),
+                playerHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                opponentHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                poolStats: System.Array.Empty<GameBattle.BattleTraceSnapshot.PoolStatTraceRow>(),
+                isFrozen: false, isResultFrozen: false, finalResult: null);
+
+            var report = TraceComparator.Compare(expected, actual);
+
+            Assert.IsFalse(report.HasDifferences,
+                "浮点字段在容差内不应报偏离：\n" + report.Report());
+        }
+
+        [Test]
+        [Description("task 8.3：浮点字段超出容差报偏离并记录实际差值（位置差 0.1 > 1e-4 容差）。")]
+        public void TraceComparator_FloatBeyondTolerance_RecordsDiff()
+        {
+            var expected = CreateMinimalTraceSnapshot();
+            // 位置差 0.1 > 容差 0.0001，应报偏离
+            var enemy = new GameBattle.BattleTraceSnapshot.EnemyTraceRow(
+                id: 1, isPlayerLane: false, state: 1,
+                x: 3.6f, y: 2.0f, health: 10, pathIndex: 0,
+                remainingPathDistance: 14.5f);
+            var actual = new GameBattle.BattleTraceSnapshot(
+                frameNowMs: 80, stepMs: 80, elapsedGameTimeMs: 80,
+                updatePhase: (int)GameBattle.BattleUpdatePhase.Enemy,
+                state: expected.State,
+                enemies: new[] { enemy },
+                projectiles: System.Array.Empty<GameBattle.BattleTraceSnapshot.ProjectileTraceRow>(),
+                attackEffects: System.Array.Empty<GameBattle.BattleTraceSnapshot.AttackEffectTraceRow>(),
+                playerHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                opponentHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                poolStats: System.Array.Empty<GameBattle.BattleTraceSnapshot.PoolStatTraceRow>(),
+                isFrozen: false, isResultFrozen: false, finalResult: null);
+
+            var report = TraceComparator.Compare(expected, actual);
+
+            Assert.IsTrue(report.HasDifferences, "浮点字段超出容差应报偏离");
+            TraceComparator.TraceDifference first = report.FirstDifference;
+            Assert.IsNotNull(first, "首个偏离位置不应为 null");
+            StringAssert.Contains("enemies[0].x", first.FieldPath,
+                "首个偏离路径应包含 enemies[0].x");
+            // 容差应为显式声明的 1e-4
+            Assert.AreEqual(FieldToleranceRules.PositionTolerance.ToString("R", CultureInfo.InvariantCulture),
+                first.Tolerance, "容差应为 FieldToleranceRules.PositionTolerance");
+            // 差值应为实际差值 0.1
+            float expectedDiff = Math.Abs(3.5f - 3.6f);
+            Assert.AreEqual(expectedDiff.ToString("R", CultureInfo.InvariantCulture),
+                first.Difference, "差值应为实际差值");
+        }
+
+        [Test]
+        [Description("task 8.3：FieldToleranceRules 为已知浮点字段返回显式容差，未知字段返回 0。")]
+        public void FieldToleranceRules_KnownFloatFields_ReturnExplicitTolerance()
+        {
+            // 位置字段通配符匹配
+            Assert.AreEqual(FieldToleranceRules.PositionTolerance,
+                FieldToleranceRules.GetTolerance("enemies[0].x"),
+                "enemies[0].x 应返回位置容差");
+            Assert.AreEqual(FieldToleranceRules.PositionTolerance,
+                FieldToleranceRules.GetTolerance("enemies[5].y"),
+                "enemies[5].y 应返回位置容差");
+            Assert.AreEqual(FieldToleranceRules.PositionTolerance,
+                FieldToleranceRules.GetTolerance("projectiles[2].x"),
+                "projectiles[2].x 应返回位置容差");
+
+            // 剩余路径距离
+            Assert.AreEqual(FieldToleranceRules.RemainingDistanceTolerance,
+                FieldToleranceRules.GetTolerance("enemies[0].remainingDist"),
+                "enemies[0].remainingDist 应返回剩余距离容差");
+
+            // 未注册字段返回 0（精确相等）
+            Assert.AreEqual(0f,
+                FieldToleranceRules.GetTolerance("enemies[0].health"),
+                "health 为离散 int 字段，容差应为 0");
+        }
+
+        [Test]
+        [Description("task 8.3：phase 顺序对照——相同序列无偏离。")]
+        public void TraceComparator_PhaseOrder_IdenticalSequence_NoDifference()
+        {
+            var snapshot = CreateMinimalTraceSnapshot();
+            var sequence = new System.Collections.Generic.List<GameBattle.BattleTraceSnapshot> { snapshot, snapshot };
+
+            var report = TraceComparator.ComparePhaseOrder(sequence, sequence);
+
+            Assert.IsFalse(report.HasDifferences,
+                "相同 phase 序列对照不应有偏离：\n" + report.Report());
+        }
+
+        [Test]
+        [Description("task 8.3：phase 顺序对照——phase 值差异被检出。")]
+        public void TraceComparator_PhaseOrder_PhaseDiff_Detected()
+        {
+            var snapshot1 = CreateMinimalTraceSnapshot();
+            var snapshot2 = new GameBattle.BattleTraceSnapshot(
+                frameNowMs: 80, stepMs: 80, elapsedGameTimeMs: 80,
+                updatePhase: (int)GameBattle.BattleUpdatePhase.Projectile, // 不同 phase
+                state: snapshot1.State,
+                enemies: snapshot1.Enemies,
+                projectiles: System.Array.Empty<GameBattle.BattleTraceSnapshot.ProjectileTraceRow>(),
+                attackEffects: System.Array.Empty<GameBattle.BattleTraceSnapshot.AttackEffectTraceRow>(),
+                playerHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                opponentHand: System.Array.Empty<GameBattle.BattleTraceSnapshot.UnitCardTraceRow>(),
+                poolStats: System.Array.Empty<GameBattle.BattleTraceSnapshot.PoolStatTraceRow>(),
+                isFrozen: false, isResultFrozen: false, finalResult: null);
+
+            var expectedSeq = new System.Collections.Generic.List<GameBattle.BattleTraceSnapshot> { snapshot1 };
+            var actualSeq = new System.Collections.Generic.List<GameBattle.BattleTraceSnapshot> { snapshot2 };
+
+            var report = TraceComparator.ComparePhaseOrder(expectedSeq, actualSeq);
+
+            Assert.IsTrue(report.HasDifferences, "phase 值差异应被检出");
+            StringAssert.Contains("updatePhase", report.FirstDifference.FieldPath,
+                "首个偏离路径应包含 updatePhase");
+        }
     }
 }

@@ -314,8 +314,28 @@ namespace GameFUI
             // 描述资源 location：{PackageName}_fui（spec：包名与资源 location 使用统一规则）。
             string descLocation = packageName + DescLocationSuffix;
 
-            // 异步预载描述资源。失败/取消时 provider 抛出异常，由调用方按操作账本回滚（design.md 决策9）。
-            IFUIAssetHandle descHandle = await provider.LoadAssetAsyncHandle<TextAsset>(descLocation, cancellationToken);
+            // 异步预载描述资源。取消保持标准取消语义；其他 provider 异常统一包装为带包名/location
+            // 上下文的 FUIException。此时尚未取得 handle，也未向账本登记任何所有权，无需回滚。
+            IFUIAssetHandle descHandle;
+            try
+            {
+                descHandle = await provider.LoadAssetAsyncHandle<TextAsset>(descLocation, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new FUIException(
+                    $"[PackageLoader] 描述资源加载失败：{packageName}（location={descLocation}）", ex);
+            }
+
+            if (descHandle == null)
+            {
+                throw new FUIException(
+                    $"[PackageLoader] 描述资源加载失败：provider 返回空 handle，pkg={packageName}，location={descLocation}");
+            }
 
             TextAsset descAsset;
             try

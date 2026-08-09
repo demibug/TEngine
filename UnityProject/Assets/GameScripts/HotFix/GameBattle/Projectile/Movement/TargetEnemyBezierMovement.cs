@@ -453,8 +453,10 @@ namespace GameBattle
             }
 
             _targetMissing = false;
-            _targetX = enemy.X + _cellSize / 2.0;
-            _targetY = enemy.Y + _cellSize / 2.0;
+            // 目标为敌人命中锚点（ProjectileAimOffset 由敌人类型定义，如 Mob0=0,-40），
+            // 而非简单矩形中心。保证箭矢落在角色身上实际受击位置。
+            _targetX = enemy.X + enemy.ProjectileAimOffsetX;
+            _targetY = enemy.Y + enemy.ProjectileAimOffsetY;
             return true;
         }
     }

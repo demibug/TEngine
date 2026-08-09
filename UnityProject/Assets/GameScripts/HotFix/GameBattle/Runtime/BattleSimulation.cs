@@ -185,7 +185,13 @@ namespace GameBattle
                     ExecutePhase(phase);
 
                     // TryFreeze 中止检查点：首次冻结成功后，当前 phase 剩余迭代已完成同步提交并返回，
-                    // 此处跳过当前子步后续 phase（spec.md “Battle result is frozen once”、决策 0.4）。
+                    // 此处跳过当前子步后续 phase（spec.md "Battle result is frozen once"、决策 0.4）。
+                    // task 6.10 闭环：phase handler 内部可能触发 BattleManager.TryFreezeResult →
+                    // resultBuilder.TryFreeze → resultBuilder.IsFrozen=true。此处调用 Simulation.TryFreeze()
+                    // 检查 _tryFreezeHandler（指向 resultBuilder.IsFrozen）并据此置位 Simulation.IsFrozen
+                    // + Freeze ActionScheduler，使后续检查点能正确中止。
+                    TryFreeze();
+
                     if (IsFrozen)
                     {
                         phaseAborted = true;

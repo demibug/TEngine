@@ -8,7 +8,7 @@ namespace GameBattle
     //   与可建造阵营等业务语义，供 MapData.GetCell 返回。
     //
     //   还原工程 grid[x][y] 元素为字符串 "kind_lane"（kind: 0=通道, 1=可建造, 2=阻挡；
-    //   lane: 1=玩家, 0=对手）。适配层把该字符串一次性解析为本类型，业务层不再接触
+    //   lane 表示地图半场）。适配层按当前竖屏本机视角把下半场归玩家，业务层不再接触
     //   嵌套数组或字符串编码。
     //
     // 不变量：
@@ -44,8 +44,8 @@ namespace GameBattle
     /// 可建造格所属阵营。
     /// </summary>
     /// <remarks>
-    /// <para>对应还原工程 <c>grid[x][y]</c> 元素字符串 "kind_lane" 的 lane 维度：
-    /// lane=1 为玩家方，lane=0 为对手方。只有 <see cref="GridCellKind.Buildable"/> 格才有阵营归属。</para>
+    /// <para>对应还原工程 <c>grid[x][y]</c> 元素字符串 "kind_lane" 的 lane 维度；
+    /// 适配层已把下半场规范化为玩家方。只有 <see cref="GridCellKind.Buildable"/> 格才有阵营归属。</para>
     /// </remarks>
     public enum BuildableSide
     {

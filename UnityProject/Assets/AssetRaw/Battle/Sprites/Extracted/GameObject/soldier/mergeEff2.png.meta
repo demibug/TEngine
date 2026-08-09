@@ -1,0 +1,1317 @@
+fileFormatVersion: 2
+guid: 9e0cc1ee94454374386a28e48d7eb833
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -5258012341858791187
+    second: mergeEff2_0
+  - first:
+      213: -2903138137238514648
+    second: mergeEff2_1
+  - first:
+      213: 1245155056759845773
+    second: mergeEff2_2
+  - first:
+      213: -368870810898879832
+    second: mergeEff2_3
+  - first:
+      213: -7063169011926266153
+    second: mergeEff2_4
+  - first:
+      213: 5802904618753537084
+    second: mergeEff2_5
+  - first:
+      213: 8889683270758799192
+    second: mergeEff2_6
+  - first:
+      213: -2769320882852494607
+    second: mergeEff2_7
+  - first:
+      213: -8726073072312312847
+    second: mergeEff2_8
+  - first:
+      213: -7242668561895430604
+    second: mergeEff2_9
+  - first:
+      213: 72583270744170093
+    second: mergeEff2_10
+  - first:
+      213: -1049901772189757976
+    second: mergeEff2_11
+  - first:
+      213: -3091850500420678597
+    second: mergeEff2_12
+  - first:
+      213: -8735060804040803077
+    second: mergeEff2_13
+  - first:
+      213: 5610358404362788497
+    second: mergeEff2_14
+  - first:
+      213: 8912360287085560416
+    second: mergeEff2_15
+  - first:
+      213: -5236947991534975925
+    second: mergeEff2_16
+  - first:
+      213: -4297475634629161476
+    second: mergeEff2_17
+  - first:
+      213: 2313808354547065947
+    second: mergeEff2_18
+  - first:
+      213: -5230382614124229125
+    second: mergeEff2_19
+  - first:
+      213: -4626564278542294035
+    second: mergeEff2_20
+  - first:
+      213: -7851552830512569792
+    second: mergeEff2_21
+  - first:
+      213: -7040156893103879824
+    second: mergeEff2_22
+  - first:
+      213: 824269269075942809
+    second: mergeEff2_23
+  - first:
+      213: -4911412376026213308
+    second: mergeEff2_24
+  - first:
+      213: 8005417389183269496
+    second: mergeEff2_25
+  - first:
+      213: 8278339156373247869
+    second: mergeEff2_26
+  - first:
+      213: -6261409212474379987
+    second: mergeEff2_27
+  - first:
+      213: -7934599497503140962
+    second: mergeEff2_28
+  - first:
+      213: 7462963014560104849
+    second: mergeEff2_29
+  - first:
+      213: -3474525947505517293
+    second: mergeEff2_30
+  - first:
+      213: -558488332252276718
+    second: mergeEff2_31
+  - first:
+      213: 5522681088917958121
+    second: mergeEff2_32
+  - first:
+      213: -4183032755290305768
+    second: mergeEff2_33
+  - first:
+      213: 576203101805191866
+    second: mergeEff2_34
+  - first:
+      213: -6290633179720322624
+    second: mergeEff2_35
+  - first:
+      213: 1958301274656681245
+    second: mergeEff2_36
+  - first:
+      213: 4644036166395027931
+    second: mergeEff2_37
+  - first:
+      213: -2806631967644672342
+    second: mergeEff2_38
+  - first:
+      213: 1291487439079430284
+    second: mergeEff2_39
+  - first:
+      213: -142252754105587759
+    second: mergeEff2_40
+  - first:
+      213: -7508286449412361161
+    second: mergeEff2_41
+  - first:
+      213: -3386641371842599636
+    second: mergeEff2_42
+  - first:
+      213: -5776122478695705748
+    second: mergeEff2_43
+  - first:
+      213: 48682332963909438
+    second: mergeEff2_44
+  - first:
+      213: 744841690646092645
+    second: mergeEff2_45
+  - first:
+      213: 1714377485019635966
+    second: mergeEff2_46
+  - first:
+      213: -413537475710979677
+    second: mergeEff2_47
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: mergeEff2_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 82
+        width: 18
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: de013ea12a9c707b0800000000000000
+      internalID: -5258012341858791187
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_1
+      rect:
+        serializedVersion: 2
+        x: 12
+        y: 86
+        width: 14
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8245204ee3bf5b7d0800000000000000
+      internalID: -2903138137238514648
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_2
+      rect:
+        serializedVersion: 2
+        x: 24
+        y: 87
+        width: 8
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d83b3705deda74110800000000000000
+      internalID: 1245155056759845773
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_3
+      rect:
+        serializedVersion: 2
+        x: 30
+        y: 90
+        width: 8
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8aaac5ca3f181eaf0800000000000000
+      internalID: -368870810898879832
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_4
+      rect:
+        serializedVersion: 2
+        x: 36
+        y: 92
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7de8697b4359afd90800000000000000
+      internalID: -7063169011926266153
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_5
+      rect:
+        serializedVersion: 2
+        x: 48
+        y: 90
+        width: 11
+        height: 16
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c343742710f088050800000000000000
+      internalID: 5802904618753537084
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_6
+      rect:
+        serializedVersion: 2
+        x: 62
+        y: 90
+        width: 9
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8579f4fc5df7e5b70800000000000000
+      internalID: 8889683270758799192
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_7
+      rect:
+        serializedVersion: 2
+        x: 74
+        y: 94
+        width: 6
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1f2818c54556199d0800000000000000
+      internalID: -2769320882852494607
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_8
+      rect:
+        serializedVersion: 2
+        x: 80
+        y: 93
+        width: 11
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1fb19b006c2c6e680800000000000000
+      internalID: -8726073072312312847
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_9
+      rect:
+        serializedVersion: 2
+        x: 90
+        y: 88
+        width: 8
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4366556f05fdc7b90800000000000000
+      internalID: -7242668561895430604
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_10
+      rect:
+        serializedVersion: 2
+        x: 97
+        y: 93
+        width: 7
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d6e9755a91ed10100800000000000000
+      internalID: 72583270744170093
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_11
+      rect:
+        serializedVersion: 2
+        x: 108
+        y: 88
+        width: 9
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8ed839b96effd61f0800000000000000
+      internalID: -1049901772189757976
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_12
+      rect:
+        serializedVersion: 2
+        x: 115
+        y: 90
+        width: 13
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b3ccfc7e95a8715d0800000000000000
+      internalID: -3091850500420678597
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_13
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 89
+        width: 7
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bfcb5b3aa74d6c680800000000000000
+      internalID: -8735060804040803077
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_14
+      rect:
+        serializedVersion: 2
+        x: 135
+        y: 82
+        width: 8
+        height: 24
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 19edbaa6e3ffbdd40800000000000000
+      internalID: 5610358404362788497
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_15
+      rect:
+        serializedVersion: 2
+        x: 142
+        y: 86
+        width: 8
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 062880e16701fab70800000000000000
+      internalID: 8912360287085560416
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_16
+      rect:
+        serializedVersion: 2
+        x: 148
+        y: 86
+        width: 8
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b44cc595c8f9257b0800000000000000
+      internalID: -5236947991534975925
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_17
+      rect:
+        serializedVersion: 2
+        x: 155
+        y: 89
+        width: 9
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: cfd4807edac4c54c0800000000000000
+      internalID: -4297475634629161476
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_18
+      rect:
+        serializedVersion: 2
+        x: 162
+        y: 81
+        width: 18
+        height: 24
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b54eb1b707c4c1020800000000000000
+      internalID: 2313808354547065947
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_19
+      rect:
+        serializedVersion: 2
+        x: 1
+        y: 70
+        width: 15
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bfd0fb569b2f967b0800000000000000
+      internalID: -5230382614124229125
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_20
+      rect:
+        serializedVersion: 2
+        x: 2
+        y: 76
+        width: 14
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: de3a9fe1d442bcfb0800000000000000
+      internalID: -4626564278542294035
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_21
+      rect:
+        serializedVersion: 2
+        x: 165
+        y: 74
+        width: 13
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 042e51acc4ea90390800000000000000
+      internalID: -7851552830512569792
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_22
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 63
+        width: 17
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 07986872b965c4e90800000000000000
+      internalID: -7040156893103879824
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_23
+      rect:
+        serializedVersion: 2
+        x: 164
+        y: 65
+        width: 20
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 99dda867884607b00800000000000000
+      internalID: 824269269075942809
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_24
+      rect:
+        serializedVersion: 2
+        x: 165
+        y: 59
+        width: 14
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 444108d377827dbb0800000000000000
+      internalID: -4911412376026213308
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_25
+      rect:
+        serializedVersion: 2
+        x: 1
+        y: 48
+        width: 20
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 87af00173b4f81f60800000000000000
+      internalID: 8005417389183269496
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_26
+      rect:
+        serializedVersion: 2
+        x: 4
+        y: 58
+        width: 15
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d7795d92a9192e270800000000000000
+      internalID: 8278339156373247869
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_27
+      rect:
+        serializedVersion: 2
+        x: 166
+        y: 51
+        width: 18
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d213b11ee710b19a0800000000000000
+      internalID: -6261409212474379987
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_28
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 26
+        width: 20
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e93155cdbc3a2e190800000000000000
+      internalID: -7934599497503140962
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_29
+      rect:
+        serializedVersion: 2
+        x: 6
+        y: 43
+        width: 16
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 191cbbe3255c19760800000000000000
+      internalID: 7462963014560104849
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_30
+      rect:
+        serializedVersion: 2
+        x: 163
+        y: 28
+        width: 23
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 31d5e004f0108cfc0800000000000000
+      internalID: -3474525947505517293
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_31
+      rect:
+        serializedVersion: 2
+        x: 5
+        y: 15
+        width: 16
+        height: 16
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 21817e022d9df38f0800000000000000
+      internalID: -558488332252276718
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_32
+      rect:
+        serializedVersion: 2
+        x: 9
+        y: 8
+        width: 17
+        height: 16
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9ede8b0a03184ac40800000000000000
+      internalID: 5522681088917958121
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_33
+      rect:
+        serializedVersion: 2
+        x: 21
+        y: 5
+        width: 16
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 81b09192fd1e2f5c0800000000000000
+      internalID: -4183032755290305768
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_34
+      rect:
+        serializedVersion: 2
+        x: 28
+        y: 0
+        width: 25
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ab2a3911ba51ff700800000000000000
+      internalID: 576203101805191866
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_35
+      rect:
+        serializedVersion: 2
+        x: 49
+        y: 4
+        width: 11
+        height: 16
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0c1fb76c37e23b8a0800000000000000
+      internalID: -6290633179720322624
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_36
+      rect:
+        serializedVersion: 2
+        x: 70
+        y: 3
+        width: 8
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d1d2b1f32a84d2b10800000000000000
+      internalID: 1958301274656681245
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_37
+      rect:
+        serializedVersion: 2
+        x: 76
+        y: 4
+        width: 14
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bd1ea06c94ee27040800000000000000
+      internalID: 4644036166395027931
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_38
+      rect:
+        serializedVersion: 2
+        x: 89
+        y: 1
+        width: 7
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: aae98497817dc09d0800000000000000
+      internalID: -2806631967644672342
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_39
+      rect:
+        serializedVersion: 2
+        x: 98
+        y: 4
+        width: 10
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c885536bbf84ce110800000000000000
+      internalID: 1291487439079430284
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_40
+      rect:
+        serializedVersion: 2
+        x: 106
+        y: 3
+        width: 11
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1d72733bfdd960ef0800000000000000
+      internalID: -142252754105587759
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_41
+      rect:
+        serializedVersion: 2
+        x: 116
+        y: 2
+        width: 8
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 734b5ee31453dc790800000000000000
+      internalID: -7508286449412361161
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_42
+      rect:
+        serializedVersion: 2
+        x: 121
+        y: 7
+        width: 8
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c252ea19d9b3001d0800000000000000
+      internalID: -3386641371842599636
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_43
+      rect:
+        serializedVersion: 2
+        x: 127
+        y: 4
+        width: 7
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c639136753717dfa0800000000000000
+      internalID: -5776122478695705748
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_44
+      rect:
+        serializedVersion: 2
+        x: 134
+        y: 5
+        width: 31
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e3fa62be254fca000800000000000000
+      internalID: 48682332963909438
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_45
+      rect:
+        serializedVersion: 2
+        x: 157
+        y: 5
+        width: 27
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 56b9cd04295365a00800000000000000
+      internalID: 744841690646092645
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_46
+      rect:
+        serializedVersion: 2
+        x: 164
+        y: 19
+        width: 16
+        height: 10
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ef0e58d4d31bac710800000000000000
+      internalID: 1714377485019635966
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: mergeEff2_47
+      rect:
+        serializedVersion: 2
+        x: 61
+        y: 7
+        width: 8
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3a17fea5bd1d24af0800000000000000
+      internalID: -413537475710979677
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable: {}
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

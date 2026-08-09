@@ -144,6 +144,15 @@ namespace GameBattle
         /// </summary>
         private readonly Dictionary<int, int> _idToIndex = new Dictionary<int, int>();
 
+        /// <summary>
+        /// BattleUnit.UnitId → 战斗运行时实例映射（最终方案"增加 UnitId → BattleRuntimeId 映射"）。
+        /// <para>战场槽换位时复用同一战斗实例；下场时解除战斗实例但保留 BattleUnit。</para>
+        /// <para>键为 <see cref="BattleUnit.UnitId"/>（局内单位权威 ID），值为对应
+        /// <see cref="SoldierBase"/> 实例（其 <see cref="UnitBase.Id"/> 是运行时 ID）。</para>
+        /// </summary>
+        private readonly Dictionary<int, SoldierBase> _unitIdToSoldier =
+            new Dictionary<int, SoldierBase>();
+
         // ====================================================================
         // 注入依赖
         // ====================================================================
@@ -153,6 +162,18 @@ namespace GameBattle
 
         /// <summary>格子尺寸（像素，对应 map.gridWidth=80）。放置时计算逻辑像素位置。</summary>
         private readonly float _cellSize;
+
+        /// <summary>单位完成放置后的低频表现事实（末位为等级，修复 P0）。</summary>
+        internal event Action<int, bool, int, int, int, int> UnitPlaced;
+
+        /// <summary>单位从活动集合移除后的低频表现事实。</summary>
+        internal event Action<int> UnitRemoved;
+
+        /// <summary>战场单位移动到新战场格后的低频表现事实（最终方案"战场槽换位"）。</summary>
+        internal event Action<int, int, int> UnitMoved;
+
+        /// <summary>战场单位等级变化后的低频表现事实（最终方案"等级数值和等级表现"）。</summary>
+        internal event Action<int, int> UnitLevelChanged;
 
         // ====================================================================
         // 诊断属性
@@ -274,8 +295,213 @@ namespace GameBattle
             float pixelX = gridX * _cellSize;
             float pixelY = gridY * _cellSize;
             unit.ActivatePlacement(pixelX, pixelY);
+            UnitPlaced?.Invoke(unit.Id, side, (int)type, gridX, gridY, unit.UnitLevel);
 
             return unit;
+        }
+
+        // ====================================================================
+        // ActivateBattleUnit / DeactivateBattleUnit —— 激活/解除战场槽中的战斗实例
+        // --------------------------------------------------------------------
+        // 最终方案"UnitRegistry 从'创建并购买'改成'激活战场槽中的单位'"：
+        //   - 战场槽换位时复用同一战斗实例（UnitId → BattleRuntimeId 映射）。
+        //   - 下场时解除战斗实例，但保留 BattleUnit（槽位状态由 UnitSlotBoard 维护）。
+        //   - GetActiveUnits 仍只返回战场实例，待上场单位永远不会进入攻击调度。
+        // ====================================================================
+
+        /// <summary>
+        /// 激活/复用指定局内单位在指定战场格子的战斗实例（最终方案）。
+        /// </summary>
+        /// <param name="unit">局内单位权威数据。</param>
+        /// <param name="config">单位配置快照。</param>
+        /// <param name="levelService">等级数值服务（应用局内等级倍率）。</param>
+        /// <param name="gridX">战场格子列索引。</param>
+        /// <param name="gridY">战场格子行索引。</param>
+        /// <param name="unitWidth">逻辑宽度。</param>
+        /// <param name="unitHeight">逻辑高度。</param>
+        /// <returns>激活或复用的战斗实例。</returns>
+        /// <remarks>
+        /// <para><b>战场槽换位时复用同一战斗实例：</b>若该 <see cref="BattleUnit.UnitId"/>
+        /// 已有活动战斗实例，只重新放置（SetPlacement + ActivatePlacement），不重新 Acquire。</para>
+        /// <para><b>首次上场：</b>经 <see cref="UnitFactory.Acquire(BattleUnit, UnitConfigSnapshot, float, float)"/>
+        /// 创建并应用等级，再放置到战场格。</para>
+        /// </remarks>
+        internal SoldierBase ActivateBattleUnit(
+            BattleUnit unit,
+            UnitConfigSnapshot config,
+            UnitLevelService levelService,
+            int gridX,
+            int gridY,
+            float unitWidth,
+            float unitHeight)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            // 战场槽换位复用：该单位已有活动战斗实例则重新放置。
+            if (_unitIdToSoldier.TryGetValue(unit.UnitId, out SoldierBase existing))
+            {
+                // 修复 P0：战场换格复用同一 SoldierBase，但先取消尚未释放的攻击。
+                existing.CancelUnreleasedAttacks();
+                existing.SetPlacement(gridX, gridY);
+                float pixelX = gridX * _cellSize;
+                float pixelY = gridY * _cellSize;
+                existing.ActivatePlacement(pixelX, pixelY);
+                // 等级可能因合并提升，重新应用数值。
+                existing.ConfigureLevel(levelService);
+                existing.ApplyLevel(unit.Level);
+                // 战场换格不导入 Board 冷却（Board 冷却已由调用方同步为实时值）。
+                // 战场槽换位复用同一战斗实例，发布位置与等级变化表现事实。
+                UnitMoved?.Invoke(existing.Id, gridX, gridY);
+                UnitLevelChanged?.Invoke(existing.Id, unit.Level);
+                return existing;
+            }
+
+            // 首次上场：创建并应用等级，再放置。
+            SoldierBase soldier = _unitFactory.Acquire(unit, config, unitWidth, unitHeight);
+            // 修复 P0：首次上场导入冷却（上下场不刷新攻击冷却）。
+            soldier.ImportAttackCooldown(unit.LastAttackTimeMs);
+            soldier.SetPlacement(gridX, gridY);
+            Register(soldier);
+            float px = gridX * _cellSize;
+            float py = gridY * _cellSize;
+            soldier.ActivatePlacement(px, py);
+            _unitIdToSoldier[unit.UnitId] = soldier;
+            UnitPlaced?.Invoke(soldier.Id, unit.Side, (int)unit.SoldierType, gridX, gridY, unit.Level);
+            return soldier;
+        }
+
+        // ====================================================================
+        // 原子事务分段：Prepare / ReleasePrepared / ActivatePrepared
+        // --------------------------------------------------------------------
+        // 修复 P0：把"创建并激活"拆成可回滚的两段，使 BattleInputController 能在
+        // Commit Board 之前完成全部可能抛错的对象池 Acquire，任何失败都不影响槽位。
+        // ====================================================================
+
+        /// <summary>
+        /// 准备（但不注册/放置）一个新战斗实例。可抛错，供 Controller 在 Commit Board 前调用。
+        /// </summary>
+        /// <param name="unit">局内单位权威数据。</param>
+        /// <param name="config">单位配置快照（非 null）。</param>
+        /// <param name="unitWidth">逻辑宽度。</param>
+        /// <param name="unitHeight">逻辑高度。</param>
+        /// <returns>已 Acquire + Configure + Init + ApplyLevel + 导入冷却的士兵（尚未注册/放置）。</returns>
+        /// <remarks>
+        /// <para>返回的实例尚未 Register（不在 <see cref="_soldiers"/> 中，不在攻击调度内）。
+        /// 调用方必须在 <see cref="ActivatePrepared"/> 前持有它；若事务失败，
+        /// 调用方应经 <see cref="ReleasePrepared"/> 归还池。</para>
+        /// </remarks>
+        internal SoldierBase PrepareBattleInstance(
+            BattleUnit unit,
+            UnitConfigSnapshot config,
+            float unitWidth,
+            float unitHeight)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            SoldierBase soldier = _unitFactory.Acquire(unit, config, unitWidth, unitHeight);
+            soldier.ImportAttackCooldown(unit.LastAttackTimeMs);
+            return soldier;
+        }
+
+        /// <summary>
+        /// 归还一个已准备但未激活的战斗实例到池（事务失败回滚用）。
+        /// </summary>
+        /// <param name="soldier">已准备但未激活的实例。</param>
+        internal void ReleasePrepared(SoldierBase soldier)
+        {
+            if (soldier == null || soldier.InPool)
+            {
+                return;
+            }
+
+            soldier.CancelUnreleasedAttacks();
+            _unitFactory.Release(soldier);
+        }
+
+        /// <summary>
+        /// 激活一个已准备的战斗实例：注册 + 放置 + 激活 + 事实发布。
+        /// </summary>
+        /// <param name="unit">局内单位权威数据。</param>
+        /// <param name="soldier">已准备实例。</param>
+        /// <param name="levelService">等级数值服务。</param>
+        /// <param name="gridX">战场格子列索引。</param>
+        /// <param name="gridY">战场格子行索引。</param>
+        /// <returns>已激活的战斗实例。</returns>
+        internal SoldierBase ActivatePrepared(
+            BattleUnit unit,
+            SoldierBase soldier,
+            UnitLevelService levelService,
+            int gridX,
+            int gridY)
+        {
+            if (soldier == null)
+            {
+                throw new ArgumentNullException(nameof(soldier));
+            }
+
+            soldier.SetPlacement(gridX, gridY);
+            Register(soldier);
+            float px = gridX * _cellSize;
+            float py = gridY * _cellSize;
+            soldier.ActivatePlacement(px, py);
+            _unitIdToSoldier[unit.UnitId] = soldier;
+            UnitPlaced?.Invoke(soldier.Id, unit.Side, (int)unit.SoldierType, gridX, gridY, unit.Level);
+            return soldier;
+        }
+
+        /// <summary>
+        /// 解除指定局内单位的战斗实例（最终方案"下场时解除战斗实例，但保留 BattleUnit"）。
+        /// </summary>
+        /// <param name="unitId">局内单位权威 ID（BattleUnit.UnitId）。</param>
+        /// <returns>
+        /// 成功时返回该单位的冷却时间戳（调用方写回 BattleUnit）；无活动实例返回 -1。
+        /// </returns>
+        /// <remarks>
+        /// <para><b>修复 P0（冷却写回）：</b>下场前导出 <see cref="SoldierBase.LastAttackTimeMs"/>，
+        /// 供调用方经 <see cref="BattleUnit.WithAttackCooldown"/> 写回 BattleUnit，保证
+        /// "上下场不刷新攻击冷却"。随后取消未释放攻击（已发射投射物继续飞行）并回池。</para>
+        /// <para>槽位中的 <see cref="BattleUnit"/> 保留（由 UnitSlotBoard 维护）。</para>
+        /// </remarks>
+        internal long DeactivateBattleUnit(int unitId)
+        {
+            if (!_unitIdToSoldier.TryGetValue(unitId, out SoldierBase soldier))
+            {
+                return -1L;
+            }
+
+            _unitIdToSoldier.Remove(unitId);
+            long cooldown = soldier.LastAttackTimeMs;
+            soldier.CancelUnreleasedAttacks();
+            Remove(soldier.Id);
+            return cooldown;
+        }
+
+        /// <summary>按局内单位权威 ID 查找活动战斗实例（无则返回 null）。</summary>
+        internal SoldierBase GetActiveByUnitId(int unitId)
+        {
+            return _unitIdToSoldier.TryGetValue(unitId, out SoldierBase soldier) ? soldier : null;
+        }
+
+        /// <summary>读取活动战斗实例的实时攻击冷却（修复 P0：战斗内冷却同步）。</summary>
+        /// <param name="unitId">局内单位权威 ID。</param>
+        /// <param name="lastAttackTimeMs">输出实时冷却；无活动实例时为 0。</param>
+        /// <returns>true=该单位当前有活动战斗实例。</returns>
+        internal bool TryGetLiveCooldown(int unitId, out long lastAttackTimeMs)
+        {
+            if (_unitIdToSoldier.TryGetValue(unitId, out SoldierBase soldier))
+            {
+                lastAttackTimeMs = soldier.LastAttackTimeMs;
+                return true;
+            }
+
+            lastAttackTimeMs = 0L;
+            return false;
         }
 
         // ====================================================================
@@ -361,6 +587,9 @@ namespace GameBattle
 
             _soldiers.RemoveAt(lastIndex);
             _idToIndex.Remove(id);
+
+            // 先发布移除事实，再归还对象池；回收后运行时 ID 会被重置。
+            UnitRemoved?.Invoke(id);
 
             // 归还池（对应 JS objectPool.recoverByClass，经 UnitFactory.Release）。
             _unitFactory.Release(unit);
@@ -550,6 +779,7 @@ namespace GameBattle
             // Remove 已清空，此处防御性确保。
             _soldiers.Clear();
             _idToIndex.Clear();
+            _unitIdToSoldier.Clear();
         }
 
         // ====================================================================

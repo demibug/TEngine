@@ -204,8 +204,8 @@ namespace GameBattle
         /// <para>由 <see cref="BattleRuntimeFactory"/> 构造并经 Assembly 注入，本类型接管持有。
         /// 原子执行购买放置和刷新命令，任一步失败按逆序补偿到调用前状态
         /// （spec "Input commands are atomic"）。</para>
-        /// <para>注入依赖：UnitFactory / UnitRegistry / BattleEconomy / DeckManager /
-        /// PlacementReservationRegistry / MapData / BattleConfigSnapshot。</para>
+        /// <para>注入依赖：UnitFactory / UnitRegistry / BattleEconomy / UnitSlotBoard /
+        /// RecruitManager / UnitLevelService / BattleConfigSnapshot。</para>
         /// <para>独占语义：不跨局复用；重开销毁旧 Runtime 时连同控制器一并销毁
         /// （BattleModule 新建 Runtime 时由 Factory 产生新控制器）。CommandId 去重缓存
         /// 由 task 6.8 在本类型内维护，随 Runtime 清理清空，不跨局保留。</para>
@@ -216,34 +216,217 @@ namespace GameBattle
         public BattleInputController InputController { get; }
 
         // ====================================================================
+        // task 6.10 闭环新增：闭环必需的 Manager / 状态 / 服务
+        // --------------------------------------------------------------------
+        // 以下属性在 task 6.10 接入时由 Assembly 注入，使 Runtime 能在 EnterSettling
+        // 补全步骤 5-8 并在 phaseHandlers 接入实际 Manager 的 update 方法。
+        // ====================================================================
+
+        /// <summary>
+        /// 本局权威战斗状态（task 3.7 产物）。
+        /// <para>保存双方生命、金币、波次等权威可变状态，只由本局规则服务经 Apply* 方法修改。
+        /// Runtime 在 EnterSettling 步骤 7 调用 GameOver 重置，并在 phaseHandlers 中供
+        /// BattleManager 读取波次/生命等状态。</para>
+        /// </summary>
+        public BattleState BattleState { get; }
+
+        /// <summary>
+        /// 本局战斗规则协调器（task 3.10 产物）。
+        /// <para>管理波次运行态、战斗规则和胜负条件。Runtime 在 phaseHandlers 的 WaveSpawn
+        /// 阶段回调 <see cref="BattleManager.UpdateSpawnState"/>，在 EnterSettling 步骤 7
+        /// 调用 <see cref="BattleManager.GameOver"/> 重置规则状态。</para>
+        /// </summary>
+        public BattleManager BattleManager { get; }
+
+        /// <summary>
+        /// 本局波次管理器（task 3.9 产物）。
+        /// <para>生成确定性 Mob0 波次计划并按子步刷怪。Runtime 在 EnterSettling 步骤 7
+        /// 调用 <see cref="WaveManager.GameOver"/> 清理波次状态。</para>
+        /// </summary>
+        public WaveManager WaveManager { get; }
+
+        /// <summary>
+        /// 本局经济服务（task 3.8 产物）。
+        /// <para>处理招募、刷新、击杀奖励的校验与余额变更。Runtime 在 EnterSettling 步骤 7
+        /// 调用 <see cref="BattleEconomy.GameOver"/> 重置经济计数。</para>
+        /// </summary>
+        public BattleEconomy BattleEconomy { get; }
+
+        /// <summary>
+        /// 本局格子预留注册表（task 3.8 产物）。
+        /// <para>管理购买放置事务中的临时格子预留。Runtime 在 EnterSettling 步骤 7
+        /// 调用 <see cref="PlacementReservationRegistry.Clear"/> 清空全部预留。</para>
+        /// </summary>
+        public PlacementReservationRegistry ReservationRegistry { get; }
+
+        /// <summary>
+        /// 本局敌人管理器（task 4.6 产物）。
+        /// <para>维护敌人集合和空间索引，提供稳定查询、伤害入口、生成与清理。
+        /// Runtime 在 phaseHandlers 的 Enemy 阶段回调 <see cref="EnemyManager.Update"/>，
+        /// 在 EnterSettling 步骤 5 调用 <see cref="EnemyManager.GameOver"/> 清理敌人实体、
+        /// 接触 Timer 和空间索引。</para>
+        /// </summary>
+        public EnemyManager EnemyManager { get; }
+
+        /// <summary>
+        /// 本局攻击调度器（task 5.2 产物）。
+        /// <para>每子步只推进一次单位冷却、选取目标并触发一次攻击。Runtime 在 phaseHandlers
+        /// 的 UnitAttack 阶段回调 <see cref="AttackScheduler.Update"/>。</para>
+        /// </summary>
+        public AttackScheduler AttackScheduler { get; }
+
+        /// <summary>
+        /// 本局结果冻结器（task 3.11 产物）。
+        /// <para>提供幂等 TryFreeze 唯一入口。Simulation 的 tryFreeze 回调指向
+        /// <see cref="BattleResultBuilder.IsFrozen"/>。BattleManager 在完成事实发生点
+        /// 调用 TryFreezeResult → resultBuilder.TryFreeze。</para>
+        /// </summary>
+        public BattleResultBuilder ResultBuilder { get; }
+
+        // ====================================================================
+        // task 7.4 表现层只读状态视图
+        // --------------------------------------------------------------------
+        // BattleReadModel 由 Factory 构造并经 Assembly 注入，本类型接管持有。
+        // BattlePresenter 只读本属性获取只读状态视图，把状态/事实翻译成视图操作，
+        // 不回写规则状态（design.md:217 / spec "Settling has no gameplay damage authority"）。
+        // ====================================================================
+
+        /// <summary>
+        /// 本局只读状态视图（task 3.7 产物，task 7.4 接入 Presenter）。
+        /// <para>由 <see cref="BattleRuntimeFactory"/> 在构造 BattleResultBuilder 时一并构造，
+        /// 经 Assembly 注入本类型。<see cref="BattlePresenter"/>（task 7.4）只读本属性
+        /// 访问 BattleState 的只读快照，不直接访问 BattleState 或 Manager。</para>
+        /// <para>spec "Settling has no gameplay damage authority"：Settling 只允许
+        /// 发布不可变结果、生成只读快照和执行不回写规则状态的表现收尾。Presenter 经
+        /// 本属性生成只读快照属 Settling 允许范畴。</para>
+        /// <para>独占语义：不跨局复用；随 Runtime 销毁（ReadModel 不持有可释放资源，
+        /// 只持有 BattleState 引用，随 Runtime Dispose 释放）。</para>
+        /// </summary>
+        public BattleReadModel ReadModel { get; }
+
+        // ====================================================================
+        // Phase 6 内部信号中枢（task 7.1 产物）
+        // ====================================================================
+
+        /// <summary>
+        /// 本局内部低频一对多事实信号中枢（task 7.1 产物）。
+        /// <para>由 <see cref="BattleRuntimeFactory"/> 构造并经 Assembly 注入，本类型接管持有。
+        /// 仅承载需要一对多的单局低频内部事实（如 ROUND_SPAWN_PREPARED、HEALTH_CHANGED），
+        /// 不承担核心一致性（敌人注册、空间索引、伤害等继续使用直接调用），
+        /// 不承担跨程序集通信（开始/完成等走 <c>IBattlePublicEvent</c>）。</para>
+        /// <para>订阅由 <see cref="Scope"/> 经 <see cref="BattleRuntimeScope.TrackSignalHub"/>
+        /// 批量登记，在 Settling 静默清理、失败回滚或 Dispose 时由
+        /// <see cref="BattleInternalSignalHub.Clear"/> 一次性解除
+        /// （spec "Event subscriptions follow runtime lifetime"）。</para>
+        /// <para>独占语义：不跨局复用；重开销毁旧 Runtime 时连同 SignalHub 一并清理
+        /// （BattleModule 新建 Runtime 时由 Factory 产生新 SignalHub）。</para>
+        /// </summary>
+        public BattleInternalSignalHub SignalHub { get; }
+
+        // ====================================================================
+        // Phase 6 事件桥接器（task 7.2 产物）
+        // ====================================================================
+
+        /// <summary>
+        /// 本局事件桥接器（task 7.2 产物）。
+        /// <para>由 <see cref="BattleRuntimeFactory"/> 构造并经 Assembly 注入，本类型接管持有。
+        /// 把 <see cref="SignalHub"/> 的单局低频内部信号桥接到 <c>IBattleUiEvent</c> UI 通知，
+        /// 把开始/结果等少量事实转换成 <c>GameCommon</c> 公共 DTO 并发送 TEngine <c>GameEvent</c>
+        /// （design.md Events/BattleEventBridge.cs / spec battle-event-boundary）。</para>
+        /// <para>订阅生命周期：Bridge 订阅 SignalHub 的四个信号，由
+        /// <see cref="Scope"/> 经 <see cref="BattleRuntimeScope.TrackDisposable"/> 登记，
+        /// 在 Settling 静默清理、失败回滚或 Dispose 时调用 <c>BattleEventBridge.Dispose</c>
+        /// 批量退订（spec "Event subscriptions follow runtime lifetime"）。</para>
+        /// <para>跨程序集只传 GameCommon 不可变 DTO（spec "Cross-assembly events use immutable
+        /// common contracts"）：<c>PublishBattleStarted</c>/<c>PublishBattleFinished</c>
+        /// 只接受 <c>BattleLoadoutDto</c>/<c>BattleResultDto</c>（readonly struct），
+        /// 不暴露 GameBattle 内部实体。</para>
+        /// <para>独占语义：不跨局复用；重开销毁旧 Runtime 时连同 Bridge 一并 Dispose
+        /// （BattleModule 新建 Runtime 时由 Factory 产生新 Bridge）。</para>
+        /// </summary>
+        public BattleEventBridge EventBridge { get; }
+
+        // ====================================================================
+        // task 7.4 表现层组装产物
+        // --------------------------------------------------------------------
+        // BattlePresenter 由 Factory 在组装阶段构造并注入，本类型接管持有。
+        // Presenter 只读 ReadModel，把只读状态/事实翻译成视图操作，不回写规则状态
+        // （design.md:217）。Presenter 持有 ViewRegistry / ViewSynchronizer / InputAdapter
+        // 三个协作者，经 IBattleViewPort/IBattleAudioPort/IBattleVfxPort 端口接收逻辑层事实。
+        //
+        // 当前 Presenter 的三个端口默认为 Null 实现（task 7.3 产物），使纯逻辑闭环
+        // 不依赖 Unity 表现层。生产环境由 BattleModule / 真实实现替换为 Unity 真实端口
+        // （task 7.5/7.6 接入 FairyGUI / Unity 表现层后）。
+        // ====================================================================
+
+        /// <summary>
+        /// 本局表现层组装器（task 7.4 产物）。
+        /// <para>由 <see cref="BattleRuntimeFactory"/> 构造并经 Assembly 注入，本类型接管持有。
+        /// 把只读状态/事实翻译成视图操作，不回写规则状态（design.md:217）。</para>
+        /// <para>持有 <see cref="BattleViewRegistry"/> / <see cref="BattleViewSynchronizer"/> /
+        /// <see cref="BattleInputAdapter"/> 三个协作者，经 IBattleViewPort /
+        /// IBattleAudioPort / IBattleVfxPort 端口接收逻辑层事实。</para>
+        /// <para>独占语义：不跨局复用；随 Runtime Dispose 调用 Presenter.Dispose
+        /// 清理表现对象与监听（经 Scope 登记释放）。</para>
+        /// </summary>
+        public BattlePresenter Presenter { get; }
+
+        // ====================================================================
+        // 最终方案新增：槽位面板 / 征兵服务 / 等级数值服务
+        // ====================================================================
+
+        /// <summary>
+        /// 本局槽位面板（最终方案"核心架构"）。
+        /// <para>由 <see cref="BattleRuntimeFactory"/> 构造并经 Assembly 注入，集中维护槽、
+        /// 单位和换槽不变量。UI、DeckManager、UnitRegistry 不再分别保存一份"单位在哪里"的状态。</para>
+        /// </summary>
+        public UnitSlotBoard SlotBoard { get; }
+
+        /// <summary>
+        /// 本局征兵服务（最终方案 Recruit/RecruitManager）。
+        /// <para>只负责随机生成一整批 1 级四兵，不保存手牌和槽位状态，不负责上场。</para>
+        /// </summary>
+        public RecruitManager RecruitManager { get; }
+
+        /// <summary>
+        /// 本局等级数值服务（最终方案 Unit/UnitLevelService）。
+        /// <para>校验最大等级、从 UnitLevelConfigSnapshot 解析伤害及攻速倍率、统一应用等级数值。</para>
+        /// </summary>
+        public UnitLevelService LevelService { get; }
+
+        // ====================================================================
         // 预留扩展点（后续 Phase 产物，当前为骨架占位）
         // ====================================================================
 
-        // TODO Phase 2 task 3.7：BattleState —— 双方生命、金币、波次等权威可变状态。
-        //   独占语义：只由本局逻辑修改，不跨局复用。
-        //   当前由 BattleRuntimeFactory 构造并经 BattleEconomy 持有，但未在 BattleRuntime
-        //   上公开属性（待 task 6.10 接入 phaseHandlers 时补全）。
-        //   public BattleState State { get; }
+        // task 6.10 闭环已接入的 Manager / 状态 / 服务（见上方 public 属性）：
+        //   - BattleState（task 3.7）—— 双方生命、金币、波次等权威可变状态
+        //   - BattleResultBuilder（task 3.11）—— 唯一结果冻结点
+        //   - BattleManager（task 3.10）—— 战斗规则、波次、胜负
+        //   - WaveManager（task 3.9）—— 确定性波次计划
+        //   - BattleEconomy（task 3.8）—— 经济校验与余额变更
+        //   - DeckManager（task 6.5）—— 牌组抽牌/补牌/刷新
+        //   - PlacementReservationRegistry（task 3.8）—— 格子预留
+        //   - EnemyManager（task 4.6）—— 敌人集合、空间索引、伤害入口
+        //   - AttackScheduler（task 5.2）—— 单位攻击调度
+        //   - AttackEffectManager（task 5.3）—— 攻击效果推进
+        //   - ProjectileManager（task 5.8）—— 投射物推进
+        //   - UnitFactory（task 6.3）—— 单位工厂
+        //   - UnitRegistry（task 6.3）—— 单位注册表
+        //   - BattleInputController（task 6.7）—— 输入命令执行
 
-        // TODO Phase 2 task 3.11：BattleResultBuilder —— 唯一结果冻结点。
-        //   独占语义：首次 TryFreeze 冻结一次最终结果 DTO，冻结后不可修改。
-        //   public BattleResultBuilder ResultBuilder { get; }
+        // task 7.1 闭环已接入：BattleInternalSignalHub —— 单局低频一对多内部事实信号中枢。
+        //   独占语义：每局由 Factory 新建，随 Runtime 销毁而 Clear，不跨局复用。
+        //   订阅由 Scope 经 TrackSignalHub 批量登记，Dispose 时一次性 Clear。
 
-        // TODO Phase 2 task 3.9/3.10：BattleManager / WaveManager —— 战斗规则、波次、胜负。
-        // TODO Phase 3 task 4.6：EnemyManager —— 敌人集合、空间索引、伤害入口。
-        //   当前由 BattleRuntimeFactory 构造并经 ProjectileFactory 传递给 UnitFactory，
-        //   但未在 BattleRuntime 上公开属性（待 task 6.10 接入 phaseHandlers 时补全）。
+        // task 7.2 闭环已接入：BattleEventBridge —— 单局事件桥接器。
+        //   职责：SignalHub 信号→IBattleUiEvent UI 事件；GameCommon DTO→IBattlePublicEvent 跨程序集。
+        //   独占语义：每局由 Factory 新建，随 Runtime 销毁而 Dispose，不跨局复用。
+        //   订阅由 Scope 经 TrackDisposable 登记，Dispose 时批量退订 SignalHub 信号。
+
         // TODO Phase 3 task 4.1：BattlePoolScope —— 可跨局复用池容量与逐局清空活动对象。
-        // Phase 4 task 5.3/5.8：AttackEffectManager / ProjectileManager 已接入（见上方属性）。
-        // Phase 5 task 6.3：UnitFactory / UnitRegistry 已接入（见上方属性）。
-        // Phase 5 task 6.7：BattleInputController 已接入（见上方属性）。
-        // TODO Phase 5 task 6.5：DeckManager —— 牌组抽牌/补牌/刷新。
-        //   当前由 BattleRuntimeFactory 构造并经 BattleInputController 持有，但未在
-        //   BattleRuntime 上公开属性（待 task 6.10 接入 phaseHandlers 时补全）。
-        // TODO Phase 6 task 7.1：BattleInternalSignalHub —— 单局低频局部事件。
         // TODO Phase 2/3：SeededRandomSource —— 确定性随机源（Ports/SeededRandomSource.cs）。
         //   独占语义：每局从 Loadout.RandomSeed 构造新实例，不沿用旧局随机进度。
-        //   当前由 BattleRuntimeFactory 构造并经 DeckManager 持有。
+        //   当前由 BattleRuntimeFactory 构造并经 DeckManager / WaveManager 持有。
 
         // ====================================================================
         // 生命周期状态标记
@@ -323,6 +506,27 @@ namespace GameBattle
             UnitFactory = assembly.UnitFactory;
             UnitRegistry = assembly.UnitRegistry;
             InputController = assembly.InputController;
+            // task 6.10 闭环新增 Manager / 状态 / 服务
+            BattleState = assembly.BattleState;
+            BattleManager = assembly.BattleManager;
+            WaveManager = assembly.WaveManager;
+            BattleEconomy = assembly.BattleEconomy;
+            ReservationRegistry = assembly.ReservationRegistry;
+            EnemyManager = assembly.EnemyManager;
+            AttackScheduler = assembly.AttackScheduler;
+            ResultBuilder = assembly.ResultBuilder;
+            // task 7.4 闭环新增：表现层只读状态视图（供 Presenter 只读访问）。
+            ReadModel = assembly.ReadModel;
+            // task 7.1 闭环新增：内部信号中枢。
+            SignalHub = assembly.SignalHub;
+            // task 7.2 闭环新增：事件桥接器。
+            EventBridge = assembly.EventBridge;
+            // task 7.4 闭环新增：表现层组装器。
+            Presenter = assembly.Presenter;
+            // 最终方案新增：槽位面板 / 征兵服务 / 等级数值服务。
+            SlotBoard = assembly.SlotBoard;
+            RecruitManager = assembly.RecruitManager;
+            LevelService = assembly.LevelService;
 
             Log.Info(
                 $"{LogTag} 构造完成，mapId={Loadout.MapId} round={Loadout.Round} seed={Loadout.RandomSeed}");
@@ -408,15 +612,17 @@ namespace GameBattle
         /// <item>清理 EnemyManager 的接触 Timer、实体和空间索引（待 task 6.10 接入属性后补充）。</item>
         /// <item>清理 UnitRegistry 的监听、Timer 和实体（task 6.3 接入）。</item>
         /// <item>清理波次、牌组、预留及其他单局注册表（后续 Phase 2/5 接入）。</item>
-        /// <item>解除剩余局部监听（后续 Phase 6 接入）。</item>
+        /// <item>解除剩余局部监听（task 7.1 接入：BattleInternalSignalHub.Clear）。</item>
         /// <item>断言没有活动 Timer、回调或租借对象。</item>
         /// <item>完成静默后发布一次已冻结的不可变结果。</item>
         /// </list>
         /// <para>当前实现已执行步骤 1（标记 Settling + 关闭 InputController + 清空
         /// CommandId 缓存 task 6.8）、步骤 2（停止模拟 + 取消 Token + 冻结调度器）、
-        /// 步骤 3（清理 AttackEffectManager）、步骤 4（清理 ProjectileManager）和步骤 6
-        /// （清理 UnitRegistry）。步骤 5（EnemyManager）、步骤 7-8（波次/牌组/预留/
-        /// 局部监听）和步骤 9-10（断言与结果发布）在后续 Phase 接入对应 Manager 后补充。</para>
+        /// 步骤 3（清理 AttackEffectManager）、步骤 4（清理 ProjectileManager）、步骤 5
+        /// （清理 EnemyManager）、步骤 6（清理 UnitRegistry）、步骤 7（清理
+        /// BattleManager/WaveManager/BattleEconomy/DeckManager/PlacementReservationRegistry）
+        /// 和步骤 8（清理 BattleInternalSignalHub）。步骤 9-10（断言与结果发布）
+        /// 在后续 Phase 接入对应 Manager 后补充。</para>
         /// </remarks>
         internal void EnterSettling()
         {
@@ -529,14 +735,20 @@ namespace GameBattle
             }
 
             // ----------------------------------------------------------
-            // 步骤 5：清理 EnemyManager 的接触 Timer、实体和空间索引。
+            // 步骤 5：清理 EnemyManager 的接触 Timer、实体和空间索引（task 6.10 接入）。
+            // GameOver 逐个通知敌人 gameOver（触发敌人自身清理），再清空管理器集合与空间索引。
+            // 幂等：重复调用安全。
+            // spec "Runtime quiescence and cleanup have one ordered owner"：
+            //   清理 EnemyManager 的接触 Timer、实体和空间索引。
             // ----------------------------------------------------------
-            // EnemyManager 当前由 BattleRuntimeFactory 构造并经 ProjectileFactory /
-            // UnitFactory 持有，但未在 BattleRuntime 上公开属性。EnemyManager 的清理
-            // （Clear/GameOver）待 task 6.10 接入 phaseHandlers 时在 BattleRuntime 上
-            // 公开属性并在此调用。当前 EnemyManager 的活动敌人由 ProjectileManager.Clear
-            // 与 UnitRegistry.ClearForSettling 间接处理（敌人不再被攻击/移动）。
-            // TODO task 6.10：EnemyManager.GameOver() —— 清理敌人实体、接触 Timer、空间索引。
+            try
+            {
+                EnemyManager?.GameOver();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} Settling 清理 EnemyManager 异常: {ex}");
+            }
 
             // ----------------------------------------------------------
             // 步骤 6：清理 UnitRegistry 的监听、Timer 和实体（task 6.3 接入）。
@@ -557,9 +769,74 @@ namespace GameBattle
 
             // ----------------------------------------------------------
             // 步骤 7-8：清理波次、牌组、预留及其他单局注册表；解除剩余局部监听。
+            // task 6.10 闭环接入：BattleManager.GameOver 重置规则状态，
+            // WaveManager.GameOver 清理波次计划，BattleEconomy.GameOver 重置经济计数，
+            // DeckManager.GameOver 清理牌组，PlacementReservationRegistry.Clear 清空预留。
             // ----------------------------------------------------------
-            // TODO Phase 2/5：WaveManager / DeckManager / PlacementReservationRegistry.Clear()。
-            // TODO Phase 6：BattleInternalSignalHub 解除全部局部订阅（由 Scope 批量释放）。
+            try
+            {
+                BattleManager?.GameOver();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} Settling 清理 BattleManager 异常: {ex}");
+            }
+
+            try
+            {
+                WaveManager?.GameOver();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} Settling 清理 WaveManager 异常: {ex}");
+            }
+
+            try
+            {
+                BattleEconomy?.GameOver();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} Settling 清理 BattleEconomy 异常: {ex}");
+            }
+
+            // 最终方案：清理槽位面板（清空槽、单位及运行时映射，不写存档）。
+            try
+            {
+                SlotBoard?.GameOver();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} Settling 清理 UnitSlotBoard 异常: {ex}");
+            }
+
+            try
+            {
+                ReservationRegistry?.Clear();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} Settling 清理 PlacementReservationRegistry 异常: {ex}");
+            }
+
+            // ----------------------------------------------------------
+            // 步骤 8：解除剩余局部监听（task 7.1 接入）。
+            // BattleInternalSignalHub.Clear 一次性解除全部单局低频信号订阅，
+            // 保证 Settling 中发布冻结结果时不会回调到已清理的订阅者，
+            // 也保证重开后旧订阅不会回调旧运行时对象
+            // （spec "Event subscriptions follow runtime lifetime" /
+            ///  spec "Restart after listeners were registered"）。
+            // Scope 已经 TrackSignalHub 登记，Dispose 时会再次幂等 Clear；
+            // 此处在静默阶段先 Clear，使步骤 9 断言与步骤 10 结果发布前订阅已解除。
+            // ----------------------------------------------------------
+            try
+            {
+                SignalHub?.Clear();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} Settling 清理 SignalHub 异常: {ex}");
+            }
 
             // ----------------------------------------------------------
             // 步骤 9：断言没有活动 Timer、回调或租借对象。
@@ -573,12 +850,28 @@ namespace GameBattle
             // ----------------------------------------------------------
             // 步骤 10：发布一次已冻结的不可变结果。
             // ----------------------------------------------------------
-            // TODO Phase 2 task 3.11：BattleResultBuilder.TryFreeze 已在 Simulation 冻结点
-            //   冻结结果。此处应在静默清理完成后发布一次 IBattlePublicEvent.OnBattleFinished。
-            //   当前骨架未接入 ResultBuilder 与 EventBridge，占位。
-            // ----------------------------------------------------------
+            if (!IsResultPublished)
+            {
+                if (ResultBuilder != null && ResultBuilder.IsFrozen)
+                {
+                    BattleResultDto result = ResultBuilder.GetFrozenResult();
 
-            Log.Info($"{LogTag} Settling 静默清理完成（已停止模拟、取消 Token、冻结调度器、清理 AttackEffect/Projectile Manager、清理 UnitRegistry）");
+                    // 表现层只消费不可变结果，不回写规则状态。
+                    Presenter?.NotifyBattleFinished(result);
+
+                    // 跨程序集只发布 GameCommon 的不可变 DTO。
+                    EventBridge?.PublishBattleFinished(result);
+                    IsResultPublished = true;
+                }
+                else
+                {
+                    Log.Warning($"{LogTag} EnterSettling 时结果尚未冻结，跳过完成事实发布");
+                }
+            }
+
+            Log.Info($"{LogTag} Settling 静默清理完成（已停止模拟、取消 Token、冻结调度器、" +
+                "清理 AttackEffect/Projectile/Enemy/UnitRegistry Manager、清理 BattleManager/" +
+                "WaveManager/BattleEconomy/DeckManager/PlacementReservationRegistry）");
         }
 
         // ====================================================================

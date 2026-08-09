@@ -79,7 +79,10 @@ namespace GameFUI
         /// 本方法同样在进入 ModuleSystem 前做重复注册保护。
         /// </remarks>
         /// <exception cref="FUIException">模块已注册（重复注册保护）或 <paramref name="provider"/> 为 null。</exception>
-        internal static void RegisterModuleForTesting(IFUIResourceProvider provider, FUIOptions options = null)
+        internal static void RegisterModuleForTesting(
+            IFUIResourceProvider provider,
+            FUIOptions options = null,
+            System.Func<UnityEngine.Rect> safeAreaProvider = null)
         {
             // 重复注册保护：与公开 RegisterModule 一致，在进入 ModuleSystem 前拒绝第二次注册。
             if (_module != null)
@@ -93,7 +96,7 @@ namespace GameFUI
             }
 
             // 直接注入内存 provider，不经过 IResourceModule 包装，使测试可注入可控失败/取消。
-            _module = new FUIModule(provider, options);
+            _module = new FUIModule(provider, options, safeAreaProvider);
         }
 
         /// <summary>

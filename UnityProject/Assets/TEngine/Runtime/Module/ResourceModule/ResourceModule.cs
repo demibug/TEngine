@@ -50,6 +50,9 @@ namespace TEngine
 
         public override void Shutdown()
         {
+            // 对象池模块随后会释放全部资源对象。先断开引用，避免迟到的
+            // AssetsReference.OnDestroy 再向已经关闭的资源池归还对象。
+            _assetPool = null;
         }
 
         /// <summary>

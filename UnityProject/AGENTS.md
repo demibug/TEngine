@@ -30,3 +30,11 @@ ZCode 会话同样以 `.codex/skills/` 为本仓库技能的权威来源：仓�
 3. 只能把包含标准 `SKILL.md` 的技能目录视为可用技能；不要把 `.claude/skills/` 当作 Codex 技能入口。
 4. `SKILL.md` 与实际代码 API 冲突时，先搜索代码验证实际签名，并在回答中说明冲突。
 5. 输出代码前，必须遵守已读取技能中的规范；不能只读取技能名称而不读取内容。
+
+## Codex 多代理联动规则
+
+仅 Codex 在处理 L4 任务，或任务存在明显的并行调查、上下文隔离、专业分工、复杂日志分析、跨模块取证或不重叠文件批量处理价值时，触发全局 `dev-swarm` Skill，由 Main Agent 按决策类型、问题边界、系统职责和影响范围选择 `luna_explorer`、`luna_tester`、`luna_triage`、`luna_worker` 或 `terra_engineer`。不得仅因任务涉及 Bug、测试、修改、代码、修复、实现或 Unity 就启动多代理；小型单步任务由 Main Agent 直接完成。
+
+`dev-swarm` 只负责 Codex 的代理编排和职责路由，不能替代本项目的 `tengine-dev` 规范闸。所有 L2+ 代码任务，无论由 Main Agent、`luna_worker` 还是 `terra_engineer` 执行，修改代码前都必须先触发 `tengine-dev`，读取其路由的相关 references，并以当前源码为准完成搜索证据和修改前清单。只读调查、日志分类和单纯测试执行不因 `dev-swarm` 自动获得产品代码修改权限。
+
+所有 Codex subagent 默认禁止继续创建自己的 subagent。并行写入仅允许在文件 ownership 完全不重叠时进行；无法可靠隔离时必须串行，或交给单一 Agent 统一处理。最终方案、Review、Validation 与 Acceptance 始终由 Main Agent 负责。本规则为 Codex 特化规则，不要求同步到 `CLAUDE.md` 或 `.claude/` 下的任何文件。

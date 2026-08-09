@@ -16,7 +16,7 @@ namespace GameFUI.Tests.EditMode
     /// 并发不同参数 Show（同类型并发 Show 合并，各自刷新）、
     /// 调用方取消隔离（单调用方取消不传播到共享加载）、
     /// 加载期间 Close（加载期间 Close 使加载操作过期并回滚）、
-    /// Closing 中 Show（Closing 期间的 Show 抛防御性 FUIException）、
+    /// Close/Show 交叠（OnClose 内重入 ShowAsync 构造真实 Closing 期间交叠，等待重开不抛异常；Close 后 Show 等价场景作为回归覆盖）、
     /// 失败重试（加载失败后可重新 Show）、
     /// 层级（窗口挂载到正确层级）、
     /// 安全区（Safe 子容器对齐 Screen.safeArea）、
@@ -89,7 +89,7 @@ namespace GameFUI.Tests.EditMode
 
             // 确保 FairyGUI Stage/GRoot 已初始化（EditMode 下需要主动触发）。
             // GRoot.inst getter 会在首次访问时调用 Stage.Instantiate() 创建 Stage 与 GRoot。
-            GRoot.inst.SetSize(1920, 1080);
+            _ = GRoot.inst;
         }
 
         /// <summary>
@@ -393,43 +393,56 @@ namespace GameFUI.Tests.EditMode
         }
 
         // ============================================================
-        // 场景 e：Closing 中 Show——Closing 期间的 Show 抛防御性 FUIException
+        // 场景 e：Close/Show 交叠——Close 后 Show 从 Cached/Absent 重开，不复活旧打开域
         // ============================================================
 
         /// <summary>
-        /// Closing 中 Show：由于 5.6 实现同步 Close（Close 同步推进到 Cached/Disposed），
-        /// 正常时序下不会观察到 Closing 状态。但若因时序异常到达 Closing，
-        /// Show SHALL 抛防御性 FUIException，避免在未就绪状态下错误推进。
+        /// Close/Show 交叠（默认 None 缓存）：Close 完成后再 Show 应从新 Absent entry 创建新实例，
+        /// 不复活旧打开域，不抛防御性 FUIException，且租约无泄漏。
         /// </summary>
         /// <remarks>
         /// spec "窗口状态转换受控" / "Closing 期间再次 Show"——新 Show SHALL 等待本轮 Close 完成后再
         /// 从 Cached 或 Absent 重新打开，不得中途复活旧打开域。
-        /// design.md 决策4：Closing 期间的新 Show 排在 Close 之后，不复活旧打开域。
+        /// design.md 决策4：Closing 期间的新 Show 排在 Close 之后，不复活旧 Open 域。
         ///
-        /// 实现说明：5.6 的同步 Close 使 CloseEntryCore 同步推进到 Cached/Disposed，
-        /// 因此 ShowAsyncCore 正常路径不会观察到 Closing。ShowAsyncCore 内有防御性分支：
-        /// 若 entry.State == Closing 则抛 FUIException。本测试验证该防御性分支。
-        /// 由于无法通过公开 API 使 entry 停留在 Closing（同步 Close 立即推进），
-        /// 本测试通过验证"Close 后再 Show 创建新实例/从 Absent 重新打开"来确认 Closing 不被复活。
+        /// 可达性说明（任务 8.3）：Closing 状态通过 OnClose 回调内重入 module.ShowAsync 可达
+        /// （CloseEntryCore 在 :885 TransitionTo(Closing) 后于 :896 调用 InvokeOnClose，
+        /// 业务 OnClose 内调用 ShowAsync 时 entry 处于 Closing）。真实交叠测试见
+        /// <see cref="ClosingShowOverlap_None_WaitsAndReopensFromAbsent"/>。
+        /// 本测试作为回归覆盖：Close 完成后立即 Show 从 Absent 重新打开，验证不抛异常 +
+        /// 旧打开域不复活（新实例、OnCreate 再次执行）+ 租约无泄漏（引用计数归零后重新获取）。
         /// </remarks>
         [Test]
-        [Description("Closing 中 Show：Close 完成后再 Show 从新 Absent/Cached 重新打开，不复活旧打开域。")]
+        [Description("Close/Show 交叠：Close 后 Show 从新 Absent 重开，不复活旧域，租约无泄漏。")]
         public async UniTask ShowAfterClose_DoesNotReviveOldOpenDomain()
         {
-            // 安排：装配模块。
+            // 安排：装配模块（默认 CacheMode=None）。
             FUIModule module = SetupModuleWithLifecycleWindow();
 
             // 执行：首次 Show 并 Close（同步推进到 Disposed）。
             LifecycleTestWindow window1 = await module.ShowAsync<LifecycleTestWindow>();
             Assert.AreEqual(FUIWindowState.Open, GetEntryState(module, typeof(LifecycleTestWindow)),
                 "首次 Show 后应处于 Open。");
+
+            // 断言：首次 Show 后租约已获取（UIBattle 引用 1，UICommon 依赖引用 1）。
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "首次 Show 后 UIBattle 引用计数应为 1。");
+            Assert.AreEqual(1, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "首次 Show 后 UICommon 引用计数应为 1。");
+
             module.Close<LifecycleTestWindow>();
 
             // Close 后状态应为 Disposed（默认 CacheMode=None）。
             Assert.AreEqual(FUIWindowState.Disposed, GetEntryState(module, typeof(LifecycleTestWindow)),
                 "默认 CacheMode=None Close 后应处于 Disposed。");
 
-            // 执行：再次 Show——应从新 Absent entry 创建新实例，不复活旧打开域。
+            // 断言：Close 释放实例后租约归零（无泄漏）。
+            Assert.AreEqual(0, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "Close 后 UIBattle 引用计数应归零（无租约泄漏）。");
+            Assert.AreEqual(0, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "Close 后 UICommon 引用计数应归零（无租约泄漏）。");
+
+            // 执行：再次 Show——应从新 Absent entry 创建新实例，不抛异常，不复活旧打开域。
             LifecycleTestWindow window2 = await module.ShowAsync<LifecycleTestWindow>();
 
             // 断言：新实例不同（不复活旧实例）。
@@ -439,6 +452,286 @@ namespace GameFUI.Tests.EditMode
 
             // 断言：OnCreate 执行两次（两个不同实例各一次），证明不复活旧打开域。
             Assert.AreEqual(2, LifecycleTestWindow.OnCreateCount, "两个不同实例应各执行一次 OnCreate。");
+
+            // 断言：再次 Show 后重新获取租约（引用计数恢复为 1，新租约不复用旧 lease）。
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "再次 Show 后 UIBattle 引用计数应恢复为 1（新租约）。");
+            Assert.AreEqual(1, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "再次 Show 后 UICommon 引用计数应恢复为 1（新租约）。");
+
+            // 执行：再次 Close，验证最终无泄漏。
+            module.Close<LifecycleTestWindow>();
+            Assert.AreEqual(0, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "再次 Close 后 UIBattle 引用计数应归零（无租约泄漏）。");
+            Assert.AreEqual(0, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "再次 Close 后 UICommon 引用计数应归零（无租约泄漏）。");
+        }
+
+        /// <summary>
+        /// Close/Show 交叠（Cache 模式）：Close(Cached) 后再 Show 从 Cached 重新打开，
+        /// 验证不抛异常、旧打开域不复活（OnCreate 不重复、新 OpenCts/事件域）、租约无泄漏、FIFO 顺序保留。
+        /// </summary>
+        /// <remarks>
+        /// spec "Closing 期间再次 Show"——新 Show SHALL 等待本轮 Close 完成后再从 Cached 或 Absent 重新打开，
+        /// 不得中途复活旧打开域。
+        /// spec "缓存窗口重新打开"——SHALL 不重复执行 OnCreate，但 SHALL 重新建立打开取消域和事件域，
+        /// 并再次执行 OnOpen 与 OnRefresh。
+        /// design.md 决策4：Closing 期间的新 Show 排在 Close 之后，不复活旧 Open 域。
+        ///
+        /// 可达性说明（任务 8.3）：Closing 状态通过 OnClose 回调内重入 module.ShowAsync 可达。
+        /// 真实交叠测试见 <see cref="ClosingShowOverlap_Cache_WaitsAndReopensFromCached"/>。
+        /// 本测试作为回归覆盖：Close(Cached) 后立即 Show 从 Cached 重新打开，
+        /// 验证不抛异常 + 旧打开域不复活（OnCreate 不重复）+ 新打开域建立（OnOpen/OnRefresh 按新轮执行）+
+        /// 租约无泄漏（Cached 保留计数、最终释放归零）+ FIFO（重开请求刷新参数生效）。
+        /// </remarks>
+        [Test]
+        [Description("Close/Show 交叠等价：Cache 模式 Close 后 Show 从 Cached 重开，不复活旧域，无泄漏。")]
+        public async UniTask ShowAfterClose_Cached_ReopensWithoutLeakOrDomainRevival()
+        {
+            // 安排：装配 Cache 模式窗口。
+            FUIModule module = SetupModuleWithLifecycleWindow(cacheMode: FUICacheMode.Cache);
+
+            // 执行：首次 Show。
+            LifecycleTestWindow window1 = await module.ShowAsync<LifecycleTestWindow>("first");
+            Assert.AreEqual(FUIWindowState.Open, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "首次 Show 后应处于 Open。");
+            Assert.AreEqual("first", window1.UserData, "首个请求的 UserData 应生效。");
+
+            // 断言：首次 Show 后租约已获取。
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "首次 Show 后 UIBattle 引用计数应为 1。");
+            Assert.AreEqual(1, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "首次 Show 后 UICommon 引用计数应为 1。");
+
+            // 执行：Close（Cache 模式 -> Cached，保留实例与租约）。
+            module.Close<LifecycleTestWindow>();
+            Assert.AreEqual(FUIWindowState.Cached, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "Cache 模式 Close 后应处于 Cached。");
+
+            // 断言：Cached 保留租约（引用计数仍为 1，无泄漏）。
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "Cached 状态 UIBattle 引用计数应保持 1。");
+            Assert.AreEqual(1, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "Cached 状态 UICommon 引用计数应保持 1。");
+
+            // 执行：再次 Show——从 Cached 重新打开，不抛异常，不复活旧打开域。
+            // 传入不同参数验证 FIFO 与刷新语义：重开请求的 UserData 应由其刷新参数决定。
+            LifecycleTestWindow window2 = await module.ShowAsync<LifecycleTestWindow>("reopened");
+
+            // 断言：Cached 重开复用同一实例（不创建新实例，旧打开域不复活）。
+            Assert.AreSame(window1, window2, "Cache 模式重开应复用同一实例，不创建新实例。");
+            Assert.AreEqual(FUIWindowState.Open, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "重开后应处于 Open。");
+
+            // 断言：OnCreate 只执行一次（实例未重建，旧打开域不复活）。
+            Assert.AreEqual(1, LifecycleTestWindow.OnCreateCount, "Cached 重开不应重复 OnCreate。");
+            // 断言：OnOpen 执行两次（每轮打开各一次，重新建立打开域）。
+            Assert.AreEqual(2, LifecycleTestWindow.OnOpenCount, "两轮打开应各执行一次 OnOpen。");
+            // 断言：OnRefresh 执行两次（首次 Show 与重开 Show 各一次，FIFO）。
+            Assert.AreEqual(2, LifecycleTestWindow.OnRefreshCount, "两个有效请求应各执行一次 OnRefresh。");
+            // 断言：OnClose 执行一次（仅首轮 Close，重开后尚未 Close）。
+            Assert.AreEqual(1, LifecycleTestWindow.OnCloseCount, "首轮 Close 后 OnClose 应执行一次。");
+
+            // 断言：FIFO——重开请求的刷新参数生效（最终 UserData 为 "reopened"）。
+            Assert.AreEqual("reopened", window1.UserData, "重开请求的 UserData 应由其刷新参数决定。");
+
+            // 断言：重开后租约仍保持（Cached 重开不重新获取租约，计数仍为 1）。
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "重开后 UIBattle 引用计数应保持 1（Cached 重开不重新获取租约）。");
+
+            // 执行：最终 Close（Cached -> Disposed，释放实例与租约）。
+            module.Close<LifecycleTestWindow>();
+            Assert.AreEqual(FUIWindowState.Disposed, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "最终 Close 后应处于 Disposed。");
+
+            // 断言：最终释放后租约归零（无泄漏）。
+            Assert.AreEqual(0, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "最终释放后 UIBattle 引用计数应为 0（无租约泄漏）。");
+            Assert.AreEqual(0, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "最终释放后 UICommon 引用计数应为 0（无租约泄漏）。");
+        }
+
+        // ============================================================
+        // 场景 e2：真实 Closing 期间 Show 交叠（任务 8.3 返工——公开 API 重入构造）
+        // ============================================================
+
+        /// <summary>
+        /// 真实 Closing 期间 Show 交叠（None 模式）：OnClose 回调内通过公开 API ShowAsync 重入，
+        /// 此时 entry 处于 Closing。ShowAsync 不抛异常，等待 Close 完成后从新 Absent entry 重开。
+        /// 验证：await 返回窗口实例、FIFO 顺序（重开请求 args 生效）、旧 Open 域不复活（新实例 OnCreate 再执行）、
+        /// 租约无泄漏（Close 释放后重开获取，归零→1→最终归零）。
+        /// </summary>
+        /// <remarks>
+        /// spec "Closing 期间再次 Show"——新 Show SHALL 等待本轮 Close 完成后再从 Cached 或 Absent 重新打开，
+        /// 不得中途复活旧打开域。不得对该有效请求抛防御性 FUIException。
+        ///
+        /// 真实交叠构造（任务 8.3 硬要求③）：测试窗口的 OnClose 回调内调用 module.ShowAsync<T>()（公开 API）。
+        /// 此时 CloseEntryCore 正在执行栈上、entry 处于 Closing（:885 TransitionTo(Closing) 之后）。
+        /// ShowAsyncCore 重入执行读到 entry.State==Closing，命中等待重开分支。
+        /// 这是通过公开 API 构造的真实交叠，不是"Close 后 Show"等价场景。
+        /// </remarks>
+        [Test]
+        [Description("真实 Closing 期间 Show 交叠（None）：OnClose 内 ShowAsync 等待重开，不抛异常，无泄漏。")]
+        public async UniTask ClosingShowOverlap_None_WaitsAndReopensFromAbsent()
+        {
+            // 安排：装配模块（默认 CacheMode=None）。
+            FUIModule module = SetupModuleWithLifecycleWindow();
+
+            // 首次 Show，获取初始窗口实例与初始 OpenCancellationToken。
+            LifecycleTestWindow window1 = await module.ShowAsync<LifecycleTestWindow>("initial");
+            Assert.AreEqual(FUIWindowState.Open, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "首次 Show 后应处于 Open。");
+            CancellationToken oldOpenToken = window1.OpenCancellationToken;
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "首次 Show 后 UIBattle 引用计数应为 1。");
+
+            // 记录重入 Show 的待决任务与参数。
+            UniTask<LifecycleTestWindow> reopenTask = default;
+            const string reopenArg = "reopenArg";
+
+            // 设置 OnClose 钩子：在 OnClose 内通过公开 API 构造重入 Show（entry 处于 Closing）。
+            LifecycleTestWindow.OnCloseHook = _ =>
+            {
+                // 此时 CloseEntryCore 正在执行栈上，entry.State == Closing。
+                // ShowAsyncCore 重入命中 Closing 分支，注册 pending reopen，返回挂起 UniTask。
+                // 不抛异常（任务 8.3 硬要求①②）。
+                reopenTask = FUI.ShowAsync<LifecycleTestWindow>(reopenArg);
+            };
+
+            // 执行：Close 触发 OnClose -> 重入 ShowAsync（交叠发生在 Closing 期间）。
+            module.Close<LifecycleTestWindow>();
+
+            // Close 返回后，None 模式的 pending reopen 通过 UniTaskVoid 异步重建。
+            // await reopenTask 驱动 PlayerLoop 完成异步重开。
+            LifecycleTestWindow window2 = await reopenTask;
+
+            // 断言：ShowAsync 成功完成（不抛异常），返回窗口实例。
+            Assert.IsNotNull(window2, "Closing 期间 Show 的 await 应返回重开后的窗口实例，不抛异常。");
+            Assert.AreEqual(FUIWindowState.Open, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "重开后应处于 Open。");
+
+            // 断言：旧 Open 域不复活——None 模式重开创建新实例（OnCreate 再执行一次）。
+            Assert.AreNotSame(window1, window2, "None 模式重开应创建新实例，不复活旧实例。");
+            Assert.AreEqual(2, LifecycleTestWindow.OnCreateCount,
+                "两个不同实例应各执行一次 OnCreate（旧域不复活）。");
+            Assert.AreEqual(2, LifecycleTestWindow.OnOpenCount,
+                "两轮打开应各执行一次 OnOpen（新 Open 域建立）。");
+            Assert.AreEqual(2, LifecycleTestWindow.OnRefreshCount,
+                "两个有效请求应各执行一次 OnRefresh（FIFO 顺序保留）。");
+            Assert.AreEqual(1, LifecycleTestWindow.OnCloseCount,
+                "仅首轮 Close 执行一次 OnClose。");
+
+            // 断言：FIFO 顺序——重开请求的 args 生效（最终 UserData 为 reopenArg）。
+            Assert.AreEqual(reopenArg, window2.UserData,
+                "重开请求的 args 应在 OnRefresh 中生效（FIFO 顺序保留）。");
+
+            // 断言：旧 OpenCts 不复活——新实例有新的 OpenCancellationToken。
+            Assert.AreNotEqual(oldOpenToken, window2.OpenCancellationToken,
+                "重开应创建新 OpenCts，不复用旧 Open 域的取消令牌。");
+
+            // 断言：租约无泄漏——重开后引用计数恢复为 1（新租约，旧 lease 已释放）。
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "重开后 UIBattle 引用计数应恢复为 1（新租约）。");
+            Assert.AreEqual(1, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "重开后 UICommon 引用计数应恢复为 1（新租约）。");
+
+            // 清除 OnClose 钩子，避免最终 Close 再次触发重入 Show。
+            LifecycleTestWindow.OnCloseHook = null;
+
+            // 执行：最终 Close，验证无泄漏。
+            module.Close<LifecycleTestWindow>();
+            Assert.AreEqual(0, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "最终 Close 后 UIBattle 引用计数应归零（无租约泄漏）。");
+            Assert.AreEqual(0, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "最终 Close 后 UICommon 引用计数应归零（无租约泄漏）。");
+        }
+
+        /// <summary>
+        /// 真实 Closing 期间 Show 交叠（Cache 模式）：OnClose 回调内通过公开 API ShowAsync 重入，
+        /// 此时 entry 处于 Closing。ShowAsync 不抛异常，等待 Close 完成后从 Cached 同步重开。
+        /// 验证：await 返回窗口实例、FIFO 顺序（重开请求 args 生效）、旧 Open 域不复活（OnCreate 不重复、新 OpenCts）、
+        /// 租约无泄漏（Cached 保留计数、最终释放归零）。
+        /// </summary>
+        /// <remarks>
+        /// spec "Closing 期间再次 Show" + "缓存窗口重新打开"——SHALL 不重复执行 OnCreate，
+        /// 但 SHALL 重新建立打开取消域和事件域，并再次执行 OnOpen 与 OnRefresh。
+        ///
+        /// 真实交叠构造（任务 8.3 硬要求③）：测试窗口的 OnClose 回调内调用 module.ShowAsync<T>()（公开 API）。
+        /// CloseEntryCore 在 InvokeOnClose 返回后检测 pending reopen，同步从 Cached 重开（ExecuteOpenLifecycle）。
+        /// </remarks>
+        [Test]
+        [Description("真实 Closing 期间 Show 交叠（Cache）：OnClose 内 ShowAsync 等待同步重开，不抛异常，无泄漏。")]
+        public async UniTask ClosingShowOverlap_Cache_WaitsAndReopensFromCached()
+        {
+            // 安排：装配 Cache 模式窗口。
+            FUIModule module = SetupModuleWithLifecycleWindow(cacheMode: FUICacheMode.Cache);
+
+            // 首次 Show。
+            LifecycleTestWindow window1 = await module.ShowAsync<LifecycleTestWindow>("initial");
+            Assert.AreEqual(FUIWindowState.Open, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "首次 Show 后应处于 Open。");
+            CancellationToken oldOpenToken = window1.OpenCancellationToken;
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "首次 Show 后 UIBattle 引用计数应为 1。");
+
+            // 记录重入 Show 的待决任务与参数。
+            UniTask<LifecycleTestWindow> reopenTask = default;
+            const string reopenArg = "reopenArg";
+
+            // 设置 OnClose 钩子：在 OnClose 内通过公开 API 构造重入 Show（entry 处于 Closing）。
+            LifecycleTestWindow.OnCloseHook = _ =>
+            {
+                // 此时 CloseEntryCore 正在执行栈上，entry.State == Closing。
+                // ShowAsyncCore 重入命中 Closing 分支，注册 pending reopen，返回挂起 UniTask。
+                reopenTask = FUI.ShowAsync<LifecycleTestWindow>(reopenArg);
+            };
+
+            // 执行：Close 触发 OnClose -> 重入 ShowAsync（交叠发生在 Closing 期间）。
+            module.Close<LifecycleTestWindow>();
+
+            // Cache 模式的 pending reopen 由 CloseEntryCore 同步处理（ExecuteOpenLifecycle）。
+            // tcs 已 resolve，await reopenTask 在 UniTask 调度上恢复。
+            LifecycleTestWindow window2 = await reopenTask;
+
+            // 断言：ShowAsync 成功完成（不抛异常），返回窗口实例。
+            Assert.IsNotNull(window2, "Closing 期间 Show 的 await 应返回重开后的窗口实例，不抛异常。");
+            Assert.AreEqual(FUIWindowState.Open, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "重开后应处于 Open。");
+
+            // 断言：旧 Open 域不复活——Cache 模式复用同一实例（OnCreate 不重复），但新 OpenCts/事件域。
+            Assert.AreSame(window1, window2, "Cache 模式重开应复用同一实例，不创建新实例。");
+            Assert.AreEqual(1, LifecycleTestWindow.OnCreateCount,
+                "Cache 模式重开不应重复 OnCreate（旧实例生命周期不复活）。");
+            Assert.AreEqual(2, LifecycleTestWindow.OnOpenCount,
+                "两轮打开应各执行一次 OnOpen（新 Open 域建立）。");
+            Assert.AreEqual(2, LifecycleTestWindow.OnRefreshCount,
+                "两个有效请求应各执行一次 OnRefresh（FIFO 顺序保留）。");
+            Assert.AreEqual(1, LifecycleTestWindow.OnCloseCount,
+                "仅首轮 Close 执行一次 OnClose。");
+
+            // 断言：FIFO 顺序——重开请求的 args 生效（最终 UserData 为 reopenArg）。
+            Assert.AreEqual(reopenArg, window2.UserData,
+                "重开请求的 args 应在 OnRefresh 中生效（FIFO 顺序保留）。");
+
+            // 断言：旧 OpenCts 不复活——重开创建新 OpenCancellationToken。
+            Assert.AreNotEqual(oldOpenToken, window2.OpenCancellationToken,
+                "重开应创建新 OpenCts，不复用旧 Open 域的取消令牌。");
+
+            // 断言：租约无泄漏——Cached 保留计数（重开不重新获取，计数仍为 1）。
+            Assert.AreEqual(1, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "重开后 UIBattle 引用计数应保持 1（Cached 重开不重新获取租约）。");
+
+            // 清除 OnClose 钩子，避免最终 Close 再次触发重入 Show。
+            LifecycleTestWindow.OnCloseHook = null;
+
+            // 执行：最终 Close（Cached -> Disposed，释放实例与租约）。
+            module.Close<LifecycleTestWindow>();
+            Assert.AreEqual(FUIWindowState.Disposed, GetEntryState(module, typeof(LifecycleTestWindow)),
+                "最终 Close 后应处于 Disposed。");
+            Assert.AreEqual(0, PackageLoader.FindRecord(UIBattlePkg).ReferenceCount,
+                "最终释放后 UIBattle 引用计数应为 0（无租约泄漏）。");
+            Assert.AreEqual(0, PackageLoader.FindRecord(UICommonPkg).ReferenceCount,
+                "最终释放后 UICommon 引用计数应为 0（无租约泄漏）。");
         }
 
         // ============================================================
@@ -942,6 +1235,13 @@ namespace GameFUI.Tests.EditMode
             public static int OnDisposeCount;
 
             /// <summary>
+            /// OnClose 回调钩子，供测试在 OnClose 内通过公开 API 构造重入 Show 交叠（任务 8.3 真实交叠测试）。
+            /// 设置后，每次 OnClose 会调用此钩子；测试结束后应置 null 以免影响其他测试。
+            /// 钩子内可调用 FUI.ShowAsync 触发 Closing 期间 Show 的重入场景。
+            /// </summary>
+            public static Action<LifecycleTestWindow> OnCloseHook;
+
+            /// <summary>
             /// 重置所有静态计数器为 0，在每个测试的 SetUp 中调用。
             /// </summary>
             public static void ResetCounters()
@@ -952,6 +1252,7 @@ namespace GameFUI.Tests.EditMode
                 OnCloseCount = 0;
                 OnHideCount = 0;
                 OnDisposeCount = 0;
+                OnCloseHook = null;
             }
 
             /// <inheritdoc/>
@@ -987,6 +1288,9 @@ namespace GameFUI.Tests.EditMode
             {
                 base.OnClose();
                 OnCloseCount++;
+                // 任务 8.3：在 OnClose 内通过公开 API 构造重入 Show 交叠。
+                // 此时 CloseEntryCore 正在执行栈上、entry 处于 Closing，ShowAsyncCore 重入读到 Closing 状态。
+                OnCloseHook?.Invoke(this);
             }
 
             /// <inheritdoc/>

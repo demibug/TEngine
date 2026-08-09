@@ -1,6 +1,6 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
-using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
 using GameConfig;
 using TEngine;
@@ -93,7 +93,7 @@ namespace GameBattle
         /// （task 3.4 / specs/battle-config-snapshot "Runtime consumes an immutable
         /// configuration snapshot"）。
         /// <para>由 <see cref="BattleRuntimeFactory"/> 在组装阶段通过
-        /// <see cref="LubanBattleConfigProvider"/> 从 <see cref="ConfigSystem.Instance.Tables"/>
+        /// <see cref="LubanBattleConfigProvider"/> 从 <see cref="Tables"/>
         /// 复制一次，之后运行时只持有本快照，不再访问资源加载器或可变全局配置表，
         /// 也不由 <see cref="BattleRuntime"/> 卸载应用级配置资源（决策 0.11）。</para>
         /// </summary>
@@ -142,6 +142,194 @@ namespace GameBattle
         /// </summary>
         public readonly BattleInputController InputController;
 
+        // ====================================================================
+        // task 6.10 新增：闭环必需的 Manager / 状态 / 服务
+        // --------------------------------------------------------------------
+        // 以下字段在 task 6.10 闭环接入时由 Factory 构造并经 Assembly 传递给
+        /// <see cref="BattleRuntime"/>，使 Runtime 能在 EnterSettling 补全步骤 5-8
+        /// 并在 phaseHandlers 接入实际 Manager 的 update 方法。
+        // ====================================================================
+
+        /// <summary>
+        /// 本次组装产生的权威战斗状态（task 3.7 产物）。
+        /// <para>由 Factory 构造，供 BattleManager/WaveManager/BattleEconomy 等规则服务
+        /// 经 Apply* 方法提交变更。Runtime 通过此属性在 EnterSettling 步骤 7 调用
+        /// BattleState 重置并供 phaseHandlers 读取波次/生命等状态。</para>
+        /// </summary>
+        public readonly BattleState BattleState;
+
+        /// <summary>
+        /// 本次组装产生的战斗规则协调器（task 3.10 产物）。
+        /// <para>由 Factory 构造，持有 WaveManager/BattleEconomy/BattleResultBuilder 引用。
+        /// Runtime 在 phaseHandlers 的 WaveSpawn 阶段回调
+        /// <see cref="BattleManager.UpdateSpawnState"/>，在 EnterSettling 步骤 7 调用
+        /// <see cref="BattleManager.GameOver"/> 重置规则状态。</para>
+        /// </summary>
+        public readonly BattleManager BattleManager;
+
+        /// <summary>
+        /// 本次组装产生的波次管理器（task 3.9 产物）。
+        /// <para>由 Factory 构造，提供确定性 Mob0 波次计划。Runtime 在 EnterSettling
+        /// 步骤 7 调用 <see cref="WaveManager.GameOver"/> 清理波次状态。</para>
+        /// </summary>
+        public readonly WaveManager WaveManager;
+
+        /// <summary>
+        /// 本次组装产生的经济服务（task 3.8 产物）。
+        /// <para>由 Factory 构造，处理招募/刷新/击杀奖励的校验与余额变更。Runtime 在
+        /// EnterSettling 步骤 7 调用 <see cref="BattleEconomy.GameOver"/> 重置经济计数。</para>
+        /// </summary>
+        public readonly BattleEconomy BattleEconomy;
+
+        /// <summary>
+        /// 本次组装产生的格子预留注册表（task 3.8 产物）。
+        /// <para>由 Factory 构造，管理购买放置事务的临时格子预留。Runtime 在 EnterSettling
+        /// 步骤 7 调用 <see cref="PlacementReservationRegistry.Clear"/> 清空全部预留。</para>
+        /// </summary>
+        public readonly PlacementReservationRegistry ReservationRegistry;
+
+        /// <summary>
+        /// 本次组装产生的敌人管理器（task 4.6 产物）。
+        /// <para>由 Factory 构造，维护敌人集合与空间索引。Runtime 在 phaseHandlers 的
+        /// Enemy 阶段回调 <see cref="EnemyManager.Update"/>，在 EnterSettling 步骤 5
+        /// 调用 <see cref="EnemyManager.GameOver"/> 清理敌人实体、接触 Timer 与空间索引。</para>
+        /// </summary>
+        public readonly EnemyManager EnemyManager;
+
+        /// <summary>
+        /// 本次组装产生的攻击调度器（task 5.2 产物）。
+        /// <para>由 Factory 构造，每子步只推进一次单位冷却、选取目标并触发一次攻击。
+        /// Runtime 在 phaseHandlers 的 UnitAttack 阶段回调
+        /// <see cref="AttackScheduler.Update"/>。</para>
+        /// </summary>
+        public readonly AttackScheduler AttackScheduler;
+
+        /// <summary>
+        /// 本次组装产生的结果冻结器（task 3.11 产物）。
+        /// <para>由 Factory 构造，提供幂等 TryFreeze 唯一入口。Simulation 的 tryFreeze
+        /// 回调指向 <see cref="BattleResultBuilder.TryFreeze"/>。</para>
+        /// </summary>
+        public readonly BattleResultBuilder ResultBuilder;
+
+        /// <summary>
+        /// 本次组装产生的单局内部信号中枢（task 7.1 产物）。
+        /// <para>由 Factory 构造并登记到 Scope（<see cref="BattleRuntimeScope.TrackSignalHub"/>），
+        /// <see cref="BattleRuntime"/> 接管后持有。仅承载需要一对多的单局低频内部事实，
+        /// 不承担核心一致性（直接调用）与跨程序集通信（<c>IBattlePublicEvent</c>）。</para>
+        /// <para>Factory 在构造后把 <see cref="WaveManager.OnRoundSpawnPrepared"/> 桥接到
+        /// <see cref="BattleInternalSignalHub.RoundSpawnPrepared"/>，使波次准备完成事实
+        /// 经信号中枢一对多分发。订阅随 Scope 批量解除（spec "Event subscriptions follow
+        /// runtime lifetime"）。</para>
+        /// </summary>
+        public readonly BattleInternalSignalHub SignalHub;
+
+        /// <summary>
+        /// 本次组装产生的单局事件桥接器（task 7.2 产物）。
+        /// <para>由 Factory 在构造 SignalHub 之后立即构造，订阅 SignalHub 的四个信号，
+        /// 桥接到 <c>IBattleUiEvent</c> UI 通知；并提供 <c>PublishBattleStarted</c>/
+        /// <c>PublishBattleFinished</c> 跨程序集发送（经 <c>IBattlePublicEvent</c>）。</para>
+        /// <para>Bridge 的 SignalHub 订阅由自身持有退订句柄，通过
+        /// <see cref="BattleRuntimeScope.TrackDisposable"/> 登记到 Scope，
+        /// 在失败回滚/Settling/Dispose 时调用 <c>BattleEventBridge.Dispose</c> 批量退订
+        /// （spec "Event subscriptions follow runtime lifetime"）。</para>
+        /// <para>前提：<c>GameEventHelper.Init()</c> 已在 <c>GameApp.Entrance</c> 第一行
+        /// 最先调用（1.6 spike §3.2），保证全局 EventMgr 就绪。Factory 不调用 Init()。</para>
+        /// </summary>
+        public readonly BattleEventBridge EventBridge;
+
+        // ====================================================================
+        // task 7.3 返工新增：表现端口（View / Audio / Vfx）
+        // --------------------------------------------------------------------
+        // 三个表现端口由 Factory 在组装阶段以 Null 实现注入作为默认值，使纯逻辑
+        // EditMode 测试与无表现逻辑闭环不依赖 Unity 表现层（design.md:9,215,216）。
+        // 生产环境由 BattleModule / BattlePresenter 在 Entering 阶段替换为 Unity
+        // 真实实现（UnityBattleAudioPort / UnityBattleVfxPort / FairyGUI ViewPort，
+        /// task 7.4/7.5/7.6 接入）。
+        //
+        // 当前默认注入 NullBattleViewPort / NullBattleAudioPort / NullBattleVfxPort，
+        // 保证 task 7.3 的 Null 实现被实际接入并验证可实例化（校验报告"Null 实现未接入"）。
+        // ====================================================================
+
+        /// <summary>
+        /// 本次组装产生的视图表现端口（task 7.3 产物）。
+        /// <para>默认为 <see cref="NullBattleViewPort"/>，使逻辑闭环不依赖 Unity/FairyGUI 表现层。
+        /// 生产环境由 BattleModule/BattlePresenter 在 Entering 阶段替换为 FairyGUI 真实实现
+        /// （task 7.4/7.5，受 FairyGUI 程序集未引用限制推迟到 7.5）。</para>
+        /// <para>逻辑层经本端口向表现层发送实体生成/移除/状态变化等低频事实
+        /// （design.md:214）。表现层实现本端口，把事实翻译成视图操作，不回写规则状态
+        /// （design.md:217）。</para>
+        /// </summary>
+        public readonly IBattleViewPort ViewPort;
+
+        /// <summary>
+        /// 本次组装产生的音频表现端口（task 7.3 产物）。
+        /// <para>默认为 <see cref="NullBattleAudioPort"/>，使逻辑闭环不依赖 Unity 音频。
+        /// 生产环境由 BattleModule/BattlePresenter 替换为 <see cref="UnityBattleAudioPort"/>
+        /// （基于 TEngine IAudioModule，不受 asmdef 限制）。</para>
+        /// <para>逻辑层经本端口发送 BGM/SFX 播放停止意图（design.md:215）。</para>
+        /// </summary>
+        public readonly IBattleAudioPort AudioPort;
+
+        /// <summary>
+        /// 本次组装产生的特效表现端口（task 7.3 产物）。
+        /// <para>默认为 <see cref="NullBattleVfxPort"/>，使逻辑闭环不依赖 Unity 特效。
+        /// 生产环境由 BattleModule/BattlePresenter 替换为 <see cref="UnityBattleVfxPort"/>
+        /// （基于 UnityEngine.ParticleSystem + 对象池，不受 asmdef 限制）。</para>
+        /// <para>逻辑层经本端口发送特效播放意图（design.md:216）。</para>
+        /// </summary>
+        public readonly IBattleVfxPort VfxPort;
+
+        // ====================================================================
+        // task 7.4 表现层组装产物
+        // --------------------------------------------------------------------
+        // BattleReadModel 与 BattlePresenter 由 Factory 在组装阶段构造并经 Assembly
+        // 注入。ReadModel 在步骤 7 构造（与 BattleResultBuilder 共享同一实例），
+        // Presenter 在步骤 11 之后构造（依赖 ReadModel + ViewPort/AudioPort/VfxPort +
+        // InputController）。Presenter 持有 ViewRegistry/ViewSynchronizer/InputAdapter
+        // 三个协作者，把只读状态/事实翻译成视图操作，不回写规则状态（design.md:217）。
+        // ====================================================================
+
+        /// <summary>
+        /// 本次组装产生的只读状态视图（task 3.7 产物，task 7.4 接入 Presenter）。
+        /// <para>与 <see cref="ResultBuilder"/> 共享同一实例（task 3.11 时由 Factory 构造并
+        /// 注入 ResultBuilder）。task 7.4 起经 Assembly 暴露给
+        /// <see cref="BattleRuntime"/>/<see cref="BattlePresenter"/>，使 Presenter 只读访问
+        /// BattleState 快照，不直接访问 BattleState 或 Manager。</para>
+        /// </summary>
+        public readonly BattleReadModel ReadModel;
+
+        /// <summary>
+        /// 本次组装产生的表现层组装器（task 7.4 产物）。
+        /// <para>由 Factory 在构造 ReadModel + 三个端口 + InputController 之后构造，
+        /// 持有 ViewRegistry / ViewSynchronizer / BattleInputAdapter 三个协作者。
+        /// Presenter 只读 ReadModel，把只读状态/事实翻译成视图操作，不回写规则状态
+        /// （design.md:217）。</para>
+        /// <para>三个端口默认为 Null 实现（task 7.3），生产环境由 BattleModule 替换为
+        /// Unity 真实实现（task 7.5/7.6 接入 FairyGUI / Unity 表现层）。</para>
+        /// <para>Presenter 经 <see cref="BattleRuntimeScope.TrackDisposable"/> 登记到 Scope，
+        /// 在失败回滚/Settling/Dispose 时调用 <c>Presenter.Dispose</c> 清理表现对象与监听。</para>
+        /// </summary>
+        public readonly BattlePresenter Presenter;
+
+        /// <summary>
+        /// 本次组装产生的槽位面板（最终方案"核心架构"）。
+        /// <para>由 Factory 构造，集中维护槽、单位和换槽不变量。UI、DeckManager、
+        /// UnitRegistry 不再分别保存一份"单位在哪里"的状态。</para>
+        /// </summary>
+        public readonly UnitSlotBoard SlotBoard;
+
+        /// <summary>
+        /// 本次组装产生的征兵服务（最终方案 Recruit/RecruitManager）。
+        /// <para>只负责随机生成一整批 1 级四兵，不保存手牌和槽位状态，不负责上场。</para>
+        /// </summary>
+        public readonly RecruitManager RecruitManager;
+
+        /// <summary>
+        /// 本次组装产生的等级数值服务（最终方案 Unit/UnitLevelService）。
+        /// <para>校验最大等级、从 UnitLevelConfigSnapshot 解析伤害及攻速倍率、统一应用等级数值。</para>
+        /// </summary>
+        public readonly UnitLevelService LevelService;
+
         private BattleRuntimeAssembly(
             BattleErrorCode errorCode,
             string diagnosticMessage,
@@ -154,7 +342,25 @@ namespace GameBattle
             ProjectileManager projectileManager,
             UnitFactory unitFactory,
             UnitRegistry unitRegistry,
-            BattleInputController inputController)
+            BattleInputController inputController,
+            BattleState battleState,
+            BattleManager battleManager,
+            WaveManager waveManager,
+            BattleEconomy battleEconomy,
+            PlacementReservationRegistry reservationRegistry,
+            EnemyManager enemyManager,
+            AttackScheduler attackScheduler,
+            BattleResultBuilder resultBuilder,
+            BattleInternalSignalHub signalHub,
+            BattleEventBridge eventBridge,
+            IBattleViewPort viewPort,
+            IBattleAudioPort audioPort,
+            IBattleVfxPort vfxPort,
+            BattleReadModel readModel,
+            BattlePresenter presenter,
+            UnitSlotBoard slotBoard,
+            RecruitManager recruitManager,
+            UnitLevelService levelService)
         {
             ErrorCode = errorCode;
             DiagnosticMessage = diagnosticMessage ?? string.Empty;
@@ -168,6 +374,24 @@ namespace GameBattle
             UnitFactory = unitFactory;
             UnitRegistry = unitRegistry;
             InputController = inputController;
+            BattleState = battleState;
+            BattleManager = battleManager;
+            WaveManager = waveManager;
+            BattleEconomy = battleEconomy;
+            ReservationRegistry = reservationRegistry;
+            EnemyManager = enemyManager;
+            AttackScheduler = attackScheduler;
+            ResultBuilder = resultBuilder;
+            SignalHub = signalHub;
+            EventBridge = eventBridge;
+            ViewPort = viewPort;
+            AudioPort = audioPort;
+            VfxPort = vfxPort;
+            ReadModel = readModel;
+            Presenter = presenter;
+            SlotBoard = slotBoard;
+            RecruitManager = recruitManager;
+            LevelService = levelService;
         }
 
         /// <summary>
@@ -183,7 +407,25 @@ namespace GameBattle
             ProjectileManager projectileManager,
             UnitFactory unitFactory,
             UnitRegistry unitRegistry,
-            BattleInputController inputController)
+            BattleInputController inputController,
+            BattleState battleState,
+            BattleManager battleManager,
+            WaveManager waveManager,
+            BattleEconomy battleEconomy,
+            PlacementReservationRegistry reservationRegistry,
+            EnemyManager enemyManager,
+            AttackScheduler attackScheduler,
+            BattleResultBuilder resultBuilder,
+            BattleInternalSignalHub signalHub,
+            BattleEventBridge eventBridge,
+            IBattleViewPort viewPort,
+            IBattleAudioPort audioPort,
+            IBattleVfxPort vfxPort,
+            BattleReadModel readModel,
+            BattlePresenter presenter,
+            UnitSlotBoard slotBoard,
+            RecruitManager recruitManager,
+            UnitLevelService levelService)
             => new BattleRuntimeAssembly(
                 BattleErrorCode.None,
                 string.Empty,
@@ -196,7 +438,25 @@ namespace GameBattle
                 projectileManager,
                 unitFactory,
                 unitRegistry,
-                inputController);
+                inputController,
+                battleState,
+                battleManager,
+                waveManager,
+                battleEconomy,
+                reservationRegistry,
+                enemyManager,
+                attackScheduler,
+                resultBuilder,
+                signalHub,
+                eventBridge,
+                viewPort,
+                audioPort,
+                vfxPort,
+                readModel,
+                presenter,
+                slotBoard,
+                recruitManager,
+                levelService);
 
         /// <summary>
         /// 构造失败产物。失败时 scope 已被 Factory 回滚释放。
@@ -217,7 +477,25 @@ namespace GameBattle
                 projectileManager: null,
                 unitFactory: null,
                 unitRegistry: null,
-                inputController: null);
+                inputController: null,
+                battleState: null,
+                battleManager: null,
+                waveManager: null,
+                battleEconomy: null,
+                reservationRegistry: null,
+                enemyManager: null,
+                attackScheduler: null,
+                resultBuilder: null,
+                signalHub: null,
+                eventBridge: null,
+                viewPort: null,
+                audioPort: null,
+                vfxPort: null,
+                readModel: null,
+                presenter: null,
+                slotBoard: null,
+                recruitManager: null,
+                levelService: null);
     }
 
     /// <summary>
@@ -280,7 +558,7 @@ namespace GameBattle
         /// <item>校验装载信息（牌组预设、配置版本占位），失败返回
         /// <see cref="BattleErrorCode.ConfigInvalid"/> 或 <see cref="BattleErrorCode.ConfigVersionMismatch"/>。
         /// 配置版本字段的权威校验在此步骤（详见 <see cref="TryValidateLoadout"/>）。</item>
-        /// <item>从应用级 <see cref="ConfigSystem.Instance.Tables"/> 复制不可变配置快照
+        /// <item>从应用级 <see cref="Tables"/> 复制不可变配置快照
         /// （task 3.4 / battle-config-snapshot spec）。使用 <see cref="LubanBattleConfigProvider"/>
         /// 读取已加载 Tables 并经 <see cref="BattleConfigNormalizer"/> 规范化，不在模拟子步加载
         /// TextAsset，也不由 <see cref="BattleRuntime"/> 卸载应用级配置资源（决策 0.11）。</item>
@@ -308,6 +586,12 @@ namespace GameBattle
         /// BattleInputController 原子执行购买放置和刷新命令，任一步失败按逆序补偿。
         /// MapData 从 configSnapshot.Map 获取，BattleConfigSnapshot 直接注入。phaseHandlers
         /// 接入与 StartGame/GameOver 生命周期钩子调用属于 task 6.10 闭环范畴，此处只构造实例。</item>
+        /// <item>构造 Phase 6 <see cref="BattleInternalSignalHub"/>（task 7.1 产物）并登记到 Scope
+        /// （<see cref="BattleRuntimeScope.TrackSignalHub"/>）。在 WaveManager 构造后把
+        /// <see cref="WaveManager.OnRoundSpawnPrepared"/> 桥接到
+        /// <see cref="BattleInternalSignalHub.RoundSpawnPrepared"/>，使波次准备完成事实
+        /// 经信号中枢一对多分发。订阅随 Scope 批量解除（spec "Event subscriptions follow
+        /// runtime lifetime"）。</item>
         /// </list>
         /// <para>任一步骤失败：记录日志，调用 <see cref="BattleRuntimeScope.Rollback"/>
         /// 只释放本次已取得的所有权，返回失败产物。不抛出预期失败异常（决策 0.7）。</para>
@@ -316,12 +600,32 @@ namespace GameBattle
         /// </remarks>
         internal static BattleRuntimeAssembly Create(
             BattleLoadoutDto loadout,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            BattlePoolScope poolScope = null)
+        {
+            return Create(loadout, cancellationToken, poolScope, bindings: null);
+        }
+
+        /// <summary>
+        /// 以已校验的地图绑定组装战斗运行时。
+        /// </summary>
+        /// <remarks>
+        /// 只有提供地图绑定时才创建 Unity 表现端口；旧的三参数调用保持 Null 端口，
+        /// 以保留纯逻辑测试与尚未接入 BattleWorldHost 的调用语义。
+        /// </remarks>
+        internal static BattleRuntimeAssembly Create(
+            BattleLoadoutDto loadout,
+            CancellationToken cancellationToken,
+            BattlePoolScope poolScope,
+            BattleMapBindings bindings)
         {
             // 步骤 1：创建本次组装的所有权作用域。这是本次 Create 取得全部所有权的根，
             // 失败时只回滚这个 Scope，不触碰调用方的外部对象。
             Log.Info($"{LogTag} 开始组装一局运行时依赖，mapId={loadout.MapId} round={loadout.Round} seed={loadout.RandomSeed}");
             BattleRuntimeScope scope = new BattleRuntimeScope();
+            // 生产路径由 BattleModule 注入跨局池作用域；独立 Factory 测试未注入时
+            // 使用本次组装私有作用域，随 Runtime 不可达后由 GC 回收。
+            BattlePoolScope effectivePoolScope = poolScope ?? new BattlePoolScope();
 
             BattleSimulation simulation = null;
             CancellationTokenSource runtimeTokenSource = null;
@@ -333,34 +637,88 @@ namespace GameBattle
             UnitRegistry unitRegistry = null;
             BattleInputController inputController = null;
 
+            // task 6.10 闭环新增的 Manager / 状态 / 服务
+            BattleState battleState = null;
+            BattleManager battleManager = null;
+            WaveManager waveManager = null;
+            BattleEconomy battleEconomy = null;
+            PlacementReservationRegistry reservationRegistry = null;
+            EnemyManager enemyManager = null;
+            AttackScheduler attackScheduler = null;
+            BattleResultBuilder resultBuilder = null;
+
+            // task 7.1 闭环新增：单局内部信号中枢。
+            BattleInternalSignalHub signalHub = null;
+
+            // task 7.2 闭环新增：单局事件桥接器。
+            BattleEventBridge eventBridge = null;
+
+            // task 7.3 返工新增：表现端口（View / Audio / Vfx）。
+            // 默认以 Null 实现注入，使纯逻辑 EditMode 测试与无表现逻辑闭环不依赖
+            // Unity/FairyGUI 表现层（design.md:9,215,216）。生产环境由 BattleModule /
+            // BattlePresenter 在 Entering 阶段替换为 Unity 真实实现。
+            IBattleViewPort viewPort = null;
+            IBattleAudioPort audioPort = null;
+            IBattleVfxPort vfxPort = null;
+
+            // task 7.4 闭环新增：表现层只读状态视图与组装器。
+            BattleReadModel readModel = null;
+            BattlePresenter presenter = null;
+
+            // 最终方案新增：槽位面板、征兵服务、等级数值服务。
+            UnitSlotBoard slotBoard = null;
+            RecruitManager recruitManager = null;
+            UnitLevelService levelService = null;
+
             try
             {
                 // 步骤 2：创建运行时取消令牌源并登记所有权。
                 // 该令牌用于取消本局所有异步操作与表现回调（spec "Exit releases battle-owned state"）。
-                Log.Info($"{LogTag} 步骤 1/9：创建运行时取消令牌源");
+                Log.Info($"{LogTag} 步骤 1/12：创建运行时取消令牌源");
                 cancellationToken.ThrowIfCancellationRequested();
                 runtimeTokenSource = new CancellationTokenSource();
                 scope.TrackCancellationTokenSource(runtimeTokenSource, "RuntimeToken");
 
+                // task 7.1 闭环：构造单局内部信号中枢并登记到 Scope。
+                // SignalHub 仅承载需要一对多的单局低频内部事实；订阅由 Scope 经
+                // TrackSignalHub 批量登记，在失败回滚/Settling/Dispose 时一次性 Clear
+                // （spec "Event subscriptions follow runtime lifetime"）。
+                // 尽早构造以保证后续 WaveManager 桥接、表现层订阅都能使用同一实例。
+                signalHub = new BattleInternalSignalHub();
+                scope.TrackSignalHub(signalHub, "InternalSignalHub");
+
+                // task 7.2 闭环：构造单局事件桥接器并登记到 Scope。
+                // BattleEventBridge 订阅 SignalHub 的四个信号，桥接到 IBattleUiEvent UI 事件；
+                // 并提供 PublishBattleStarted/PublishBattleFinished 跨程序集发送
+                // （经 GameCommon IBattlePublicEvent + TEngine GameEvent）。
+                // 前提：GameEventHelper.Init() 已在 GameApp.Entrance 第一行最先调用
+                // （1.6 spike §3.2），本 Factory 不调用 Init()。
+                // Bridge 的 SignalHub 订阅由自身持有退订句柄，通过 TrackDisposable 登记，
+                // 在失败回滚/Settling/Dispose 时调用 BattleEventBridge.Dispose 批量退订
+                // （spec "Event subscriptions follow runtime lifetime"）。
+                eventBridge = new BattleEventBridge(signalHub);
+                scope.TrackDisposable(eventBridge, "EventBridge");
+
                 // 步骤 3：构造到期动作/冷却调度器（task 2.11 产物，强类型注入，非字符串查找）。
-                Log.Info($"{LogTag} 步骤 2/9：构造 BattleActionScheduler");
+                Log.Info($"{LogTag} 步骤 2/12：构造 BattleActionScheduler");
                 cancellationToken.ThrowIfCancellationRequested();
                 actionScheduler = new BattleActionScheduler();
 
                 // 步骤 4：构造逻辑模拟器（task 2.11 产物）。
-                // 阶段回调占位：task 2.10 BattleRuntime 实现后，由 Runtime 提供真实阶段回调
-                // 并经 Assembly 连接到 Simulation。当前占位回调为空操作，保证 Simulation 可构造。
-                // TryFreeze 回调占位：返回 false（未冻结），task 2.10 实现后由 BattleResultBuilder 提供。
-                Log.Info($"{LogTag} 步骤 3/9：构造 BattleSimulation");
+                // task 6.10 闭环：phaseHandlers 与 tryFreeze 回调连接到实际 Manager 的 update 方法。
+                // 但 Simulation 依赖的 Manager 尚未构造（步骤 8-10），此处先创建 Simulation
+                // 的依赖顺序需要调整：先构造 Manager（步骤 5-10），再创建带真实 phaseHandlers
+                // 的 Simulation。为保持步骤日志编号一致且不改变所有权登记顺序，此处先创建
+                // Simulation 的占位实例（使步骤编号不变），在全部 Manager 构造完成后（步骤 10）
+                // 用真实 phaseHandlers 重建 Simulation。
+                //
+                // 实际实现：此处先不创建 Simulation，推迟到步骤 10。步骤 3 只构造
+                // BattleActionScheduler（Simulation 的依赖），Simulation 在步骤 11 构造。
+                Log.Info($"{LogTag} 步骤 3/12：BattleActionScheduler 已构造，Simulation 推迟到步骤 10");
                 cancellationToken.ThrowIfCancellationRequested();
-                int phaseCount = Enum.GetValues(typeof(BattleUpdatePhase)).Length;
-                Action<long, long, BattleUpdatePhase>[] phaseHandlers =
-                    new Action<long, long, BattleUpdatePhase>[phaseCount];
-                Func<bool> tryFreezePlaceholder = () => false;
-                simulation = new BattleSimulation(phaseHandlers, tryFreezePlaceholder, actionScheduler);
 
                 // 步骤 5：校验装载信息。预期校验失败返回结构化错误码，不抛异常（决策 0.7）。
-                Log.Info($"{LogTag} 步骤 4/9：校验装载信息");
+                Log.Info($"{LogTag} 步骤 4/12：校验装载信息");
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!TryValidateLoadout(loadout, out BattleErrorCode validateError, out string validateMsg))
                 {
@@ -371,12 +729,7 @@ namespace GameBattle
                 }
 
                 // 步骤 6：从应用级 ConfigSystem.Tables 复制不可变配置快照（task 3.4）。
-                // battle-config-snapshot spec "Runtime consumes an immutable configuration snapshot"：
-                //   运行时只依赖快照，逻辑子步不得反复访问资源加载器或可变全局配置表。
-                // decision 0.11：应用级 ConfigSystem/资源预加载持有配置数据，BattleRuntime 只持有
-                //   不可变快照，不在模拟子步加载 TextAsset，也不由 BattleRuntime 卸载应用级配置资源。
-                // LubanBattleConfigProvider 从已加载 Tables 读取并规范化，不触发同步 IO。
-                Log.Info($"{LogTag} 步骤 5/9：从 ConfigSystem.Tables 复制战斗配置快照");
+                Log.Info($"{LogTag} 步骤 5/12：从 ConfigSystem.Tables 复制战斗配置快照");
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
@@ -387,8 +740,6 @@ namespace GameBattle
                 catch (Exception configEx)
                 {
                     // 配置快照复制失败：回滚本次已取得的所有权，返回配置错误。
-                    // ConfigSystem.Tables getter 未 Load 时抛 InvalidOperationException，
-                    // 由 GameApp.Entrance 中的 ConfigSystem.Instance.Load() 保证已就绪。
                     Log.Error($"{LogTag} 配置快照复制失败: {configEx}");
                     scope.Rollback();
                     return BattleRuntimeAssembly.Fail(
@@ -398,19 +749,11 @@ namespace GameBattle
                 }
 
                 // 步骤 7：校验配置快照（task 3.5 BattleConfigValidator）。
-                // battle-config-snapshot spec "Invalid configuration blocks battle entry"：
-                //   缺失表、非法权重、错误地图尺寸、未知单位或不完整路径 MUST 返回可诊断错误，
-                //   并阻止运行时进入运行状态。
-                // 决策 0.7：预期失败返回结构化结果而非异常。Validator 返回结构化结果，
-                //   校验失败时据错误码返回 ConfigInvalid/ConfigMissing/ConfigVersionMismatch，
-                //   不创建半初始化实体，不进入运行状态。
-                Log.Info($"{LogTag} 步骤 6/9：校验配置快照（BattleConfigValidator）");
+                Log.Info($"{LogTag} 步骤 6/12：校验配置快照（BattleConfigValidator）");
                 cancellationToken.ThrowIfCancellationRequested();
                 BattleConfigValidationResult validationResult = BattleConfigValidator.Validate(configSnapshot);
                 if (!validationResult.IsValid)
                 {
-                    // 校验失败：回滚本次已取得的所有权，返回 Validator 给出的稳定错误码。
-                    // 不抛异常，不依赖诊断文本判断失败原因（决策 0.7）。
                     Log.Warning($"{LogTag} 配置校验失败 code={validationResult.ErrorCode} " +
                         $"errors={validationResult.Errors.Count} first={validationResult.Errors[0]}");
                     scope.Rollback();
@@ -420,93 +763,330 @@ namespace GameBattle
                         scope);
                 }
 
-                // 步骤 8：构造 Phase 4 Manager（AttackEffectManager / ProjectileManager）。
-                // 这些 Manager 当前只由 BattleRuntime 持有，用于 Settling 静默清理时调用 Clear()。
-                // phaseHandlers 接入属于后续 task 6.10 闭环范畴，此处只构造实例并注入。
-                // ProjectileManager 依赖 ProjectileFactory，后者依赖 RuntimeIdAllocator /
-                // BattleObjectPool<SimpleDynamicArrow> / EnemyManager / cellSize。
-                // EnemyManager 属于 Phase 3 产物，此处只构造实例供 ProjectileFactory 使用，
-                // 不接入 phaseHandlers（task 6.10 范畴）。
-                Log.Info($"{LogTag} 步骤 7/9：构造 AttackEffectManager / ProjectileManager");
+                // 步骤 8：构造 BattleState / BattleReadModel / BattleResultBuilder（task 3.7/3.11 产物）。
+                // task 6.10 闭环：这些状态/服务在构造 Manager 前先构造，因为 BattleManager 依赖
+                // BattleResultBuilder，BattleResultBuilder 依赖 BattleReadModel，BattleReadModel 依赖
+                // BattleState + RuntimeIdAllocator。
+                // task 7.4 闭环：BattleReadModel 经 Assembly 暴露给 BattlePresenter，使 Presenter
+                // 只读访问 BattleState 快照，不直接访问 BattleState 或 Manager。
+                Log.Info($"{LogTag} 步骤 7/12：构造 BattleState / BattleReadModel / BattleResultBuilder");
                 cancellationToken.ThrowIfCancellationRequested();
-                attackEffectManager = new AttackEffectManager();
-
-                // 构造 ProjectileManager 的依赖链。
-                // gridSize / cellSize：本期固定 80（对应 map.gridWidth，EnemyManager.DefaultGridSize）。
-                // 后续由配置快照暴露 cellWidth/cellHeight 字段后从快照读取。
                 const int gridSize = EnemyManager.DefaultGridSize;
                 const float cellSize = 80f;
                 var idAllocator = new RuntimeIdAllocator();
-                var arrowPool = new BattleObjectPool<SimpleDynamicArrow>(() => new SimpleDynamicArrow());
-                var enemyManager = new EnemyManager(gridSize);
+                battleState = new BattleState();
+
+                // 最终方案：构造等级数值服务与槽位面板（在 readModel 之前，供其注入）。
+                // LevelService 无状态；SlotBoard 每局新建并初始化固定战场槽与待上场槽。
+                // 修复 P0：待上场槽数量统一读取配置（RecruitManager 与 SlotBoard 共用同一值）。
+                int reserveSlotCount = configSnapshot.Deck?.HandSize > 0
+                    ? configSnapshot.Deck.HandSize
+                    : RecruitDefinitions.ReserveSlotCount;
+                levelService = new UnitLevelService(configSnapshot.UnitLevel);
+                slotBoard = new UnitSlotBoard(levelService.MaxLevel);
+                slotBoard.Initialize(configSnapshot.Map, reserveSlotCount);
+
+                // 注意：readModel 同时被 ResultBuilder 与 Presenter 共享只读访问。
+                // 两个消费者都只读不写，共享同一实例安全。
+                readModel = new BattleReadModel(battleState, idAllocator, slotBoard);
+                resultBuilder = new BattleResultBuilder(readModel);
+
+                // 步骤 9：构造 EnemyManager / AttackResolver / AttackEffectManager / ProjectileManager
+                // 及其依赖链（Phase 3/4 产物）。
+                Log.Info($"{LogTag} 步骤 8/12：构造 EnemyManager / AttackEffectManager / ProjectileManager");
+                cancellationToken.ThrowIfCancellationRequested();
+                enemyManager = new EnemyManager(gridSize);
+                attackEffectManager = new AttackEffectManager();
                 var attackResolver = new AttackResolver();
+                BattleObjectPool<SimpleDynamicArrow> arrowPool =
+                    effectivePoolScope.GetPool(() => new SimpleDynamicArrow());
                 var projectileFactory = new ProjectileFactory(idAllocator, arrowPool, enemyManager, cellSize);
                 projectileManager = new ProjectileManager(projectileFactory);
 
-                // 步骤 9：构造 Phase 5 UnitFactory / UnitRegistry（task 6.3 产物）。
-                // UnitFactory 只识别四个强类型兵种 ID（刀/弓/枪/骑），使用四个独立的
-                // BattleObjectPool<T> 池化四兵，Acquire 分配新 RuntimeId（复用上方 idAllocator），
-                // Release 回收并 Reset。按兵种分支调用各士兵的 Configure：弓兵多
-                // ProjectileFactory/ProjectileManager 参数（其余三兵种只传通用 5 参数）。
-                // UnitRegistry 管理单位注册、放置、移除和战斗结束清理，维护稳定有序集合
-                // （List<SoldierBase> + Dictionary<int,int>）供 AttackScheduler 遍历。
-                // cellSize / opponentAttackMultiplier：本期固定 80 / 1（与上方 ProjectileFactory
-                // 及 BattleState.OpponentAttackMultiplier 一致）；后续从配置快照读取。
-                // 池实例：本期与 ProjectileFactory 一样在 Factory 内局部构造，待 BattlePoolScope
-                // 接入 BattleModule（后续 Phase）后改为从跨局池作用域获取，复用空闲容量。
-                Log.Info($"{LogTag} 步骤 8/9：构造 UnitFactory / UnitRegistry");
+                // task 6.10 闭环返工：构造 EnemyFactory，供 OnSpawnEnemy 委托实际创建敌人。
+                // EnemyFactory 持有 RuntimeIdAllocator + Mob0Enemy 对象池，
+                // Acquire 分配新 RuntimeId，Release 回收并 ResetState（池复用无污染）。
+                BattleObjectPool<Mob0Enemy> mob0Pool =
+                    effectivePoolScope.GetPool(() => new Mob0Enemy());
+                var enemyFactory = new EnemyFactory(idAllocator, mob0Pool);
+
+                // 步骤 10：构造 UnitFactory / UnitRegistry / BattleEconomy / DeckManager /
+                // PlacementReservationRegistry / BattleInputController / WaveManager / BattleManager /
+                // AttackScheduler（Phase 2/3/5 产物）。
+                Log.Info($"{LogTag} 步骤 9/12：构造 UnitFactory / UnitRegistry / Economy / Deck / Input / Wave / BattleManager");
                 cancellationToken.ThrowIfCancellationRequested();
                 const int opponentAttackMultiplier = 1;
-                var knifePool = new BattleObjectPool<KnifeSoldier>(() => new KnifeSoldier());
-                var bowPool = new BattleObjectPool<BowSoldier>(() => new BowSoldier());
-                var spearPool = new BattleObjectPool<SpearSoldier>(() => new SpearSoldier());
-                var cavalryPool = new BattleObjectPool<CavalrySoldier>(() => new CavalrySoldier());
+                BattleObjectPool<KnifeSoldier> knifePool =
+                    effectivePoolScope.GetPool(() => new KnifeSoldier());
+                BattleObjectPool<BowSoldier> bowPool =
+                    effectivePoolScope.GetPool(() => new BowSoldier());
+                BattleObjectPool<SpearSoldier> spearPool =
+                    effectivePoolScope.GetPool(() => new SpearSoldier());
+                BattleObjectPool<CavalrySoldier> cavalryPool =
+                    effectivePoolScope.GetPool(() => new CavalrySoldier());
+
+                var randomSource = new SeededRandomSource(loadout.RandomSeed);
+
+                // 最终方案：征兵服务，随机生成 1 级四兵批次。
+                // levelService / slotBoard / reserveSlotCount 已在步骤 7 构造，此处复用。
+                recruitManager = new RecruitManager(randomSource, slotBoard, reserveSlotCount);
+
+                // 最终方案：开局免费生成第一批待上场单位，填满待上场槽。
+                // 此后只有点击征兵扣馒头（扣费由 BattleInputController.ExecuteRecruit 完成）。
+                // 修复 P0：开局免费填充失败时终止组装并回滚，不留下空局继续。
+                bool initialFillOk =
+                    slotBoard.ReplaceReserve(true, recruitManager.GenerateBatch(isPlayerSide: true))
+                    && slotBoard.ReplaceReserve(false, recruitManager.GenerateBatch(isPlayerSide: false));
+                if (!initialFillOk)
+                {
+                    Log.Error($"{LogTag} 开局免费填满待上场槽失败（批次数量与槽位数不一致），终止组装");
+                    scope.Rollback();
+                    return BattleRuntimeAssembly.Fail(
+                        BattleErrorCode.ConfigInvalid,
+                        "开局免费填满待上场槽失败：征兵批次数量与待上场槽数量不一致",
+                        scope);
+                }
 
                 unitFactory = new UnitFactory(
                     idAllocator,
                     knifePool, bowPool, spearPool, cavalryPool,
                     enemyManager, attackResolver, attackEffectManager,
                     projectileFactory, projectileManager,
-                    cellSize, opponentAttackMultiplier);
+                    cellSize, opponentAttackMultiplier,
+                    levelService);
 
                 unitRegistry = new UnitRegistry(unitFactory, cellSize);
 
-                // 步骤 10：构造 Phase 5 BattleInputController（task 6.7 产物）及其新增依赖。
-                // BattleInputController 原子执行购买放置和刷新命令，任一步失败按逆序补偿。
-                // 注入依赖（7 个）：
-                //   - UnitFactory / UnitRegistry（步骤 8 已构造）
-                //   - BattleEconomy / DeckManager / PlacementReservationRegistry（本步骤新建）
-                //   - MapData（从 configSnapshot.Map 获取）
-                //   - BattleConfigSnapshot（步骤 6 已复制）
-                // BattleEconomy 依赖 BattleState + refreshCostIncrement（从配置快照 Economy 读取）。
-                // DeckManager 依赖 IRandomSource + DeckConfigSnapshot（从配置快照 Deck 读取）。
-                // SeededRandomSource 从 loadout.RandomSeed 构造，保证每局确定性可复现。
-                // BattleState 无参构造，使用默认初始值（后续配置接入后从快照注入）。
-                // phaseHandlers 接入与 BattleInputController 的 StartGame/GameOver 生命周期钩子
-                // 调用属于 task 6.10 闭环范畴，此处只构造实例。
-                Log.Info($"{LogTag} 步骤 9/9：构造 BattleEconomy / DeckManager / BattleInputController");
-                cancellationToken.ThrowIfCancellationRequested();
-                var battleState = new BattleState();
                 int refreshCostIncrement = configSnapshot.Economy.RefreshCostIncrement;
-                var economy = new BattleEconomy(battleState, refreshCostIncrement);
+                battleEconomy = new BattleEconomy(battleState, refreshCostIncrement);
 
-                var randomSource = new SeededRandomSource(loadout.RandomSeed);
-                DeckConfigSnapshot deckConfig = configSnapshot.Deck;
-                var deckManager = new DeckManager(randomSource, deckConfig);
-
-                var reservationRegistry = new PlacementReservationRegistry();
+                reservationRegistry = new PlacementReservationRegistry();
 
                 inputController = new BattleInputController(
-                    unitFactory,
+                    slotBoard,
+                    recruitManager,
+                    levelService,
+                    battleEconomy,
                     unitRegistry,
-                    economy,
-                    deckManager,
-                    reservationRegistry,
-                    configSnapshot.Map,
-                    configSnapshot);
+                    configSnapshot,
+                    signalHub);
+
+                // WaveManager 依赖 configSnapshot / battleState / randomSource（skipBoss 模式下 randomSource 可为 null）。
+                // 使用与 DeckManager 相同的确定性随机源实例，保证波次 Boss 决策可复现。
+                // SeededRandomSource.NextUnit() 返回 [0,1) float，对应 WaveManager 的 Func<float> 随机源委托。
+                waveManager = new WaveManager(configSnapshot, battleState, randomSource.NextUnit);
+
+                // task 7.1 闭环：把 WaveManager 的唯一 ROUND_SPAWN_PREPARED(plan) 事实
+                // 桥接到 BattleInternalSignalHub.RoundSpawnPrepared，使该低频一对多事实可被
+                // 多个内部组件订阅（spec "Event signatures are unambiguous"：唯一带 plan 签名）。
+                // WaveManager 仍按直接调用语义触发委托（design 决策 4：内部一致性优先直接调用），
+                // SignalHub 只负责把事实一对多分发给订阅者；不新增无参重载。
+                // BattleManager 不二次发布同名事件（task 3.9 约束）。
+                waveManager.OnRoundSpawnPrepared = plan => signalHub.RoundSpawnPrepared.Publish(plan);
+
+                // BattleManager 依赖 configSnapshot / battleState / waveManager / battleEconomy / resultBuilder。
+                battleManager = new BattleManager(
+                    configSnapshot, battleState, waveManager, battleEconomy, resultBuilder);
+
+                // task 6.10 闭环返工：构造 BattleTarget 并绑定到 BattleState/BattleManager/ResultBuilder，
+                // 使敌人接触目标时能通过 ContactBattleTargetHandler → BattleTarget.ApplyDamage →
+                // BattleState.ApplyDamage → BattleManager.CheckHealthFreeze → ResultBuilder.TryFreeze
+                // 完成实际战斗结算（而非 maxRounds 超时触发冻结）。
+                // 玩家方目标（isPlayerLaneTarget=true）受击 → CheckHealthFreeze(true) → 玩家败；
+                // 对手方目标（isPlayerLaneTarget=false）受击 → CheckHealthFreeze(false) → 玩家胜。
+                var playerTarget = new BattleTarget();
+                playerTarget.Bind(
+                    battleState,
+                    battleManager,
+                    resultBuilder,
+                    isPlayerLaneTarget: true,
+                    signalHub: signalHub);
+                var opponentTarget = new BattleTarget();
+                opponentTarget.Bind(
+                    battleState,
+                    battleManager,
+                    resultBuilder,
+                    isPlayerLaneTarget: false,
+                    signalHub: signalHub);
+
+                // task 6.10 闭环返工：注入 OnSpawnEnemy 委托，使 BattleManager.SpawnPairWhenDue
+                // 真正创建敌人并登记到 EnemyManager，而非只推进 spawnIndex 状态机。
+                // 委托负责 Acquire → Configure → InitializeStats → Init → BeginMoving → Register 全流程。
+                // 委托内捕获 enemyFactory / enemyManager / configSnapshot / playerTarget / opponentTarget，
+                // 这些依赖已在上方构造完成，闭包捕获安全（单局生命周期内不释放）。
+                EnemyConfigSnapshot enemyConfig = configSnapshot.Enemy;
+                MapData mapData = configSnapshot.Map;
+                battleManager.OnSpawnEnemy = (isPlayerLane, typeIndex) =>
+                {
+                    // 1. 从工厂获取 Mob0Enemy（含新 RuntimeId 分配）。
+                    Mob0Enemy enemy = enemyFactory.Acquire();
+
+                    // 2. 注入运行时依赖（地图、接触目标、击杀回调）。
+                    //    EnemyBase.Configure 为 protected，只能在子类内调用。
+                    //    本委托不在 EnemyBase 继承链中，需通过反射调用 Configure
+                    //    注入 map/cellSize/contactTarget/onEnemyKilled 四个依赖。
+                    //    反射只在 spawn 时调用（低频），不引入性能问题。
+                    BattleTarget target = isPlayerLane ? playerTarget : opponentTarget;
+                    ContactBattleTargetHandler contactHandler = (lane, damage, attackerId) =>
+                        target.ApplyDamage(damage, attackerId);
+                    EnemyKilledHandler killedHandler = (killedId, attackerId, reward, lane) =>
+                    {
+                        // 本期最简链：击杀奖励经 EnemyBase 内置 experienceReward=1，
+                        // 不额外经 BattleEconomy 发放金币（task 3.12 已确认最简链在死亡点直接结算）。
+                    };
+                    // 死亡请求移除回调：敌人血量归零时通知 EnemyManager 入队，遍历结束后统一移除。
+                    EnemyDeathRequestHandler deathRequestHandler = (killedId) =>
+                    {
+                        enemyManager.RequestRemoveEnemy(killedId);
+                    };
+                    // 反射调用 protected Configure（EnemyBase.cs:519）。
+                    // 签名：Configure(MapData map, float cellSize, ContactBattleTargetHandler, EnemyKilledHandler, EnemyDeathRequestHandler)。
+                    typeof(EnemyBase).InvokeMember(
+                        "Configure",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.InvokeMethod,
+                        null, enemy, new object[] { mapData, cellSize, contactHandler, killedHandler, deathRequestHandler });
+
+                    // 3. 初始化 Mob0 数值（healthByWave / speed / contactDamage / rewardGold）。
+                    //    rewardGold 取 EnemyBase 内置值 1（普通敌人），此处显式传 1 保持一致。
+                    var initStats = new Mob0EnemyInitStats(
+                        healthByWave: enemyConfig.HealthByWave,
+                        speed: enemyConfig.Speed,
+                        contactDamage: enemyConfig.ContactDamage,
+                        rewardGold: 1);
+                    enemy.InitializeStats(initStats);
+
+                    // 4. 初始化出生状态（阵营、血量、位置、SPAWNING 状态）。
+                    //    Init 为 protected internal virtual，可通过 InternalsVisibleTo 调用。
+                    //    maxHealth 取 GetInitialHealth（healthByWave[0]）。
+                    //    width/height 取 40f（与 EnemyIntegrationTests 一致，对应 visual.width/height）。
+                    int maxHealth = enemy.GetInitialHealth();
+                    enemy.Init(isPlayerLane, maxHealth, width: 40f, height: 40f);
+
+                    // 5. 从 SPAWNING 切换到 MOVING（敌人立即开始沿路径移动）。
+                    enemy.BeginMoving();
+
+                    // 6. 登记到 EnemyManager（参与 Update 推进与目标查询）。
+                    enemyManager.Register(enemy);
+                };
+
+                // AttackScheduler 依赖 actionScheduler / attackResolver / cellWidth / cellHeight。
+                attackScheduler = new AttackScheduler(actionScheduler, attackResolver, cellSize, cellSize);
+
+                // 步骤 11：构造 BattleSimulation，phaseHandlers 连接到实际 Manager 的 update 方法，
+                // tryFreeze 回调连接到 BattleResultBuilder.TryFreeze（task 6.10 闭环核心接入）。
+                // phaseHandlers 按 BattleUpdatePhase 顺序注册：
+                //   DueActionsAndInput → ActionScheduler.FlushDueActions（到期动作）
+                //   Enemy → EnemyManager.Update
+                //   Projectile → ProjectileManager.Update
+                //   AttackRelease → 空操作（攻击释放由单位攻击调度内的效果/投射物创建同步完成）
+                //   WaveSpawn → BattleManager.UpdateSpawnState
+                //   UnitAttack → AttackScheduler.Update（遍历 UnitRegistry 活动单位）
+                //   AttackEffect → AttackEffectManager.Update
+                Log.Info($"{LogTag} 步骤 10/12：构造 BattleSimulation（phaseHandlers 接入实际 Manager）");
+                cancellationToken.ThrowIfCancellationRequested();
+                int phaseCount = Enum.GetValues(typeof(BattleUpdatePhase)).Length;
+                Action<long, long, BattleUpdatePhase>[] phaseHandlers =
+                    new Action<long, long, BattleUpdatePhase>[phaseCount];
+
+                // DueActionsAndInput：处理本帧已到期的规则回调（接触伤害、刀兵命中、攻击释放等）。
+                phaseHandlers[(int)BattleUpdatePhase.DueActionsAndInput] =
+                    (frameNow, step, phase) => actionScheduler.FlushDueActions(step);
+
+                // Enemy：敌人沿路径移动、接触目标并同步维护空间事实。
+                phaseHandlers[(int)BattleUpdatePhase.Enemy] =
+                    (frameNow, step, phase) => enemyManager.Update(step);
+
+                // Projectile：推进已存在的投射物移动、命中判定与逆序移除。
+                phaseHandlers[(int)BattleUpdatePhase.Projectile] =
+                    (frameNow, step, phase) => projectileManager.Update(frameNow, step);
+
+                // AttackRelease：攻击释放时序阶段。本期攻击释放由单位攻击调度内的
+                // 效果/投射物创建同步完成，此阶段为空操作占位（保持阶段顺序一致）。
+                phaseHandlers[(int)BattleUpdatePhase.AttackRelease] =
+                    (frameNow, step, phase) => { };
+
+                // WaveSpawn：波次/生成阶段，推进波次状态机并按间隔刷怪。
+                phaseHandlers[(int)BattleUpdatePhase.WaveSpawn] =
+                    (frameNow, step, phase) => battleManager.UpdateSpawnState(frameNow, step);
+
+                // UnitAttack：单位攻击调度，每子步只推进一次单位冷却、选取目标并触发一次攻击。
+                phaseHandlers[(int)BattleUpdatePhase.UnitAttack] =
+                    (frameNow, step, phase) =>
+                    {
+                        // 获取活动单位只读列表（稳定有序，按放置顺序）。
+                        // AttackScheduler.Update 内部有冻结守卫，冻结后不调度。
+                        IReadOnlyList<SoldierBase> units = unitRegistry.GetActiveUnits();
+                        attackScheduler.Update(units, enemyManager);
+                    };
+
+                // AttackEffect：推进近战/范围攻击效果累计。
+                phaseHandlers[(int)BattleUpdatePhase.AttackEffect] =
+                    (frameNow, step, phase) => attackEffectManager.Update(step);
+
+                // TryFreeze 回调连接到 BattleResultBuilder.TryFreeze。
+                // 注意：BattleManager.TryFreezeResult(playerWin) 内部调用 resultBuilder.TryFreeze，
+                // 但 Simulation 的 _tryFreezeHandler 是无参 bool 回调，用于检查"是否已冻结"
+                // 并在检查点中止。此处提供 () => resultBuilder.IsFrozen 作为冻结检查：
+                // BattleManager 在完成事实发生点调用 TryFreezeResult → resultBuilder.TryFreeze，
+                // 成功后 resultBuilder.IsFrozen 为 true，Simulation 在检查点检测到并中止。
+                // 但 Simulation.TryFreeze() 方法会调用 _tryFreezeHandler() 并据返回值置位
+                // IsFrozen + Freeze ActionScheduler。为了正确驱动，_tryFreezeHandler 应返回
+                // resultBuilder.IsFrozen（已被 BattleManager 在完成事实点设置）。
+                Func<bool> tryFreezeHandler = () => resultBuilder.IsFrozen;
+
+                simulation = new BattleSimulation(phaseHandlers, tryFreezeHandler, actionScheduler);
+
+                // task 7.3 返工：注入表现端口。
+                // task 7.6 接入：使用 Unity 真实实现（UnityBattleViewPort / UnityBattleAudioPort /
+                // UnityBattleVfxPort），使生产环境具备 Unity 表现层能力。
+                // 纯逻辑 EditMode 测试通过注入 Null 实现委托（通过 BattleModule 的可注入构造）
+                // 或测试专用入口验证；本 Factory 使用 Unity 真实实现作为生产默认值。
+                // 真实端口在 PreloadAsync 中持有 AssetHandle，并随 Presenter.Dispose 的
+                // Clear 路径统一释放，避免模块 Scope 与端口双重 Release。
+                // IBattleViewPort 的 FairyGUI 真实实现因 GameBattle asmdef 未引用 FairyGUI 程序集，
+                // 推迟到 task 7.5（FairyGUI Change 冻结公共注册契约后接入）。
+                // 当前 UnityBattleViewPort 基于 UnityEngine GameObject，不依赖 FairyGUI。
+                if (bindings != null)
+                {
+                    viewPort = new UnityBattleViewPort(bindings);
+                    vfxPort = new UnityBattleVfxPort(bindings);
+                }
+                else
+                {
+                    viewPort = new NullBattleViewPort();
+                    vfxPort = new NullBattleVfxPort();
+                }
+
+                audioPort = new UnityBattleAudioPort();
+
+                // task 7.4 闭环：构造表现层组装器 BattlePresenter。
+                // task 7.6 接入：传入 enemyManager/unitRegistry/projectileManager，
+                // 使 Presenter 内部的 Synchronizer 能查询真实逻辑位置。
+                // Presenter 依赖：readModel（只读状态视图）+ viewPort/audioPort/vfxPort（三个端口）+
+                // inputController（供 BattleInputAdapter 提交命令）+
+                // enemyManager/unitRegistry/projectileManager（供 RuntimeReadModelProvider 查询位置）。
+                // Presenter 只读 readModel，把只读状态/事实翻译成视图操作，不回写规则状态
+                // （design.md:217）。
+                // 三个端口当前为 Unity 真实实现（task 7.6），使生产环境具备 Unity 表现层能力。
+                // Presenter 经 Scope.TrackDisposable 登记释放，在失败回滚/Settling/Dispose 时
+                // 调用 Presenter.Dispose 清理表现对象与监听。
+                Log.Info($"{LogTag} 步骤 11/12：构造 BattlePresenter（task 7.4/7.6 产物）");
+                cancellationToken.ThrowIfCancellationRequested();
+                presenter = new BattlePresenter(
+                    readModel,
+                    viewPort,
+                    audioPort,
+                    vfxPort,
+                    inputController,
+                    enemyManager,
+                    unitRegistry,
+                    projectileManager,
+                    bindings,
+                    signalHub);
+                scope.TrackDisposable(presenter, "BattlePresenter");
 
                 // 组装成功：记录完成日志，返回成功产物。
-                Log.Info($"{LogTag} 组装成功，返回 Assembly（task 2.10 BattleRuntime 将接管所有权）");
+                Log.Info($"{LogTag} 步骤 12/12：组装成功，返回 Assembly（BattleRuntime 将接管所有权）");
                 return BattleRuntimeAssembly.Ok(
                     scope,
                     simulation,
@@ -517,7 +1097,25 @@ namespace GameBattle
                     projectileManager,
                     unitFactory,
                     unitRegistry,
-                    inputController);
+                    inputController,
+                    battleState,
+                    battleManager,
+                    waveManager,
+                    battleEconomy,
+                    reservationRegistry,
+                    enemyManager,
+                    attackScheduler,
+                    resultBuilder,
+                    signalHub,
+                    eventBridge,
+                    viewPort,
+                    audioPort,
+                    vfxPort,
+                    readModel,
+                    presenter,
+                    slotBoard,
+                    recruitManager,
+                    levelService);
             }
             catch (OperationCanceledException)
             {

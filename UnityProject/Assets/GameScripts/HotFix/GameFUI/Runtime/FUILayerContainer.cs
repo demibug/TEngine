@@ -70,6 +70,11 @@ namespace GameFUI
         private readonly GComponent[,] _subContainers = new GComponent[LayerCount, SubContainerCount];
 
         /// <summary>
+        /// 安全区输入。生产默认读取 <see cref="Screen.safeArea"/>，测试可注入稳定的像素矩形。
+        /// </summary>
+        private readonly Func<Rect> _safeAreaProvider;
+
+        /// <summary>
         /// 本实例是否已创建层级容器。重复创建在已创建状态下抛 <see cref="FUIException"/>。
         /// </summary>
         private bool _created;
@@ -88,6 +93,15 @@ namespace GameFUI
         /// 延迟一帧重算用的 Timers 回调句柄，用于在多次 onStageResized 合并到一帧后取消未触发的旧调度。
         /// </summary>
         private TimerCallback _deferredApplyCallback;
+
+        /// <summary>
+        /// 创建层容器管理器。
+        /// </summary>
+        /// <param name="safeAreaProvider">可选安全区输入；为空时使用平台 <see cref="Screen.safeArea"/>。</param>
+        internal FUILayerContainer(Func<Rect> safeAreaProvider = null)
+        {
+            _safeAreaProvider = safeAreaProvider ?? GetScreenSafeArea;
+        }
 
         /// <summary>
         /// 在 <c>GRoot</c> 下按 <see cref="FUILayer"/> 枚举顺序创建六个固定层级容器，并在每层下建立 Full/Safe 子容器。
@@ -312,7 +326,7 @@ namespace GameFUI
             }
 
             // 计算 Safe 子容器在 GRoot 内容坐标系下的位置与大小。
-            Rect safeArea = Screen.safeArea;
+            Rect safeArea = _safeAreaProvider();
             float safeX = safeArea.x / scaleFactor;
             float safeYFromTop = root.height - safeArea.yMax / scaleFactor;
             float safeWidth = safeArea.width / scaleFactor;
@@ -603,6 +617,11 @@ namespace GameFUI
             {
                 throw new FUIException("FUILayerContainer 尚未创建，请先调用 Create。");
             }
+        }
+
+        private static Rect GetScreenSafeArea()
+        {
+            return Screen.safeArea;
         }
     }
 }

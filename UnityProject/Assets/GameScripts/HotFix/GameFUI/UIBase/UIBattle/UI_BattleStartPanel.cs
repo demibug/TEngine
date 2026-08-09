@@ -7,6 +7,7 @@ namespace UIBattle
 {
     public partial class UI_BattleStartPanel : GameFUI.FUIWindow
     {
+        public Controller m_cState;
         public GButton m_btn;
         public UI_BattleStartWidget m_widgetStart;
         public const string URL = "ui://56fffadntdew0";
@@ -22,6 +23,7 @@ namespace UIBattle
         {
             base.ConstructFromXML(xml);
 
+            m_cState = GetControllerAt(0);
             m_btn = (GButton)GetChildAt(0);
             m_widgetStart = (UI_BattleStartWidget)GetChildAt(1);
         }

@@ -101,6 +101,12 @@ namespace GameBattle.Tests.EditMode.Enemy
             /// <summary>上次击杀的阵营。</summary>
             public bool LastKillIsPlayerLane;
 
+            /// <summary>死亡请求移除回调次数。</summary>
+            public int DeathRequestedCount;
+
+            /// <summary>上次死亡请求移除的敌人 ID。</summary>
+            public int LastDeathRequestedEnemyId;
+
             /// <summary>
             /// 配置测试依赖并注入记录回调。
             /// </summary>
@@ -127,6 +133,11 @@ namespace GameBattle.Tests.EditMode.Enemy
                         LastKillAttackerId = attackerId;
                         LastExperienceReward = reward;
                         LastKillIsPlayerLane = isPlayerLane;
+                    },
+                    onDeathRequested: (killedId) =>
+                    {
+                        DeathRequestedCount++;
+                        LastDeathRequestedEnemyId = killedId;
                     });
             }
 
@@ -169,6 +180,31 @@ namespace GameBattle.Tests.EditMode.Enemy
 
             /// <summary>暴露 CurrentHealth 供测试验证。</summary>
             internal int TestHealth => CurrentHealth;
+
+            /// <summary>血量变化回调累计次数。</summary>
+            public int HealthChangedCount;
+
+            /// <summary>上次血量变化回调的当前血量。</summary>
+            public int LastHealthChangedCurrent;
+
+            /// <summary>上次血量变化回调的最大血量。</summary>
+            public int LastHealthChangedMax;
+
+            /// <summary>上次血量变化回调的变化量。</summary>
+            public int LastHealthChangedDelta;
+
+            /// <summary>暴露 SetHealthChangedCallback 供测试注入记录回调。</summary>
+            internal void SetHealthChangedForTest(Action<int, int, int, int> callback)
+            {
+                SetHealthChangedCallback((changedId, current, max, delta) =>
+                {
+                    HealthChangedCount++;
+                    LastHealthChangedCurrent = current;
+                    LastHealthChangedMax = max;
+                    LastHealthChangedDelta = delta;
+                    callback?.Invoke(changedId, current, max, delta);
+                });
+            }
         }
 
         // ====================================================================
@@ -558,6 +594,50 @@ namespace GameBattle.Tests.EditMode.Enemy
 
             Assert.IsTrue(result, "受击生效返回 true。");
             Assert.AreEqual(70, enemy.Health, "扣血 30，剩余 70。");
+        }
+
+        [Test]
+        [Description("Hit 扣血成功后触发血量变化回调，携带当前/最大/变化量。")]
+        public void Hit_TriggersHealthChangedCallback()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = CreateMovingEnemy(map, id: 7, isPlayerLane: true, maxHealth: 100);
+            enemy.SetHealthChangedForTest(null);
+
+            enemy.Hit(30, attackerId: 10);
+
+            Assert.AreEqual(1, enemy.HealthChangedCount, "有效受击触发一次血量变化回调。");
+            Assert.AreEqual(70, enemy.LastHealthChangedCurrent, "回调当前血量=70。");
+            Assert.AreEqual(100, enemy.LastHealthChangedMax, "回调最大血量=100。");
+            Assert.AreEqual(-30, enemy.LastHealthChangedDelta, "回调变化量=-30。");
+        }
+
+        [Test]
+        [Description("血量归零时血量变化回调携带 current=0（死亡事实）。")]
+        public void Hit_HealthZero_TriggersHealthChangedWithZero()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = CreateMovingEnemy(map, id: 8, isPlayerLane: true, maxHealth: 100);
+            enemy.SetHealthChangedForTest(null);
+
+            enemy.Hit(100, attackerId: 10);
+
+            Assert.AreEqual(1, enemy.HealthChangedCount, "致死一击触发一次回调。");
+            Assert.AreEqual(0, enemy.LastHealthChangedCurrent, "回调当前血量=0。");
+            Assert.AreEqual(-100, enemy.LastHealthChangedDelta, "回调变化量=-100。");
+        }
+
+        [Test]
+        [Description("无效受击（0 伤害）不触发血量变化回调。")]
+        public void Hit_InvalidDamage_DoesNotTriggerHealthChanged()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = CreateMovingEnemy(map, id: 9, isPlayerLane: true, maxHealth: 100);
+            enemy.SetHealthChangedForTest(null);
+
+            enemy.Hit(0, attackerId: 10);
+
+            Assert.AreEqual(0, enemy.HealthChangedCount, "0 伤害不触发血量变化回调。");
         }
 
         [Test]

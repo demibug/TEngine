@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 
-// 仅向测试程序集暴露 internal 成员，避免为了测试把全部运行时类型改为 public。
-// 友元程序集名必须与 GameFUI.Tests.asmdef 的 name 完全一致。
-// 暴露目标：InMemoryFUIResourceProvider / InMemoryAssetHandle 等测试可注入的 internal 类型
-// （见 Resource/IFUIResourceProvider.cs），供 EditMode/PlayMode 测试注入可控内存资源能力。
+// 友元程序集名必须与对应 asmdef 的 name 完全一致。
+// GameFUI.Tests 只用于测试注入；GameBattle 作为 UIBattle 唯一业务 owner，
+// 复用已冻结的 Registry 注册契约，不扩大 GameFUI 公共接口。
 [assembly: InternalsVisibleTo("GameFUI.Tests")]
+[assembly: InternalsVisibleTo("GameBattle")]

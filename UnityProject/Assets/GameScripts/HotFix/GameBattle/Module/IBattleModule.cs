@@ -123,6 +123,13 @@ namespace GameBattle
         BattleModuleState State { get; }
 
         /// <summary>
+        /// 显示战斗入口界面，不启动战斗运行时。
+        /// </summary>
+        /// <param name="loadout">供入口界面冻结持有的初始装载信息。</param>
+        /// <returns>入口窗口完成打开后的异步任务。</returns>
+        UniTask ShowEntryAsync(BattleLoadoutDto loadout);
+
+        /// <summary>
         /// 开始一局战斗（公共异步 API）。
         /// </summary>
         /// <param name="loadout">不可变战斗装载信息（地图、种子、配置版本/hash 占位、牌组预设）。</param>
@@ -134,7 +141,7 @@ namespace GameBattle
         /// 结构化操作结果。成功时 <see cref="BattleOperationResult.IsSuccess"/> 为 true 且状态为
         /// <see cref="BattleModuleState.Running"/>；预期失败返回错误码（如
         /// <see cref="BattleErrorCode.AlreadyActive"/>、<see cref="BattleErrorCode.ConfigMissing"/>、
-        /// <see cref="BattleErrorCode.SceneLoadFailed"/> 等）。
+        /// <see cref="BattleErrorCode.AssetLoadFailed"/> 等）。
         /// </returns>
         /// <remarks>
         /// <para><b>状态约束（spec "Duplicate start returns AlreadyActive"）：</b></para>
