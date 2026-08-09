@@ -312,13 +312,41 @@ namespace GameBattle.Tests.PlayMode.Presentation
             drag.BeginDrag(sourceSlotId, touchId: 1);
             Assert.IsTrue(drag.IsDragging, "拖动中");
 
-            BattleInputResult? result = drag.EndDrag(0f, 0f);
+            BattleInputResult? result = drag.EndDrag(0f, 0f, touchId: 1);
 
             Assert.IsTrue(result.HasValue, "应提交命令");
             Assert.IsTrue(result.Value.IsSuccess, "拖放应成功");
             Assert.IsTrue(_slotBoard.GetSlotById(sourceSlotId).IsEmpty, "源槽变空");
             Assert.IsFalse(_slotBoard.GetSlotById(targetSlotId).IsEmpty, "目标槽承载单位");
             Assert.IsFalse(drag.IsDragging, "松手后不再拖拽");
+        }
+
+        [Test]
+        [Description("拖拽控制器：错误 touchId 不能结束拖拽（多指保护）。")]
+        public void DragController_WrongTouchId_CannotEnd()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            int sourceSlotId = reserves[0].SlotId.Id;
+            int unitIdBefore = _slotBoard.GetSlotById(sourceSlotId).OccupantUnitId;
+
+            var drag = new BattleDragController(
+                dropUnit: _adapter.HandleDropUnit,
+                resolveTargetSlot: (x, y) => reserves[2].SlotId.Id);
+
+            drag.BeginDrag(sourceSlotId, touchId: 1);
+
+            // 另一个手指（touchId=2）不能结束拖拽。
+            BattleInputResult? wrongTouchResult = drag.EndDrag(0f, 0f, touchId: 2);
+            Assert.IsNull(wrongTouchResult, "错误 touchId 不提交");
+            Assert.IsTrue(drag.IsDragging, "拖拽仍在进行（源槽未变）");
+            Assert.AreEqual(unitIdBefore, _slotBoard.GetSlotById(sourceSlotId).OccupantUnitId,
+                "源槽单位未变");
+
+            // 正确的 touchId 仍能结束并提交。
+            BattleInputResult? rightTouchResult = drag.EndDrag(0f, 0f, touchId: 1);
+            Assert.IsTrue(rightTouchResult.HasValue, "正确 touchId 应提交");
+            Assert.IsTrue(rightTouchResult.Value.IsSuccess, "拖放应成功");
+            Assert.IsTrue(_slotBoard.GetSlotById(sourceSlotId).IsEmpty, "源槽变空");
         }
 
         [Test]
@@ -334,7 +362,7 @@ namespace GameBattle.Tests.PlayMode.Presentation
                 resolveTargetSlot: (x, y) => -1);
 
             drag.BeginDrag(sourceSlotId, touchId: 1);
-            BattleInputResult? result = drag.EndDrag(0f, 0f);
+            BattleInputResult? result = drag.EndDrag(0f, 0f, touchId: 1);
 
             Assert.IsNull(result, "未命中目标不提交命令");
             Assert.AreEqual(unitIdBefore, _slotBoard.GetSlotById(sourceSlotId).OccupantUnitId,
@@ -350,9 +378,28 @@ namespace GameBattle.Tests.PlayMode.Presentation
                 dropUnit: _adapter.HandleDropUnit,
                 resolveTargetSlot: (x, y) => 1);
 
-            BattleInputResult? result = drag.EndDrag(0f, 0f);
+            BattleInputResult? result = drag.EndDrag(0f, 0f, touchId: 1);
 
             Assert.IsNull(result, "未拖拽时不提交");
+        }
+
+        [Test]
+        [Description("拖拽控制器：Cancel(touchId) 校验所有权；错误 touchId 不取消。")]
+        public void DragController_Cancel_WrongTouchId_KeepsDragging()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            int sourceSlotId = reserves[0].SlotId.Id;
+
+            var drag = new BattleDragController(
+                dropUnit: _adapter.HandleDropUnit,
+                resolveTargetSlot: (x, y) => reserves[2].SlotId.Id);
+
+            drag.BeginDrag(sourceSlotId, touchId: 1);
+            drag.Cancel(touchId: 2);
+            Assert.IsTrue(drag.IsDragging, "错误 touchId 不取消拖拽");
+
+            drag.Cancel(touchId: 1);
+            Assert.IsFalse(drag.IsDragging, "正确 touchId 取消拖拽");
         }
 
         [Test]
@@ -371,10 +418,109 @@ namespace GameBattle.Tests.PlayMode.Presentation
             drag.Cancel();
             Assert.IsFalse(drag.IsDragging, "取消后不再拖拽");
 
-            BattleInputResult? result = drag.EndDrag(0f, 0f);
+            BattleInputResult? result = drag.EndDrag(0f, 0f, touchId: 1);
             Assert.IsNull(result, "取消后 EndDrag 不提交");
             Assert.AreEqual(unitIdBefore, _slotBoard.GetSlotById(sourceSlotId).OccupantUnitId,
                 "源槽单位未变");
+        }
+
+        [Test]
+        [Description("拖拽控制器：四向空槽拖动（Reserve→Reserve / Reserve→Battle / Battle→Battle / Battle→Reserve）。")]
+        public void DragController_FourWayEmptyTargets()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
+
+            // R→R：待上场[0] → 待上场[2]。
+            int r0 = reserves[0].SlotId.Id;
+            int r2 = reserves[2].SlotId.Id;
+            Assert.IsTrue(_slotBoard.GetSlotById(r2).IsEmpty, "r2 空");
+            var dragRR = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r2);
+            dragRR.BeginDrag(r0, touchId: 1);
+            Assert.IsTrue(dragRR.EndDrag(0f, 0f, 1).Value.IsSuccess, "R→R 应成功");
+            Assert.IsTrue(_slotBoard.GetSlotById(r0).IsEmpty, "r0 变空");
+
+            // R→B：待上场[0]（现空，先把 r2 换回 r0）→ 战场[0]。
+            var dragBack = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r0);
+            dragBack.BeginDrag(r2, touchId: 1);
+            Assert.IsTrue(dragBack.EndDrag(0f, 0f, 1).Value.IsSuccess, "r2→r0 归位");
+            int b0 = battles[0].SlotId.Id;
+            Assert.IsTrue(_slotBoard.GetSlotById(b0).IsEmpty, "b0 空");
+            var dragRB = new BattleDragController(_adapter.HandleDropUnit, (x, y) => b0);
+            dragRB.BeginDrag(r0, touchId: 1);
+            Assert.IsTrue(dragRB.EndDrag(0f, 0f, 1).Value.IsSuccess, "R→B 应成功");
+            Assert.IsTrue(_slotBoard.GetSlotById(r0).IsEmpty, "r0 变空");
+            Assert.IsFalse(_slotBoard.GetSlotById(b0).IsEmpty, "b0 有单位");
+
+            // B→B：战场[0] → 战场[1]。
+            int b1 = battles[1].SlotId.Id;
+            Assert.IsTrue(_slotBoard.GetSlotById(b1).IsEmpty, "b1 空");
+            var dragBB = new BattleDragController(_adapter.HandleDropUnit, (x, y) => b1);
+            dragBB.BeginDrag(b0, touchId: 1);
+            Assert.IsTrue(dragBB.EndDrag(0f, 0f, 1).Value.IsSuccess, "B→B 应成功");
+            Assert.IsTrue(_slotBoard.GetSlotById(b0).IsEmpty, "b0 变空");
+            Assert.IsFalse(_slotBoard.GetSlotById(b1).IsEmpty, "b1 有单位");
+
+            // B→R：战场[1] → 待上场[0]。
+            var dragBR = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r0);
+            dragBR.BeginDrag(b1, touchId: 1);
+            Assert.IsTrue(dragBR.EndDrag(0f, 0f, 1).Value.IsSuccess, "B→R 应成功");
+            Assert.IsTrue(_slotBoard.GetSlotById(b1).IsEmpty, "b1 变空");
+            Assert.IsFalse(_slotBoard.GetSlotById(r0).IsEmpty, "r0 有单位");
+        }
+
+        // ====================================================================
+        // 真实事件顺序回归：Reserve 卡拖动 → Stage TouchEnd（应被守卫忽略）
+        // → Card DragEnd（独占结算，只提交一次 DropUnit）
+        // ====================================================================
+
+        [Test]
+        [Description("回归：Reserve 卡拖动时 Stage TouchEnd 被守卫忽略，Card DragEnd 独占结算只提交一次。")]
+        public void DragController_ReserveDrag_StageEndIgnored_CardEndSettlesOnce()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
+            int sourceSlotId = reserves[0].SlotId.Id;
+            int targetSlotId = battles[0].SlotId.Id;
+            Assert.IsFalse(_slotBoard.GetSlotById(sourceSlotId).IsEmpty, "源槽有单位");
+            Assert.IsTrue(_slotBoard.GetSlotById(targetSlotId).IsEmpty, "战场目标槽空");
+
+            // 记录提交次数，验证只提交一次。
+            int dropCount = 0;
+            var drag = new BattleDragController(
+                dropUnit: (s, t) =>
+                {
+                    dropCount++;
+                    return _adapter.HandleDropUnit(s, t);
+                },
+                resolveTargetSlot: (x, y) => targetSlotId);
+
+            // 事件 1：Reserve 卡开始拖动。
+            drag.BeginDrag(sourceSlotId, touchId: 1);
+            Assert.IsTrue(drag.IsDragging, "拖动中");
+
+            // 事件 2：Stage.onTouchEnd 捕获先执行。
+            // 与 BattleHudPanel.OnStageTouchEnd 相同的守卫：查源槽 Zone，
+            // 非 Battle 来源直接返回（不结算、不销毁、不提交）。
+            UnitSlot source = _slotBoard.GetSlotById(drag.SourceSlotId);
+            if (source.SlotId.Zone == SlotZone.Battle)
+            {
+                drag.EndDrag(0f, 0f, 1);
+            }
+
+            // 守卫拦截后：拖动状态保留，未提交。
+            Assert.IsTrue(drag.IsDragging, "Stage TouchEnd 守卫不应消费 Reserve 拖动");
+            Assert.AreEqual(0, dropCount, "Stage TouchEnd 不应提交 DropUnit");
+            Assert.IsFalse(_slotBoard.GetSlotById(sourceSlotId).IsEmpty, "源槽未变");
+
+            // 事件 3：Card.onDragEnd 独占结算。
+            BattleInputResult? result = drag.EndDrag(0f, 0f, touchId: 1);
+
+            Assert.IsTrue(result.HasValue, "Card DragEnd 应提交");
+            Assert.AreEqual(1, dropCount, "只提交一次 DropUnit");
+            Assert.IsFalse(drag.IsDragging, "结算后不再拖拽");
+            Assert.IsTrue(_slotBoard.GetSlotById(sourceSlotId).IsEmpty, "Reserve 源槽为空");
+            Assert.IsFalse(_slotBoard.GetSlotById(targetSlotId).IsEmpty, "Battle 目标槽有单位");
         }
     }
 }

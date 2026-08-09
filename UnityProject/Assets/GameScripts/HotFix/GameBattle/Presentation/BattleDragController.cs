@@ -5,10 +5,14 @@ namespace GameBattle
     // ============================================================================
     // 表现层：BattleDragController —— 拖拽状态机（最终方案"表现层拖拽"）
     // ----------------------------------------------------------------------------
-    // 职责（修复阶段 P0 四向拖拽）：
+    // 职责（阶段 2：场上单位拖动输入接入）：
     //   只保存"源槽位 ID + touchId"的纯表现拖拽状态，统一处理 Reserve 与 Battle 源。
     //   拖动过程中不修改任何规则状态；松手时解析任意目标槽位（Reserve 或 Battle），
     //   解析失败或无目标则弹回（不提交命令）。
+    //
+    // 触摸所有权（阶段 2 第五步）：
+    //   只有开始拖动的 touchId 能结束或取消当前拖动；其他 touchId 的 End/Cancel
+    //   为空操作。新拖动开始前取消旧拖动。
     //
     // 与输入层的关系：
     //   本控制器只持有源槽位 ID 与 touchId，不直接操作 UnitSlotBoard / UnitRegistry。
@@ -18,7 +22,8 @@ namespace GameBattle
     // 不变量：
     //   1. 拖动中（BeginDrag 之后 EndDrag/Cancel 之前）不调用任何规则修改方法。
     //   2. 一次 BeginDrag 只能有一次 EndDrag 或 Cancel。
-    //   3. 未开始拖动时 EndDrag 为空操作（返回 null）。
+    //   3. 未开始拖动时 EndDrag/Cancel 为空操作（返回 null / 无效果）。
+    //   4. 只有拥有当前拖拽的 touchId 能结束或取消它。
     // ============================================================================
 
     /// <summary>
@@ -31,8 +36,9 @@ namespace GameBattle
     /// 源槽位既可以是 Reserve 槽也可以是 Battle 槽（四向：R→R、R→B、B→B、B→R）。</para>
     /// <para><b>目标解析：</b>松手时经 <paramref name="resolveTargetSlot"/> 把舞台坐标
     /// 解析为任意目标槽位；未命中返回 -1（弹回，不提交）。</para>
-    /// <para><b>本类型为 internal：</b>只供 GameBattle 内部 BattleHudPanel /
-    /// BattlePresenter 使用。</para>
+    /// <para><b>触摸所有权：</b>只有拥有当前拖拽的 touchId 能结束或取消它，
+    /// 防止多指交叉提交。</para>
+    /// <para><b>本类型为 internal：</b>只供 GameBattle 内部 BattleHudPanel 使用。</para>
     /// </remarks>
     internal sealed class BattleDragController
     {
@@ -45,7 +51,7 @@ namespace GameBattle
         /// <summary>当前拖拽源槽位 ID；-1 表示未在拖拽中。</summary>
         private int _sourceSlotId = -1;
 
-        /// <summary>当前拖拽 touchId（诊断用）。</summary>
+        /// <summary>当前拖拽 touchId（所有权校验）。</summary>
         private int _touchId = -1;
 
         /// <summary>
@@ -67,11 +73,14 @@ namespace GameBattle
         /// <summary>当前拖拽源槽位 ID（诊断用；未拖拽为 -1）。</summary>
         internal int SourceSlotId => _sourceSlotId;
 
+        /// <summary>当前拖拽 touchId（诊断用；未拖拽为 -1）。</summary>
+        internal int TouchId => _touchId;
+
         /// <summary>
-        /// 开始一次拖拽。
+        /// 开始一次拖拽（覆盖进行中的拖拽）。
         /// </summary>
         /// <param name="sourceSlotId">源槽位 ID（Reserve 或 Battle 槽）。</param>
-        /// <param name="touchId">输入 touchId。</param>
+        /// <param name="touchId">输入 touchId（拥有本次拖拽）。</param>
         /// <remarks>
         /// 覆盖进行中的拖拽（先取消再开始）。拖动中不修改规则状态。
         /// </remarks>
@@ -86,12 +95,14 @@ namespace GameBattle
         /// </summary>
         /// <param name="stageX">FairyGUI Stage X 坐标。</param>
         /// <param name="stageY">FairyGUI Stage Y 坐标。</param>
+        /// <param name="touchId">结束拖拽的 touchId；必须等于开始拖拽的 touchId。</param>
         /// <returns>
-        /// 已提交时返回命令执行结果；未在拖拽或目标未命中（弹回）时返回 null。
+        /// 已提交时返回命令执行结果；未在拖拽、touchId 不匹配或目标未命中（弹回）时返回 null。
         /// </returns>
-        internal BattleInputResult? EndDrag(float stageX, float stageY)
+        internal BattleInputResult? EndDrag(float stageX, float stageY, int touchId)
         {
-            if (_sourceSlotId < 0)
+            // 未在拖拽或 touchId 不匹配 → 空操作（多指保护）。
+            if (_sourceSlotId < 0 || _touchId != touchId)
             {
                 return null;
             }
@@ -111,8 +122,26 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 取消当前拖拽（不提交命令）。
+        /// 取消当前拖拽（不提交命令）。校验 touchId 所有权。
         /// </summary>
+        /// <param name="touchId">取消拖拽的 touchId；必须等于开始拖拽的 touchId。</param>
+        internal void Cancel(int touchId)
+        {
+            if (_sourceSlotId < 0 || _touchId != touchId)
+            {
+                return;
+            }
+
+            _sourceSlotId = -1;
+            _touchId = -1;
+        }
+
+        /// <summary>
+        /// 无条件取消当前拖拽（不提交命令，不校验 touchId）。
+        /// </summary>
+        /// <remarks>
+        /// 用于 HUD 关闭、退出战斗、征兵刷新前强制清理拖拽状态。
+        /// </remarks>
         internal void Cancel()
         {
             _sourceSlotId = -1;

@@ -439,6 +439,9 @@ namespace GameBattle
                         () => runtime.Presenter?.GetSlotSnapshot().GetSlots(isPlayerSide: true, SlotZone.Reserve)
                               ?? (IReadOnlyList<UnitSlot>)Array.Empty<UnitSlot>(),
                         ResolvePlayerBattleSlotForStage,
+                        slotId => runtime.Presenter != null
+                            ? runtime.Presenter.GetSlotSnapshot().GetSlotById(slotId)
+                            : default,
                         soldierType => (viewPort as UnityBattleViewPort)?.GetUnitIcon(soldierType)));
             }
             catch (OperationCanceledException)

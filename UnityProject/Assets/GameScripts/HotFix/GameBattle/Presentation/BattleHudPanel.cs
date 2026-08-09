@@ -29,6 +29,8 @@ namespace GameBattle
         private bool _isExiting;
         private int _selectedHandSlot = -1;
         private BattleDragController _dragController;
+        private GObject _dragShadow;
+        private Vector2 _dragOriginPosition;
 
         protected override void RegisterOpenEvents()
         {
@@ -40,6 +42,14 @@ namespace GameBattle
             if (m_btnRefresh != null)
             {
                 m_btnRefresh.onClick.Add(OnRefreshClicked);
+            }
+
+            // 场上单位拖动：全局 Stage 捕获（阶段 2）。
+            if (Stage.inst != null)
+            {
+                Stage.inst.onTouchBegin.AddCapture(OnStageTouchBegin);
+                Stage.inst.onTouchMove.Add(OnStageTouchMove);
+                Stage.inst.onTouchEnd.AddCapture(OnStageTouchEnd);
             }
         }
 
@@ -54,6 +64,17 @@ namespace GameBattle
             {
                 m_btnRefresh.onClick.Remove(OnRefreshClicked);
             }
+
+            // 对称注销 Stage 捕获并取消拖拽（阶段 2）。
+            if (Stage.inst != null)
+            {
+                Stage.inst.onTouchBegin.RemoveCapture(OnStageTouchBegin);
+                Stage.inst.onTouchMove.Remove(OnStageTouchMove);
+                Stage.inst.onTouchEnd.RemoveCapture(OnStageTouchEnd);
+            }
+
+            _dragController?.Cancel();
+            DestroyDragShadow();
 
             ClearCards();
             _dragController = null;
@@ -117,6 +138,7 @@ namespace GameBattle
                 SetCardVisual(
                     card,
                     occupant.HasValue ? occupant.Value.SoldierText : null,
+                    occupant.HasValue ? occupant.Value.Level : 0,
                     _entryArgs.GetUnitIcon);
                 AddChild(card);
                 _cards.Add(card);
@@ -144,10 +166,12 @@ namespace GameBattle
 
         /// <summary>
         /// 使用士兵 Prefab 的默认立绘设置卡牌图标；资源不可用或空槽时才回退为兵种文字。
+        /// 有单位时在卡面叠加等级数字（最终方案"待上场槽显示等级"）。
         /// </summary>
         private static void SetCardVisual(
             UI_BattleCardItem card,
             string soldierText,
+            int level,
             Func<int, Sprite> getUnitIcon)
         {
             var background = new GGraph
@@ -183,6 +207,7 @@ namespace GameBattle
                 icon.SetSize(CardWidth - 12f, CardWidth - 12f);
                 icon.SetXY(6f, 6f);
                 card.AddChild(icon);
+                AddLevelBadge(card, level);
                 return;
             }
 
@@ -202,6 +227,34 @@ namespace GameBattle
             label.SetSize(CardWidth, CardWidth);
             label.text = string.IsNullOrEmpty(soldierText) ? "空" : soldierText ?? "?";
             card.AddChild(label);
+            AddLevelBadge(card, level);
+        }
+
+        /// <summary>在待上场卡右下角叠加等级数字（空槽不显示）。</summary>
+        private static void AddLevelBadge(UI_BattleCardItem card, int level)
+        {
+            if (level <= 0)
+            {
+                return;
+            }
+
+            var badge = new GTextField
+            {
+                name = "levelBadge",
+                autoSize = AutoSizeType.None,
+                align = AlignType.Center,
+                verticalAlign = VertAlignType.Middle,
+                touchable = false,
+            };
+            TextFormat format = badge.textFormat;
+            format.size = 26;
+            format.bold = true;
+            format.color = new Color(1f, 0.85f, 0.2f, 1f);
+            badge.textFormat = format;
+            badge.SetSize(40f, 32f);
+            badge.SetXY(CardWidth - 48f, CardWidth - 40f);
+            badge.text = "Lv" + level;
+            card.AddChild(badge);
         }
 
         private void OnCardClicked(EventContext context, int handSlotIndex)
@@ -243,10 +296,237 @@ namespace GameBattle
 
             int touchId = context.inputEvent?.touchId ?? -1;
             Vector2 stagePosition = Stage.inst.GetTouchPosition(touchId);
-            BattleInputResult? result = _dragController?.EndDrag(stagePosition.x, stagePosition.y);
+            BattleInputResult? result = _dragController?.EndDrag(stagePosition.x, stagePosition.y, touchId);
             if (result.HasValue)
             {
                 TryDropUnit(result.Value);
+            }
+        }
+
+        // ====================================================================
+        // Stage 捕获：场上单位拖动源（阶段 2）
+        // --------------------------------------------------------------------
+        // 场上单位没有单独输入绑定，改用 FairyGUI Stage 全局捕获：
+        //   - onTouchBegin：识别场上源槽 → BeginDrag；创建 UI 拖动影子。
+        //   - onTouchMove：只移动影子，不修改规则状态。
+        //   - onTouchEnd：统一结束拖动（touchId 校验），提交成功销毁影子，失败弹回。
+        // ====================================================================
+
+        private void OnStageTouchBegin(EventContext context)
+        {
+            if (_dragController == null || _entryArgs == null || context.inputEvent == null)
+            {
+                return;
+            }
+
+            int touchId = context.inputEvent.touchId;
+            Vector2 stagePosition = context.inputEvent.position;
+
+            // 排除 HUD 可交互控件：征兵按钮、退出按钮、待上场卡片。
+            if (IsOverHudControl(stagePosition))
+            {
+                return;
+            }
+
+            // 识别场上源槽：Stage 坐标 → 战场槽。
+            if (_entryArgs.ResolveBattleSlotForStage?.Invoke(
+                    stagePosition.x, stagePosition.y, out int battleSlotId) != true
+                || battleSlotId < 0)
+            {
+                return;
+            }
+
+            UnitSlot slot = _entryArgs.GetSlotById(battleSlotId);
+            if (slot.SlotId.Zone != SlotZone.Battle
+                || !slot.SlotId.Side
+                || slot.IsEmpty)
+            {
+                return;
+            }
+
+            // 开始拖动并创建纯 UI 拖动影子（真实战斗单位不移动）。
+            _dragController.BeginDrag(slot.SlotId.Id, touchId);
+            CreateDragShadow(slot.Occupant.Value, stagePosition);
+        }
+
+        private void OnStageTouchMove(EventContext context)
+        {
+            if (_dragController == null || !_dragController.IsDragging
+                || context.inputEvent == null || _dragShadow == null)
+            {
+                return;
+            }
+
+            // P1 修复：错误 touchId 直接返回，不移动影子（多指保护与控制器状态一致）。
+            if (_dragController.TouchId != context.inputEvent.touchId)
+            {
+                return;
+            }
+
+            // 只移动影子，不修改规则状态。影子存 HUD 本地坐标（P2 修复）。
+            Vector2 localPosition = GlobalToLocal(context.inputEvent.position);
+            _dragShadow.xy = new Vector2(
+                localPosition.x - _dragShadow.width * 0.5f,
+                localPosition.y - _dragShadow.height * 0.5f);
+        }
+
+        private void OnStageTouchEnd(EventContext context)
+        {
+            if (_dragController == null || !_dragController.IsDragging || context.inputEvent == null)
+            {
+                return;
+            }
+
+            // P1 修复：错误 touchId 直接返回，不销毁影子、不弹回。
+            int touchId = context.inputEvent.touchId;
+            if (_dragController.TouchId != touchId)
+            {
+                return;
+            }
+
+            // P0 修复：Stage End 只结算 Battle 来源。
+            // 待上场卡（Reserve 源）的拖动由 OnCardDragEnd 独占结算，
+            // 避免 Stage 捕获提前消费导致 sourceSlotId == targetSlotId 而不提交。
+            UnitSlot source = _entryArgs.GetSlotById(_dragController.SourceSlotId);
+            if (source.SlotId.Zone != SlotZone.Battle)
+            {
+                return;
+            }
+
+            Vector2 stagePosition = context.inputEvent.position;
+            BattleInputResult? result = _dragController.EndDrag(
+                stagePosition.x, stagePosition.y, touchId);
+
+            // P1 修复：区分成功、拒绝、未命中三种结束结果。
+            if (!result.HasValue)
+            {
+                // 未命中目标：影子弹回原点后销毁。
+                AnimateDragShadowBack();
+                return;
+            }
+
+            if (result.Value.IsSuccess)
+            {
+                // 提交成功：直接销毁影子，槽位变化由现有事件驱动。
+                DestroyDragShadow();
+            }
+            else
+            {
+                // 业务拒绝（兵种/等级/满级/跨阵营等）：影子弹回原点后销毁。
+                AnimateDragShadowBack();
+            }
+
+            TryDropUnit(result.Value);
+        }
+
+        /// <summary>是否命中 HUD 可交互控件（征兵/退出按钮、待上场卡片）。</summary>
+        private bool IsOverHudControl(Vector2 stagePosition)
+        {
+            if (ContainsStagePoint(m_btnExit, stagePosition)
+                || ContainsStagePoint(m_btnRefresh, stagePosition))
+            {
+                return true;
+            }
+
+            for (int index = 0; index < _cards.Count; index++)
+            {
+                if (ContainsStagePoint(_cards[index], stagePosition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>创建纯 UI 拖动影子（复用卡片图标生成方式）。</summary>
+        private void CreateDragShadow(BattleUnit unit, Vector2 stagePosition)
+        {
+            if (_dragShadow != null)
+            {
+                DestroyDragShadow();
+            }
+
+            int soldierType = unit.SoldierText == "刀" ? 0
+                : unit.SoldierText == "弓" ? 1
+                : unit.SoldierText == "枪" ? 2
+                : unit.SoldierText == "骑" ? 3
+                : -1;
+            Sprite sprite = soldierType >= 0 ? _entryArgs?.GetUnitIcon?.Invoke(soldierType) : null;
+
+            GObject shadow;
+            if (sprite != null)
+            {
+                var loader = new GLoader
+                {
+                    touchable = false,
+                    fill = FillType.Scale,
+                    align = AlignType.Center,
+                    verticalAlign = VertAlignType.Middle,
+                    texture = new NTexture(sprite),
+                };
+                loader.SetSize(CardWidth - 12f, CardWidth - 12f);
+                shadow = loader;
+            }
+            else
+            {
+                var graph = new GGraph
+                {
+                    touchable = false,
+                };
+                graph.DrawRect(
+                    CardWidth - 12f,
+                    CardWidth - 12f,
+                    2,
+                    new Color(0.10f, 0.70f, 0.95f, 0.85f),
+                    new Color(1f, 0.88f, 0.48f, 0.9f));
+                shadow = graph;
+            }
+
+            shadow.SetSize(CardWidth - 12f, CardWidth - 12f);
+            // P2 修复：影子存 HUD 本地坐标（GlobalToLocal 转换 Stage 坐标）。
+            Vector2 localPosition = GlobalToLocal(stagePosition);
+            shadow.xy = new Vector2(
+                localPosition.x - shadow.width * 0.5f,
+                localPosition.y - shadow.height * 0.5f);
+            _dragOriginPosition = shadow.xy;
+            AddChild(shadow);
+            _dragShadow = shadow;
+        }
+
+        /// <summary>影子弹回原点后销毁（GTween，无 Coroutine）。</summary>
+        private void AnimateDragShadowBack()
+        {
+            if (_dragShadow == null)
+            {
+                return;
+            }
+
+            GObject shadow = _dragShadow;
+            Vector2 origin = _dragOriginPosition;
+            _dragShadow = null;
+            shadow.TweenMove(origin, 0.2f).OnComplete(() =>
+            {
+                if (shadow != null && shadow.parent == this)
+                {
+                    RemoveChild(shadow, dispose: true);
+                }
+            });
+        }
+
+        /// <summary>立即销毁拖动影子。</summary>
+        private void DestroyDragShadow()
+        {
+            if (_dragShadow == null)
+            {
+                return;
+            }
+
+            GObject shadow = _dragShadow;
+            _dragShadow = null;
+            if (shadow.parent == this)
+            {
+                RemoveChild(shadow, dispose: true);
             }
         }
 
@@ -355,6 +635,11 @@ namespace GameBattle
                 return;
             }
 
+            // P1 修复：征兵前强制取消进行中的拖动并销毁影子，
+            // 避免多指下旧拖动对新单位提交旧槽位。
+            _dragController?.Cancel();
+            DestroyDragShadow();
+
             BattleInputResult result = _entryArgs.Recruit();
             if (result.IsSuccess)
             {
@@ -428,7 +713,7 @@ namespace GameBattle
     }
 
     /// <summary>
-    /// 战斗 HUD 单次打开参数（最终方案：征兵 + 换槽/合并 + 槽位快照）。
+    /// 战斗 HUD 单次打开参数（最终方案：征兵 + 换槽/合并 + 槽位快照 + 场上拖动）。
     /// </summary>
     internal sealed class BattleHudEntryArgs
     {
@@ -437,6 +722,7 @@ namespace GameBattle
         internal Func<int, int, BattleInputResult> DropUnit { get; }
         internal Func<IReadOnlyList<UnitSlot>> GetPlayerReserveSlots { get; }
         internal ResolveBattleSlotDelegate ResolveBattleSlotForStage { get; }
+        internal Func<int, UnitSlot> GetSlotById { get; }
         internal Func<int, Sprite> GetUnitIcon { get; }
 
         internal BattleHudEntryArgs(
@@ -445,6 +731,7 @@ namespace GameBattle
             Func<int, int, BattleInputResult> dropUnit,
             Func<IReadOnlyList<UnitSlot>> getPlayerReserveSlots,
             ResolveBattleSlotDelegate resolveBattleSlotForStage,
+            Func<int, UnitSlot> getSlotById,
             Func<int, Sprite> getUnitIcon)
         {
             ExitAsync = exitAsync ?? throw new ArgumentNullException(nameof(exitAsync));
@@ -454,6 +741,7 @@ namespace GameBattle
                 ?? throw new ArgumentNullException(nameof(getPlayerReserveSlots));
             ResolveBattleSlotForStage = resolveBattleSlotForStage
                 ?? throw new ArgumentNullException(nameof(resolveBattleSlotForStage));
+            GetSlotById = getSlotById ?? throw new ArgumentNullException(nameof(getSlotById));
             GetUnitIcon = getUnitIcon ?? throw new ArgumentNullException(nameof(getUnitIcon));
         }
     }
