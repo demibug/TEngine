@@ -72,6 +72,11 @@ public static class LayaBattlePrefabImporter
 
     private const float PIXELS_PER_UNIT = 80f;
     private const float SORTING_DEPTH_STEP = 0.001f;
+    private static readonly Vector3 BattleSceneTopLeft = new Vector3(-4f, 7.5f, 0f);
+    private const float MAP0_DIVIDE_X = 0f;
+    private const float MAP0_DIVIDE_Y = 301f;
+    private const float MAP0_DIVIDE_WIDTH = 633f;
+    private const float MAP0_DIVIDE_HEIGHT = 182f;
 
     // 阿斗 Prefab 资源路径（地图嵌套引用的血量表现模板）。
     private const string ADOU_PREFAB_ASSET = "Assets/AssetRaw/Battle/Prefabs/Targets/ADou.prefab";
@@ -127,13 +132,13 @@ public static class LayaBattlePrefabImporter
                     "bg",
                     backgroundRoot,
                     "Background",
-                    new Vector3(-4f, 7.5f, 0f));
+                    BattleSceneTopLeft);
                 MoveRequiredChild(
                     sceneTree.transform,
                     "box",
                     boardRoot,
                     "ImportedBoard",
-                    new Vector3(-4f, 7.5f, 0f));
+                    BattleSceneTopLeft);
             }
             finally
             {
@@ -146,7 +151,7 @@ public static class LayaBattlePrefabImporter
             GameObject themeRoot = BuildUnityTree(themeLayout, new LayaImportContext());
             themeRoot.name = "ThemeRoot";
             themeRoot.transform.SetParent(backgroundRoot, false);
-            themeRoot.transform.localPosition = new Vector3(-4f, 5f, 0f);
+            themeRoot.transform.localPosition = BattleSceneTopLeft;
             OrganizeThemeRoot(themeRoot.transform);
 
             SavePrefabDeterministic(
@@ -698,18 +703,25 @@ public static class LayaBattlePrefabImporter
     {
         Transform importedBoard = FindRequiredChild(boardRoot, "ImportedBoard");
         Transform importedMap = FindRequiredChild(importedBoard, "map");
+        Transform importedUnitSlotRoot = FindRequiredChild(importedBoard, "gameObjectBox");
         Transform ground = CreateChild(boardRoot, "Ground");
+
+        // Laya Image 的子节点坐标始终相对 Image 左上角；但 Unity SpriteRenderer 的
+        // Transform 位于图片中心。map 只是 Laya 的布局容器且没有 skin，因此把它的
+        // Transform 对齐到同一地图区域的 gameObjectBox 左上角，避免其所有子节点
+        // 额外偏移半张地图（640×800 的一半，即 +4,-5 世界单位）。
+        Vector3 mapPosition = importedUnitSlotRoot.position;
+        mapPosition.z = importedMap.position.z;
+        importedMap.position = mapPosition;
 
         MoveRequiredChildPreserveWorld(importedMap, "road", boardRoot, "Road");
         MoveRequiredChildPreserveWorld(importedMap, "highGround", boardRoot, "HighGround");
         MoveRequiredChildPreserveWorld(importedMap, "divide", boardRoot, "Divide");
         MoveRequiredChildPreserveWorld(importedBoard, "gameObjectBox", boardRoot, "UnitSlotRoot");
+        ApplyMap0RuntimeLayout(boardRoot);
 
-        // 原始路径终点 end1/end2 是"80×80 终点格"的左上角，取其格中心作为路径终点锚点
-        // （阿斗与终点格共用的视觉真源），而非使用节点左上角或硬编码格子坐标。
-        // 不整体移动道路、棋盘或单位，只修正终点目标的视觉锚点。
-        Vector3 playerEndAnchor = ExtractEndNodeCenter(importedMap, "end1");
-        Vector3 opponentEndAnchor = ExtractEndNodeCenter(importedMap, "end2");
+        // .ls 中的 end1/end2 是编辑器初始值。原版运行时会依据 Map0 的 8×10 格子
+        // 重设它们，因此 Unity 以与 BattleMapBindings 相同的终点格中心作为锚点。
         RemoveStaticEndNode(importedMap, "end1");
         RemoveStaticEndNode(importedMap, "end2");
 
@@ -730,32 +742,39 @@ public static class LayaBattlePrefabImporter
         CreateGridPoint(spawnPointRoot, "OpponentSpawn", 7, 1);
 
         Transform pathAnchorRoot = CreateChild(boardRoot, "PathAnchorRoot");
-        CreateAnchorPoint(pathAnchorRoot, "PlayerEndAnchor", playerEndAnchor);
-        CreateAnchorPoint(pathAnchorRoot, "OpponentEndAnchor", opponentEndAnchor);
+        CreateGridPoint(pathAnchorRoot, "PlayerEndAnchor", 7, 9);
+        CreateGridPoint(pathAnchorRoot, "OpponentEndAnchor", 0, 0);
 
         // 终点锚点与逻辑格原点重合时，终点节点即锚点位置；否则终点节点位于锚点之下、
         // 用于承载终点格逻辑（放置/寻路），由 BattleMapBindings 校验二者重合。
         Transform endPointRoot = CreateChild(boardRoot, "EndPointRoot");
-        CreateAnchorPoint(endPointRoot, "PlayerEnd", playerEndAnchor);
-        CreateAnchorPoint(endPointRoot, "OpponentEnd", opponentEndAnchor);
+        CreateGridPoint(endPointRoot, "PlayerEnd", 7, 9);
+        CreateGridPoint(endPointRoot, "OpponentEnd", 0, 0);
 
         EmbedAdou(endPointRoot.Find("PlayerEnd"));
         EmbedAdou(endPointRoot.Find("OpponentEnd"));
     }
 
-    /// <summary>
-    /// 提取原始路径终点节点（end1/end2）的"80×80 终点格中心"世界位置。
-    /// z 归零：终点锚点与旧格子坐标保持一致 z=0，避免排序深度偏移。
-    /// </summary>
-    private static Vector3 ExtractEndNodeCenter(Transform importedMap, string endNodeName)
+    /// <summary>应用原版 Map0 打开后对分隔线做出的固定布局覆盖。</summary>
+    private static void ApplyMap0RuntimeLayout(Transform boardRoot)
     {
-        Transform endNode = FindRequiredChild(importedMap, endNodeName);
-        // 终点格 80×80（80ppu=1 世界单位）：半格 = 40px = 0.5 世界单位，
-        // 终点节点坐标是左上角（Laya Y 轴向下），中心 = 左上角 + (0.5, -0.5)。
-        Vector3 localCenter = endNode.localPosition + new Vector3(0.5f, -0.5f, 0f);
-        Vector3 worldCenter = importedMap.TransformPoint(localCenter);
-        worldCenter.z = 0f;
-        return worldCenter;
+        Transform divide = FindRequiredChild(boardRoot, "Divide");
+        SpriteRenderer renderer = divide.GetComponent<SpriteRenderer>();
+        if (renderer == null)
+        {
+            throw new InvalidOperationException("Map0 分隔线缺少 SpriteRenderer。");
+        }
+
+        float centerX = MAP0_DIVIDE_X + MAP0_DIVIDE_WIDTH * 0.5f;
+        float centerY = MAP0_DIVIDE_Y + MAP0_DIVIDE_HEIGHT * 0.5f;
+        Vector3 position = BattleSceneTopLeft + new Vector3(
+            PixelsToWorld(centerX),
+            -PixelsToWorld(200f + centerY),
+            divide.localPosition.z);
+        divide.localPosition = position;
+        renderer.size = new Vector2(
+            PixelsToWorld(MAP0_DIVIDE_WIDTH),
+            PixelsToWorld(MAP0_DIVIDE_HEIGHT));
     }
 
     /// <summary>移除原始路径终点自带的静态心（heartBox），避免与运行时血量重复。</summary>
@@ -766,12 +785,6 @@ public static class LayaBattlePrefabImporter
         {
             UnityEngine.Object.DestroyImmediate(endNode.gameObject);
         }
-    }
-
-    private static void CreateAnchorPoint(Transform parent, string name, Vector3 worldPosition)
-    {
-        Transform point = CreateChild(parent, name);
-        point.position = worldPosition;
     }
 
     /// <summary>
