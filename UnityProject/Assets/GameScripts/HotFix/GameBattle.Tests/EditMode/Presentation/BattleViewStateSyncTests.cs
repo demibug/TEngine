@@ -68,9 +68,9 @@ namespace GameBattle.Tests.EditMode.Presentation
                 return false;
             }
 
-            public bool TryGetUnitFacing(int runtimeId, out bool facingRight)
+            public bool TryGetUnitBodyRotation(int runtimeId, out float angleDegrees)
             {
-                facingRight = true;
+                angleDegrees = 0f;
                 return false;
             }
 
@@ -115,7 +115,7 @@ namespace GameBattle.Tests.EditMode.Presentation
 
             public void SetPosition(object viewObject, float logicX, float logicY) { }
             public void SetHealthRatio(object viewObject, float ratio) { }
-            public void SetBodyFacing(object viewObject, bool facingRight) { }
+            public void SetBodyRotation(object viewObject, float angleDegrees) { }
             public void SetWeaponAim(object viewObject, float angleDegrees) { }
             public void SetProjectileRotation(object viewObject, float angleDegrees) { }
             public void SetAttackIntervalSeconds(object viewObject, float intervalSeconds) { }

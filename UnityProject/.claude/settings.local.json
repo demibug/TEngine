@@ -101,7 +101,16 @@
       "Bash(git add *)",
       "Bash(powershell -NoProfile -Command \"if \\(Test-Path -LiteralPath 'E:\\\\MyWork\\\\MyTD\\\\TEngine\\\\UnityProject\\\\nul'\\) { 'FILE_EXISTS' } else { 'FILE_GONE' }\")",
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\\\MyWork\\\\MyTD\\\\TEngine\\\\check_nul2.ps1\")",
-      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\\\MyWork\\\\MyTD\\\\TEngine\\\\del_nul2.ps1\")"
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File \"E:\\\\MyWork\\\\MyTD\\\\TEngine\\\\del_nul2.ps1\")",
+      "Bash(powershell.exe -NoProfile -Command \"[System.Reflection.Assembly]::LoadWithPartialName\\('System.Drawing'\\) | Out-Null; [System.Drawing.Bitmap]::new\\(1,1\\).GetType\\(\\).FullName\")",
+      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\Temp\\\\gen_level_numbers.ps1\")",
+      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\Temp\\\\find_single_sprite.ps1\")",
+      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\Temp\\\\gen_level_number_meta.ps1\")",
+      "Bash(find \"C:/Program Files\" \"C:/Program Files \\(x86\\)\" -maxdepth 4 -iname \"Unity.exe\" 2>/dev/null)",
+      "Bash(powershell.exe -NoProfile -Command \"Get-Process Unity -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,MainWindowTitle | Format-Table -AutoSize\")",
+      "Bash(git -C \"E:/MyWork/MyTD/TEngine/UnityProject\" log --oneline -3 -- \"Assets/Editor/Battle/BattleSpriteImportPostprocessor.cs\")",
+      "Bash(tail -5 \"C:/Users/Administrator/AppData/Local/Unity/Editor/Editor.log\")",
+      "WebFetch(domain:docs.unity.cn)"
     ],
     "ask": [
       "Bash(rm *)",

@@ -328,12 +328,14 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 延迟移除队列：死亡请求入队，遍历结束后由 ProcessRemoveQueue 统一处理。
+        /// 延迟移除队列：移除请求入队，遍历结束后由 ProcessRemoveQueue 统一处理。
         /// <para>对应决策 0.4 "TryFreeze 不在嵌套伤害调用栈内重入销毁集合"——
-        /// 同子步内多个死亡请求不重入修改集合，先入队再统一处理。</para>
-        /// <para>使用 List 而非 Queue 以便诊断时观察与去重。</para>
+        /// 同子步内多个移除请求不重入修改集合，先入队再统一处理。</para>
+        /// <para>队列元素携带 <see cref="EnemyRemovalReason"/>，驱动注销时是否播放死亡表现，
+        /// 并保证同一 ID 无论重复请求多少次都只回收一次。</para>
         /// </summary>
-        private readonly List<int> _removeQueue = new List<int>();
+        private readonly List<(int id, EnemyRemovalReason reason)> _removeQueue =
+            new List<(int id, EnemyRemovalReason reason)>();
 
         /// <summary>敌人完成登记后的低频表现事实。</summary>
         internal event Action<int, bool, float, float> EnemySpawned;
@@ -351,6 +353,14 @@ namespace GameBattle
         /// 表现层据此立即隐藏血条并复位。</para>
         /// </remarks>
         internal event Action<int, int, int, int> EnemyHealthChanged;
+
+        /// <summary>
+        /// 敌军归还对象池回调：由 BattleRuntimeFactory 装配时桥接到 EnemyFactory.Release。
+        /// <para>在敌军从活动集合注销后调用，保证每次 Acquire 恰好对应一次 Release
+        /// （池租借对称契约）。同一 ID 由 <see cref="ProcessRemoveQueue"/> / <see cref="GameOver"/>
+        /// 保证只归还一次。</para>
+        /// </summary>
+        internal Action<IEnemyEntity> ReleaseEnemy { get; set; }
 
         // ====================================================================
         // 冻结标志（决策 0.4）
@@ -1073,6 +1083,23 @@ namespace GameBattle
         /// </remarks>
         internal void ForceRemove(int id)
         {
+            RequestRemoveEnemy(id, EnemyRemovalReason.Forced);
+        }
+
+        /// <summary>
+        /// 请求按指定原因移除敌人（供敌人死亡/终点攻击回调注入）。
+        /// </summary>
+        /// <param name="id">敌人运行时 ID。</param>
+        /// <param name="reason">移除原因（驱动表现与回收语义）。</param>
+        /// <remarks>
+        /// <para>由 <see cref="EnemyBase"/> 在血量归零（Killed）或抵达路径终点
+        /// （ReachedEndPoint）时通过注入的回调调用本方法，内部委托入队。入队后由
+        /// <see cref="ProcessRemoveQueue"/> 在遍历结束后统一处理，避免在伤害调用栈内
+        /// 重入销毁集合（决策 0.4）。</para>
+        /// <para>幂等：ID 不存在或已入队则跳过——同一 ID 无论重复请求多少次都只回收一次。</para>
+        /// </remarks>
+        internal void RequestRemoveEnemy(int id, EnemyRemovalReason reason)
+        {
             if (!_enemiesById.TryGetValue(id, out IEnemyEntity enemy))
             {
                 return;
@@ -1081,33 +1108,27 @@ namespace GameBattle
             // 调用 gameOver 触发敌人自身清理（回收表现、清除定时器等）。
             enemy.GameOver();
 
-            // 入队移除队列，遍历结束后统一处理。
-            if (!_removeQueue.Contains(id))
+            // 入队移除队列，遍历结束后统一处理。重复请求同 ID 只入队一次（首次 reason 生效）。
+            for (int index = 0; index < _removeQueue.Count; index++)
             {
-                _removeQueue.Add(id);
+                if (_removeQueue[index].id == id)
+                {
+                    return;
+                }
             }
+
+            _removeQueue.Add((id, reason));
         }
 
         /// <summary>
-        /// 请求移除敌人（供敌人死亡回调注入）。
-        /// </summary>
-        /// <remarks>
-        /// <para>由 <see cref="EnemyBase"/> 在血量归零时通过注入的回调调用本方法，
-        /// 内部委托 <see cref="ForceRemove"/> 入队。入队后由 <see cref="ProcessRemoveQueue"/>
-        /// 在遍历结束后统一处理，避免在伤害调用栈内重入销毁集合（决策 0.4）。</para>
-        /// <para>幂等：ID 不存在或已入队则跳过（<see cref="ForceRemove"/> 语义）。</para>
-        /// </remarks>
-        internal void RequestRemoveEnemy(int id)
-        {
-            ForceRemove(id);
-        }
-
-        /// <summary>
-        /// 处理移除队列：统一注销所有待移除敌人。
+        /// 处理移除队列：统一注销并归还所有待移除敌人。
         /// </summary>
         /// <remarks>
         /// <para>由 <see cref="Update"/> 在遍历结束后调用。也可由外部在安全点显式调用。
         /// 处理后清空队列。幂等：队列中的 ID 若已不存在则跳过。</para>
+        /// <para>按 <see cref="EnemyRemovalReason"/> 决定 <see cref="Unregister"/> 的
+        /// <c>playDeathEffect</c>（Killed 保留死亡表现，其余不播），并从活动集合注销后
+        /// 经 <see cref="ReleaseEnemy"/> 归还对象池（恰好一次）。</para>
         /// </remarks>
         internal void ProcessRemoveQueue()
         {
@@ -1116,9 +1137,15 @@ namespace GameBattle
                 return;
             }
 
-            foreach (int id in _removeQueue)
+            foreach ((int id, EnemyRemovalReason reason) in _removeQueue)
             {
-                Unregister(id);
+                if (!_enemiesById.TryGetValue(id, out IEnemyEntity enemy))
+                {
+                    continue;
+                }
+
+                Unregister(id, playDeathEffect: reason == EnemyRemovalReason.Killed);
+                ReleaseEnemy?.Invoke(enemy);
             }
             _removeQueue.Clear();
         }
@@ -1210,8 +1237,9 @@ namespace GameBattle
                 if (_enemiesById.TryGetValue(id, out IEnemyEntity enemy))
                 {
                     enemy.GameOver();
-                    // 结算清理是静默回收，不播放死亡表现。
+                    // 结算清理是静默回收，不播放死亡表现；注销后归还对象池（恰好一次）。
                     Unregister(id, playDeathEffect: false);
+                    ReleaseEnemy?.Invoke(enemy);
                 }
             }
 

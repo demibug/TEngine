@@ -102,7 +102,7 @@ namespace GameBattle
     /// <para><b>本类型为 internal：</b>只供 GameBattle 内部规则服务（<c>EnemyManager</c>、
     /// <c>AttackResolver</c> 等）调用，不对其他程序集暴露。</para>
     /// </remarks>
-    internal sealed class BattleTarget
+    internal sealed class BattleTarget : IEnemyEndPointAttackTarget
     {
         // ====================================================================
         // 状态机（对应 BattleTarget.js:25 battleTargetState）
@@ -569,6 +569,26 @@ namespace GameBattle
             }
 
             return true;
+        }
+
+        // ========================================================================
+        // IEnemyEndPointAttackTarget —— 敌军终点攻击入口
+        // ========================================================================
+
+        /// <summary>
+        /// 接收一次敌军终点攻击：复用 <see cref="ApplyDamage"/> 对阿斗扣血。
+        /// </summary>
+        /// <param name="request">终点攻击载荷（攻击者 ID / 车道 / 伤害）。</param>
+        /// <returns>true=攻击生效（目标接受伤害）；false=目标已死亡、已冻结或拒绝伤害。</returns>
+        /// <remarks>
+        /// <para>只转发到 <see cref="ApplyDamage"/>：该方法已含"目标死亡/冻结拒绝伤害返回 false"
+        /// 守卫，且日志即"终点受击"。攻击者车道由 <see cref="_isPlayerLaneTarget"/> 决定，
+        /// 本方法不额外校验请求车道——车道绑定在装配阶段（BattleRuntimeFactory 按车道选目标）
+        /// 完成，运行时不重复判断。</para>
+        /// </remarks>
+        bool IEnemyEndPointAttackTarget.ReceiveEndPointAttack(EndPointAttackRequest request)
+        {
+            return ApplyDamage(request.Damage, request.AttackerRuntimeId);
         }
     }
 

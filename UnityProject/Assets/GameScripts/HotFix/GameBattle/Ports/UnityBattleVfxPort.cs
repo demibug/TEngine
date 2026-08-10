@@ -14,6 +14,7 @@ namespace GameBattle
     internal sealed class UnityBattleVfxPort : IBattleVfxPort
     {
         private const string ArrowAddress = "Arrow";
+        private const string MergeEffectAddress = "Sprites/Extracted/GameObject/soldier/mergeEff1";
 
         private readonly BattleMapBindings _bindings;
         private readonly Dictionary<string, string> _requiredPrefabs = new Dictionary<string, string>
@@ -27,6 +28,7 @@ namespace GameBattle
         private readonly HashSet<GameObject> _activeInstances = new HashSet<GameObject>();
 
         private bool _preloaded;
+        private Sprite _mergeEffectSprite;
 
         internal UnityBattleVfxPort(BattleMapBindings bindings)
         {
@@ -55,6 +57,18 @@ namespace GameBattle
                         requiredPrefab.Key,
                         requiredPrefab.Value,
                         cancellationToken);
+                }
+
+                // 合并特效：用已提取的 mergeEff1.png 静态贴图做短时效（无 Prefab 时的最小接入）。
+                AssetHandle mergeHandle = resource.LoadAssetAsyncHandle<Sprite>(MergeEffectAddress);
+                if (mergeHandle != null)
+                {
+                    _assetHandles.Add(mergeHandle);
+                    await UniTask.WaitUntil(() => mergeHandle.IsDone, cancellationToken: cancellationToken);
+                    if (mergeHandle.IsValid && mergeHandle.AssetObject is Sprite mergeSprite)
+                    {
+                        _mergeEffectSprite = mergeSprite;
+                    }
                 }
 
                 _preloaded = true;
@@ -93,7 +107,32 @@ namespace GameBattle
 
         public void PlaySpawnEffect(string vfxId, int gridX, int gridY)
         {
+            if (vfxId == "unit_merge" && _mergeEffectSprite != null)
+            {
+                PlayMergeSpriteEffect(_bindings.CellToWorld(gridX, gridY));
+                return;
+            }
+
             PlayOptionalVfx(vfxId, _bindings.CellToWorld(gridX, gridY));
+        }
+
+        /// <summary>
+        /// 播放合并特效（mergeEff1.png 静态贴图，短暂显示后自动回收）。
+        /// 原工程没有可加载的 unit_merge Prefab，此处用已提取贴图做最小接入。
+        /// </summary>
+        private void PlayMergeSpriteEffect(Vector3 worldPosition)
+        {
+            var go = new GameObject("MergeEffect");
+            go.transform.SetParent(_bindings.EffectRoot, false);
+            go.transform.position = worldPosition;
+            go.transform.localScale = Vector3.one;
+
+            SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
+            renderer.sprite = _mergeEffectSprite;
+            renderer.sortingOrder = 20;
+
+            // 短暂显示后自动销毁（无 Coroutine，用 Update 计时）。
+            go.AddComponent<AutoDestroyVfx>().Run(durationSeconds: 1f);
         }
 
         public void Clear()
@@ -281,6 +320,29 @@ namespace GameBattle
             if (gameObject != null)
             {
                 UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 短暂显示后自动销毁自身的 VFX 组件（无 Coroutine，用 Update 计时）。
+    /// </summary>
+    internal sealed class AutoDestroyVfx : MonoBehaviour
+    {
+        private float _remaining;
+
+        /// <summary>启动自动销毁计时。</summary>
+        internal void Run(float durationSeconds)
+        {
+            _remaining = durationSeconds > 0f ? durationSeconds : 1f;
+        }
+
+        private void Update()
+        {
+            _remaining -= Time.deltaTime;
+            if (_remaining <= 0f)
+            {
+                Destroy(gameObject);
             }
         }
     }

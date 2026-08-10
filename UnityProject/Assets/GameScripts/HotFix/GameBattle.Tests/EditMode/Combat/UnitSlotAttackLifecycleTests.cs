@@ -270,10 +270,9 @@ namespace GameBattle.Tests.EditMode.Combat
             IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
             IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
             UnitSlot sourceReserve = reserves[0];
-            UnitSlot reserveTarget = reserves[1];
             UnitSlot battle = battles[0];
 
-            // 上场：Reserve → Battle。
+            // 上场：Reserve[0] → Battle[0]。
             Assert.IsFalse(sourceReserve.IsEmpty, "开局待上场槽已填满");
             BattleInputResult up = _controller.Execute(
                 BattleInputCommand.CreateDropUnit(1, sourceReserve.SlotId.Id, battle.SlotId.Id));
@@ -286,21 +285,21 @@ namespace GameBattle.Tests.EditMode.Combat
             // 模拟已攻击过：冷却 = 500ms（写回实例）。
             soldier.LastAttackTimeMs = 500L;
 
-            // 下场：Battle → Reserve（同一 UnitId）。
-            Assert.IsTrue(_slotBoard.GetSlot(reserveTarget.SlotId).IsEmpty, "目标待上场槽空");
+            // 下场：Battle → Reserve[0]（源槽，上场后已空）。
+            Assert.IsTrue(_slotBoard.GetSlot(sourceReserve.SlotId).IsEmpty, "源待上场槽已空（上场后腾出）");
             BattleInputResult down = _controller.Execute(
-                BattleInputCommand.CreateDropUnit(2, battle.SlotId.Id, reserveTarget.SlotId.Id));
+                BattleInputCommand.CreateDropUnit(2, battle.SlotId.Id, sourceReserve.SlotId.Id));
             Assert.IsTrue(down.IsSuccess, "下场应成功");
 
             // 下场后解除战斗实例。
             Assert.IsNull(_unitRegistry.GetActiveByUnitId(unitId), "下场后解除战斗实例");
             // 冷却写回 BattleUnit（WriteBackCooldown）。
-            Assert.AreEqual(500L, _slotBoard.GetSlot(reserveTarget.SlotId).Occupant.Value.LastAttackTimeMs,
+            Assert.AreEqual(500L, _slotBoard.GetSlot(sourceReserve.SlotId).Occupant.Value.LastAttackTimeMs,
                 "下场后冷却写回 BattleUnit");
 
-            // 再上场：Reserve → Battle（同一 UnitId，冷却导入）。
+            // 再上场：Reserve[0] → Battle[0]（同一 UnitId，冷却导入）。
             BattleInputResult upAgain = _controller.Execute(
-                BattleInputCommand.CreateDropUnit(3, reserveTarget.SlotId.Id, battle.SlotId.Id));
+                BattleInputCommand.CreateDropUnit(3, sourceReserve.SlotId.Id, battle.SlotId.Id));
             Assert.IsTrue(upAgain.IsSuccess, "重新上场应成功");
 
             SoldierBase reactivated = _unitRegistry.GetActiveByUnitId(unitId);

@@ -5,12 +5,12 @@ using NUnit.Framework;
 namespace GameBattle.Tests.EditMode.Enemy
 {
     // ============================================================================
-    // 任务 4.7：敌人系统集成测试 —— 移动/接触、路径边界、死亡、同子步集合修改、
+    // 任务 4.7：敌人系统集成测试 —— 移动/终点攻击、路径边界、死亡、同子步集合修改、
     //           重复死亡、奖励一次、Mob0 池复用无污染
     // ----------------------------------------------------------------------------
     // 验证要求（task 4.7）：
-    //   1. 敌人移动/接触：EnemyBase 沿路径移动到末尾后接触 BattleTarget，造成伤害。
-    //   2. 路径边界：敌人走完全部路径点后索引达 length，触发 GameOver 回收。
+    //   1. 敌人移动/终点攻击：EnemyBase 沿路径移动到末尾后发起终点攻击，造成伤害。
+    //   2. 路径边界：敌人走完全部路径点后索引达 length，请求以 ReachedEndPoint 原因回收。
     //   3. 死亡：Hit 血量归零进入 DEAD，击杀回调触发，奖励提交。
     //   4. 同子步集合修改：EnemyManager.Update 中敌人触发 ForceRemove 不重入修改集合，
     //      先入 _removeQueue 再遍历结束后统一处理（决策 0.4）。
@@ -36,21 +36,22 @@ namespace GameBattle.Tests.EditMode.Enemy
     //   移除请求入 _removeQueue，由 ProcessRemoveQueue 统一处理。
     //
     // design.md 决策 4：敌人注册、空间索引、伤害、回收等一致性操作使用直接调用，
-    //   不通过全局事件总线。EnemyBase 通过 ContactBattleTargetHandler 委托接触
-    //   BattleTarget，通过 EnemyKilledHandler 委托提交击杀奖励。
+    //   不通过全局事件总线。EnemyBase 通过 IEnemyEndPointAttackTarget 接口发起
+    //   终点攻击，通过 EnemyKilledHandler 委托提交击杀奖励，通过 EnemyDeathRequestHandler
+    //   委托请求移除。
     //
     // 本测试不接触 Scene、FUI 或资源加载，符合纯逻辑 EditMode 约束（task 2.2）。
     // ============================================================================
 
     /// <summary>
-    /// 敌人系统集成测试：移动/接触、路径边界、死亡、同子步集合修改、重复死亡、
+    /// 敌人系统集成测试：移动/终点攻击、路径边界、死亡、同子步集合修改、重复死亡、
     /// 奖励一次、Mob0 池复用无污染（task 4.7）。
     /// </summary>
     /// <remarks>
     /// <para>验证覆盖（task 4.7 的 7 个场景）：</para>
     /// <list type="bullet">
-    /// <item>敌人移动/接触：EnemyBase 沿路径移动到末尾接触 BattleTarget。</item>
-    /// <item>路径边界：走完全部路径点后索引达 length，GameOver 回收。</item>
+    /// <item>敌人移动/终点攻击：EnemyBase 沿路径移动到末尾发起终点攻击。</item>
+    /// <item>路径边界：走完全部路径点后索引达 length，请求 ReachedEndPoint 回收。</item>
     /// <item>死亡：Hit 血量归零进入 DEAD，击杀回调触发。</item>
     /// <item>同子步集合修改：Update 中 ForceRemove 入队，遍历后统一处理。</item>
     /// <item>重复死亡：多次 Hit 致死只触发一次击杀回调。</item>
@@ -58,8 +59,9 @@ namespace GameBattle.Tests.EditMode.Enemy
     /// <item>Mob0 池复用无污染：Release 后 Reset 清除 target/id/state。</item>
     /// </list>
     /// <para>本测试使用真实生产类型（EnemyBase/Mob0Enemy/EnemyFactory/EnemyManager/
-    /// BattleObjectPool/BattleTarget），通过委托注入 BattleTarget 接触回调与击杀奖励回调，
-    /// 验证跨类集成行为。不使用 Mock 框架，全部为手写测试夹具。</para>
+    /// BattleObjectPool/BattleTarget），通过 IEnemyEndPointAttackTarget 目标桩注入终点攻击
+    /// 与 EnemyKilledHandler 击杀奖励回调，验证跨类集成行为。不使用 Mock 框架，
+    /// 全部为手写测试夹具。</para>
     /// </remarks>
     [TestFixture]
     internal class EnemyIntegrationTests
@@ -91,8 +93,11 @@ namespace GameBattle.Tests.EditMode.Enemy
         /// </summary>
         private sealed class IntegrationEnemy : EnemyBase
         {
-            /// <summary>接触回调累计次数。</summary>
-            public int ContactCount;
+            /// <summary>终点攻击回调累计次数。</summary>
+            public int EndPointAttackCount;
+
+            /// <summary>上次终点攻击是否生效（目标返回 true）。</summary>
+            public bool LastEndPointResult;
 
             /// <summary>击杀回调累计次数（对应 EnemyKilledHandler 触发次数）。</summary>
             public int KillCallbackCount;
@@ -109,34 +114,28 @@ namespace GameBattle.Tests.EditMode.Enemy
             /// <summary>上次击杀的阵营。</summary>
             public bool LastKillIsPlayerLane;
 
-            /// <summary>上次接触是否生效（contactTarget 返回 true）。</summary>
-            public bool LastContactResult;
-
             /// <summary>死亡请求移除回调累计次数（对应 EnemyDeathRequestHandler 触发次数）。</summary>
             public int DeathRequestedCount;
 
             /// <summary>上次死亡请求移除的敌人 ID。</summary>
             public int LastDeathRequestedEnemyId;
 
+            /// <summary>上次死亡请求移除的原因。</summary>
+            public EnemyRemovalReason LastDeathRequestedReason;
+
             /// <summary>
-            /// 配置测试依赖并注入记录回调。自动包装 contactTarget 以记录接触次数。
+            /// 配置测试依赖并注入记录回调。自动包装终点攻击目标以记录调用次数与结果。
             /// </summary>
             /// <param name="map">地图数据。</param>
-            /// <param name="contactTarget">接触目标回调（可自定义，如委托到 BattleTarget）。</param>
+            /// <param name="endPointTarget">终点攻击目标（可自定义，如委托到 BattleTarget）。</param>
             /// <param name="onEnemyKilled">击杀奖励回调。</param>
             internal void ConfigureForTest(
                 MapData map,
-                ContactBattleTargetHandler contactTarget,
+                IEnemyEndPointAttackTarget endPointTarget,
                 EnemyKilledHandler onEnemyKilled)
             {
-                // 包装接触回调以记录接触次数与结果（复用 EnemyBaseTests.TestEnemy 模式）。
-                ContactBattleTargetHandler wrappedContact = (isPlayerLane, damage, attackerId) =>
-                {
-                    ContactCount++;
-                    bool result = contactTarget(isPlayerLane, damage, attackerId);
-                    LastContactResult = result;
-                    return result;
-                };
+                // 包装终点攻击目标以记录调用次数与结果。
+                IEnemyEndPointAttackTarget wrappedTarget = new RecordingTarget(this, endPointTarget);
 
                 // 包装击杀回调以记录击杀次数与参数。
                 EnemyKilledHandler wrappedKill = (killedId, attackerId, reward, isPlayerLane) =>
@@ -149,14 +148,36 @@ namespace GameBattle.Tests.EditMode.Enemy
                     onEnemyKilled(killedId, attackerId, reward, isPlayerLane);
                 };
 
-                // 记录死亡请求移除回调次数与参数。
-                EnemyDeathRequestHandler wrappedDeath = (killedId) =>
+                // 记录死亡请求移除回调次数、参数与原因。
+                EnemyDeathRequestHandler wrappedDeath = (killedId, reason) =>
                 {
                     DeathRequestedCount++;
                     LastDeathRequestedEnemyId = killedId;
+                    LastDeathRequestedReason = reason;
                 };
 
-                Configure(map, CellSize, wrappedContact, wrappedKill, wrappedDeath);
+                Configure(map, CellSize, wrappedTarget, wrappedKill, wrappedDeath);
+            }
+
+            /// <summary>记录终点攻击调用并转发到真实目标的包装目标。</summary>
+            private sealed class RecordingTarget : IEnemyEndPointAttackTarget
+            {
+                private readonly IntegrationEnemy _owner;
+                private readonly IEnemyEndPointAttackTarget _inner;
+
+                internal RecordingTarget(IntegrationEnemy owner, IEnemyEndPointAttackTarget inner)
+                {
+                    _owner = owner;
+                    _inner = inner;
+                }
+
+                public bool ReceiveEndPointAttack(EndPointAttackRequest request)
+                {
+                    _owner.EndPointAttackCount++;
+                    bool result = _inner?.ReceiveEndPointAttack(request) ?? true;
+                    _owner.LastEndPointResult = result;
+                    return result;
+                }
             }
 
             /// <summary>暴露 Init 供测试调用。</summary>
@@ -174,9 +195,6 @@ namespace GameBattle.Tests.EditMode.Enemy
 
             /// <summary>暴露 BeginMoving 供测试调用。</summary>
             internal void StartMoving() => BeginMoving();
-
-            /// <summary>暴露 ConfigureFrameNow 供测试调用。</summary>
-            internal void SetFrameNow(long frameNowMs) => ConfigureFrameNow(frameNowMs);
 
             /// <summary>暴露 DeathStarted 供测试验证。</summary>
             internal bool TestDeathStarted => DeathStarted;
@@ -275,27 +293,66 @@ namespace GameBattle.Tests.EditMode.Enemy
             (killedId, attackerId, reward, isPlayerLane) => { };
 
         /// <summary>
+        /// 恒返回 true 的终点攻击目标桩：测试不关心攻击结果时使用。
+        /// </summary>
+        private static readonly IEnemyEndPointAttackTarget AlwaysTrueTarget =
+            new AlwaysTrueEndPointTarget();
+
+        /// <summary>
+        /// 恒返回 true 的终点攻击目标实现（ReceiveEndPointAttack 无条件生效）。
+        /// </summary>
+        private sealed class AlwaysTrueEndPointTarget : IEnemyEndPointAttackTarget
+        {
+            public bool ReceiveEndPointAttack(EndPointAttackRequest request) => true;
+        }
+
+        /// <summary>
+        /// 记录终点攻击伤害并委托到 BattleState.ApplyDamage 的目标桩（验证终点攻击伤害链路）。
+        /// </summary>
+        private sealed class RecordingStateDamageTarget : IEnemyEndPointAttackTarget
+        {
+            private readonly BattleState _state;
+
+            /// <summary>累计收到的终点攻击伤害。</summary>
+            public int DamageReceived;
+
+            /// <summary>上次终点攻击的目标车道（true=玩家方）。</summary>
+            public bool LastIsPlayerLane;
+
+            internal RecordingStateDamageTarget(BattleState state)
+            {
+                _state = state;
+            }
+
+            public bool ReceiveEndPointAttack(EndPointAttackRequest request)
+            {
+                DamageReceived += request.Damage;
+                LastIsPlayerLane = request.IsPlayerLane;
+                // 委托到 BattleState.ApplyDamage（玩家方目标受击）。
+                _state.ApplyDamage(true, request.Damage);
+                return true;
+            }
+        }
+
+        /// <summary>
         /// 构造一个已 Configure + Init + BeginMoving 的集成测试敌人，位于玩家路径起点。
         /// </summary>
         /// <param name="map">地图数据。</param>
-        /// <param name="contactTarget">接触目标回调。</param>
+        /// <param name="endPointTarget">终点攻击目标。</param>
         /// <param name="onEnemyKilled">击杀奖励回调（null 时使用空操作）。</param>
         /// <param name="id">敌人运行时 ID。</param>
         /// <param name="maxHealth">最大血量。</param>
-        /// <param name="frameNowMs">初始帧时间戳。</param>
         private static IntegrationEnemy CreateMovingEnemy(
             MapData map,
-            ContactBattleTargetHandler contactTarget,
+            IEnemyEndPointAttackTarget endPointTarget,
             EnemyKilledHandler onEnemyKilled,
             int id = 1,
-            int maxHealth = 100,
-            long frameNowMs = 1000)
+            int maxHealth = 100)
         {
             var enemy = new IntegrationEnemy();
-            enemy.ConfigureForTest(map, contactTarget, onEnemyKilled ?? NoOpKillHandler);
+            enemy.ConfigureForTest(map, endPointTarget, onEnemyKilled ?? NoOpKillHandler);
             enemy.AssignId(id);
             enemy.InitForTest(isPlayerLane: true, maxHealth);
-            enemy.SetFrameNow(frameNowMs);
             enemy.StartMoving();
             return enemy;
         }
@@ -340,36 +397,27 @@ namespace GameBattle.Tests.EditMode.Enemy
         }
 
         // ====================================================================
-        // 场景 1：敌人移动/接触目标
+        // 场景 1：敌人移动/终点攻击目标
         // ====================================================================
 
         [Test]
-        [Description("敌人沿路径移动到末尾后接触目标，通过委托对 BattleTarget 造成 1 点伤害。"
-            + " 验证 EnemyBase.AttackBattleTarget → ContactBattleTargetHandler → BattleTarget.ApplyDamage 集成链。"
+        [Description("敌人沿路径移动到末尾后发起终点攻击，通过目标桩对 BattleTarget 造成 1 点伤害。"
+            + " 验证 EnemyBase.AttemptEndPointAttackOnce → IEnemyEndPointAttackTarget → BattleState.ApplyDamage 集成链。"
             + " spec '伤害、死亡事实 MUST 在其发生点同步生效'。")]
         public void EnemyMoveAndContact_DealsDamageToBattleTarget()
         {
             MapData map = BuildLinearPathMapData();
 
-            // 构造一个最小 BattleState 作为接触伤害的接收方。
-            // 玩家方目标生命默认 3，敌人接触造成 1 点伤害。
+            // 构造一个最小 BattleState 作为终点攻击伤害的接收方。
+            // 玩家方目标生命默认 3，终点攻击造成 1 点伤害。
             var state = new BattleState();
             state.ApplyStartGame(nowMs: 0);
 
-            // 构造接触回调：委托到 state.ApplyDamage（模拟 BattleTarget.ReceiveEnemyContact 语义）。
-            // 玩家车道敌人接触玩家方目标，造成 1 点伤害。
-            int contactDamageReceived = 0;
-            bool contactIsPlayerLane = false;
-            ContactBattleTargetHandler contactTarget = (isPlayerLane, damage, attackerId) =>
-            {
-                contactDamageReceived += damage;
-                contactIsPlayerLane = isPlayerLane;
-                // 委托到 BattleState.ApplyDamage（玩家方目标受击）。
-                state.ApplyDamage(true, damage);
-                return true;
-            };
+            // 构造终点攻击目标桩：记录伤害并委托到 state.ApplyDamage（模拟 BattleTarget 语义）。
+            // 玩家车道敌人终点攻击玩家方目标，造成 1 点伤害。
+            var contactTarget = new RecordingStateDamageTarget(state);
 
-            var enemy = CreateMovingEnemy(map, contactTarget, onEnemyKilled: null, id: 1, frameNowMs: 1000);
+            var enemy = CreateMovingEnemy(map, contactTarget, onEnemyKilled: null, id: 1);
 
             // 4 点路径 (0,0)→(80,0)→(160,0)→(240,0)，3 段 × 80px。
             // 50px/s，每段 80px 需 1600ms（50*1600/1000=80px）。
@@ -380,47 +428,35 @@ namespace GameBattle.Tests.EditMode.Enemy
                 enemy.Update(1600);
             }
 
-            // 走完全程后应触发接触回调。
-            Assert.GreaterOrEqual(enemy.ContactCount, 1, "走完全程后触发接触回调。");
-            Assert.AreEqual(1, contactDamageReceived, "接触伤害为 1 点。");
-            Assert.IsTrue(contactIsPlayerLane, "接触阵营为玩家方。");
+            // 走完全程后应触发终点攻击。
+            Assert.GreaterOrEqual(enemy.EndPointAttackCount, 1, "走完全程后触发终点攻击。");
+            Assert.AreEqual(1, contactTarget.DamageReceived, "终点攻击伤害为 1 点。");
+            Assert.IsTrue(contactTarget.LastIsPlayerLane, "终点攻击目标为玩家方。");
             Assert.AreEqual(BattleState.DefaultMaxHealth - 1, state.PlayerHealth,
-                "玩家方目标生命 3-1=2（接触伤害生效）。");
+                "玩家方目标生命 3-1=2（终点攻击伤害生效）。");
         }
 
         [Test]
-        [Description("敌人接触有 500ms 冷却：冷却内不重复造成伤害。"
-            + " 对应 EnemyBase.js:428-429 接触冷却读 frameNowMs。"
-            + " 决策 0.9：同帧所有子步观察同一 frameNowMs。")]
-        public void EnemyContact_Cooldown500Ms_NoRepeatDamage()
+        [Description("敌人终点攻击无冷却、严格一次性：两个敌人各自走完全程，都恰好攻击 1 次。"
+            + " 不再依赖 500ms 接触冷却（终点接触是一次到达事件，必须只尝试一次）。")]
+        public void EnemyEndPointAttack_Once_NoRepeatAttack()
         {
             MapData map = BuildLinearPathMapData();
 
-            int contactCount = 0;
-            ContactBattleTargetHandler contactTarget = (isPlayerLane, damage, attackerId) =>
-            {
-                contactCount++;
-                return true;
-            };
+            // 两个敌人各自从路径起点走完全程。
+            var enemyA = CreateMovingEnemy(map, AlwaysTrueTarget, onEnemyKilled: null, id: 1);
+            var enemyB = CreateMovingEnemy(map, AlwaysTrueTarget, onEnemyKilled: null, id: 2);
 
-            // frameNowMs=0，lastAttackTime=0，0-0=0 < 500 冷却不通过。
-            var enemyInCooldown = CreateMovingEnemy(
-                map, contactTarget, onEnemyKilled: null, id: 1, frameNowMs: 0);
-            // 使用 1600ms/帧（80px/帧）避免过冲振荡。
+            // 使用 1600ms/帧（80px/帧）避免过冲振荡，8 帧足以走完全程。
             for (int i = 0; i < 8; i++)
             {
-                enemyInCooldown.Update(1600);
+                enemyA.Update(1600);
+                enemyB.Update(1600);
             }
-            Assert.AreEqual(0, contactCount, "frameNowMs=0 与 lastAttackTime=0 差 0 < 500ms，不触发接触。");
 
-            // frameNowMs=1000，lastAttackTime=0，1000-0>=500 冷却通过。
-            var enemyCooldownPassed = CreateMovingEnemy(
-                map, contactTarget, onEnemyKilled: null, id: 2, frameNowMs: 1000);
-            for (int i = 0; i < 8; i++)
-            {
-                enemyCooldownPassed.Update(1600);
-            }
-            Assert.GreaterOrEqual(contactCount, 1, "frameNowMs=1000 冷却通过，触发接触。");
+            // 每个敌人走到终点恰好攻击一次（严格一次性，无冷却可重复）。
+            Assert.AreEqual(1, enemyA.EndPointAttackCount, "敌人 A 走完全程恰好攻击 1 次。");
+            Assert.AreEqual(1, enemyB.EndPointAttackCount, "敌人 B 走完全程恰好攻击 1 次。");
         }
 
         // ====================================================================
@@ -428,48 +464,47 @@ namespace GameBattle.Tests.EditMode.Enemy
         // ====================================================================
 
         [Test]
-        [Description("敌人走完全部路径点后路径索引达 length，触发 GameOver 回收。"
-            + " 对应 EnemyBase.js:411-418 索引达 length 时 gameOver。"
-            + " 验证路径边界：索引不越界，到达终点后安全回收。")]
-        public void PathBoundary_ReachesEnd_TriggersGameOver()
+        [Description("敌人走完全部路径点后路径索引达 length，请求以 ReachedEndPoint 原因移除。"
+            + " 对应 EnemyBase.AttemptEndPointAttackOnce：终点攻击后经 EnemyDeathRequestHandler 请求回收。"
+            + " 验证路径边界：索引不越界，到达终点后请求移除。")]
+        public void PathBoundary_ReachesEnd_RequestsReachedEndPointRemoval()
         {
             MapData map = BuildLinearPathMapData();
-            var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true, onEnemyKilled: null, id: 1, frameNowMs: 1000);
+            var enemy = CreateMovingEnemy(map, AlwaysTrueTarget, onEnemyKilled: null, id: 1);
 
             // 4 点路径，3 段 × 80px = 240px。50px/s，每段 1600ms（80px/帧）。
-            // 使用 1600ms/帧避免过冲振荡。8 帧足以走完全程并触发 GameOver。
+            // 使用 1600ms/帧避免过冲振荡。8 帧足以走完全程并请求移除。
             for (int i = 0; i < 8; i++)
             {
                 enemy.Update(1600);
             }
 
-            // 走完全程后触发 GameOver（GameOver 重置 index 为 0 并置 inPool=true）。
-            // 注：HandlePathIndexChanged 先置 deathStarted=true 再调 GameOver，
-            // GameOver 内部重置 deathStarted=false，故此处只验证 inPool。
-            Assert.IsTrue(enemy.TestInPool, "到达路径终点触发 GameOver 回收。");
+            // 走完全程后请求以 ReachedEndPoint 原因移除一次。
+            Assert.AreEqual(1, enemy.DeathRequestedCount, "到达路径终点请求移除一次。");
+            Assert.AreEqual(EnemyRemovalReason.ReachedEndPoint, enemy.LastDeathRequestedReason,
+                "终点移除原因为 ReachedEndPoint。");
         }
 
         [Test]
-        [Description("敌人到达路径终点后不再移动（GameOver 后 Update 为空操作）。"
-            + " 验证路径边界后状态稳定，不越界访问路径列表。")]
+        [Description("敌人到达路径终点后请求移除一次、后续 Update 不再重复请求。"
+            + " 验证终点攻击严格一次性：请求移除后状态稳定，不越界访问路径列表。")]
         public void PathBoundary_AfterGameOver_UpdateIsNoOp()
         {
             MapData map = BuildLinearPathMapData();
-            var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true, onEnemyKilled: null, id: 1, frameNowMs: 1000);
+            var enemy = CreateMovingEnemy(map, AlwaysTrueTarget, onEnemyKilled: null, id: 1);
 
             // 走完全程（1600ms/帧避免过冲振荡）。
             for (int i = 0; i < 8; i++)
             {
                 enemy.Update(1600);
             }
-            Assert.IsTrue(enemy.TestInPool, "已回收。");
+            Assert.AreEqual(1, enemy.DeathRequestedCount, "到达终点后请求移除一次。");
             float xAfterEnd = enemy.X;
 
-            // 回收后再 Update 不抛异常，位置不变。
+            // 请求移除后再 Update 不抛异常、位置不变、不重复请求移除。
             Assert.DoesNotThrow(() => enemy.Update(1000));
-            Assert.AreEqual(xAfterEnd, enemy.X, "回收后位置不变。");
+            Assert.AreEqual(xAfterEnd, enemy.X, "请求移除后位置不变。");
+            Assert.AreEqual(1, enemy.DeathRequestedCount, "后续 Update 不重复请求移除。");
         }
 
         // ====================================================================
@@ -484,9 +519,9 @@ namespace GameBattle.Tests.EditMode.Enemy
         {
             MapData map = BuildLinearPathMapData();
             var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, isPlayerLane) => { },
-                id: 1, maxHealth: 100, frameNowMs: 0);
+                id: 1, maxHealth: 100);
 
             Assert.AreEqual(0, enemy.KillCallbackCount, "受击前无击杀回调。");
 
@@ -509,9 +544,9 @@ namespace GameBattle.Tests.EditMode.Enemy
         {
             MapData map = BuildLinearPathMapData();
             var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, isPlayerLane) => { },
-                id: 1, maxHealth: 30, frameNowMs: 0);
+                id: 1, maxHealth: 30);
 
             // 第一击 10，剩余 20。
             enemy.Hit(10, attackerId: 5);
@@ -543,15 +578,15 @@ namespace GameBattle.Tests.EditMode.Enemy
             // 敌人 1 在路径起点，敌人 2 也在起点。
             var rewardTracker = new KillRewardTracker();
             var enemy1 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, lane) =>
                     rewardTracker.TryReward(killedId, reward),
-                id: 1, maxHealth: 10, frameNowMs: 1000);
+                id: 1, maxHealth: 10);
             var enemy2 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, lane) =>
                     rewardTracker.TryReward(killedId, reward),
-                id: 2, maxHealth: 10, frameNowMs: 1000);
+                id: 2, maxHealth: 10);
 
             mgr.Register(enemy1);
             mgr.Register(enemy2);
@@ -579,14 +614,14 @@ namespace GameBattle.Tests.EditMode.Enemy
             var mgr = new EnemyManager(GridSize);
 
             var enemy1 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
-                onEnemyKilled: null, id: 1, maxHealth: 10, frameNowMs: 1000);
+                map, AlwaysTrueTarget,
+                onEnemyKilled: null, id: 1, maxHealth: 10);
             var enemy2 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
-                onEnemyKilled: null, id: 2, maxHealth: 10, frameNowMs: 1000);
+                map, AlwaysTrueTarget,
+                onEnemyKilled: null, id: 2, maxHealth: 10);
             var enemy3 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
-                onEnemyKilled: null, id: 3, maxHealth: 10, frameNowMs: 1000);
+                map, AlwaysTrueTarget,
+                onEnemyKilled: null, id: 3, maxHealth: 10);
 
             mgr.Register(enemy1);
             mgr.Register(enemy2);
@@ -623,9 +658,9 @@ namespace GameBattle.Tests.EditMode.Enemy
         {
             MapData map = BuildLinearPathMapData();
             var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, lane) => { },
-                id: 1, maxHealth: 10, frameNowMs: 0);
+                id: 1, maxHealth: 10);
 
             // 第一次致死。
             enemy.Hit(10, attackerId: 5);
@@ -650,8 +685,8 @@ namespace GameBattle.Tests.EditMode.Enemy
             // 用真实 EnemyBase 注册，但需要 IEnemyEntity 接口。
             // IntegrationEnemy 继承 EnemyBase 实现 IEnemyEntity。
             var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
-                onEnemyKilled: null, id: 1, maxHealth: 100, frameNowMs: 1000);
+                map, AlwaysTrueTarget,
+                onEnemyKilled: null, id: 1, maxHealth: 100);
             mgr.Register(enemy);
 
             // 多次 ForceRemove。
@@ -687,8 +722,8 @@ namespace GameBattle.Tests.EditMode.Enemy
             };
 
             var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
-                onEnemyKilled: null, id: 1, maxHealth: 100, frameNowMs: 1000);
+                map, AlwaysTrueTarget,
+                onEnemyKilled: null, id: 1, maxHealth: 100);
             mgr.Register(enemy);
 
             enemy.Hit(30, attackerId: 10);
@@ -715,8 +750,8 @@ namespace GameBattle.Tests.EditMode.Enemy
             };
 
             var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
-                onEnemyKilled: null, id: 1, maxHealth: 100, frameNowMs: 1000);
+                map, AlwaysTrueTarget,
+                onEnemyKilled: null, id: 1, maxHealth: 100);
             mgr.Register(enemy);
 
             enemy.Hit(100, attackerId: 10);
@@ -740,10 +775,10 @@ namespace GameBattle.Tests.EditMode.Enemy
             var rewardTracker = new KillRewardTracker();
 
             var enemy = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, lane) =>
                     rewardTracker.TryReward(killedId, reward),
-                id: 1, maxHealth: 10, frameNowMs: 0);
+                id: 1, maxHealth: 10);
 
             // 第一次致死，奖励生效。
             enemy.Hit(10, attackerId: 5);
@@ -765,15 +800,15 @@ namespace GameBattle.Tests.EditMode.Enemy
             var rewardTracker = new KillRewardTracker();
 
             var enemy1 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, lane) =>
                     rewardTracker.TryReward(killedId, reward),
-                id: 1, maxHealth: 10, frameNowMs: 0);
+                id: 1, maxHealth: 10);
             var enemy2 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, lane) =>
                     rewardTracker.TryReward(killedId, reward),
-                id: 2, maxHealth: 10, frameNowMs: 0);
+                id: 2, maxHealth: 10);
 
             enemy1.Hit(10, attackerId: 5);
             enemy2.Hit(10, attackerId: 5);
@@ -795,15 +830,15 @@ namespace GameBattle.Tests.EditMode.Enemy
             var rewardTracker = new KillRewardTracker();
 
             var enemy1 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, lane) =>
                     rewardTracker.TryReward(killedId, reward),
-                id: 1, maxHealth: 10, frameNowMs: 0);
+                id: 1, maxHealth: 10);
             var enemy2 = CreateMovingEnemy(
-                map, contactTarget: (_, _, _) => true,
+                map, AlwaysTrueTarget,
                 onEnemyKilled: (killedId, attackerId, reward, lane) =>
                     rewardTracker.TryReward(killedId, reward),
-                id: 2, maxHealth: 10, frameNowMs: 0);
+                id: 2, maxHealth: 10);
 
             // 冻结前：enemy1 死亡正常奖励。
             enemy1.Hit(10, attackerId: 5);

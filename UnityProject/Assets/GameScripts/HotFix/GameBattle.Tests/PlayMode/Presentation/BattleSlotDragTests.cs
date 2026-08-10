@@ -211,6 +211,9 @@ namespace GameBattle.Tests.PlayMode.Presentation
             int sourceSlotId = reserves[0].SlotId.Id;
             int targetSlotId = reserves[1].SlotId.Id;
             Assert.IsFalse(_slotBoard.GetSlotById(sourceSlotId).IsEmpty, "源槽有单位");
+
+            // ReplaceReserve 严格要求填满，开局无空槽；先腾出目标槽。
+            ClearReserveSlot(reserves[1].SlotId);
             Assert.IsTrue(_slotBoard.GetSlotById(targetSlotId).IsEmpty, "目标槽空");
 
             BattleInputResult result = _adapter.HandleDropUnit(sourceSlotId, targetSlotId);
@@ -263,6 +266,32 @@ namespace GameBattle.Tests.PlayMode.Presentation
             _slotBoard.ReplaceReserve(true, batch);
         }
 
+        /// <summary>
+        /// 把指定待上场槽的单位换到第一个空战场槽，使该待上场槽变为空槽。
+        /// ReplaceReserve 严格要求填满，开局无空槽，需显式腾出测试用空槽。
+        /// </summary>
+        private void ClearReserveSlot(UnitSlotId reserveSlotId)
+        {
+            IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
+            foreach (UnitSlot battle in battles)
+            {
+                if (battle.IsEmpty)
+                {
+                    _adapter.HandleDropUnit(reserveSlotId.Id, battle.SlotId.Id);
+                    return;
+                }
+            }
+
+            // 无空战场槽：把最后一个待上场槽换到第一个战场槽，腾出战场槽再换入目标槽单位。
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            if (reserves.Count >= 2)
+            {
+                int lastReserveId = reserves[reserves.Count - 1].SlotId.Id;
+                _adapter.HandleDropUnit(lastReserveId, battles[0].SlotId.Id);
+                _adapter.HandleDropUnit(reserveSlotId.Id, battles[0].SlotId.Id);
+            }
+        }
+
         [Test]
         [Description("屏幕坐标解析：Identity 转换器把屏幕坐标映射为战场槽。")]
         public void DragDrop_ScreenCoordinate_ResolvesToBattleSlot()
@@ -303,6 +332,9 @@ namespace GameBattle.Tests.PlayMode.Presentation
             int sourceSlotId = reserves[0].SlotId.Id;
             int targetSlotId = reserves[2].SlotId.Id;
             Assert.IsFalse(_slotBoard.GetSlotById(sourceSlotId).IsEmpty, "源槽有单位");
+
+            // ReplaceReserve 严格要求填满，开局无空槽；先腾出目标槽。
+            ClearReserveSlot(reserves[2].SlotId);
             Assert.IsTrue(_slotBoard.GetSlotById(targetSlotId).IsEmpty, "目标槽空");
 
             var drag = new BattleDragController(
@@ -431,41 +463,55 @@ namespace GameBattle.Tests.PlayMode.Presentation
             IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
             IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
 
-            // R→R：待上场[0] → 待上场[2]。
             int r0 = reserves[0].SlotId.Id;
+            int r1 = reserves[1].SlotId.Id;
             int r2 = reserves[2].SlotId.Id;
-            Assert.IsTrue(_slotBoard.GetSlotById(r2).IsEmpty, "r2 空");
-            var dragRR = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r2);
+            int b0 = battles[0].SlotId.Id;
+            int b1 = battles[1].SlotId.Id;
+
+            // 开局：全部待上场槽满，战场槽空。
+            Assert.IsFalse(_slotBoard.GetSlotById(r0).IsEmpty, "r0 有单位");
+
+            // 先腾出 r1（把 r1 单位换到 b0），使 r1 变空。
+            ClearReserveSlot(reserves[1].SlotId);
+            Assert.IsTrue(_slotBoard.GetSlotById(r1).IsEmpty, "r1 空（腾出）");
+
+            // R→R：待上场[0] → 待上场[1]（r1 空）。
+            var dragRR = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r1);
             dragRR.BeginDrag(r0, touchId: 1);
             Assert.IsTrue(dragRR.EndDrag(0f, 0f, 1).Value.IsSuccess, "R→R 应成功");
             Assert.IsTrue(_slotBoard.GetSlotById(r0).IsEmpty, "r0 变空");
+            Assert.IsFalse(_slotBoard.GetSlotById(r1).IsEmpty, "r1 有单位");
 
-            // R→B：待上场[0]（现空，先把 r2 换回 r0）→ 战场[0]。
+            // R→B：待上场[0]（现空，先把 r1 换回 r0 恢复满）→ 战场[1]（b1 空，b0 已被占用）。
             var dragBack = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r0);
-            dragBack.BeginDrag(r2, touchId: 1);
-            Assert.IsTrue(dragBack.EndDrag(0f, 0f, 1).Value.IsSuccess, "r2→r0 归位");
-            int b0 = battles[0].SlotId.Id;
-            Assert.IsTrue(_slotBoard.GetSlotById(b0).IsEmpty, "b0 空");
-            var dragRB = new BattleDragController(_adapter.HandleDropUnit, (x, y) => b0);
+            dragBack.BeginDrag(r1, touchId: 1);
+            Assert.IsTrue(dragBack.EndDrag(0f, 0f, 1).Value.IsSuccess, "r1→r0 归位");
+            Assert.IsTrue(_slotBoard.GetSlotById(b1).IsEmpty, "b1 空");
+            var dragRB = new BattleDragController(_adapter.HandleDropUnit, (x, y) => b1);
             dragRB.BeginDrag(r0, touchId: 1);
             Assert.IsTrue(dragRB.EndDrag(0f, 0f, 1).Value.IsSuccess, "R→B 应成功");
             Assert.IsTrue(_slotBoard.GetSlotById(r0).IsEmpty, "r0 变空");
-            Assert.IsFalse(_slotBoard.GetSlotById(b0).IsEmpty, "b0 有单位");
-
-            // B→B：战场[0] → 战场[1]。
-            int b1 = battles[1].SlotId.Id;
-            Assert.IsTrue(_slotBoard.GetSlotById(b1).IsEmpty, "b1 空");
-            var dragBB = new BattleDragController(_adapter.HandleDropUnit, (x, y) => b1);
-            dragBB.BeginDrag(b0, touchId: 1);
-            Assert.IsTrue(dragBB.EndDrag(0f, 0f, 1).Value.IsSuccess, "B→B 应成功");
-            Assert.IsTrue(_slotBoard.GetSlotById(b0).IsEmpty, "b0 变空");
             Assert.IsFalse(_slotBoard.GetSlotById(b1).IsEmpty, "b1 有单位");
 
-            // B→R：战场[1] → 待上场[0]。
-            var dragBR = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r0);
-            dragBR.BeginDrag(b1, touchId: 1);
-            Assert.IsTrue(dragBR.EndDrag(0f, 0f, 1).Value.IsSuccess, "B→R 应成功");
+            // B→B：战场[1] → 战场[0]（b0 已有腾出时放入的单位，先挪走）。
+            // 把 b1 单位换到 b0（b0 当前被 r1 腾出时占用，先把它换到 r2 腾出 b0）。
+            var dragFreeB0 = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r2);
+            dragFreeB0.BeginDrag(b0, touchId: 1);
+            Assert.IsTrue(dragFreeB0.EndDrag(0f, 0f, 1).Value.IsSuccess, "b0→r2 腾出 b0");
+            Assert.IsTrue(_slotBoard.GetSlotById(b0).IsEmpty, "b0 空（腾出）");
+
+            var dragBB = new BattleDragController(_adapter.HandleDropUnit, (x, y) => b0);
+            dragBB.BeginDrag(b1, touchId: 1);
+            Assert.IsTrue(dragBB.EndDrag(0f, 0f, 1).Value.IsSuccess, "B→B 应成功");
             Assert.IsTrue(_slotBoard.GetSlotById(b1).IsEmpty, "b1 变空");
+            Assert.IsFalse(_slotBoard.GetSlotById(b0).IsEmpty, "b0 有单位");
+
+            // B→R：战场[0] → 待上场[0]（r0 空）。
+            var dragBR = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r0);
+            dragBR.BeginDrag(b0, touchId: 1);
+            Assert.IsTrue(dragBR.EndDrag(0f, 0f, 1).Value.IsSuccess, "B→R 应成功");
+            Assert.IsTrue(_slotBoard.GetSlotById(b0).IsEmpty, "b0 变空");
             Assert.IsFalse(_slotBoard.GetSlotById(r0).IsEmpty, "r0 有单位");
         }
 

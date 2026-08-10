@@ -810,6 +810,10 @@ namespace GameBattle
                     effectivePoolScope.GetPool(() => new Mob0Enemy());
                 var enemyFactory = new EnemyFactory(idAllocator, mob0Pool);
 
+                // 敌军回收桥接：EnemyManager 统一移除时（Killed/ReachedEndPoint/Forced）
+                // 经本回调归还到 EnemyFactory 对象池，保证每次 Acquire 恰好对应一次 Release。
+                enemyManager.ReleaseEnemy = enemy => enemyFactory.Release((Mob0Enemy)enemy);
+
                 // 步骤 10：构造 UnitFactory / UnitRegistry / BattleEconomy / DeckManager /
                 // PlacementReservationRegistry / BattleInputController / WaveManager / BattleManager /
                 // AttackScheduler（Phase 2/3/5 产物）。
@@ -889,9 +893,9 @@ namespace GameBattle
                     configSnapshot, battleState, waveManager, battleEconomy, resultBuilder);
 
                 // task 6.10 闭环返工：构造 BattleTarget 并绑定到 BattleState/BattleManager/ResultBuilder，
-                // 使敌人接触目标时能通过 ContactBattleTargetHandler → BattleTarget.ApplyDamage →
-                // BattleState.ApplyDamage → BattleManager.CheckHealthFreeze → ResultBuilder.TryFreeze
-                // 完成实际战斗结算（而非 maxRounds 超时触发冻结）。
+                // 使敌人抵达终点时能通过 IEnemyEndPointAttackTarget.ReceiveEndPointAttack →
+                // BattleTarget.ApplyDamage → BattleState.ApplyDamage → BattleManager.CheckHealthFreeze
+                // → ResultBuilder.TryFreeze 完成实际战斗结算（而非 maxRounds 超时触发冻结）。
                 // 玩家方目标（isPlayerLaneTarget=true）受击 → CheckHealthFreeze(true) → 玩家败；
                 // 对手方目标（isPlayerLaneTarget=false）受击 → CheckHealthFreeze(false) → 玩家胜。
                 var playerTarget = new BattleTarget();
@@ -921,30 +925,31 @@ namespace GameBattle
                     // 1. 从工厂获取 Mob0Enemy（含新 RuntimeId 分配）。
                     Mob0Enemy enemy = enemyFactory.Acquire();
 
-                    // 2. 注入运行时依赖（地图、接触目标、击杀回调）。
+                    // 2. 注入运行时依赖（地图、终点攻击目标、击杀回调）。
                     //    EnemyBase.Configure 为 protected，只能在子类内调用。
                     //    本委托不在 EnemyBase 继承链中，需通过反射调用 Configure
-                    //    注入 map/cellSize/contactTarget/onEnemyKilled 四个依赖。
+                    //    注入 map/cellSize/endPointTarget/onEnemyKilled 四个依赖。
                     //    反射只在 spawn 时调用（低频），不引入性能问题。
-                    BattleTarget target = isPlayerLane ? playerTarget : opponentTarget;
-                    ContactBattleTargetHandler contactHandler = (lane, damage, attackerId) =>
-                        target.ApplyDamage(damage, attackerId);
+                    //    终点攻击目标按车道绑定：玩家车道敌→玩家阿斗，对手车道敌→对手阿斗。
+                    IEnemyEndPointAttackTarget endPointTarget =
+                        isPlayerLane ? playerTarget : opponentTarget;
                     EnemyKilledHandler killedHandler = (killedId, attackerId, reward, lane) =>
                     {
                         // 本期最简链：击杀奖励经 EnemyBase 内置 experienceReward=1，
                         // 不额外经 BattleEconomy 发放金币（task 3.12 已确认最简链在死亡点直接结算）。
                     };
-                    // 死亡请求移除回调：敌人血量归零时通知 EnemyManager 入队，遍历结束后统一移除。
-                    EnemyDeathRequestHandler deathRequestHandler = (killedId) =>
+                    // 移除请求回调：敌人血量归零（Killed）或抵达终点（ReachedEndPoint）时
+                    // 通知 EnemyManager 入队，遍历结束后统一移除并归还对象池。
+                    EnemyDeathRequestHandler deathRequestHandler = (killedId, reason) =>
                     {
-                        enemyManager.RequestRemoveEnemy(killedId);
+                        enemyManager.RequestRemoveEnemy(killedId, reason);
                     };
                     // 反射调用 protected Configure（EnemyBase.cs:519）。
-                    // 签名：Configure(MapData map, float cellSize, ContactBattleTargetHandler, EnemyKilledHandler, EnemyDeathRequestHandler)。
+                    // 签名：Configure(MapData map, float cellSize, IEnemyEndPointAttackTarget, EnemyKilledHandler, EnemyDeathRequestHandler)。
                     typeof(EnemyBase).InvokeMember(
                         "Configure",
                         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.InvokeMethod,
-                        null, enemy, new object[] { mapData, cellSize, contactHandler, killedHandler, deathRequestHandler });
+                        null, enemy, new object[] { mapData, cellSize, endPointTarget, killedHandler, deathRequestHandler });
 
                     // 3. 初始化 Mob0 数值（healthByWave / speed / contactDamage / rewardGold）。
                     //    rewardGold 取 EnemyBase 内置值 1（普通敌人），此处显式传 1 保持一致。

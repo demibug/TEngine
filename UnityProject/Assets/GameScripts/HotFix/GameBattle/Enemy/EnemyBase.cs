@@ -81,17 +81,6 @@ namespace GameBattle
     }
 
     /// <summary>
-    /// 战斗目标接触入口（对应还原工程 BattleTarget.receiveEnemyContact）。
-    /// </summary>
-    /// <remarks>
-    /// <para>EnemyBase 通过本委托接触 BattleTarget，避免直接引用 BattleTarget 类型
-    /// （task 4.2 尚未实现，且保持 EnemyBase 与 BattleTarget 解耦）。</para>
-    /// <para>参数：isPlayerLane（目标阵营）、damage（伤害值）、attackerId（攻击者运行时 ID）。
-    /// 返回 true=接触生效；false=目标已死亡或无效。</para>
-    /// </remarks>
-    internal delegate bool ContactBattleTargetHandler(bool isPlayerLane, int damage, int attackerId);
-
-    /// <summary>
     /// 敌人击杀奖励回调（对应还原工程 rewardService.onEnemyKilled + ENEMY_KILLED_BY 事件）。
     /// </summary>
     /// <remarks>
@@ -106,12 +95,13 @@ namespace GameBattle
     /// 敌人死亡请求移除回调（对应还原工程 gameOver/回收通知）。
     /// </summary>
     /// <remarks>
-    /// <para>EnemyBase 在血量归零进入 DEAD 时通过本委托通知管理器请求移除，
+    /// <para>EnemyBase 在血量归零进入 DEAD 或抵达路径终点时通过本委托通知管理器请求移除，
     /// 避免直接引用 EnemyManager（design 决策 4：一致性操作使用直接调用）。
     /// 由 BattleRuntimeFactory 装配时委托到 EnemyManager.RequestRemoveEnemy。</para>
-    /// <para>参数：killedEnemyId（已死亡敌人的运行时 ID）。</para>
+    /// <para>参数：killedEnemyId（已死亡或到终点的敌人运行时 ID）、reason（移除原因，驱动
+    /// 表现与回收语义，见 <see cref="EnemyRemovalReason"/>）。</para>
     /// </remarks>
-    internal delegate void EnemyDeathRequestHandler(int killedEnemyId);
+    internal delegate void EnemyDeathRequestHandler(int killedEnemyId, EnemyRemovalReason reason);
 
     /// <summary>
     /// 纯逻辑敌人生命周期基类：初始化、沿路径移动、受击、接触目标、死亡、重置。
@@ -136,12 +126,12 @@ namespace GameBattle
     /// C# 移植由 <see cref="EnemyManager.RefreshCellIndex"/> 在 Update 后直接调用刷新
     /// 空间索引（design 决策 4：直接调用），不再经 EventBus 发送 GRID_LEFT/ENTERED 事件。</para>
     ///
-    /// <para><b>接触目标（EnemyBase.js:406-446）：</b>
-    /// 路径索引达到末尾时调用 <see cref="AttackBattleTarget"/>，500ms 冷却（接触冷却读
-    /// frameNowMs），50ms 延迟后通过 <see cref="_contactTarget"/> 委托对 BattleTarget
-    /// 造成 1 点伤害。C# 移植将 50ms 延迟改为同步立即提交（本期不引入 BattleActionScheduler
-    /// 的 timer 桩，接触伤害在发生点同步生效，符合 spec "伤害、死亡事实 MUST 在其发生点
-    /// 同步生效"）。</para>
+    /// <para><b>终点攻击（EnemyBase.js:406-446 接触目标裁剪）：</b>
+    /// 路径索引达到末尾（真正抵达路径终点）时调用 <see cref="AttemptEndPointAttackOnce"/>，
+    /// 对本车道阿斗发起严格一次性的 1 点终点攻击（固定 <see cref="EndPointContactDamage"/>），
+    /// 随后经 <see cref="_onDeathRequested"/> 请求以 <see cref="EnemyRemovalReason.ReachedEndPoint"/>
+    /// 原因回收。不再依赖 500ms 接触冷却，也不再在 length-1 提前攻击。攻击在发生点同步生效，
+    /// 符合 spec "伤害、死亡事实 MUST 在其发生点同步生效"。</para>
     ///
     /// <para><b>受击（EnemyBase.js:453-479 hit）：</b>
     /// 扣血、记录伤害贡献者，血量归零进入 DEAD 并通过 <see cref="_onEnemyKilled"/>
@@ -167,12 +157,11 @@ namespace GameBattle
         /// </remarks>
         protected internal const int BaseMoveSpeedDefault = 50;
 
-        /// <summary>接触攻击冷却（毫秒，对应 CONTACT_ATTACK_COOLDOWN_MS=500，EnemyBase.js:21）。</summary>
-        /// <remarks>接触冷却读 frameNowMs（同帧固定），不读 stepMs。</remarks>
-        protected internal const long ContactAttackCooldownMs = 500;
-
         /// <summary>时间单位转换常量（毫秒/秒，对应 TIME_UNIT_MS=1000，EnemyBase.js:23）。</summary>
         protected internal const float TimeUnitMs = 1000f;
+
+        /// <summary>终点攻击伤害值（固定 1，对应 BattleDataCore 硬编码接触伤害）。</summary>
+        protected internal const int EndPointContactDamage = 1;
 
         /// <summary>到达当前路径点的距离阈值（对应 EnemyBase.js:339 distance &lt; 1）。</summary>
         protected internal const float PathPointReachedThreshold = 1f;
@@ -260,10 +249,13 @@ namespace GameBattle
         /// <summary>死亡是否已开始（对应 deathStarted/Cm，EnemyBase.js:103，防止重复触发）。</summary>
         private bool _deathStarted;
 
-        // --- 接触攻击 ---
+        // --- 终点攻击 ---
 
-        /// <summary>上次接触攻击时间戳（对应 lastAttackTime/Wm，EnemyBase.js:105，读 frameNowMs）。</summary>
-        private long _lastAttackTime;
+        /// <summary>
+        /// 是否已尝试过终点攻击（严格一次性到达事件）。
+        /// <para>即使目标已死亡、冻结或拒绝伤害，也视为已尝试；重置时复位。</para>
+        /// </summary>
+        private bool _hasAttemptedEndPointAttack;
 
         // --- 受击 ---
 
@@ -285,21 +277,14 @@ namespace GameBattle
         /// <summary>格子尺寸（px，对应 map.gridWidth=80）。路径点网格坐标 → 像素坐标的转换系数。</summary>
         private float _cellSize;
 
-        /// <summary>接触目标回调（委托到 BattleTarget，避免直接引用）。</summary>
-        private ContactBattleTargetHandler _contactTarget;
+        /// <summary>终点攻击目标（IEnemyEndPointAttackTarget，按车道绑定阿斗，避免直接引用）。</summary>
+        private IEnemyEndPointAttackTarget _endPointTarget;
 
         /// <summary>敌人击杀奖励回调（委托到 BattleEconomy/BattleManager，避免直接引用）。</summary>
         private EnemyKilledHandler _onEnemyKilled;
 
         /// <summary>敌人死亡请求移除回调（委托到 EnemyManager.RequestRemoveEnemy，避免直接引用）。</summary>
         private EnemyDeathRequestHandler _onDeathRequested;
-
-        /// <summary>当前帧时间戳（毫秒，对应 laya.timer.currTimer）。接触冷却读此值。</summary>
-        /// <remarks>
-        /// 由 <see cref="ConfigureFrameNow"/> 在每子步前设置，对齐 BattleSimulation.FrameNowMs
-        /// （同帧所有子步观察同一值，决策 0.9）。
-        /// </remarks>
-        private long _frameNowMs;
 
         /// <summary>是否已 Configure（对应 _configured，EnemyBase.js:122）。</summary>
         private bool _configured;
@@ -497,7 +482,7 @@ namespace GameBattle
             _targetable = false;
             _deathStarted = false;
 
-            _lastAttackTime = 0;
+            _hasAttemptedEndPointAttack = false;
 
             _damageContributors.Clear();
 
@@ -505,10 +490,9 @@ namespace GameBattle
 
             _map = null;
             _cellSize = 0f;
-            _contactTarget = null;
+            _endPointTarget = null;
             _onEnemyKilled = null;
             _onDeathRequested = null;
-            _frameNowMs = 0;
             _configured = false;
             _onHealthChanged = null;
         }
@@ -522,14 +506,14 @@ namespace GameBattle
         /// </summary>
         /// <param name="map">地图数据，提供路径与坐标 API（不可为 null）。</param>
         /// <param name="cellSize">格子尺寸（px，对应 map.gridWidth=80）。</param>
-        /// <param name="contactTarget">接触目标回调（不可为 null，委托到 BattleTarget）。</param>
+        /// <param name="endPointTarget">终点攻击目标（不可为 null，按车道绑定阿斗）。</param>
         /// <param name="onEnemyKilled">击杀奖励回调（不可为 null，委托到 BattleEconomy/BattleManager）。</param>
         /// <param name="onDeathRequested">死亡请求移除回调（不可为 null，委托到 EnemyManager）。</param>
         /// <exception cref="ArgumentNullException">任一必需参数为 null。</exception>
         /// <remarks>
         /// <para>对应还原工程 <c>EnemyBase.configure({...})</c>（EnemyBase.js:133-182）。
         /// C# 移植删除了 laya/eventBus/gameData/enemyFactory/objectPool/presentation/audio/
-        /// effects/rewardService 等 Laya/全局依赖，只保留规则层必需的地图、接触目标、
+        /// effects/rewardService 等 Laya/全局依赖，只保留规则层必需的地图、终点攻击目标、
         /// 击杀奖励回调。表现层由 Presenter 通过端口同步，规则层不持有。</para>
         /// <para><b>不持有 Unity GameObject（task 4.3 约束）：</b>
         /// 还原工程 configure 注入 parentResolver/presentation/audio/effects，
@@ -538,7 +522,7 @@ namespace GameBattle
         protected void Configure(
             MapData map,
             float cellSize,
-            ContactBattleTargetHandler contactTarget,
+            IEnemyEndPointAttackTarget endPointTarget,
             EnemyKilledHandler onEnemyKilled,
             EnemyDeathRequestHandler onDeathRequested)
         {
@@ -547,9 +531,9 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(map));
             }
 
-            if (contactTarget == null)
+            if (endPointTarget == null)
             {
-                throw new ArgumentNullException(nameof(contactTarget));
+                throw new ArgumentNullException(nameof(endPointTarget));
             }
 
             if (onEnemyKilled == null)
@@ -564,20 +548,10 @@ namespace GameBattle
 
             _map = map;
             _cellSize = cellSize > 0 ? cellSize : 80f;
-            _contactTarget = contactTarget;
+            _endPointTarget = endPointTarget;
             _onEnemyKilled = onEnemyKilled;
             _onDeathRequested = onDeathRequested;
             _configured = true;
-        }
-
-        /// <summary>
-        /// 设置当前帧时间戳（毫秒）。由 EnemyManager 在每子步 Update 前调用，
-        /// 对齐 BattleSimulation.FrameNowMs（同帧所有子步观察同一值，决策 0.9）。
-        /// </summary>
-        /// <param name="frameNowMs">当前外部帧时间戳（毫秒）。</param>
-        internal void ConfigureFrameNow(long frameNowMs)
-        {
-            _frameNowMs = frameNowMs;
         }
 
         /// <summary>
@@ -781,8 +755,7 @@ namespace GameBattle
         /// <remarks>
         /// <para>对应还原工程 <c>EnemyBase.update(deltaMs)</c>（EnemyBase.js:314-320）。
         /// 只在 MOVING 状态推进移动；其他状态不推进。</para>
-        /// <para><b>stepMs 驱动移动（决策 0.9）：</b>deltaMs 为子步时长，驱动位移累计。
-        /// 接触冷却读 frameNowMs（由 ConfigureFrameNow 设置），不读 deltaMs。</para>
+        /// <para><b>stepMs 驱动移动（决策 0.9）：</b>deltaMs 为子步时长，驱动位移累计。</para>
         /// </remarks>
         public virtual void Update(long deltaMs)
         {
@@ -898,8 +871,8 @@ namespace GameBattle
         /// <para>C# 移植（design 决策 4）：</para>
         /// <list type="bullet">
         /// <item>接近/最终警告事件改为表现端口同步，本期 EnemyBase 不发送事件。</item>
-        /// <item>索引达到 length-1 时调用 <see cref="AttackBattleTarget"/>（接触冷却）。</item>
-        /// <item>索引达到 length 时调用 <see cref="GameOver"/>（回收）。</item>
+        /// <item>索引达到 length（真正抵达路径终点）时调用 <see cref="AttemptEndPointAttackOnce"/>
+        /// 发起严格一次性的终点攻击并请求回收。</item>
         /// </list>
         /// </remarks>
         private void HandlePathIndexChanged()
@@ -909,69 +882,50 @@ namespace GameBattle
 
             if (_currentPathIndex >= length)
             {
-                // 已走完全部路径，触发接触并回收（EnemyBase.js:411-418）。
-                AttackBattleTarget();
-                if (!_deathStarted)
-                {
-                    _deathStarted = true;
-                }
-
-                GameOver();
-                return;
-            }
-
-            if (_currentPathIndex == length - 1)
-            {
-                // 到达倒数第二个点，尝试接触攻击（EnemyBase.js:410）。
-                AttackBattleTarget();
+                // 真正抵达路径终点：一次性终点攻击 + 请求以 ReachedEndPoint 原因回收
+                // （对应 EnemyBase.js:411-418 索引达 length 时 gameOver，改为由管理器统一移除）。
+                AttemptEndPointAttackOnce();
             }
             // 接近/最终警告（length-3/length-2）本期不发送事件，由表现端口自行检测。
+            // 不再在 length-1 提前攻击：终点攻击是一次到达事件，只在真正抵达终点时触发。
         }
 
         // ====================================================================
-        // AttackBattleTarget —— 接触目标攻击（对应 EnemyBase.js:427-446 attackBattleTarget）
+        // AttemptEndPointAttackOnce —— 终点攻击（严格一次性到达事件）
         // ====================================================================
 
         /// <summary>
-        /// 接触目标攻击：500ms 冷却，通过委托对 BattleTarget 造成 1 点伤害
-        /// （对应 EnemyBase.js:427-446 attackBattleTarget）。
+        /// 对本车道阿斗发起严格一次性的终点攻击（固定 1 点），随后请求回收。
         /// </summary>
-        /// <returns>true=本次接触生效；false=冷却中或路径不足。</returns>
         /// <remarks>
-        /// <para><b>接触冷却读 frameNowMs（决策 0.9）：</b>
-        /// 对应还原工程 <c>laya.timer.currTimer</c>，C# 移植由 ConfigureFrameNow 设置。
-        /// 同帧所有子步观察同一 frameNowMs，保证冷却判断一致。</para>
-        /// <para><b>50ms 延迟改为同步提交：</b>
-        /// 还原工程经 laya.timer.once(50ms) 延迟提交接触伤害（EnemyBase.js:434-443）。
-        /// C# 移植在发生点同步提交，符合 spec "伤害、死亡事实 MUST 在其发生点同步生效"。
-        /// 延迟提交会引入跨子步状态依赖，本期不引入 timer 桩。</para>
-        /// <para><b>接触伤害值：</b>固定 1 点（对应 BattleDataCore 硬编码 + EnemyConfigSnapshot.ContactDamage）。
-        /// 本期使用常量 1，后续可由配置注入。</para>
+        /// <para><b>严格一次性：</b>仅通过 <see cref="_hasAttemptedEndPointAttack"/> 保证
+        /// 只尝试一次。即使目标已死亡、冻结或拒绝伤害，也视为已经完成一次攻击尝试。
+        /// 不再依赖 500ms 普通攻击冷却（终点接触是一次到达事件，必须只尝试一次）。</para>
+        /// <para><b>攻击后立即回收：</b>攻击完成立即经 <see cref="_onDeathRequested"/> 请求
+        /// 以 <see cref="EnemyRemovalReason.ReachedEndPoint"/> 原因移除，不继续停留、移动
+        /// 或再次攻击。回收由 EnemyManager 统一完成（注销 + 表现通知 + 池归还）。</para>
+        /// <para><b>同步生效：</b>攻击在发生点同步提交，符合 spec "伤害、死亡事实 MUST
+        /// 在其发生点同步生效"。</para>
         /// </remarks>
-        protected internal virtual bool AttackBattleTarget()
+        private void AttemptEndPointAttackOnce()
         {
-            // 冷却判断（EnemyBase.js:428-429），读 frameNowMs。
-            if (_frameNowMs - _lastAttackTime < ContactAttackCooldownMs)
+            if (_hasAttemptedEndPointAttack)
             {
-                return false;
+                return;
             }
 
-            // 路径不足时不攻击（EnemyBase.js:430）。
+            _hasAttemptedEndPointAttack = true;
+
+            // 路径不足 2 点时不攻击（对应 EnemyBase.js:430 接触守卫）：退化路径没有
+            // 真正的终点接触语义。但即使如此仍请求回收，避免敌人滞留在终点。
             IReadOnlyList<GridPosition> path = GetPath();
-            if (path.Count < 2)
+            if (path.Count >= 2)
             {
-                return false;
+                _endPointTarget?.ReceiveEndPointAttack(
+                    new EndPointAttackRequest(_id, _isPlayerLane, EndPointContactDamage));
             }
 
-            // 同步提交接触伤害（对应 EnemyBase.js:434-443 的 50ms 延迟回调，
-            // C# 移植改为立即提交，符合 spec 伤害同步生效）。
-            if (_contactTarget != null)
-            {
-                _contactTarget(_isPlayerLane, 1, _id);
-            }
-
-            _lastAttackTime = _frameNowMs;
-            return true;
+            _onDeathRequested?.Invoke(_id, EnemyRemovalReason.ReachedEndPoint);
         }
 
         // ====================================================================
@@ -1081,7 +1035,7 @@ namespace GameBattle
 
                 // 通知管理器请求移除（入队，遍历结束后统一处理）。
                 // 对应还原工程 gameOver/回收通知；避免在伤害调用栈内重入销毁集合。
-                _onDeathRequested?.Invoke(_id);
+                _onDeathRequested?.Invoke(_id, EnemyRemovalReason.Killed);
             }
 
             return true;
@@ -1170,7 +1124,6 @@ namespace GameBattle
             _lastPathIndex = 0;
             _currentState = EnemyRuntimeState.Spawning;
             _deathStarted = false;
-            _lastAttackTime = 0;
             _movementDirectionX = 0f;
             _movementDirectionY = 0f;
             _damageContributors.Clear();

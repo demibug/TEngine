@@ -74,17 +74,17 @@ namespace GameBattle.Tests.EditMode.Enemy
         /// </summary>
         private class TestEnemy : EnemyBase
         {
-            /// <summary>接触回调累计次数。</summary>
-            public int ContactCount;
+            /// <summary>终点攻击回调累计次数。</summary>
+            public int EndPointAttackCount;
 
-            /// <summary>上次接触的阵营。</summary>
-            public bool LastContactIsPlayerLane;
+            /// <summary>上次终点攻击的目标车道。</summary>
+            public bool LastEndPointIsPlayerLane;
 
-            /// <summary>上次接触的伤害值。</summary>
-            public int LastContactDamage;
+            /// <summary>上次终点攻击的伤害值。</summary>
+            public int LastEndPointDamage;
 
-            /// <summary>上次接触的攻击者 ID。</summary>
-            public int LastContactAttackerId;
+            /// <summary>上次终点攻击的攻击者 ID。</summary>
+            public int LastEndPointAttackerId;
 
             /// <summary>击杀回调累计次数。</summary>
             public int KillCallbackCount;
@@ -107,25 +107,43 @@ namespace GameBattle.Tests.EditMode.Enemy
             /// <summary>上次死亡请求移除的敌人 ID。</summary>
             public int LastDeathRequestedEnemyId;
 
+            /// <summary>上次死亡请求移除的原因。</summary>
+            public EnemyRemovalReason LastDeathRequestedReason;
+
+            /// <summary>终点攻击目标桩：记录调用并返回 contactReturnsTrue。</summary>
+            private sealed class RecordingTarget : IEnemyEndPointAttackTarget
+            {
+                private readonly TestEnemy _owner;
+                private readonly bool _returns;
+
+                internal RecordingTarget(TestEnemy owner, bool returns)
+                {
+                    _owner = owner;
+                    _returns = returns;
+                }
+
+                public bool ReceiveEndPointAttack(EndPointAttackRequest request)
+                {
+                    _owner.EndPointAttackCount++;
+                    _owner.LastEndPointIsPlayerLane = request.IsPlayerLane;
+                    _owner.LastEndPointDamage = request.Damage;
+                    _owner.LastEndPointAttackerId = request.AttackerRuntimeId;
+                    return _returns;
+                }
+            }
+
             /// <summary>
             /// 配置测试依赖并注入记录回调。
             /// </summary>
             internal void ConfigureForTest(
                 MapData map,
                 float cellSize,
-                bool contactReturnsTrue = true)
+                bool endPointTargetReturnsTrue = true)
             {
                 Configure(
                     map,
                     cellSize,
-                    contactTarget: (isPlayerLane, damage, attackerId) =>
-                    {
-                        ContactCount++;
-                        LastContactIsPlayerLane = isPlayerLane;
-                        LastContactDamage = damage;
-                        LastContactAttackerId = attackerId;
-                        return contactReturnsTrue;
-                    },
+                    new RecordingTarget(this, endPointTargetReturnsTrue),
                     onEnemyKilled: (killedId, attackerId, reward, isPlayerLane) =>
                     {
                         KillCallbackCount++;
@@ -134,10 +152,11 @@ namespace GameBattle.Tests.EditMode.Enemy
                         LastExperienceReward = reward;
                         LastKillIsPlayerLane = isPlayerLane;
                     },
-                    onDeathRequested: (killedId) =>
+                    onDeathRequested: (killedId, reason) =>
                     {
                         DeathRequestedCount++;
                         LastDeathRequestedEnemyId = killedId;
+                        LastDeathRequestedReason = reason;
                     });
             }
 
@@ -156,9 +175,6 @@ namespace GameBattle.Tests.EditMode.Enemy
 
             /// <summary>暴露 BeginMoving 供测试调用。</summary>
             internal void StartMoving() => BeginMoving();
-
-            /// <summary>暴露 ConfigureFrameNow 供测试调用。</summary>
-            internal void SetFrameNow(long frameNowMs) => ConfigureFrameNow(frameNowMs);
 
             /// <summary>暴露 GridX/GridY 供测试验证。</summary>
             internal int TestGridX => GridX;
@@ -299,14 +315,12 @@ namespace GameBattle.Tests.EditMode.Enemy
             MapData map,
             int id = 1,
             bool isPlayerLane = true,
-            int maxHealth = 100,
-            long frameNowMs = 0)
+            int maxHealth = 100)
         {
             var enemy = new TestEnemy();
             enemy.ConfigureForTest(map, CellSize);
             enemy.AssignId(id);
             enemy.InitForTest(isPlayerLane, maxHealth);
-            enemy.SetFrameNow(frameNowMs);
             // 从 SPAWNING 切换到 MOVING，使 Update 推进移动。
             enemy.StartMoving();
             return enemy;
@@ -415,7 +429,6 @@ namespace GameBattle.Tests.EditMode.Enemy
             enemy.ConfigureForTest(map, CellSize);
             enemy.AssignId(1);
             enemy.InitForTest(true, 100);
-            enemy.SetFrameNow(0);
             // 不调用 BeginMoving，仍为 SPAWNING。
 
             enemy.Update(1000);
@@ -438,7 +451,7 @@ namespace GameBattle.Tests.EditMode.Enemy
         }
 
         [Test]
-        [Description("连续多段路径推进：到达终点后索引达 length。")]
+        [Description("连续多段路径推进：到达终点后索引达 length，请求以 ReachedEndPoint 原因回收。")]
         public void Update_MultiSegmentPath_ReachesEnd()
         {
             MapData map = BuildLinearPathMapData();
@@ -454,9 +467,12 @@ namespace GameBattle.Tests.EditMode.Enemy
             }
 
             // 6 帧 × 1000ms = 6000ms，足以走完 3 段 × 1600ms = 4800ms。
-            // 索引应达 4（= path.Count），触发 GameOver。
+            // 索引应达 4（= path.Count），触发终点攻击并请求以 ReachedEndPoint 原因回收。
             Assert.AreEqual(4, enemy.CurrentPathIndex, "走完全程后索引达 length。");
-            Assert.IsTrue(enemy.TestInPool, "走完全程后触发 GameOver 回收。");
+            Assert.AreEqual(1, enemy.DeathRequestedCount, "走完全程后请求移除一次。");
+            Assert.AreEqual(
+                EnemyRemovalReason.ReachedEndPoint, enemy.LastDeathRequestedReason,
+                "走完全程后请求以 ReachedEndPoint 原因回收。");
         }
 
         // ====================================================================
@@ -499,13 +515,13 @@ namespace GameBattle.Tests.EditMode.Enemy
         // ====================================================================
 
         [Test]
-        [Description("路径索引达 length-1 时触发接触回调。")]
-        public void PathIndex_ReachesLastIndex_TriggersContact()
+        [Description("索引达 length（真正抵达终点）时触发严格一次性的终点攻击。")]
+        public void PathIndex_ReachesEnd_TriggersEndPointAttackOnce()
         {
             MapData map = BuildLinearPathMapData();
-            var enemy = CreateMovingEnemy(map, id: 1, isPlayerLane: true, frameNowMs: 1000);
+            var enemy = CreateMovingEnemy(map, id: 1, isPlayerLane: true);
 
-            // 4 点路径，走完前 3 段（索引达 3 = length-1）。
+            // 4 点路径，走完前 3 段（索引达 4 = length）。
             // 还原工程 _advanceAlongPath 每帧只朝当前路径点推进，到达后下一帧递增索引。
             // 逐帧推进模拟多子步：6 帧 × 1000ms 足以走完 3 段 × 1600ms = 4800ms。
             for (int i = 0; i < 6; i++)
@@ -513,40 +529,39 @@ namespace GameBattle.Tests.EditMode.Enemy
                 enemy.Update(1000);
             }
 
-            // 索引达 3 时应已触发接触（frameNowMs=1000，lastAttackTime=0，1000-0>=500 通过冷却）。
-            Assert.GreaterOrEqual(enemy.ContactCount, 1, "路径末尾触发接触回调。");
-            Assert.IsTrue(enemy.LastContactIsPlayerLane, "接触阵营为玩家方。");
-            Assert.AreEqual(1, enemy.LastContactDamage, "接触伤害为 1。");
-            Assert.AreEqual(1, enemy.LastContactAttackerId, "接触攻击者 ID 为敌人 ID。");
+            // 抵达终点触发一次终点攻击：伤害 1、攻击者 ID=敌人 ID、车道=玩家方。
+            Assert.AreEqual(1, enemy.EndPointAttackCount, "抵达终点触发一次终点攻击。");
+            Assert.IsTrue(enemy.LastEndPointIsPlayerLane, "终点攻击目标车道为玩家方。");
+            Assert.AreEqual(1, enemy.LastEndPointDamage, "终点攻击伤害为 1。");
+            Assert.AreEqual(1, enemy.LastEndPointAttackerId, "终点攻击攻击者 ID 为敌人 ID。");
+
+            // 后续帧不再重复攻击，也不重复请求移除。
+            enemy.Update(1000);
+            enemy.Update(1000);
+            Assert.AreEqual(1, enemy.EndPointAttackCount, "终点攻击严格一次性，不重复。");
+            Assert.AreEqual(1, enemy.DeathRequestedCount, "回收请求严格一次性，不重复。");
         }
 
         [Test]
-        [Description("接触攻击有 500ms 冷却：冷却内不重复触发。")]
-        public void ContactAttack_Cooldown_500Ms()
+        [Description("终点攻击无 500ms 冷却：不同 frameNowMs 的敌人抵达终点都恰好攻击一次。")]
+        public void EndPointAttack_NoCooldown_TriggersExactlyOnce()
         {
             MapData map = BuildLinearPathMapData();
 
-            // 验证冷却逻辑：frameNowMs - lastAttackTime < 500 时不触发。
-            // 创建两个敌人，第一个 frameNowMs=1000（冷却通过），第二个 frameNowMs=400（冷却不通过）。
-            var enemyWithCooldownPassed = CreateMovingEnemy(
-                map, id: 1, isPlayerLane: true, frameNowMs: 1000);
+            // 终点攻击是严格一次性到达事件，不依赖接触冷却（frameNowMs 已被移除）。
+            var enemyA = CreateMovingEnemy(map, id: 1, isPlayerLane: true);
             for (int i = 0; i < 6; i++)
             {
-                enemyWithCooldownPassed.Update(1000);
+                enemyA.Update(1000);
             }
-            Assert.GreaterOrEqual(
-                enemyWithCooldownPassed.ContactCount, 1, "frameNowMs=1000 冷却通过，触发接触。");
+            Assert.AreEqual(1, enemyA.EndPointAttackCount, "敌人 A 抵达终点攻击一次。");
 
-            // 第二个敌人 frameNowMs=0，lastAttackTime=0，0-0=0 < 500 冷却不通过。
-            var enemyInCooldown = CreateMovingEnemy(
-                map, id: 2, isPlayerLane: true, frameNowMs: 0);
+            var enemyB = CreateMovingEnemy(map, id: 2, isPlayerLane: true);
             for (int i = 0; i < 6; i++)
             {
-                enemyInCooldown.Update(1000);
+                enemyB.Update(1000);
             }
-            Assert.AreEqual(
-                0, enemyInCooldown.ContactCount,
-                "frameNowMs=0 与 lastAttackTime=0 差 0 < 500ms 冷却，不触发接触。");
+            Assert.AreEqual(1, enemyB.EndPointAttackCount, "敌人 B 抵达终点攻击一次。");
         }
 
         [Test]
@@ -570,13 +585,14 @@ namespace GameBattle.Tests.EditMode.Enemy
                 playerPath: singlePath,
                 opponentPath: singlePath);
 
-            var enemy = CreateMovingEnemy(map, id: 1, isPlayerLane: true, frameNowMs: 1000);
+            var enemy = CreateMovingEnemy(map, id: 1, isPlayerLane: true);
 
             // 路径只有 1 点，索引 0 >= length=1，触发 HandlePathIndexChanged。
-            // 但 AttackBattleTarget 内 path.Count < 2 返回 false，不触发接触。
+            // 但 AttemptEndPointAttackOnce 内 path.Count < 2 不触发攻击；仍请求回收避免滞留。
             enemy.Update(100);
 
-            Assert.AreEqual(0, enemy.ContactCount, "路径不足 2 点不触发接触。");
+            Assert.AreEqual(0, enemy.EndPointAttackCount, "路径不足 2 点不触发终点攻击。");
+            Assert.AreEqual(1, enemy.DeathRequestedCount, "路径不足 2 点仍请求回收，避免滞留终点。");
         }
 
         // ====================================================================
@@ -697,7 +713,6 @@ namespace GameBattle.Tests.EditMode.Enemy
             enemy.ConfigureForTest(map, CellSize);
             enemy.AssignId(1);
             enemy.InitForTest(true, 100);
-            enemy.SetFrameNow(0);
             enemy.StartMoving();
 
             enemy.Hit(100, attackerId: 10);

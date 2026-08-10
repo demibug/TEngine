@@ -108,6 +108,11 @@ python scripts/luban_helper.py --data-dir Configs/GameConfig/Datas <command>
 
 ## 参考文档（按需加载）
 
+- 先按场景选择 1 篇最相关文档，再用标题或关键词定位命中章节；只读取该章节及必要上下文。
+- 仅当存在当前文档无法回答的明确缺口时，才补读直接相关文档并说明原因；不得预读全部 reference、示例或官方文档。
+- 用 Grep/`rg` 检查项目集成或生成代码时，命中超过 50 条先按目录、文件类型或关键词继续收窄，不得直接截断并据此下结论。
+- 同一会话缓存“结论 + 证据路径/符号”。相关文件变化后只重查受影响部分；除非文档已修改、缓存无法覆盖当前问题或发现冲突，否则不重读 reference。
+
 | 场景 | 文档 | 内容 |
 |------|------|------|
 | TEngine 集成 / ConfigSystem / 生成脚本 / 兼容性 | [tengine-integration.md](references/tengine-integration.md) | 项目结构、加载器、导出脚本、Excel规范 |

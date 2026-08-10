@@ -679,8 +679,8 @@ namespace GameBattle.Tests.EditMode.Unit
         }
 
         [Test]
-        [Description("弓兵攻击后进入 Idle 清除朝向表现意图（HasBodyFacing），使表现层恢复默认朝向。")]
-        public void BowSoldier_EnterIdle_ClearsBodyFacingIntent()
+        [Description("弓兵攻击写入原工程的初始箭矢切线角，并在进入 Idle 时清除旋转表现意图。")]
+        public void BowSoldier_EnterIdle_ClearsBodyRotationIntent()
         {
             ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
             var projManager = new ProjectileManager(factory);
@@ -692,15 +692,17 @@ namespace GameBattle.Tests.EditMode.Unit
                 enemyManager, resolver, effectManager, factory, projManager,
                 attackIntervalSeconds: 0.8f);
 
-            // 攻击设置朝向意图（选中目标后 SetBodyFacing）。
+            // 攻击设置旋转意图（原工程：箭矢初始切线角 + 90°）。
             soldier.Attack();
-            Assert.IsTrue(soldier.HasBodyFacing, "攻击后应设置朝向意图");
+            Assert.IsTrue(soldier.HasBodyRotation, "攻击后应设置旋转意图");
+            Assert.AreEqual(45f, soldier.BodyRotationDegrees, 0.0001f,
+                "目标在右下方且曲线控制点上移 120px 时，原工程的初始攻击角应为 45°");
 
             // 模拟 AttackScheduler 锁定目标切到 Attack，随后目标丢失切回 Idle。
             soldier.SetState(AttackUnitState.Attack);
-            Assert.IsTrue(soldier.HasBodyFacing, "进入 Attack 态不应清除朝向意图");
+            Assert.IsTrue(soldier.HasBodyRotation, "进入 Attack 态不应清除旋转意图");
             soldier.SetState(AttackUnitState.Idle);
-            Assert.IsFalse(soldier.HasBodyFacing, "进入 Idle 应清除朝向意图，避免旧朝向残留");
+            Assert.IsFalse(soldier.HasBodyRotation, "进入 Idle 应清除旋转意图，避免旧旋转残留");
         }
 
         [Test]
@@ -726,7 +728,7 @@ namespace GameBattle.Tests.EditMode.Unit
         }
 
         [Test]
-        [Description("弓兵 ResetState 后朝向与瞄准意图清零，池复用无残留。")]
+        [Description("弓兵 ResetState 后旋转与瞄准意图清零，池复用无残留。")]
         public void SoldierBase_ResetState_ClearsVisualIntent()
         {
             ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
@@ -740,11 +742,11 @@ namespace GameBattle.Tests.EditMode.Unit
                 attackIntervalSeconds: 0.8f);
             soldier.Attack();
             soldier.SetState(AttackUnitState.Attack);
-            Assert.IsTrue(soldier.HasBodyFacing, "攻击后应设置朝向意图");
+            Assert.IsTrue(soldier.HasBodyRotation, "攻击后应设置旋转意图");
 
             soldier.ResetState();
 
-            Assert.IsFalse(soldier.HasBodyFacing, "ResetState 应清除朝向意图");
+            Assert.IsFalse(soldier.HasBodyRotation, "ResetState 应清除旋转意图");
             Assert.IsFalse(soldier.HasWeaponAim, "ResetState 应清除瞄准意图");
         }
 

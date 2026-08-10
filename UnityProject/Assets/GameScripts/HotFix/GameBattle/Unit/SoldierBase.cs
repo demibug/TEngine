@@ -188,11 +188,11 @@ namespace GameBattle
 
         // --- 纯表现状态（供表现层读取，不持有 Unity 引用） ---
 
-        /// <summary>角色本体是否朝右（弓兵攻击转向用，false=朝左）。</summary>
-        private bool _bodyFacingRight;
+        /// <summary>角色本体是否已有旋转角度（弓兵攻击转向用，false=未攻击保持默认）。</summary>
+        private bool _hasBodyRotation;
 
-        /// <summary>角色本体是否已设置朝向（弓兵攻击转向用，false=未攻击保持默认）。</summary>
-        private bool _hasBodyFacing;
+        /// <summary>角色本体旋转角度（度，DisplayAngle 语义：0°朝上、90°朝右）。</summary>
+        private float _bodyRotationDegrees;
 
         /// <summary>武器是否已有朝向角度（枪兵武器瞄准用，false=无目标保持默认）。</summary>
         private bool _hasWeaponAim;
@@ -276,11 +276,11 @@ namespace GameBattle
             set => _animationKey = value;
         }
 
-        /// <summary>角色本体是否朝右（供表现层读取；弓兵攻击时由 <see cref="SetBodyFacing"/> 设置）。</summary>
-        internal bool BodyFacingRight => _bodyFacingRight;
+        /// <summary>角色本体是否已有旋转角度（供表现层读取；false=未攻击过，保持 Prefab 默认朝向）。</summary>
+        internal bool HasBodyRotation => _hasBodyRotation;
 
-        /// <summary>角色本体是否已设置朝向（供表现层读取；false=未攻击过，保持 Prefab 默认朝向）。</summary>
-        internal bool HasBodyFacing => _hasBodyFacing;
+        /// <summary>角色本体旋转角度（度，DisplayAngle 语义）。</summary>
+        internal float BodyRotationDegrees => _bodyRotationDegrees;
 
         /// <summary>武器是否已有朝向角度（供表现层读取；枪兵攻击时由 <see cref="SetWeaponAim"/> 设置）。</summary>
         internal bool HasWeaponAim => _hasWeaponAim;
@@ -289,17 +289,17 @@ namespace GameBattle
         internal float WeaponAimDegrees => _weaponAimDegrees;
 
         /// <summary>
-        /// 设置角色本体朝向（弓兵攻击转向用）。
+        /// 设置角色本体旋转角度（弓兵攻击转向用）。
         /// </summary>
-        /// <param name="facingRight">true=朝右；false=朝左。</param>
+        /// <param name="angleDegrees">角度（度，DisplayAngle 语义）。</param>
         /// <remarks>
-        /// <para>纯表现状态：不持有 Unity 引用，只记录朝向供表现层同步。
+        /// <para>纯表现状态：不持有 Unity 引用，只记录旋转角度供表现层同步。
         /// 由弓兵在 <see cref="BowSoldier.PerformAttack"/> 选中目标后调用。</para>
         /// </remarks>
-        protected internal void SetBodyFacing(bool facingRight)
+        protected internal void SetBodyRotation(float angleDegrees)
         {
-            _bodyFacingRight = facingRight;
-            _hasBodyFacing = true;
+            _bodyRotationDegrees = angleDegrees;
+            _hasBodyRotation = true;
         }
 
         /// <summary>
@@ -396,8 +396,8 @@ namespace GameBattle
 
             _typeIndex = -1;
             _animationKey = null;
-            _bodyFacingRight = false;
-            _hasBodyFacing = false;
+            _hasBodyRotation = false;
+            _bodyRotationDegrees = 0f;
             _hasWeaponAim = false;
             _weaponAimDegrees = 0f;
 
@@ -688,18 +688,18 @@ namespace GameBattle
         /// C# 移植为纯逻辑层，不持有动画引用，具体动画播放由表现端口根据状态同步。</para>
         /// <para><b>进入 Idle 清除表现意图：</b>AttackScheduler 在目标丢失时
         /// <see cref="UnitBase.SetState(AttackUnitState.Idle)"/>，本方法清除
-        /// <see cref="_hasBodyFacing"/> 与 <see cref="_hasWeaponAim"/>，使表现层
+        /// <see cref="_hasBodyRotation"/> 与 <see cref="_hasWeaponAim"/>，使表现层
         /// 下次同步时不再收到旧朝向/旧瞄准角，配合 BattleViewSynchronizer 的状态边沿
         /// 复位完成待机表现恢复。不清理战斗数值或攻击冷却。</para>
         /// <para>子类（4 兵种，task 6.2）可覆写本方法扩展状态进入行为，但 MUST 调用 base。</para>
         /// </remarks>
         protected override void OnEnterState(AttackUnitState nextState)
         {
-            // 进入待机：清除朝向/瞄准等纯表现意图，避免旧表现残留（纯逻辑层不持有动画引用）。
+            // 进入待机：清除旋转/瞄准等纯表现意图，避免旧表现残留（纯逻辑层不持有动画引用）。
             // JS 的 playIdleAnimation/applyAttackPlaybackRate 由表现端口承担。
             if (nextState == AttackUnitState.Idle)
             {
-                _hasBodyFacing = false;
+                _hasBodyRotation = false;
                 _hasWeaponAim = false;
             }
         }

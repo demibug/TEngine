@@ -46,6 +46,8 @@ namespace GameBattle
     {
         private const string Mob0Address = "Mob0";
         private const string ArrowAddress = "Arrow";
+        private const int MaxLevelNumber = 8;
+        private const string LevelNumberAddressPrefix = "Sprites/LevelBadge/level_number_";
 
         private readonly BattleMapBindings _bindings;
         private readonly Dictionary<int, string> _unitAddresses = new Dictionary<int, string>
@@ -68,6 +70,7 @@ namespace GameBattle
         private BattleViewRegistry _registry;
         private SpriteRenderer[] _playerHealthPoints;
         private SpriteRenderer[] _opponentHealthPoints;
+        private Sprite[] _levelNumberSprites;
 
         internal UnityBattleViewPort(BattleMapBindings bindings)
         {
@@ -127,6 +130,7 @@ namespace GameBattle
                 }
 
                 await LoadUnitAnimationsAsync(resource, cancellationToken);
+                await LoadLevelNumberSpritesAsync(resource, cancellationToken);
 
                 _preloaded = true;
             }
@@ -215,6 +219,7 @@ namespace GameBattle
                     badge = placed.GameObject.AddComponent<SoldierLevelBadge>();
                 }
 
+                badge.Configure(_levelNumberSprites);
                 badge.SetLevel(level > 0 ? level : 1);
             }
         }
@@ -550,10 +555,6 @@ namespace GameBattle
             instance.GetComponent<SoldierSpriteAnimator>()?.ResetToIdle();
             instance.GetComponent<SpearWeaponView>()?.ResetView();
 
-            // 恢复士兵根节点默认朝向（弓兵攻击可能翻转 localScale.x），避免复用残留翻转。
-            Vector3 instanceScale = instance.transform.localScale;
-            instanceScale.x = Mathf.Abs(instanceScale.x);
-            instance.transform.localScale = instanceScale;
             return instance;
         }
 
@@ -631,6 +632,41 @@ namespace GameBattle
             return frames;
         }
 
+        /// <summary>
+        /// 预加载 1 至 8 的等级数字 Sprite（index = level - 1），每个数字独立单图。
+        /// </summary>
+        private async UniTask LoadLevelNumberSpritesAsync(
+            IResourceModule resource,
+            CancellationToken cancellationToken)
+        {
+            var sprites = new Sprite[MaxLevelNumber];
+            for (int index = 0; index < MaxLevelNumber; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string address = LevelNumberAddressPrefix + (index + 1);
+                AssetHandle handle = resource.LoadAssetAsyncHandle<Sprite>(address);
+                if (handle == null)
+                {
+                    throw new BattlePresentationLoadException(
+                        "load-level-number", address,
+                        new InvalidOperationException("资源模块返回空 AssetHandle"));
+                }
+
+                _assetHandles.Add(handle);
+                await UniTask.WaitUntil(() => handle.IsDone, cancellationToken: cancellationToken);
+                if (!handle.IsValid || !(handle.AssetObject is Sprite sprite) || sprite == null)
+                {
+                    throw new BattlePresentationLoadException(
+                        "validate-level-number", address,
+                        new InvalidOperationException("等级数字 Sprite 无效"));
+                }
+
+                sprites[index] = sprite;
+            }
+
+            _levelNumberSprites = sprites;
+        }
+
         private void ConfigureUnitAnimation(GameObject instance, string assetKey)
         {
             int soldierType = assetKey == "unit_KnifeSoldier" ? 0
@@ -662,6 +698,8 @@ namespace GameBattle
 
         private void ResetPreload()
         {
+            _levelNumberSprites = null;
+
             for (int index = 0; index < _assetHandles.Count; index++)
             {
                 AssetHandle handle = _assetHandles[index];

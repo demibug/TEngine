@@ -797,21 +797,21 @@ namespace GameBattle
                 return true;
             }
 
-            public bool TryGetUnitFacing(int runtimeId, out bool facingRight)
+            public bool TryGetUnitBodyRotation(int runtimeId, out float angleDegrees)
             {
-                facingRight = true;
+                angleDegrees = 0f;
                 if (_unitRegistry == null)
                 {
                     return false;
                 }
 
                 SoldierBase unit = _unitRegistry.GetUnit(runtimeId);
-                if (unit == null || !unit.HasBodyFacing)
+                if (unit == null || !unit.HasBodyRotation)
                 {
                     return false;
                 }
 
-                facingRight = unit.BodyFacingRight;
+                angleDegrees = unit.BodyRotationDegrees;
                 return true;
             }
 
@@ -930,8 +930,8 @@ namespace GameBattle
             private readonly BattleMapBindings _bindings;
             private readonly Dictionary<GameObject, long> _attackTimes =
                 new Dictionary<GameObject, long>();
-            private readonly Dictionary<GameObject, Vector3> _initialScales =
-                new Dictionary<GameObject, Vector3>();
+            private readonly Dictionary<GameObject, Quaternion> _initialRotations =
+                new Dictionary<GameObject, Quaternion>();
 
             internal UnityViewObjectSync(BattleMapBindings bindings)
             {
@@ -939,17 +939,17 @@ namespace GameBattle
             }
 
             /// <summary>
-            /// 缓存表现对象的初始 localScale，供 <see cref="ResetUnitToIdle"/> 复位。
+            /// 缓存表现对象的初始 localRotation，供 <see cref="ResetUnitToIdle"/> 复位。
             /// </summary>
-            private Vector3 GetInitialScale(GameObject go)
+            private Quaternion GetInitialRotation(GameObject go)
             {
-                if (!_initialScales.TryGetValue(go, out Vector3 initialScale))
+                if (!_initialRotations.TryGetValue(go, out Quaternion initialRotation))
                 {
-                    initialScale = go.transform.localScale;
-                    _initialScales.Add(go, initialScale);
+                    initialRotation = go.transform.localRotation;
+                    _initialRotations.Add(go, initialRotation);
                 }
 
-                return initialScale;
+                return initialRotation;
             }
 
             public void SetPosition(object viewObject, float logicX, float logicY)
@@ -970,14 +970,12 @@ namespace GameBattle
                 }
             }
 
-            public void SetBodyFacing(object viewObject, bool facingRight)
+            public void SetBodyRotation(object viewObject, float angleDegrees)
             {
                 if (viewObject is GameObject go && go != null)
                 {
-                    Vector3 initialScale = GetInitialScale(go);
-                    Vector3 scale = initialScale;
-                    scale.x = facingRight ? Mathf.Abs(initialScale.x) : -Mathf.Abs(initialScale.x);
-                    go.transform.localScale = scale;
+                    Quaternion initialRotation = GetInitialRotation(go);
+                    go.transform.localRotation = initialRotation * _bindings.LogicAngleToWorld(angleDegrees);
                 }
             }
 
@@ -1050,10 +1048,10 @@ namespace GameBattle
                     return;
                 }
 
-                // 恢复根节点初始 localScale（弓兵攻击可能翻转 localScale.x）。
-                if (_initialScales.TryGetValue(go, out Vector3 initialScale))
+                // 恢复根节点初始旋转（弓兵攻击会按目标方向旋转角色本体）。
+                if (_initialRotations.TryGetValue(go, out Quaternion initialRotation))
                 {
-                    go.transform.localScale = initialScale;
+                    go.transform.localRotation = initialRotation;
                 }
 
                 go.GetComponent<SoldierSpriteAnimator>()?.ResetToIdle();
@@ -1102,9 +1100,9 @@ namespace GameBattle
                 return false;
             }
 
-            public bool TryGetUnitFacing(int runtimeId, out bool facingRight)
+            public bool TryGetUnitBodyRotation(int runtimeId, out float angleDegrees)
             {
-                facingRight = true;
+                angleDegrees = 0f;
                 return false;
             }
 
@@ -1158,7 +1156,7 @@ namespace GameBattle
                 // 空操作：Null 实现。
             }
 
-            public void SetBodyFacing(object viewObject, bool facingRight)
+            public void SetBodyRotation(object viewObject, float angleDegrees)
             {
                 // 空操作：Null 实现。
             }

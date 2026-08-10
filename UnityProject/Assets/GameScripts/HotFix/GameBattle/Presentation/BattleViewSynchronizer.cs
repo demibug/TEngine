@@ -67,11 +67,11 @@ namespace GameBattle
         void SetHealthRatio(object viewObject, float ratio);
 
         /// <summary>
-        /// 设置角色本体朝向（仅弓兵使用：攻击时整个角色左右翻转）。
+        /// 设置角色本体旋转（仅弓兵使用：攻击时按原工程的攻击角度旋转）。
         /// </summary>
         /// <param name="viewObject">表现对象引用。</param>
-        /// <param name="facingRight">true=朝右；false=朝左。</param>
-        void SetBodyFacing(object viewObject, bool facingRight);
+        /// <param name="angleDegrees">角度（度，DisplayAngle 语义：0°朝上、90°朝右）。</param>
+        void SetBodyRotation(object viewObject, float angleDegrees);
 
         /// <summary>
         /// 设置武器瞄准角度（仅枪兵武器使用：枪独立绕挂点旋转，角色本体不转）。
@@ -146,12 +146,12 @@ namespace GameBattle
         bool TryGetUnitAttackTime(int runtimeId, out long attackTimeMs);
 
         /// <summary>
-        /// 尝试查询单位角色本体朝向（弓兵攻击转向用）。
+        /// 尝试查询单位角色本体旋转角度（弓兵攻击转向用）。
         /// </summary>
         /// <param name="runtimeId">单位运行时 ID。</param>
-        /// <param name="facingRight">输出是否朝右。</param>
+        /// <param name="angleDegrees">输出旋转角度（度，DisplayAngle 语义）。</param>
         /// <returns>找到返回 true；否则 false。</returns>
-        bool TryGetUnitFacing(int runtimeId, out bool facingRight);
+        bool TryGetUnitBodyRotation(int runtimeId, out float angleDegrees);
 
         /// <summary>
         /// 尝试查询单位武器瞄准角度（枪兵武器朝向用）。
@@ -330,7 +330,7 @@ namespace GameBattle
                 _readModelProvider.TryGetUnitPosition,
                 healthRatioProvider: null);
             SyncUnitStates();
-            SyncUnitFacings();
+            SyncUnitBodyRotations();
             SyncUnitWeaponAims();
             SyncUnitAttackIntervals();
             SyncUnitAnimations();
@@ -378,18 +378,18 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 同步单位角色本体朝向（弓兵攻击转向）。
+        /// 同步单位角色本体旋转（弓兵攻击转向）。
         /// </summary>
-        private void SyncUnitFacings()
+        private void SyncUnitBodyRotations()
         {
             _registry.CopyEntries(ViewObjectCategory.Unit, _entryBuffer);
             for (int index = 0; index < _entryBuffer.Count; index++)
             {
                 KeyValuePair<int, object> entry = _entryBuffer[index];
                 if (entry.Value != null
-                    && _readModelProvider.TryGetUnitFacing(entry.Key, out bool facingRight))
+                    && _readModelProvider.TryGetUnitBodyRotation(entry.Key, out float angleDegrees))
                 {
-                    _objectSync.SetBodyFacing(entry.Value, facingRight);
+                    _objectSync.SetBodyRotation(entry.Value, angleDegrees);
                 }
             }
         }

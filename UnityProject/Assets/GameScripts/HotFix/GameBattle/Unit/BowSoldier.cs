@@ -72,6 +72,12 @@ namespace GameBattle
     /// </remarks>
     internal sealed class BowSoldier : SoldierBase
     {
+        /// <summary>箭矢贝塞尔曲线向上的控制点偏移（像素，对应原工程固定值 120）。</summary>
+        private const float ArrowCurveHeight = 120f;
+
+        /// <summary>箭矢飞行速度缩放（对应原工程固定值 1.75）。</summary>
+        private const float ArrowSpeedScale = 1.75f;
+
         // ====================================================================
         // 弓兵专属依赖
         // ====================================================================
@@ -194,8 +200,15 @@ namespace GameBattle
             EnemyTargetDto target = targets[0];
             int targetId = target.Id;
 
-            // 弓兵角色转向：按目标与自身的 X 差设置朝向（纯表现状态，供表现层同步）。
-            SetBodyFacing(target.X >= CenterX);
+            // 原工程以箭矢初始切线角旋转整个人物，不能使用 XScale 镜像。
+            // 目标取矩形中心，与原 BowSoldier._targetCenter 的 gridWidth/gridHeight/2 语义一致。
+            float targetCenterX = target.X + CellSize / 2f;
+            float targetCenterY = target.Y + CellSize / 2f;
+            float controlX = CenterX + (targetCenterX - CenterX) / 2f;
+            float controlY = CenterY + (targetCenterY - CenterY) / 2f - ArrowCurveHeight;
+            float angleDegrees = (float)(ProjectileMath.QuadraticTangentDegrees(
+                CenterX, CenterY, controlX, controlY, targetCenterX, targetCenterY, 0d) + 90d);
+            SetBodyRotation(angleDegrees);
 
             // 登记延迟释放效果：攻击动画到第 17 帧开始时触发射箭。
             // 箭矢不在此刻创建，由 BowReleaseEffect 在释放延迟后调用 LaunchArrow 实际发射。
@@ -233,8 +246,8 @@ namespace GameBattle
                 attackerDamage: AttackDamage,
                 explicitDamage: true,
                 damage: AttackDamage,
-                speedScale: 1.75f,
-                curveHeight: 120f);
+                speedScale: ArrowSpeedScale,
+                curveHeight: ArrowCurveHeight);
 
             // 从本单位逻辑中心发射箭矢（对应 JS projectile.fire(startX, startY)）。
             arrow.Fire(centerX, centerY);

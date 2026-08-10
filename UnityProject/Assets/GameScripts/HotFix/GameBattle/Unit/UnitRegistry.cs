@@ -343,8 +343,9 @@ namespace GameBattle
             // 战场槽换位复用：该单位已有活动战斗实例则重新放置。
             if (_unitIdToSoldier.TryGetValue(unit.UnitId, out SoldierBase existing))
             {
-                // 修复 P0：战场换格复用同一 SoldierBase，但先取消尚未释放的攻击。
-                existing.CancelUnreleasedAttacks();
+                // 复用路径不取消待释放攻击：需求只要求"被消耗的源单位"（合并源/下场）
+                // 取消尚未释放的攻击，由 DeactivateBattleUnit 处理；移动/合并保留方
+                // 保留待释放攻击，已发射投射物继续飞行。
                 existing.SetPlacement(gridX, gridY);
                 float pixelX = gridX * _cellSize;
                 float pixelY = gridY * _cellSize;

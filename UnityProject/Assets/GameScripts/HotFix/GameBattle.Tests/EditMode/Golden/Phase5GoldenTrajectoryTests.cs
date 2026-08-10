@@ -141,6 +141,10 @@ namespace GameBattle.Tests.EditMode.Golden
             var mob0Pool = new BattleObjectPool<Mob0Enemy>(() => new Mob0Enemy());
             var enemyFactory = new EnemyFactory(idAllocator, mob0Pool);
 
+            // 敌军回收桥接：与 BattleRuntimeFactory 正式运行时一致，EnemyManager 统一移除时
+            // 归还到 EnemyFactory 对象池，保证测试环境不泄漏池租借对象。
+            enemyManager.ReleaseEnemy = enemy => enemyFactory.Release((Mob0Enemy)enemy);
+
             const int opponentAttackMultiplier = 1;
             var knifePool = new BattleObjectPool<KnifeSoldier>(() => new KnifeSoldier());
             var bowPool = new BattleObjectPool<BowSoldier>(() => new BowSoldier());
@@ -195,15 +199,14 @@ namespace GameBattle.Tests.EditMode.Golden
                 Mob0Enemy enemy = enemyFactory.Acquire();
 
                 BattleTarget target = isPlayerLane ? playerTarget : opponentTarget;
-                ContactBattleTargetHandler contactHandler = (lane, damage, attackerId) =>
-                    target.ApplyDamage(damage, attackerId);
+                IEnemyEndPointAttackTarget endPointTarget = target;
                 EnemyKilledHandler killedHandler = (killedId, attackerId, reward, lane) => { };
-                EnemyDeathRequestHandler deathRequestHandler = (killedId) => enemyManager.RequestRemoveEnemy(killedId);
+                EnemyDeathRequestHandler deathRequestHandler = (killedId, reason) => enemyManager.RequestRemoveEnemy(killedId, reason);
                 // EnemyBase.Configure 为 protected，通过反射调用（与 BattleRuntimeFactory 一致）。
                 typeof(EnemyBase).InvokeMember(
                     "Configure",
                     System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.InvokeMethod,
-                    null, enemy, new object[] { mapData, cellSize, contactHandler, killedHandler, deathRequestHandler });
+                    null, enemy, new object[] { mapData, cellSize, endPointTarget, killedHandler, deathRequestHandler });
 
                 var initStats = new Mob0EnemyInitStats(
                     healthByWave: enemyConfig.HealthByWave,
