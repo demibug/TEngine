@@ -147,15 +147,20 @@ namespace GameBattle
         void SetState(AttackUnitState state);
 
         /// <summary>
-        /// 触发攻击（对应 <c>unit.attack()</c>）。
+        /// 触发一次攻击（对应 <c>unit.attack()</c>），接收调度器为本次攻击选定的唯一初始目标。
         /// 内部由具体兵种实现创建攻击效果 / 投射物 / 延迟命中等。
         /// </summary>
+        /// <param name="initialTarget">
+        /// 调度器为本次攻击选定的初始目标快照（对应 JS <c>targets[0]</c>）。
+        /// 一次攻击只选择一次初始目标，兵种 MUST NOT 再独立执行第二次选敌查询。
+        /// </param>
         /// <remarks>
-        /// 调用前 AttackScheduler 已保证冷却完毕且存在目标。本方法内部的二次目标查询
-        /// （如 KnifeSoldier.performKnifeAttack 会再次 queryTargets）是各兵种的既定行为，
-        /// AttackScheduler 不阻止——二次查询在 AttackResolver 的稳定查询下结果确定。
+        /// 调用前 AttackScheduler 已保证冷却完毕且存在目标，并已把稳定查询的第一个目标
+        /// 作为本次攻击的初始目标传入。兵种使用该目标创建攻击效果或计算朝向；
+        /// 锁定型攻击（刀兵/弓兵）在命中点/释放点目标失效时由各自 Effect 经
+        /// <see cref="AttackResolver"/> 执行有限稳定重选，不再由兵种二次查询。
         /// </remarks>
-        void Attack();
+        void Attack(EnemyTargetDto initialTarget);
     }
 
     /// <summary>
@@ -444,7 +449,21 @@ namespace GameBattle
         {
             // 守卫：单位为 null / 非活动 / 禁用 / 回池 → 跳过。
             // 对应 JS if (!unit || !unit.isActive || unit.disabled || unit.inPool) return。
-            if (unit == null || !unit.IsActive || unit.Disabled || unit.InPool)
+            if (unit == null || !unit.IsActive)
+            {
+                return false;
+            }
+
+            // Attack 态被禁用或回池时仍需显式退出到 Idle。
+            // 该转换必须位于通用跳过逻辑之前，否则下方 Attack 态守卫永远不可达。
+            if (unit.CurrentState == AttackUnitState.Attack && (unit.Disabled || unit.InPool))
+            {
+                unit.SetState(AttackUnitState.Idle);
+                return false;
+            }
+
+            // 非 Attack 态的禁用/回池单位直接跳过，不产生状态或攻击副作用。
+            if (unit.Disabled || unit.InPool)
             {
                 return false;
             }
@@ -486,16 +505,6 @@ namespace GameBattle
             }
 
             // ----------------------------------------------------------------
-            // ATTACK 态中再次检查禁用/回池：若已禁用/回池 → 切换 IDLE。
-            // 对应 JS 第 26-29 行。单位可能在上一子步后被打断（如被回池）。
-            // ----------------------------------------------------------------
-            if (unit.Disabled || unit.InPool)
-            {
-                unit.SetState(AttackUnitState.Idle);
-                return false;
-            }
-
-            // ----------------------------------------------------------------
             // ATTACK 态冷却检查：若冷却未完毕 → 等待。
             // 对应 JS if (currentTime - lastAttackTime < intervalMs) return { reason: 'cooldown' }。
             // ----------------------------------------------------------------
@@ -532,8 +541,9 @@ namespace GameBattle
 
             // 有目标 → 触发攻击。
             // 对应 JS unit.weapon ? unit.weapon.attack(targets[0]) : unit.attack()。
-            // C# 移植统一为 IAttackUnit.Attack()，具体兵种在 Attack 内部处理。
-            unit.Attack();
+            // C# 移植把调度器选定的第一个目标作为本次攻击的唯一初始目标显式传入单位，
+            // 消除调度器与兵种对同一次攻击的重复选敌（design 决策 2）。
+            unit.Attack(attackTargets[0]);
             return true;
         }
     }

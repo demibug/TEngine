@@ -30,15 +30,34 @@ public partial class TbWave
     }
 
 
+    /// <summary>
+    /// 【deprecated】旧字段，不再驱动有限波次
+    /// </summary>
      public System.Collections.Generic.List<int> WaveUnitCounts => _data.WaveUnitCounts;
+    /// <summary>
+    /// 【deprecated】旧字段，不再驱动有限波次
+    /// </summary>
      public System.Collections.Generic.List<int> BossWaveNumbers => _data.BossWaveNumbers;
+    /// <summary>
+    /// 【deprecated】旧字段，不再驱动有限波次
+    /// </summary>
      public System.Collections.Generic.List<float> BossSpawnChances => _data.BossSpawnChances;
+    /// <summary>
+    /// 【deprecated】旧字段，不再驱动有限波次
+    /// </summary>
      public System.Collections.Generic.List<int> SpawnStrategyWeights => _data.SpawnStrategyWeights;
+    /// <summary>
+    /// 生成策略表，仅由逐波 strategyProfile 显式引用
+    /// </summary>
      public System.Collections.Generic.List<System.Collections.Generic.List<float>> SpawnStrategies => _data.SpawnStrategies;
     /// <summary>
-    /// 本期显式跳过 Boss
+    /// 【deprecated】旧字段，不再驱动有限波次
     /// </summary>
      public bool SkipBoss => _data.SkipBoss;
+    /// <summary>
+    /// 当前生效的波次计划ID
+    /// </summary>
+     public string ActivePlanId => _data.ActivePlanId;
     
     public void ResolveRef(Tables tables)
     {

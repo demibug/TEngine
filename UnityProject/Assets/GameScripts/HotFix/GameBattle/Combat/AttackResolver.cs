@@ -373,5 +373,85 @@ namespace GameBattle
 
             enemyManager.ApplyDamage(damage, targetDtos, attackerId);
         }
+
+        // ====================================================================
+        // 首选目标验证与稳定回退 —— 供锁定型攻击在命中点/释放点有限重选
+        // --------------------------------------------------------------------
+        // design 决策 3：有限重选复用 AttackResolver，不抽独立 Targeting 模块。
+        // 该操作不提交伤害、不改变冷却、不保存状态，只返回解析后的目标 DTO。
+        // ====================================================================
+
+        /// <summary>
+        /// 解析首选目标或稳定回退一次：供锁定型攻击在命中点/释放点目标失效时有限重选
+        /// （design 决策 3/4）。
+        /// </summary>
+        /// <param name="enemyManager">敌人管理器（非 null），提供按 ID 查找与稳定查询。</param>
+        /// <param name="preferredTargetId">本次攻击的初始目标 ID（调度器单次选择并传入）。</param>
+        /// <param name="centerX">攻击者当前中心 X（回退查询中心）。</param>
+        /// <param name="centerY">攻击者当前中心 Y（回退查询中心）。</param>
+        /// <param name="range">攻击范围（回退查询半径，首选目标不强制在范围内）。</param>
+        /// <param name="playerSide">攻击者阵营。</param>
+        /// <param name="cellWidth">敌人格子宽（透传给稳定查询）。</param>
+        /// <param name="cellHeight">敌人格子高（透传给稳定查询）。</param>
+        /// <param name="resolvedTarget">解析成功时输出目标 DTO；失败时输出 <see cref="EnemyTargetDto.Invalid"/>。</param>
+        /// <returns>true=解析到有效目标；false=首选失效且范围内无替代目标。</returns>
+        /// <remarks>
+        /// <para><b>解析规则（design 决策 3）：</b></para>
+        /// <list type="number">
+        /// <item>按首选 ID 获取目标；目标存在且仍可被攻击方攻击时直接返回该目标。
+        ///   首选目标仅以"存在且可攻击"判定有效，保持锁定攻击对存活移动目标的现有语义，
+        ///   不强制首选目标位于当前攻击范围内。</item>
+        /// <item>首选目标失效（不存在或不可攻击）时，使用攻击者当前中心、攻击范围、阵营和
+        ///   格子尺寸执行一次既有稳定查询（<see cref="QueryTargets"/>）。</item>
+        /// <item>返回稳定顺序中的第一个有效候选；无候选返回失败。</item>
+        /// </list>
+        /// <para><b>不提交伤害、不改变冷却、不保存状态：</b>本操作只读取与查询，
+        /// 不调用 <see cref="Hit"/>、不写回 <c>LastAttackTimeMs</c>、不缓存目标。</para>
+        /// <para><b>稳定顺序：</b>回退查询委托 <see cref="QueryTargets"/> →
+        /// <see cref="EnemyManager.QueryTargets"/>，继承 <c>_orderedIds</c>（spawn 顺序）
+        /// 与空间索引的稳定有序保证，结果确定。</para>
+        /// </remarks>
+        internal bool TryResolvePreferredOrFallback(
+            EnemyManager enemyManager,
+            int preferredTargetId,
+            float centerX,
+            float centerY,
+            float range,
+            bool playerSide,
+            float cellWidth,
+            float cellHeight,
+            out EnemyTargetDto resolvedTarget)
+        {
+            resolvedTarget = EnemyTargetDto.Invalid;
+
+            if (enemyManager == null)
+            {
+                return false;
+            }
+
+            // 1. 首选目标验证：存在且可被本方攻击 → 直接返回。
+            //    首选目标不强制在当前攻击范围内（锁定攻击对存活移动目标的现有语义）。
+            IEnemyEntity preferred = enemyManager.GetById(preferredTargetId);
+            if (preferred != null && preferred.IsTargetableBy(playerSide))
+            {
+                resolvedTarget = new EnemyTargetDto(
+                    preferred.Id, preferred.X, preferred.Y, preferred.RemainingPathDistance);
+                return true;
+            }
+
+            // 2. 首选失效 → 按当前攻击范围执行一次稳定查询。
+            //    委托 QueryTargets，继承 EnemyManager 的稳定有序保证。
+            List<EnemyTargetDto> candidates = QueryTargets(
+                enemyManager, centerX, centerY, range, playerSide, cellWidth, cellHeight);
+
+            // 3. 返回稳定顺序中的第一个有效候选；无候选返回失败。
+            if (candidates != null && candidates.Count > 0)
+            {
+                resolvedTarget = candidates[0];
+                return true;
+            }
+
+            return false;
+        }
     }
 }

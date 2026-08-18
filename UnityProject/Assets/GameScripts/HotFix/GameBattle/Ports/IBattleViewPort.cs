@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 
@@ -90,6 +91,11 @@ namespace GameBattle
         /// <summary>
         /// 异步预加载本端口所需的表现资源（Prefab/图集/材质等）。
         /// </summary>
+        /// <param name="enemyResourceAddresses">
+        /// 本局所选计划解析后会使用的去重普通敌人资源地址（YooAsset location）。
+        /// 由 <see cref="BattlePresentationResourcePlan"/> 从所选配置快照收集；
+        /// 表现层只为这些地址加载 Prefab 并建立表现池，不再固定预加载 Mob0。
+        /// </param>
         /// <param name="cancellationToken">
         /// Runtime 或 Module 取消令牌。取消时抛出 <see cref="System.OperationCanceledException"/>。
         /// Runtime Token 由 <c>BattleRuntime.RuntimeTokenSource</c> 提供，在 Settling / Exit 时 Cancel。
@@ -103,7 +109,9 @@ namespace GameBattle
         /// <para>真实实现将通过 <c>GameModule.Resource.LoadAssetAsync</c> 加载资源并登记到
         /// <see cref="BattleRuntimeScope"/>（task 7.6）。</para>
         /// </remarks>
-        UniTask PreloadAsync(CancellationToken cancellationToken);
+        UniTask PreloadAsync(
+            IReadOnlyList<string> enemyResourceAddresses,
+            CancellationToken cancellationToken);
 
         /// <summary>
         /// 通知表现层：战斗已开始，可初始化场景视图与 UI。
@@ -136,17 +144,18 @@ namespace GameBattle
         /// <summary>
         /// 通知表现层：一个敌人已生成，需创建对应表现对象。
         /// </summary>
-        /// <param name="runtimeId">敌人运行时 ID（由 RuntimeIdAllocator 分配）。</param>
-        /// <param name="isPlayerLane">是否玩家方车道。</param>
-        /// <param name="logicX">生成点逻辑 X 坐标。</param>
-        /// <param name="logicY">生成点逻辑 Y 坐标。</param>
+        /// <param name="dto">
+        /// 不可变出生表现 DTO：runtimeId + enemyKey/resourceAddress + 车道与逻辑坐标。
+        /// 表现层以 <paramref name="dto"/>.ResourceAddress 为表现池键，不再固定 Mob0。
+        /// </param>
         /// <remarks>
-        /// <para>对应逻辑层 EnemyManager 生成敌人事实。表现层据此实例化敌人 Prefab / FUI 组件
+        /// <para>对应逻辑层 EnemyManager 生成敌人事实（task 5.1 起携带
+        /// <see cref="EnemySpawnViewData"/>）。表现层据此实例化敌人 Prefab / FUI 组件
         /// 并注册到 <c>BattleViewRegistry</c>（task 7.4）。</para>
         /// <para>高频调用：每波次可能批量生成多个敌人。真实实现应使用对象池复用表现对象，
         /// 不在每次调用时同步加载资源（资源预加载在 <see cref="PreloadAsync"/> 完成）。</para>
         /// </remarks>
-        void OnEnemySpawned(int runtimeId, bool isPlayerLane, float logicX, float logicY);
+        void OnEnemySpawned(EnemySpawnViewData dto);
 
         /// <summary>
         /// 通知表现层：一个敌人已移除（死亡或回收），需销毁/隐藏对应表现对象。
@@ -154,6 +163,9 @@ namespace GameBattle
         /// <param name="runtimeId">敌人运行时 ID。</param>
         /// <param name="playDeathEffect">是否播放死亡表现（true=正常死亡；false=战斗结束清理回收）。</param>
         void OnEnemyRemoved(int runtimeId, bool playDeathEffect);
+
+        /// <summary>通知表现层播放 Boss 技能动画或恢复待机动画。</summary>
+        void OnBossSkillIntent(int runtimeId, string animationKey, bool active);
 
         /// <summary>
         /// 通知表现层：一个单位已放置，需创建对应表现对象。

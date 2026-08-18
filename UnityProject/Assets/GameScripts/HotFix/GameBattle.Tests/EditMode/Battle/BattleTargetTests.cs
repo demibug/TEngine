@@ -36,9 +36,10 @@ namespace GameBattle.Tests.EditMode.Battle
     //   IsFrozen 为 public bool 属性。本测试复用此契约。
     //
     //   BattleManager.CheckHealthFreeze(bool isPlayerSide) 为 internal void 方法
-    //   （BattleManager.cs:622），内部判断 health<=0 后调用
-    //   TryFreezeResult(playerWin: !isPlayerSide)。本测试通过 BattleTarget.ApplyDamage
-    //   间接触发该路径，不直接调用 CheckHealthFreeze。
+    //   （BattleManager.cs:622）。任务 4.7 起语义：玩家侧生命归零 → TryFreezeResult(false)
+    //   立即失败；对手侧生命归零只保留状态，不直接成功（成功必须等
+    //   AllConfiguredWavesCompleted）。本测试通过 BattleTarget.ApplyDamage 间接触发该路径，
+    //   不直接调用 CheckHealthFreeze。
     // ============================================================================
 
     /// <summary>
@@ -127,6 +128,27 @@ namespace GameBattle.Tests.EditMode.Battle
         }
 
         /// <summary>
+        /// 构造测试用有序波次计划（默认 profile 0 = [1f]），供 WaveManager 三参数构造。
+        /// </summary>
+        private static OrderedWavePlanSnapshot MakePlan(params WavePlanEntry[] rows)
+        {
+            var profiles = new Dictionary<int, IReadOnlyList<float>>
+            {
+                [0] = new float[] { 1f },
+            };
+            return new OrderedWavePlanSnapshot("test", rows, profiles);
+        }
+
+        /// <summary>构造单路普通 Normal 行（本测试不驱动波次推进，仅满足构造依赖）。</summary>
+        private static WavePlanEntry NormalRow(int order)
+        {
+            return new WavePlanEntry(
+                "test", order, WavePlanKind.Normal, "Mob0", 1, 0, "",
+                preDelayMs: 0, spawnIntervalMs: 0, postDelayMs: 0,
+                playerLane: true, opponentLane: false, strategyProfile: 0);
+        }
+
+        /// <summary>
         /// 创建测试用 BattleManager、BattleState、BattleResultBuilder 及关联依赖。
         /// </summary>
         /// <returns> BattleManager 及关联依赖元组。</returns>
@@ -135,7 +157,12 @@ namespace GameBattle.Tests.EditMode.Battle
         {
             BattleConfigSnapshot snapshot = CreateTestSnapshot(maxRounds);
             BattleState state = new BattleState();
-            WaveManager waveManager = new WaveManager(snapshot, state, randomSource: null);
+            // WaveManager 有序三参数契约（新生产链）：本测试不驱动波次状态机，
+            // 注入最小单行计划 + 记录式出生替身 + 不可用 Boss 端口，仅满足 BattleManager 构造依赖。
+            OrderedWavePlanSnapshot plan = MakePlan(NormalRow(1));
+            WaveManager waveManager = new WaveManager(
+                plan, _ => new WaveEntityHandle(1, 1, 1, WaveEntityKind.Normal),
+                UnavailableBossWavePort.Instance);
             BattleEconomy economy = new BattleEconomy(state, refreshCostIncrement: 2);
 
             // BattleResultBuilder 由 task 49 产出，构造签名为
@@ -384,10 +411,10 @@ namespace GameBattle.Tests.EditMode.Battle
         }
 
         [Test]
-        [Description("生命归零时触发胜负冻结：对手方归零 → 玩家胜利（playerWin=true）。"
-            + " 对应 BattleState.js:76 BATTLE_FINISHED(true)。"
+        [Description("对手方生命归零只保留状态，不直接成功（任务 4.7：成功必须等 AllConfiguredWavesCompleted）。"
+            + " 对应 design.md 决策 9 / spec ordered-wave-plan 'Fail before the plan finishes'。"
             + " spec 'Battle result is frozen once'。")]
-        public void ApplyDamage_OpponentHealthZero_TriggersWinFreeze()
+        public void ApplyDamage_OpponentHealthZero_KeepsState_NoWinFreeze()
         {
             var (target, state, _, resultBuilder) = CreateBoundOpponentTarget();
 
@@ -397,10 +424,9 @@ namespace GameBattle.Tests.EditMode.Battle
             bool applied = target.ApplyDamage(amount: 3, sourceRuntimeId: 1);
 
             Assert.IsTrue(applied, "受击正常返回 true。");
-            Assert.AreEqual(0, state.OpponentHealth, "对手方生命归零。");
-            Assert.IsTrue(resultBuilder.IsFrozen, "生命归零触发 TryFreeze。");
-            Assert.IsTrue(resultBuilder.FrozenResult.Value.IsWin, "对手方归零 → 玩家胜利。");
-            Assert.IsTrue(target.IsDestroyed, "目标已摧毁。");
+            Assert.AreEqual(0, state.OpponentHealth, "对手方生命归零（状态保留）。");
+            Assert.IsFalse(resultBuilder.IsFrozen, "对手归零不直接成功（成功必须等全部配置波清场）。");
+            Assert.IsTrue(target.IsDestroyed, "目标已摧毁（拒绝后续受击）。");
         }
 
         [Test]
@@ -462,26 +488,26 @@ namespace GameBattle.Tests.EditMode.Battle
             + " 扩展守卫：覆盖空中弹道在冻结后才命中的迟到场景。")]
         public void ApplyDamage_AfterFrozen_Rejected()
         {
-            var (target, state, manager, resultBuilder) = CreateBoundOpponentTarget();
+            var (target, state, manager, resultBuilder) = CreateBoundPlayerTarget();
 
-            // 对手方目标归零触发冻结。
+            // 玩家方目标归零触发冻结（任务 4.7：玩家侧归零立即失败）。
             target.ApplyDamage(amount: 3, sourceRuntimeId: 1);
             Assert.IsTrue(resultBuilder.IsFrozen, "已冻结。");
-            Assert.AreEqual(0, state.OpponentHealth, "对手方生命归零。");
+            Assert.AreEqual(0, state.PlayerHealth, "玩家方生命归零。");
 
-            // 构造"玩家方目标未死亡但胜负已冻结"场景：
-            // 手动 Bind 一个新的玩家方目标到已冻结的 resultBuilder（同一局 BattleState/Manager）。
-            // 玩家方生命仍为 3（未死亡），但 resultBuilder 已冻结。
+            // 构造"对手方目标未死亡但胜负已冻结"场景：
+            // 手动 Bind 一个新的对手方目标到已冻结的 resultBuilder（同一局 BattleState/Manager）。
+            // 对手方生命仍为 3（未死亡），但 resultBuilder 已冻结。
             BattleTarget frozenTarget = new BattleTarget();
-            frozenTarget.Bind(state, manager, resultBuilder, isPlayerLaneTarget: true);
-            Assert.AreEqual(3, frozenTarget.Health, "玩家方目标未死亡。");
+            frozenTarget.Bind(state, manager, resultBuilder, isPlayerLaneTarget: false);
+            Assert.AreEqual(3, frozenTarget.Health, "对手方目标未死亡。");
             Assert.IsTrue(resultBuilder.IsFrozen, "胜负已冻结。");
 
             bool applied = frozenTarget.ApplyDamage(amount: 1, sourceRuntimeId: 9);
 
             Assert.IsFalse(applied, "冻结后受击返回 false。");
             Assert.AreEqual(3, frozenTarget.Health, "生命不变。");
-            Assert.AreEqual(3, state.PlayerHealth, "BattleState.PlayerHealth 不变。");
+            Assert.AreEqual(3, state.OpponentHealth, "BattleState.OpponentHealth 不变。");
         }
 
         [Test]
@@ -519,17 +545,17 @@ namespace GameBattle.Tests.EditMode.Battle
             + " 决策 0.4：TryFreeze 不在伤害调用栈内重入销毁。")]
         public void ApplyDamage_TriggersFreeze_NoReentrantDestruction()
         {
-            var (target, _, manager, resultBuilder) = CreateBoundOpponentTarget();
+            var (target, _, manager, resultBuilder) = CreateBoundPlayerTarget();
 
-            // 对手方归零触发冻结。
+            // 玩家方归零触发冻结（任务 4.7：玩家侧归零立即失败）。
             bool applied = target.ApplyDamage(amount: 3, sourceRuntimeId: 1);
 
             // 冻结成功后本方法正常返回 true（完成当前同步提交）。
             Assert.IsTrue(applied, "触发冻结的受击正常返回 true。");
             Assert.IsTrue(resultBuilder.IsFrozen, "已冻结。");
 
-            // Manager 仍可访问（未被销毁）。
-            Assert.AreEqual(1, manager.CurrentRound, "Manager 未被重入销毁，仍可访问。");
+            // Manager 仍可访问（未被销毁）；测试夹具未启动波次，所以当前轮次仍为 0。
+            Assert.AreEqual(0, manager.CurrentRound, "Manager 未被重入销毁，且未凭空推进波次。");
             // 目标已标记摧毁但未被销毁。
             Assert.IsTrue(target.IsDestroyed, "目标已摧毁。");
         }
@@ -630,10 +656,10 @@ namespace GameBattle.Tests.EditMode.Battle
         // ====================================================================
 
         [Test]
-        [Description("多段伤害逐步扣减，最后一击触发冻结。")]
+        [Description("多段伤害逐步扣减，最后一击触发冻结（玩家侧归零 → 失败）。")]
         public void ApplyDamage_MultipleHits_LastHitFreezes()
         {
-            var (target, _, _, resultBuilder) = CreateBoundOpponentTarget();
+            var (target, _, _, resultBuilder) = CreateBoundPlayerTarget();
 
             // 3 → 2。
             target.ApplyDamage(amount: 1, sourceRuntimeId: 1);

@@ -144,8 +144,23 @@ namespace GameBattle
     /// <para><b>本类型为 internal：</b>只供 GameBattle 内部 EnemyManager/EnemyFactory
     /// 与子类 Mob0Enemy 使用，不对其他程序集暴露。</para>
     /// </remarks>
-    internal class EnemyBase : IEnemyEntity, IPoolableBattleObject
+    internal class EnemyBase : IEnemyEntity, IPoolableBattleObject, IBuffTarget
     {
+        private static readonly BuffTargetCapabilities BuffCapabilities =
+            new BuffTargetCapabilities(
+                new[]
+                {
+                    BuffNumericChannel.MoveSpeed,
+                    BuffNumericChannel.MaxHealth,
+                    BuffNumericChannel.CurrentHealth,
+                },
+                new[]
+                {
+                    BuffStateChannel.MovementDisabled,
+                    BuffStateChannel.Suppressed,
+                    BuffStateChannel.MovementLocked,
+                });
+
         // ====================================================================
         // 常量（对应 EnemyBase.js:20-23）
         // ====================================================================
@@ -186,8 +201,14 @@ namespace GameBattle
         /// <summary>基础最大血量（对应 maxHealthBase/Km，EnemyBase.js:113）。</summary>
         private int _maxHealthBase;
 
+        /// <summary>Buff 聚合后的有效最大血量。</summary>
+        private int _maxHealth;
+
         /// <summary>当前血量（对应 currentHealth/mi/Zi，EnemyBase.js:114）。</summary>
         private int _currentHealth;
+
+        /// <summary>上次提交的 CurrentHealth Buff 聚合修饰量。</summary>
+        private int _healthBuffModifier;
 
         // --- 移动 ---
 
@@ -206,6 +227,9 @@ namespace GameBattle
         /// <summary>基础移动速度（px/s，对应 baseMoveSpeed/Sm，EnemyBase.js:97）。</summary>
         private int _baseMoveSpeed;
 
+        /// <summary>Buff 聚合后的有效移动速度。</summary>
+        private int _moveSpeed;
+
         /// <summary>当前路径点索引（对应 currentPathIndex/Lm，EnemyBase.js:92）。</summary>
         private int _currentPathIndex;
 
@@ -223,6 +247,13 @@ namespace GameBattle
 
         /// <summary>是否停止移动（对应 stopMovement/Nm，EnemyBase.js:106，受 buff 影响）。</summary>
         private bool _stopMovement;
+
+        private bool _buffMovementDisabled;
+        private bool _buffSuppressed;
+        private bool _buffMovementLocked;
+
+        /// <summary>技能激活期间的移动暂停（由 Boss 技能成功激活时设置，不归 Buff 系统管理）。</summary>
+        private bool _skillMovementPause;
 
         // --- 网格坐标 ---
 
@@ -341,7 +372,16 @@ namespace GameBattle
 
         /// <inheritdoc/>
         /// <remarks>供表现层计算真实血量比例（current / max）。由子类 InitializeStats 设置。</remarks>
-        public int MaxHealth => _maxHealthBase;
+        public int MaxHealth => _maxHealth;
+
+        BuffTargetHandle IBuffTarget.Handle =>
+            new BuffTargetHandle(BuffEntityKind.Enemy, Id, BuffGeneration);
+
+        bool IBuffTarget.IsAvailable => Id > 0
+            && !_inPool
+            && _currentState != EnemyRuntimeState.Dead;
+
+        BuffTargetCapabilities IBuffTarget.Capabilities => BuffCapabilities;
 
         // ====================================================================
         // 保护属性（供子类 Mob0Enemy 访问）
@@ -357,7 +397,11 @@ namespace GameBattle
         protected int MaxHealthBase
         {
             get => _maxHealthBase;
-            set => _maxHealthBase = value;
+            set
+            {
+                _maxHealthBase = value;
+                _maxHealth = value;
+            }
         }
 
         /// <summary>当前血量（供子类访问，由 Init 设置）。</summary>
@@ -378,8 +422,15 @@ namespace GameBattle
         protected int BaseMoveSpeed
         {
             get => _baseMoveSpeed;
-            set => _baseMoveSpeed = value;
+            set
+            {
+                _baseMoveSpeed = value;
+                _moveSpeed = value;
+            }
         }
+
+        /// <summary>当前类型可复用的租借世代；仅配置化敌人提供有效值。</summary>
+        protected virtual long BuffGeneration => 0;
 
         /// <summary>逻辑宽度（供子类初始化设置）。</summary>
         protected float WidthField
@@ -420,10 +471,34 @@ namespace GameBattle
 
         /// <summary>是否已入池（诊断用，对应 inPool）。</summary>
         /// <remarks>
-        /// <para>供子类（如 Mob0Enemy）在 OnDeathPresentationCompleted 中守卫已回收对象
+        /// <para>供子类（如 ConfiguredEnemyBase）在 OnDeathPresentationCompleted 中守卫已回收对象
         /// （对应 NormalEnemyBase.js:88 <c>if (this.inPool) return</c>）。</para>
         /// </remarks>
         internal bool InPool => _inPool;
+
+        internal int EffectiveMoveSpeedForTest => _moveSpeed;
+
+        internal bool MovementStoppedForTest => _stopMovement;
+
+        /// <summary>
+        /// 击杀奖励值（供 <see cref="Hit"/> 在死亡点提交，默认特殊 10 / 普通 1）。
+        /// </summary>
+        /// <remarks>
+        /// <para>奖励提交仍由 <see cref="EnemyBase"/> 在死亡点唯一执行（不转移所有权）；
+        /// 本虚属性只替换数值来源。配置化敌人（<see cref="ConfiguredEnemyBase"/>）按
+        /// <c>EnemyDefinitionSnapshot.RewardGold</c> override，避免在基类复制奖励逻辑。</para>
+        /// </remarks>
+        protected virtual int KillRewardValue => _isSpecial ? 10 : 1;
+
+        /// <summary>
+        /// 终点攻击伤害值（供 <see cref="AttemptEndPointAttackOnce"/> 提交，默认 1）。
+        /// </summary>
+        /// <remarks>
+        /// <para>终点攻击事实仍由 <see cref="EnemyBase"/> 严格一次性发起（不转移所有权）；
+        /// 本虚属性只替换伤害数值来源。配置化敌人按 <c>EnemyDefinitionSnapshot.ContactDamage</c>
+        /// override。</para>
+        /// </remarks>
+        protected virtual int EndPointAttackDamageValue => EndPointContactDamage;
 
         // ====================================================================
         // 构造（对应 EnemyBase.js:75-131 constructor + _constructOnce）
@@ -459,19 +534,26 @@ namespace GameBattle
             _isPlayerLane = true;
             _isSpecial = false;
             _maxHealthBase = 0;
+            _maxHealth = 0;
             _currentHealth = 0;
+            _healthBuffModifier = 0;
 
             _x = 0f;
             _y = 0f;
             _width = 0f;
             _height = 0f;
             _baseMoveSpeed = BaseMoveSpeedDefault;
+            _moveSpeed = BaseMoveSpeedDefault;
             _currentPathIndex = 0;
             _lastPathIndex = 0;
             _remainingPathDistance = float.PositiveInfinity;
             _movementDirectionX = 0f;
             _movementDirectionY = 0f;
             _stopMovement = false;
+            _buffMovementDisabled = false;
+            _buffSuppressed = false;
+            _buffMovementLocked = false;
+            _skillMovementPause = false;
 
             _gridX = 0;
             _gridY = 0;
@@ -570,6 +652,152 @@ namespace GameBattle
             _onHealthChanged = onHealthChanged;
         }
 
+        bool IBuffTarget.TryGetNumericBase(BuffNumericChannel channel, out double value)
+        {
+            switch (channel)
+            {
+                case BuffNumericChannel.MoveSpeed:
+                    value = _baseMoveSpeed;
+                    return true;
+                case BuffNumericChannel.MaxHealth:
+                    value = _maxHealthBase;
+                    return true;
+                case BuffNumericChannel.CurrentHealth:
+                    value = 0d;
+                    return true;
+                default:
+                    value = 0d;
+                    return false;
+            }
+        }
+
+        void IBuffTarget.CommitNumericAggregate(
+            BuffNumericChannel channel,
+            double effectiveValue,
+            BuffSourceHandle source)
+        {
+            switch (channel)
+            {
+                case BuffNumericChannel.MoveSpeed:
+                    _moveSpeed = ClampToInt(effectiveValue, 0);
+                    break;
+                case BuffNumericChannel.MaxHealth:
+                    CommitMaximumHealth(ClampToInt(effectiveValue, 1), source.AttackerRuntimeId);
+                    break;
+                case BuffNumericChannel.CurrentHealth:
+                    CommitCurrentHealthModifier(
+                        ClampToInt(effectiveValue, int.MinValue),
+                        source.AttackerRuntimeId);
+                    break;
+            }
+        }
+
+        void IBuffTarget.CommitStateAggregate(
+            BuffStateChannel channel,
+            bool active,
+            BuffInstanceSnapshot payloadSource)
+        {
+            _ = payloadSource;
+            switch (channel)
+            {
+                case BuffStateChannel.MovementDisabled:
+                    _buffMovementDisabled = active;
+                    break;
+                case BuffStateChannel.Suppressed:
+                    _buffSuppressed = active;
+                    break;
+                case BuffStateChannel.MovementLocked:
+                    _buffMovementLocked = active;
+                    break;
+                default:
+                    return;
+            }
+
+            RecomputeStopMovement();
+        }
+
+        void IBuffTarget.ClearBuffAggregates()
+        {
+            int oldModifier = _healthBuffModifier;
+            int missingHealth = Math.Max(0, _maxHealth - _currentHealth);
+            _maxHealth = Math.Max(1, _maxHealthBase);
+            if (_currentHealth > 0)
+            {
+                long withoutMaximumBuff = Math.Max(0, _maxHealth - missingHealth);
+                _currentHealth = ClampHealth(withoutMaximumBuff - oldModifier);
+            }
+
+            _healthBuffModifier = 0;
+            _moveSpeed = _baseMoveSpeed;
+            _buffMovementDisabled = false;
+            _buffSuppressed = false;
+            _buffMovementLocked = false;
+            RecomputeStopMovement();
+        }
+
+        /// <summary>
+        /// 设置技能激活期间的移动暂停（Boss 技能成功激活时置 true，完成/取消后置 false）。
+        /// </summary>
+        /// <remarks>
+        /// <para>供 <see cref="BossBase"/> 在技能运行期间暂停移动；与 Buff 状态互不干扰，
+        /// 恢复时只还原技能暂停位，不清除 Buff 聚合状态。重置时由 ResetState 清除。</para>
+        /// </remarks>
+        protected void SetSkillMovementPause(bool paused)
+        {
+            _skillMovementPause = paused;
+            RecomputeStopMovement();
+        }
+
+        /// <summary>重算有效停止移动标志（Buff 控制通道 + 技能暂停）。</summary>
+        private void RecomputeStopMovement()
+        {
+            _stopMovement = _buffMovementDisabled || _buffSuppressed || _buffMovementLocked || _skillMovementPause;
+        }
+
+        private void CommitMaximumHealth(int maximumHealth, int attackerId)
+        {
+            int previousHealth = _currentHealth;
+            int missingHealth = Math.Max(0, _maxHealth - _currentHealth);
+            _maxHealth = maximumHealth;
+            _currentHealth = previousHealth <= 0
+                ? 0
+                : Math.Max(0, _maxHealth - missingHealth);
+            CommitHealthChange(previousHealth, attackerId);
+        }
+
+        private void CommitCurrentHealthModifier(int modifier, int attackerId)
+        {
+            int previousHealth = _currentHealth;
+            long delta = (long)modifier - _healthBuffModifier;
+            _healthBuffModifier = modifier;
+            if (previousHealth > 0)
+            {
+                _currentHealth = ClampHealth((long)previousHealth + delta);
+            }
+
+            CommitHealthChange(previousHealth, attackerId);
+        }
+
+        private int ClampHealth(long value)
+        {
+            if (value <= 0)
+            {
+                return 0;
+            }
+
+            return value >= _maxHealth ? _maxHealth : (int)value;
+        }
+
+        private static int ClampToInt(double value, int minimum)
+        {
+            if (value <= minimum)
+            {
+                return minimum;
+            }
+
+            return value >= int.MaxValue ? int.MaxValue : (int)value;
+        }
+
         // ====================================================================
         // AssignRuntimeId —— 由 EnemyFactory.Acquire 调用分配新 ID
         // ====================================================================
@@ -621,7 +849,10 @@ namespace GameBattle
 
             _isPlayerLane = isPlayerLane;
             _maxHealthBase = maxHealth;
+            _maxHealth = maxHealth;
             _currentHealth = maxHealth;
+            _healthBuffModifier = 0;
+            _moveSpeed = _baseMoveSpeed;
             _width = width;
             _height = height;
 
@@ -825,35 +1056,54 @@ namespace GameBattle
                 return;
             }
 
-            GridPosition point = path[_currentPathIndex];
-            float targetX = point.X * _cellSize;
-            float targetY = point.Y * _cellSize;
-
-            float dx = targetX - _x;
-            float dy = targetY - _y;
-            float distance = (float)Math.Sqrt(dx * dx + dy * dy);
-
-            if (distance < PathPointReachedThreshold)
+            if (path.Count < 2)
             {
-                // 到达当前路径点，递增索引（EnemyBase.js:339-340）。
-                _currentPathIndex += 1;
+                _currentPathIndex = path.Count;
+                _remainingPathDistance = 0f;
+                return;
             }
-            else
+
+            float remainingStep = _moveSpeed * deltaMs / TimeUnitMs;
+            while (remainingStep > 0f && _currentPathIndex < path.Count - 1)
             {
-                // 沿方向推进（EnemyBase.js:341-348）。
+                GridPosition point = path[_currentPathIndex + 1];
+                float targetX = point.X * _cellSize;
+                float targetY = point.Y * _cellSize;
+                float dx = targetX - _x;
+                float dy = targetY - _y;
+                float distance = (float)Math.Sqrt(dx * dx + dy * dy);
+
+                if (distance <= PathPointReachedThreshold || remainingStep >= distance)
+                {
+                    _x = targetX;
+                    _y = targetY;
+                    remainingStep = Math.Max(0f, remainingStep - distance);
+                    _currentPathIndex += 1;
+                    continue;
+                }
+
                 float dirX = dx / distance;
                 float dirY = dy / distance;
                 _movementDirectionX = dirX;
                 _movementDirectionY = dirY;
-                // 速度 px/s * deltaMs / 1000（EnemyBase.js:347 TIME_UNIT_MS）。
-                float step = _baseMoveSpeed * deltaMs / TimeUnitMs;
-                _x += dirX * step;
-                _y += dirY * step;
+                _x += dirX * remainingStep;
+                _y += dirY * remainingStep;
+                remainingStep = 0f;
             }
 
-            // 剩余路径距离（EnemyBase.js:351）。
-            int remainingSegments = path.Count - 1 - _currentPathIndex;
-            _remainingPathDistance = distance + Math.Max(0, remainingSegments) * _cellSize;
+            if (_currentPathIndex >= path.Count - 1)
+            {
+                _currentPathIndex = path.Count;
+                _remainingPathDistance = 0f;
+                return;
+            }
+
+            GridPosition next = path[_currentPathIndex + 1];
+            float nextDx = next.X * _cellSize - _x;
+            float nextDy = next.Y * _cellSize - _y;
+            float distanceToNext = (float)Math.Sqrt(nextDx * nextDx + nextDy * nextDy);
+            int remainingSegments = path.Count - 2 - _currentPathIndex;
+            _remainingPathDistance = distanceToNext + Math.Max(0, remainingSegments) * _cellSize;
         }
 
         // ====================================================================
@@ -922,7 +1172,7 @@ namespace GameBattle
             if (path.Count >= 2)
             {
                 _endPointTarget?.ReceiveEndPointAttack(
-                    new EndPointAttackRequest(_id, _isPlayerLane, EndPointContactDamage));
+                    new EndPointAttackRequest(_id, _isPlayerLane, EndPointAttackDamageValue));
             }
 
             _onDeathRequested?.Invoke(_id, EnemyRemovalReason.ReachedEndPoint);
@@ -942,9 +1192,8 @@ namespace GameBattle
         /// 还原工程经 EventBus 发送 ENEMY_GRID_LEFT/ENEMY_GRID_ENTERED/
         /// ENEMY_GRID_ENTITY_ENTERED 事件。C# 移植由 EnemyManager 在 Update 后
         /// 直接调用 RefreshCellIndex 刷新空间索引，不经事件总线。</para>
-        /// <para><b>边界校验（EnemyBase.js:611-612）：</b>
-        /// 还原工程在更新格后检查 currentTopLeft 与 cellTopLeft 的距离平方 > 25 则不更新
-        /// （防止跨越过大格跳变）。C# 移植保留该校验。</para>
+        /// <para>格索引直接由当前中心点计算。确定性步进可能一次跨过格边界，不能再用
+        /// “左上角必须贴近格原点”的表现层阈值阻止索引更新。</para>
         /// </remarks>
         private void UpdateGridMembership()
         {
@@ -960,16 +1209,6 @@ namespace GameBattle
             int nextY = (int)Math.Floor(centerY / _cellSize);
 
             if (nextX == _gridX && nextY == _gridY)
-            {
-                return;
-            }
-
-            // 边界校验（EnemyBase.js:611-612）：位置与目标格左上角距离过大则不更新。
-            float cellTopLeftX = nextX * _cellSize;
-            float cellTopLeftY = nextY * _cellSize;
-            float dxTL = _x - cellTopLeftX;
-            float dyTL = _y - cellTopLeftY;
-            if (dxTL * dxTL + dyTL * dyTL > 25f)
             {
                 return;
             }
@@ -1013,30 +1252,7 @@ namespace GameBattle
             // 扣血，不低于 0（EnemyBase.js:460-461）。
             int previousHealth = _currentHealth;
             _currentHealth = Math.Max(0, _currentHealth - damage);
-
-            // 记录伤害贡献者（EnemyBase.js:471-472），同一攻击者只记录一次。
-            if (attackerId > 0 && !_damageContributors.Contains(attackerId))
-            {
-                _damageContributors.Add(attackerId);
-            }
-
-            // 触发低频血量变化事实（供表现层血条更新）。只读血量值，不回写规则状态。
-            _onHealthChanged?.Invoke(_id, _currentHealth, _maxHealthBase, _currentHealth - previousHealth);
-
-            // 血量归零进入 DEAD（EnemyBase.js:470）。
-            if (_currentHealth <= 0)
-            {
-                ChangeState(EnemyRuntimeState.Dead);
-
-                // 提交击杀奖励（EnemyBase.js:473-476）。
-                // 奖励值：特殊敌人 10，普通敌人 1。
-                int experienceReward = _isSpecial ? 10 : 1;
-                _onEnemyKilled?.Invoke(_id, attackerId, experienceReward, _isPlayerLane);
-
-                // 通知管理器请求移除（入队，遍历结束后统一处理）。
-                // 对应还原工程 gameOver/回收通知；避免在伤害调用栈内重入销毁集合。
-                _onDeathRequested?.Invoke(_id, EnemyRemovalReason.Killed);
-            }
+            CommitHealthChange(previousHealth, attackerId);
 
             return true;
         }
@@ -1045,6 +1261,31 @@ namespace GameBattle
         /// takeDamage 别名（对应 EnemyBase.js:481 takeDamage）。
         /// </summary>
         internal bool TakeDamage(int damage, int attackerId) => Hit(damage, attackerId);
+
+        private void CommitHealthChange(int previousHealth, int attackerId)
+        {
+            if (_currentHealth < previousHealth
+                && attackerId > 0
+                && !_damageContributors.Contains(attackerId))
+            {
+                _damageContributors.Add(attackerId);
+            }
+
+            _onHealthChanged?.Invoke(
+                _id,
+                _currentHealth,
+                _maxHealth,
+                _currentHealth - previousHealth);
+
+            if (previousHealth <= 0 || _currentHealth > 0)
+            {
+                return;
+            }
+
+            ChangeState(EnemyRuntimeState.Dead);
+            _onEnemyKilled?.Invoke(_id, attackerId, KillRewardValue, _isPlayerLane);
+            _onDeathRequested?.Invoke(_id, EnemyRemovalReason.Killed);
+        }
 
         // ====================================================================
         // BeginDeath —— 死亡开始（对应 EnemyBase.js:483-493 _beginDeath）

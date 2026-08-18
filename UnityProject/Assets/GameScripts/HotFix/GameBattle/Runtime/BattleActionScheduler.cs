@@ -148,9 +148,11 @@ namespace GameBattle
                     continue;
                 }
 
+                // 先执行回调，再标记 executed：若先 MarkExecuted，ScheduledAction.Invoke 的
+                // Executed 守卫会直接返回，到期回调永远不执行（Buff duration 强依赖 exactly-once）。
+                item.Invoke();
                 item.MarkExecuted();
                 executed++;
-                item.Invoke();
                 // 回调可能触发 TryFreeze；IsFrozen 由 BattleSimulation 在检查点统一置位。
                 // 当前同步提交正常返回后，BattleSimulation 的检查点负责中止剩余 phase/子步。
                 if (IsFrozen)

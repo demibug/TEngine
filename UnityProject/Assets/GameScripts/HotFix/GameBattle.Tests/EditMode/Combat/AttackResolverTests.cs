@@ -555,5 +555,122 @@ namespace GameBattle.Tests.EditMode.Combat
             Assert.AreEqual(1, opponentSideTargets.Count, "playerSide=false 应只返回同阵营敌人");
             Assert.AreEqual(2, opponentSideTargets[0].Id, "应返回敌人 2（isPlayerLane=false）");
         }
+
+        // ====================================================================
+        // 首选目标验证与稳定回退测试（design 决策 3，task 3.2）
+        // ====================================================================
+
+        [Test]
+        [Description("首选目标仍可攻击 → 返回首选，不执行回退查询。")]
+        public void TryResolve_PreferredValid_ReturnsPreferred()
+        {
+            EnemyManager mgr = MakeManagerWithEnemies(out FakeEnemy enemy1, out FakeEnemy enemy2);
+            var resolver = new AttackResolver();
+
+            bool ok = resolver.TryResolvePreferredOrFallback(
+                mgr, preferredTargetId: 1,
+                centerX: 40f, centerY: 40f, range: 100f,
+                playerSide: true, CellWidth, CellHeight,
+                out EnemyTargetDto resolved);
+
+            Assert.IsTrue(ok, "首选有效应返回 true");
+            Assert.AreEqual(1, resolved.Id, "应返回首选目标 id=1");
+        }
+
+        [Test]
+        [Description("首选目标死亡 → 按稳定顺序回退到范围内第一个有效目标。")]
+        public void TryResolve_PreferredDead_FallsBackToStableFirst()
+        {
+            EnemyManager mgr = MakeManagerWithEnemies(out FakeEnemy enemy1, out FakeEnemy enemy2);
+            // enemy1 死亡（CurrentState=4 DEAD）。
+            enemy1.CurrentState = 4;
+            var resolver = new AttackResolver();
+
+            bool ok = resolver.TryResolvePreferredOrFallback(
+                mgr, preferredTargetId: 1,
+                centerX: 40f, centerY: 40f, range: 200f,
+                playerSide: true, CellWidth, CellHeight,
+                out EnemyTargetDto resolved);
+
+            Assert.IsTrue(ok, "有替代目标应返回 true");
+            Assert.AreEqual(2, resolved.Id, "应回退到稳定顺序中的第一个有效目标 id=2");
+        }
+
+        [Test]
+        [Description("首选目标失效且范围内无候选 → 返回失败。")]
+        public void TryResolve_PreferredDead_NoCandidate_ReturnsFalse()
+        {
+            var mgr = new EnemyManager(GridSize);
+            FakeEnemy dead = MakeEnemy(1, isPlayerLane: true, x: 40, y: 40, health: 100);
+            dead.CurrentState = 4;
+            mgr.Register(dead);
+            var resolver = new AttackResolver();
+
+            bool ok = resolver.TryResolvePreferredOrFallback(
+                mgr, preferredTargetId: 1,
+                centerX: 40f, centerY: 40f, range: 100f,
+                playerSide: true, CellWidth, CellHeight,
+                out EnemyTargetDto resolved);
+
+            Assert.IsFalse(ok, "无替代目标应返回 false");
+            Assert.IsFalse(resolved.IsValid, "失败时应输出无效哨兵");
+        }
+
+        [Test]
+        [Description("首选目标不存在（已移除）→ 回退到稳定第一目标。")]
+        public void TryResolve_PreferredMissing_FallsBack()
+        {
+            EnemyManager mgr = MakeManagerWithEnemies(out FakeEnemy enemy1, out FakeEnemy enemy2);
+            var resolver = new AttackResolver();
+
+            // 首选 id=999 不存在。
+            bool ok = resolver.TryResolvePreferredOrFallback(
+                mgr, preferredTargetId: 999,
+                centerX: 40f, centerY: 40f, range: 200f,
+                playerSide: true, CellWidth, CellHeight,
+                out EnemyTargetDto resolved);
+
+            Assert.IsTrue(ok, "首选不存在但有范围内目标应回退成功");
+            Assert.AreEqual(1, resolved.Id, "应回退到稳定顺序第一个目标 id=1");
+        }
+
+        [Test]
+        [Description("回退目标必须位于当前攻击范围内：范围外不返回。")]
+        public void TryResolve_PreferredDead_AlternativeOutOfRange_ReturnsFalse()
+        {
+            var mgr = new EnemyManager(GridSize);
+            FakeEnemy dead = MakeEnemy(1, isPlayerLane: true, x: 40, y: 40, health: 100);
+            dead.CurrentState = 4;
+            // 替代目标在 (500,40)，攻击者中心 (40,40)，范围 100 → 范围外。
+            FakeEnemy far = MakeEnemy(2, isPlayerLane: true, x: 500, y: 40, health: 100);
+            mgr.Register(dead);
+            mgr.Register(far);
+            var resolver = new AttackResolver();
+
+            bool ok = resolver.TryResolvePreferredOrFallback(
+                mgr, preferredTargetId: 1,
+                centerX: 40f, centerY: 40f, range: 100f,
+                playerSide: true, CellWidth, CellHeight,
+                out EnemyTargetDto _);
+
+            Assert.IsFalse(ok, "替代目标在范围外应返回 false");
+        }
+
+        [Test]
+        [Description("无状态：同一参数多次调用结果一致（确定性）。")]
+        public void TryResolve_Deterministic_AcrossCalls()
+        {
+            EnemyManager mgr = MakeManagerWithEnemies(out FakeEnemy enemy1, out FakeEnemy enemy2);
+            enemy1.CurrentState = 4;
+            var resolver = new AttackResolver();
+
+            bool ok1 = resolver.TryResolvePreferredOrFallback(
+                mgr, 1, 40f, 40f, 200f, true, CellWidth, CellHeight, out EnemyTargetDto r1);
+            bool ok2 = resolver.TryResolvePreferredOrFallback(
+                mgr, 1, 40f, 40f, 200f, true, CellWidth, CellHeight, out EnemyTargetDto r2);
+
+            Assert.IsTrue(ok1 && ok2, "两次调用都应成功");
+            Assert.AreEqual(r1.Id, r2.Id, "两次调用结果应一致（确定性）");
+        }
     }
 }

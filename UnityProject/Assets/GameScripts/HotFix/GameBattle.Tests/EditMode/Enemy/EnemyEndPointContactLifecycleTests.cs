@@ -109,6 +109,8 @@ namespace GameBattle.Tests.EditMode.Enemy
             }
 
             internal void StartMoving() => BeginMoving();
+
+            internal void AssignIdForTest(int id) => AssignRuntimeId(id);
         }
 
         // ====================================================================
@@ -233,6 +235,7 @@ namespace GameBattle.Tests.EditMode.Enemy
 
             var enemy = new LifecycleEnemy();
             enemy.ConfigureForTest(map, target);
+            enemy.AssignIdForTest(1);
             enemy.InitForTest(isPlayerLane: true, maxHealth: 100);
             enemy.StartMoving();
 

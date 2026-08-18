@@ -29,6 +29,9 @@ public sealed partial class Skill : Luban.BeanBase
         if(_buf.ReadBool()){ CooldownSeconds = _buf.ReadInt(); } else { CooldownSeconds = null; }
         Source = _buf.ReadString();
         if(_buf.ReadBool()){ Confidence = _buf.ReadString(); } else { Confidence = null; }
+        HandlerKey = _buf.ReadString();
+        if(_buf.ReadBool()){ EffectBuffType = _buf.ReadInt(); } else { EffectBuffType = null; }
+        if(_buf.ReadBool()){ EffectDurationMs = _buf.ReadInt(); } else { EffectDurationMs = null; }
     }
 
     public static Skill DeserializeSkill(ByteBuf _buf)
@@ -76,6 +79,18 @@ public sealed partial class Skill : Luban.BeanBase
     /// 置信度
     /// </summary>
     public readonly string Confidence;
+    /// <summary>
+    /// 技能处理器键
+    /// </summary>
+    public readonly string HandlerKey;
+    /// <summary>
+    /// 效果Buff类型(可空)
+    /// </summary>
+    public readonly int? EffectBuffType;
+    /// <summary>
+    /// 效果持续毫秒(可空)
+    /// </summary>
+    public readonly int? EffectDurationMs;
    
     public const int __ID__ = 1107930491;
     public override int GetTypeId() => __ID__;
@@ -97,6 +112,9 @@ public sealed partial class Skill : Luban.BeanBase
         + "cooldownSeconds:" + CooldownSeconds + ","
         + "source:" + Source + ","
         + "confidence:" + Confidence + ","
+        + "handlerKey:" + HandlerKey + ","
+        + "effectBuffType:" + EffectBuffType + ","
+        + "effectDurationMs:" + EffectDurationMs + ","
         + "}";
     }
 }

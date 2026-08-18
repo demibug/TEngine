@@ -5,7 +5,7 @@ using UnityEngine;
 namespace GameBattle
 {
     /// <summary>
-    /// BattleMap0 固定节点的绑定结果。
+    /// 地图固定节点绑定结果（节点只提供层级与锚点，几何来自当前 MapData）。
     /// </summary>
     internal sealed class BattleMapBindingResult
     {
@@ -77,13 +77,22 @@ namespace GameBattle
 
     /// <summary>
     /// BattleMap0 中所有运行时必需节点的只读绑定。
+    /// <para>节点只提供表现层层级与锚点（design.md 决策 4）；格子尺寸、列数/行数、
+    /// cell 宽高和双路端点由当前地图运行快照（<see cref="MapData"/>）决定，
+    /// 不再隐含 map0 业务坐标。旧入口 <see cref="TryCreate(UnityEngine.Transform)"/>
+    /// 保留为兼容 map0 数据的显式入口。</para>
     /// </summary>
     internal sealed class BattleMapBindings
     {
-        private const float LogicCellSize = 80f;
-        private const int GridWidth = 8;
-        private const int GridHeight = 10;
+        private const float LegacyCellSize = 80f;
+        private const int LegacyGridWidth = 8;
+        private const int LegacyGridHeight = 10;
         private const float UnitVisualAnchorOffsetY = 0.35f;
+
+        private static readonly GridPosition LegacyPlayerStart = new GridPosition(0, 8);
+        private static readonly GridPosition LegacyPlayerEnd = new GridPosition(7, 9);
+        private static readonly GridPosition LegacyOpponentStart = new GridPosition(7, 1);
+        private static readonly GridPosition LegacyOpponentEnd = new GridPosition(0, 0);
 
         private static readonly string[] RequiredPaths =
         {
@@ -143,7 +152,38 @@ namespace GameBattle
         public Transform ProjectileRoot { get; }
         public Transform EffectRoot { get; }
 
-        private BattleMapBindings(Transform mapRoot, IReadOnlyDictionary<string, Transform> nodes)
+        // ====================================================================
+        // 当前地图运行几何（design.md 决策 5：坐标由 MapData 决定）
+        // ====================================================================
+
+        /// <summary>地图列数（x 维度）。</summary>
+        private readonly int _gridWidth;
+
+        /// <summary>地图行数（y 维度）。</summary>
+        private readonly int _gridHeight;
+
+        /// <summary>格子像素宽（驱动 X 逻辑坐标换算）。</summary>
+        private readonly float _cellWidth;
+
+        /// <summary>格子像素高（驱动 Y 逻辑坐标换算）。</summary>
+        private readonly float _cellHeight;
+
+        /// <summary>玩家路径起点格（PlayerSpawn 锚点格）。</summary>
+        private readonly GridPosition _playerStartCell;
+
+        /// <summary>玩家路径终点格（PlayerEndAnchor 锚点格）。</summary>
+        private readonly GridPosition _playerEndCell;
+
+        /// <summary>对手路径起点格（OpponentSpawn 锚点格）。</summary>
+        private readonly GridPosition _opponentStartCell;
+
+        /// <summary>对手路径终点格（OpponentEndAnchor 锚点格）。</summary>
+        private readonly GridPosition _opponentEndCell;
+
+        private BattleMapBindings(
+            Transform mapRoot,
+            IReadOnlyDictionary<string, Transform> nodes,
+            MapData map)
         {
             MapRoot = mapRoot;
             BackgroundRoot = nodes["BackgroundRoot"];
@@ -172,10 +212,34 @@ namespace GameBattle
             SoldierRoot = nodes["RuntimeRoot/SoldierRoot"];
             ProjectileRoot = nodes["RuntimeRoot/ProjectileRoot"];
             EffectRoot = nodes["RuntimeRoot/EffectRoot"];
+
+            // 几何来自当前 MapData；旧入口（map==null）使用兼容 map0 数据。
+            if (map != null)
+            {
+                _gridWidth = map.Width;
+                _gridHeight = map.Height;
+                _cellWidth = map.CellWidth > 0 ? map.CellWidth : LegacyCellSize;
+                _cellHeight = map.CellHeight > 0 ? map.CellHeight : LegacyCellSize;
+                _playerStartCell = map.PlayerStart;
+                _playerEndCell = map.PlayerEnd;
+                _opponentStartCell = map.OpponentStart;
+                _opponentEndCell = map.OpponentEnd;
+            }
+            else
+            {
+                _gridWidth = LegacyGridWidth;
+                _gridHeight = LegacyGridHeight;
+                _cellWidth = LegacyCellSize;
+                _cellHeight = LegacyCellSize;
+                _playerStartCell = LegacyPlayerStart;
+                _playerEndCell = LegacyPlayerEnd;
+                _opponentStartCell = LegacyOpponentStart;
+                _opponentEndCell = LegacyOpponentEnd;
+            }
         }
 
         /// <summary>
-        /// 将 8×10 棋盘格映射到 BattleMap0 的 XY 世界坐标。
+        /// 将棋盘格映射到当前地图的 XY 世界坐标（尺寸与端点来自当前 MapData）。
         /// </summary>
         internal Vector3 CellToWorld(int gridX, int gridY, float sortingDepth = 0f)
         {
@@ -185,8 +249,8 @@ namespace GameBattle
             }
 
             return MapRoot.TransformPoint(new Vector3(
-                gridX + 0.5f - GridWidth * 0.5f,
-                GridHeight * 0.5f - (gridY + 0.5f),
+                gridX + 0.5f - _gridWidth * 0.5f,
+                _gridHeight * 0.5f - (gridY + 0.5f),
                 sortingDepth));
         }
 
@@ -201,12 +265,13 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 将战斗逻辑使用的连续像素坐标映射到 BattleMap0 的 XY 世界坐标。
+        /// 将战斗逻辑使用的连续像素坐标映射到当前地图的 XY 世界坐标。
+        /// <para>X 方向除以 CellWidth、Y 方向除以 CellHeight（design.md 决策 5）。</para>
         /// </summary>
         internal Vector3 LogicToWorld(float logicX, float logicY, float sortingDepth = 0f)
         {
-            float gridX = logicX / LogicCellSize;
-            float gridY = logicY / LogicCellSize;
+            float gridX = logicX / _cellWidth;
+            float gridY = logicY / _cellHeight;
             int roundedGridX = Mathf.RoundToInt(gridX);
             int roundedGridY = Mathf.RoundToInt(gridY);
             if (Mathf.Abs(gridX - roundedGridX) <= 0.0001f
@@ -216,8 +281,8 @@ namespace GameBattle
             }
 
             return MapRoot.TransformPoint(new Vector3(
-                gridX + 0.5f - GridWidth * 0.5f,
-                GridHeight * 0.5f - (gridY + 0.5f),
+                gridX + 0.5f - _gridWidth * 0.5f,
+                _gridHeight * 0.5f - (gridY + 0.5f),
                 sortingDepth));
         }
 
@@ -244,13 +309,14 @@ namespace GameBattle
             float sortingDepth,
             out Vector3 worldPosition)
         {
-            // 出生点返回出生点自身位置；终点返回路径终点锚点位置（可见路径尽头，
-            // 即阿斗所在位置）。终点格与锚点重合由 TryCreate 校验保证。
+            // 出生点返回出生点自身位置；终点返回路径终点锚点位置（可见路径尽头）。
+            // 端点格与锚点重合由绑定阶段保证（map0 旧入口由 TryCreate 校验；
+            // 生产入口把通用节点放到所选地图的计算位置，决策 4）。
             Transform endpoint = null;
-            if (gridX == 0 && gridY == 8) endpoint = PlayerSpawn;
-            else if (gridX == 7 && gridY == 9) endpoint = PlayerEndAnchor;
-            else if (gridX == 7 && gridY == 1) endpoint = OpponentSpawn;
-            else if (gridX == 0 && gridY == 0) endpoint = OpponentEndAnchor;
+            if (gridX == _playerStartCell.X && gridY == _playerStartCell.Y) endpoint = PlayerSpawn;
+            else if (gridX == _playerEndCell.X && gridY == _playerEndCell.Y) endpoint = PlayerEndAnchor;
+            else if (gridX == _opponentStartCell.X && gridY == _opponentStartCell.Y) endpoint = OpponentSpawn;
+            else if (gridX == _opponentEndCell.X && gridY == _opponentEndCell.Y) endpoint = OpponentEndAnchor;
 
             if (endpoint == null)
             {
@@ -266,19 +332,19 @@ namespace GameBattle
         /// <summary>将格子索引转换为战斗逻辑使用的像素原点。</summary>
         internal Vector2 CellToLogic(int gridX, int gridY)
         {
-            return new Vector2(gridX * LogicCellSize, gridY * LogicCellSize);
+            return new Vector2(gridX * _cellWidth, gridY * _cellHeight);
         }
 
         /// <summary>取得包含士兵视觉锚点补偿的逻辑坐标，供逐帧同步使用。</summary>
         internal Vector2 UnitCellToLogic(int gridX, int gridY)
         {
             return new Vector2(
-                gridX * LogicCellSize,
-                gridY * LogicCellSize + UnitVisualAnchorOffsetY * LogicCellSize);
+                gridX * _cellWidth,
+                gridY * _cellHeight + UnitVisualAnchorOffsetY * _cellHeight);
         }
 
         /// <summary>
-        /// 将主相机屏幕坐标映射为棋盘格。仅接受 BattleMap0 8×10 范围内的点击。
+        /// 将主相机屏幕坐标映射为棋盘格。仅接受当前地图列数×行数范围内的点击。
         /// </summary>
         internal bool TryScreenToCell(
             Camera camera,
@@ -300,9 +366,9 @@ namespace GameBattle
             }
 
             Vector3 localPoint = MapRoot.InverseTransformPoint(ray.GetPoint(distance));
-            int gridX = Mathf.FloorToInt(localPoint.x + GridWidth * 0.5f);
-            int gridY = Mathf.FloorToInt(GridHeight * 0.5f - localPoint.y);
-            if (gridX < 0 || gridX >= GridWidth || gridY < 0 || gridY >= GridHeight)
+            int gridX = Mathf.FloorToInt(localPoint.x + _gridWidth * 0.5f);
+            int gridY = Mathf.FloorToInt(_gridHeight * 0.5f - localPoint.y);
+            if (gridX < 0 || gridX >= _gridWidth || gridY < 0 || gridY >= _gridHeight)
             {
                 return false;
             }
@@ -324,9 +390,40 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 校验固定路径并在全部路径唯一时创建绑定。
+        /// 校验固定路径并在全部路径唯一时创建绑定（兼容 map0 数据入口）。
         /// </summary>
+        /// <remarks>
+        /// 旧入口保留为兼容 map0 数据的显式入口（task 2.5）：使用 map0 几何与端点
+        /// 校验，供尚未迁移的调用方与测试夹具使用。生产入口必须使用
+        /// <see cref="TryCreate(UnityEngine.Transform, MapData)"/>。
+        /// </remarks>
         internal static BattleMapBindingResult TryCreate(Transform mapRoot)
+        {
+            return CreateInternal(mapRoot, map: null);
+        }
+
+        /// <summary>
+        /// 校验固定路径并以当前地图运行数据建立绑定（生产入口）。
+        /// </summary>
+        /// <param name="mapRoot">地图实例根节点。</param>
+        /// <param name="map">当前地图运行快照（尺寸、cell 宽高、双路端点）。</param>
+        /// <returns>绑定结果；生产路径会把通用端点节点放到所选地图的计算位置。</returns>
+        /// <remarks>
+        /// <para>节点只提供表现层层级与锚点（design.md 决策 4）：出生点、终点、尺寸
+        /// 和坐标换算全部来自 <paramref name="map"/>，map0 不再拥有特殊分支
+        /// （spec "Map bindings use runtime geometry"）。</para>
+        /// </remarks>
+        internal static BattleMapBindingResult TryCreate(Transform mapRoot, MapData map)
+        {
+            if (map == null)
+            {
+                throw new ArgumentNullException(nameof(map));
+            }
+
+            return CreateInternal(mapRoot, map);
+        }
+
+        private static BattleMapBindingResult CreateInternal(Transform mapRoot, MapData map)
         {
             var missingPaths = new List<string>();
             var duplicatePaths = new List<string>();
@@ -358,36 +455,69 @@ namespace GameBattle
             }
 
             BattleMapBindings bindings = missingPaths.Count == 0 && duplicatePaths.Count == 0
-                ? new BattleMapBindings(mapRoot, nodes)
+                ? new BattleMapBindings(mapRoot, nodes, map)
                 : null;
             if (bindings != null)
             {
-                ValidateEndpoint(bindings, "BoardRoot/SpawnPointRoot/PlayerSpawn", 0, 8, invalidPaths);
-                ValidateEndpoint(bindings, "BoardRoot/SpawnPointRoot/OpponentSpawn", 7, 1, invalidPaths);
-                ValidateAnchorEndpoint(bindings, "BoardRoot/EndPointRoot/PlayerEnd", invalidPaths);
-                ValidateAnchorEndpoint(bindings, "BoardRoot/EndPointRoot/OpponentEnd", invalidPaths);
-                if (invalidPaths.Count > 0)
+                if (map == null)
                 {
-                    bindings = null;
+                    // 兼容 map0 路径：校验 prefab 端点与 map0 计算位置一致（保留既有语义）。
+                    ValidateEndpoint(bindings, "BoardRoot/SpawnPointRoot/PlayerSpawn",
+                        bindings._playerStartCell, invalidPaths);
+                    ValidateEndpoint(bindings, "BoardRoot/SpawnPointRoot/OpponentSpawn",
+                        bindings._opponentStartCell, invalidPaths);
+                    ValidateAnchorEndpoint(bindings, "BoardRoot/EndPointRoot/PlayerEnd", invalidPaths);
+                    ValidateAnchorEndpoint(bindings, "BoardRoot/EndPointRoot/OpponentEnd", invalidPaths);
+                    if (invalidPaths.Count > 0)
+                    {
+                        bindings = null;
+                    }
+                }
+                else
+                {
+                    // 生产路径：把通用端点节点放到所选地图的计算位置（设计决策 4）。
+                    bindings.RepositionEndpoints();
                 }
             }
 
             return new BattleMapBindingResult(bindings, missingPaths, duplicatePaths, invalidPaths);
         }
 
+        /// <summary>
+        /// 把通用端点节点放到当前地图的端点格计算位置（design.md 决策 4）。
+        /// <para>出生点节点放到路径起点格，路径终点锚点与可见终点节点放到路径终点格。</para>
+        /// </summary>
+        private void RepositionEndpoints()
+        {
+            SetEndpointPosition(PlayerSpawn, _playerStartCell);
+            SetEndpointPosition(OpponentSpawn, _opponentStartCell);
+            SetEndpointPosition(PlayerEndAnchor, _playerEndCell);
+            SetEndpointPosition(OpponentEndAnchor, _opponentEndCell);
+            PlayerEnd.position = PlayerEndAnchor.position;
+            OpponentEnd.position = OpponentEndAnchor.position;
+        }
+
+        /// <summary>按格子计算世界位置并写入节点。</summary>
+        private void SetEndpointPosition(Transform node, GridPosition cell)
+        {
+            node.position = MapRoot.TransformPoint(new Vector3(
+                cell.X + 0.5f - _gridWidth * 0.5f,
+                _gridHeight * 0.5f - (cell.Y + 0.5f),
+                0f));
+        }
+
         private static void ValidateEndpoint(
             BattleMapBindings bindings,
             string path,
-            int gridX,
-            int gridY,
+            GridPosition cell,
             List<string> invalidPaths)
         {
             Transform endpoint = path.EndsWith("PlayerSpawn", StringComparison.Ordinal)
                 ? bindings.PlayerSpawn
                 : bindings.OpponentSpawn;
             Vector3 expected = bindings.MapRoot.TransformPoint(new Vector3(
-                gridX + 0.5f - GridWidth * 0.5f,
-                GridHeight * 0.5f - (gridY + 0.5f),
+                cell.X + 0.5f - bindings._gridWidth * 0.5f,
+                bindings._gridHeight * 0.5f - (cell.Y + 0.5f),
                 0f));
             if ((endpoint.position - expected).sqrMagnitude > 0.000001f)
             {

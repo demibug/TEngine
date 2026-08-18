@@ -102,3 +102,7 @@ yoo/
 
 #Claude Code 本地设置(个人权限配置,不应提交)
 .claude/settings.local.json
+
+# Codex worker 临时输出
+/.codex/deepseek-worker-output/
+/.codex/agent-worker-output/

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace GameBattle
 {
     // ============================================================================
@@ -109,44 +107,30 @@ namespace GameBattle
 
         /// <inheritdoc/>
         /// <summary>
-        /// 执行刀兵攻击：查询目标，创建 500ms <see cref="KnifeAttackEffect"/> 并登记到管理器。
+        /// 执行刀兵攻击：用调度器传入的初始目标创建 500ms <see cref="KnifeAttackEffect"/> 并登记到管理器。
         /// </summary>
+        /// <param name="initialTarget">调度器为本次攻击选定的唯一初始目标。</param>
         /// <remarks>
         /// <para><b>对应 JS <c>performKnifeAttack()</c>：</b>
-        /// 查询目标 → 取第一个目标 → 创建 KnifeAttackEffect → Launch → Add 到管理器。</para>
+        /// 使用初始目标 → 创建 KnifeAttackEffect → Launch → Add 到管理器。</para>
         ///
-        /// <para><b>目标选择：</b>经 <see cref="AttackResolver.QueryTargets"/> 查询攻击范围内
-        /// 的目标列表，取第一个目标（对应 JS <c>targets[0]</c>）。AttackScheduler 已保证
-        /// 调用前存在目标，此处二次查询是刀兵既定行为（对应 JS performKnifeAttack 内再次查询）。</para>
-        ///
-        /// <para><b>无目标守卫：</b>若二次查询无目标（如目标在 AttackScheduler 查询后死亡），
-        /// 不创建效果，直接返回。对应 JS 中目标失效时取消命中。</para>
+        /// <para><b>目标选择（design 决策 2）：</b>初始目标由 AttackScheduler 单次选择并传入，
+        /// 兵种不再独立二次查询。目标在命中点失效时由 <see cref="KnifeAttackEffect"/> 经
+        /// <see cref="AttackResolver"/> 执行有限稳定重选（design 决策 3/4）。</para>
         ///
         /// <para><b>伤害值：</b>使用 <see cref="SoldierBase.AttackDamage"/>（baseAttackPower +
         /// addAttackPower，本期 addAttackPower=0）。</para>
         ///
         /// <para><b>效果创建：</b><see cref="KnifeAttackEffect.Launch"/> 接收 owner/resolver/
-        /// enemyManager/targetId/damage。效果经 <see cref="AttackEffectManager.Add"/> 登记后，
+        /// enemyManager/targetId/damage/attackRange/cellSize。攻击范围与格子尺寸供命中点
+        /// 有限重选查询使用。效果经 <see cref="AttackEffectManager.Add"/> 登记后，
         /// 由 Manager 在 AttackEffect 阶段唯一推进，500ms 后命中目标。</para>
         /// </remarks>
-        protected internal override void PerformAttack()
+        protected internal override void PerformAttack(EnemyTargetDto initialTarget)
         {
-            // 查询攻击范围内目标（对应 JS resolver.queryTargets）。
-            List<EnemyTargetDto> targets = AttackResolver.QueryTargets(
-                EnemyManager,
-                CenterX, CenterY,
-                AttackRange,
-                Side,
-                CellSize, CellSize);
-
-            // 无目标守卫：目标在 AttackScheduler 查询后可能已死亡，不创建效果。
-            if (targets == null || targets.Count == 0)
-            {
-                return;
-            }
-
-            // 取第一个目标（对应 JS targets[0]）。
-            int targetId = targets[0].Id;
+            // 使用调度器为本次攻击选定的初始目标（design 决策 2：一次攻击只选择一次初始目标）。
+            // 不再在 PerformAttack 开头重复 QueryTargets——初始目标由 AttackScheduler 单次选择并传入。
+            int targetId = initialTarget.Id;
 
             // 创建刀兵攻击效果并启动（对应 JS KnifeAttackTimeline.start → effect.launch）。
             // 池化由 task 6.3 UnitFactory 统一管理；当前 new 创建，回收委托 null。
@@ -156,7 +140,9 @@ namespace GameBattle
                 AttackResolver,
                 EnemyManager,
                 targetId,
-                AttackDamage);
+                AttackDamage,
+                AttackRange,
+                CellSize);
 
             // 登记到攻击效果管理器（对应 JS attackEffectManager.add(effect)）。
             AttackEffectManager.Add(effect);

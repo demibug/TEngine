@@ -186,14 +186,19 @@ namespace GameBattle.Tests.EditMode.Combat
         }
 
         /// <summary>把一个指定等级的同兵种单位放入待上场槽并上场到战场槽。</summary>
-        private SoldierBase PlaceSoldierToBattle(SoldierType type, string text, int level)
+        private SoldierBase PlaceSoldierToBattle(
+            SoldierType type,
+            string text,
+            int level,
+            out int unitId)
         {
             IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
             IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
 
             UnitConfigSnapshot config = FindConfig(text);
+            unitId = _slotBoard.AllocateUnitId();
             var unit = new BattleUnit(
-                unitId: _slotBoard.AllocateUnitId(),
+                unitId: unitId,
                 side: true,
                 kind: UnitKind.Soldier,
                 soldierType: type,
@@ -230,7 +235,8 @@ namespace GameBattle.Tests.EditMode.Combat
         public void BattleUnit_LevelUp_StatsUpdateImmediately()
         {
             // 1 级刀兵：伤害 3，间隔 0.8s。
-            SoldierBase soldier = PlaceSoldierToBattle(SoldierType.Knife, "刀", level: 1);
+            SoldierBase soldier = PlaceSoldierToBattle(
+                SoldierType.Knife, "刀", level: 1, out _);
             Assert.AreEqual(3, ((KnifeSoldier)soldier).AttackDamageForTest,
                 "1 级刀兵伤害 = 3");
             Assert.AreEqual(0.8f, soldier.AttackIntervalSeconds, 0.001f,
@@ -253,7 +259,7 @@ namespace GameBattle.Tests.EditMode.Combat
         public void ReserveUnit_NotInAttackSchedule()
         {
             // 只有一个战场单位（另一个留在待上场槽）。
-            PlaceSoldierToBattle(SoldierType.Knife, "刀", level: 1);
+            PlaceSoldierToBattle(SoldierType.Knife, "刀", level: 1, out _);
 
             IReadOnlyList<SoldierBase> active = _unitRegistry.GetActiveUnits();
             Assert.AreEqual(1, active.Count, "只应有 1 个战场实例进入攻击调度");
@@ -316,14 +322,13 @@ namespace GameBattle.Tests.EditMode.Combat
         [Description("ActivateBattleUnit 导入冷却，重新激活保留冷却时间戳。")]
         public void UnitMove_CoolDownPreserved_OnReactivation()
         {
-            SoldierBase soldier = PlaceSoldierToBattle(SoldierType.Knife, "刀", level: 1);
+            SoldierBase soldier = PlaceSoldierToBattle(
+                SoldierType.Knife, "刀", level: 1, out int unitId);
             // 模拟已攻击过：冷却 = 500ms。
             soldier.LastAttackTimeMs = 500L;
             Assert.AreEqual(500L, soldier.LastAttackTimeMs, "设置攻击冷却");
 
             IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
-            int unitId = soldier.Id;
-
             // 下场：导出冷却。
             long exported = _unitRegistry.DeactivateBattleUnit(unitId);
             Assert.AreEqual(500L, exported, "下场导出冷却");

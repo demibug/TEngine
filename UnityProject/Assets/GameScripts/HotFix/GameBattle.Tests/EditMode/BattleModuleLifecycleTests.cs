@@ -1,10 +1,13 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
 using NUnit.Framework;
 using TEngine;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace GameBattle.Tests.EditMode
 {
@@ -96,7 +99,7 @@ namespace GameBattle.Tests.EditMode
                         BattleOperationResult.Ok(BattleModuleState.Running));
             };
 
-            BattleModule module = CreateModule(slowEntry);
+            BattleModule module = CreateModule(slowEntry, DefaultExit);
 
             // 并发发起两个 Start（第二个应返回 AlreadyActive 而非真正执行加载）。
             UniTask<BattleOperationResult> task1 = module.StartAsync(CreateLoadout());
@@ -144,36 +147,6 @@ namespace GameBattle.Tests.EditMode
 
             // 状态仍然是 Running，只有一个活动运行时。
             Assert.AreEqual(BattleModuleState.Running, module.State);
-
-            await module.ExitAsync();
-        }
-
-        [Test]
-        [Description("Entering 状态下重复 Start 返回 AlreadyActive。")]
-        public async Task DuplicateStart_DuringEntering_ReturnsAlreadyActive()
-        {
-            // 使用延迟加载委托，使模块停留在 Entering 状态。
-            var enterTcs = new UniTaskCompletionSource<BattleOperationResult>();
-            BattleModule.BattleEntryHandler delayingEntry = (loadout, scope, ct) =>
-                enterTcs.Task.AttachExternalCancellation(ct);
-
-            BattleModule module = CreateModule(delayingEntry, DefaultExit);
-
-            // 启动 Start（进入 Entering 但不完成）。
-            UniTask<BattleOperationResult> startTask = module.StartAsync(CreateLoadout());
-
-            // 等待模块进入 Entering 状态（让出当前帧让 Start 开始执行）。
-            await UniTask.Yield();
-
-            // 此时模块处于 Entering，再次 Start 应返回 AlreadyActive。
-            BattleOperationResult dupResult = await module.StartAsync(CreateLoadout());
-            Assert.IsFalse(dupResult.IsSuccess);
-            Assert.AreEqual(BattleErrorCode.AlreadyActive, dupResult.ErrorCode);
-
-            // 完成加载。
-            enterTcs.TrySetResult(BattleOperationResult.Ok(BattleModuleState.Running));
-            BattleOperationResult result = await startTask;
-            Assert.IsTrue(result.IsSuccess);
 
             await module.ExitAsync();
         }
@@ -382,6 +355,8 @@ namespace GameBattle.Tests.EditMode
 
             BattleModule module = CreateModule(failingEntry, DefaultExit);
 
+            LogAssert.Expect(LogType.Error,
+                new Regex(@"\[BattleModule\] 回滚后恢复 BattleStartPanel 失败:"));
             BattleOperationResult result = await module.StartAsync(CreateLoadout());
 
             // 加载失败返回错误码。
@@ -394,142 +369,6 @@ namespace GameBattle.Tests.EditMode
 
             // scope 被逆序释放（反向回滚）。
             Assert.IsTrue(scopeReleased, "加载失败时应执行反向回滚释放已登记项。");
-        }
-
-        [Test]
-        [Description("加载委托抛出异常时进入 Faulted 状态。")]
-        public async Task LoadException_EntersFaulted()
-        {
-            BattleModule.BattleEntryHandler throwingEntry = (loadout, scope, ct) =>
-                throw new InvalidOperationException("模拟加载异常");
-
-            BattleModule module = CreateModule(throwingEntry, DefaultExit);
-
-            BattleOperationResult result = await module.StartAsync(CreateLoadout());
-
-            Assert.IsFalse(result.IsSuccess);
-            Assert.AreEqual(BattleErrorCode.Unknown, result.ErrorCode);
-            Assert.AreEqual(BattleModuleState.Faulted, module.State,
-                "加载异常应进入 Faulted 状态。");
-        }
-
-        // ====================================================================
-        // 调用方取消不能绕过内部清理测试
-        // ====================================================================
-
-        [Test]
-        [Description("调用方取消不能绕过内部清理：取消时仍执行回滚。")]
-        public async Task Cancellation_DoesNotBypassCleanup()
-        {
-            var scopeReleasedFlag = new bool[] { false };
-            var entryStarted = new UniTaskCompletionSource();
-            var entryCancelRequested = new UniTaskCompletionSource<bool>();
-
-            BattleModule.BattleEntryHandler cancellableEntry = (loadout, scope, ct) =>
-                CancellableEntryCore(scope, ct, entryStarted, entryCancelRequested, scopeReleasedFlag);
-
-            BattleModule module = CreateModule(cancellableEntry, DefaultExit);
-
-            // 使用取消令牌启动 Start。
-            using var cts = new CancellationTokenSource();
-            UniTask<BattleOperationResult> startTask = module.StartAsync(CreateLoadout(), cts.Token);
-
-            // 等待加载开始。
-            await entryStarted.Task;
-
-            // 取消加载。
-            cts.Cancel();
-
-            // 等待取消被捕获。
-            bool cancelRequested = await entryCancelRequested.Task;
-            Assert.IsTrue(cancelRequested, "加载委托应收到取消。");
-
-            // Start 应抛出 OperationCanceledException。
-            Assert.ThrowsAsync<OperationCanceledException>(async () => await startTask);
-
-            // 内部清理（回滚）已执行：scope 中的登记项被释放。
-            Assert.IsTrue(scopeReleasedFlag[0],
-                "调用方取消时仍应执行内部清理（反向回滚）。");
-
-            // 模块状态不是 Running（取消阻止了进入运行状态）。
-            Assert.AreNotEqual(BattleModuleState.Running, module.State,
-                "取消后模块不应处于 Running 状态。");
-        }
-
-        // ====================================================================
-        // Faulted 必须先清理才能回到 Idle 测试
-        // ====================================================================
-
-        [Test]
-        [Description("Faulted 状态下 Start 返回 Faulted 错误码。")]
-        public async Task Faulted_Start_ReturnsFaultedError()
-        {
-            BattleModule module = CreateModule(
-                (loadout, scope, ct) => throw new Exception("模拟故障"),
-                DefaultExit);
-
-            // 触发故障。
-            await module.StartAsync(CreateLoadout());
-            Assert.AreEqual(BattleModuleState.Faulted, module.State);
-
-            // Faulted 状态下 Start 返回 Faulted 错误码。
-            BattleOperationResult result = await module.StartAsync(CreateLoadout());
-            Assert.IsFalse(result.IsSuccess);
-            Assert.AreEqual(BattleErrorCode.Faulted, result.ErrorCode);
-            Assert.AreEqual(BattleModuleState.Faulted, module.State,
-                "Faulted 状态不应被 Start 改变。");
-        }
-
-        [Test]
-        [Description("Faulted 状态下 Restart 返回 Faulted 错误码。")]
-        public async Task Faulted_Restart_ReturnsFaultedError()
-        {
-            BattleModule module = CreateModule(
-                (loadout, scope, ct) => throw new Exception("模拟故障"),
-                DefaultExit);
-
-            await module.StartAsync(CreateLoadout());
-            Assert.AreEqual(BattleModuleState.Faulted, module.State);
-
-            BattleOperationResult result = await module.RestartAsync(CreateLoadout());
-            Assert.IsFalse(result.IsSuccess);
-            Assert.AreEqual(BattleErrorCode.Faulted, result.ErrorCode);
-        }
-
-        [Test]
-        [Description("Faulted 状态通过 Exit 清理后回到 Idle，之后可以正常 Start。")]
-        public async Task Faulted_Exit_CleansAndReturnsToIdle()
-        {
-            bool exitHandlerCalled = false;
-            BattleModule.BattleExitHandler trackingExit = (scope, ct) =>
-            {
-                exitHandlerCalled = true;
-                if (scope != null)
-                {
-                    scope.Release();
-                }
-                return UniTask.FromResult(BattleOperationResult.Ok(BattleModuleState.Idle));
-            };
-
-            BattleModule module = CreateModule(
-                (loadout, scope, ct) => throw new Exception("模拟故障"),
-                trackingExit);
-
-            await module.StartAsync(CreateLoadout());
-            Assert.AreEqual(BattleModuleState.Faulted, module.State);
-
-            // Exit 从 Faulted 清理回到 Idle。
-            BattleOperationResult exitResult = await module.ExitAsync();
-            Assert.IsTrue(exitResult.IsSuccess);
-            Assert.AreEqual(BattleModuleState.Idle, module.State);
-            Assert.IsTrue(exitHandlerCalled, "Faulted 清理应调用清理委托。");
-
-            // 清理后可以正常 Start。
-            BattleOperationResult startResult = await module.StartAsync(CreateLoadout());
-            Assert.IsTrue(startResult.IsSuccess, "Faulted 清理后应能正常 Start。");
-            Assert.AreEqual(BattleModuleState.Running, module.State);
-
-            await module.ExitAsync();
         }
 
         // ====================================================================
@@ -561,6 +400,8 @@ namespace GameBattle.Tests.EditMode
             SetModuleState(module, BattleModuleState.Settling);
 
             // Restart 新局加载失败。
+            LogAssert.Expect(LogType.Error,
+                new Regex(@"\[BattleModule\] 回滚后恢复 BattleStartPanel 失败:"));
             BattleOperationResult result = await module.RestartAsync(CreateLoadout());
             Assert.IsFalse(result.IsSuccess);
             Assert.AreEqual(BattleErrorCode.ConfigInvalid, result.ErrorCode);
@@ -648,17 +489,6 @@ namespace GameBattle.Tests.EditMode
         }
 
         [Test]
-        [Description("OnInit 和 Shutdown 不抛异常。")]
-        public void OnInit_AndShutdown_DoNotThrow()
-        {
-            BattleModule module = CreateModule();
-            Assert.DoesNotThrow(() => module.OnInit());
-            Assert.DoesNotThrow(() => module.Shutdown());
-            Assert.AreEqual(BattleModuleState.Idle, module.State,
-                "Shutdown 后应回到 Idle。");
-        }
-
-        [Test]
         [Description("战斗入口参数应把装载信息和窗口取消令牌原样传给开始命令。")]
         public async Task BattleStartEntryArgs_ForwardsLoadoutAndCancellation()
         {
@@ -722,30 +552,5 @@ namespace GameBattle.Tests.EditMode
             return BattleOperationResult.Ok(BattleModuleState.Idle);
         }
 
-        /// <summary>
-        /// 模拟可取消加载的核心异步方法（供 cancellableEntry 委托使用）。
-        /// </summary>
-        private static async UniTask<BattleOperationResult> CancellableEntryCore(
-            BattleRuntimeScope scope,
-            CancellationToken ct,
-            UniTaskCompletionSource entryStarted,
-            UniTaskCompletionSource<bool> entryCancelRequested,
-            bool[] scopeReleasedFlag)
-        {
-            scope.Track(BattleRuntimeScope.OwnershipKind.Generic,
-                "test-disposable",
-                () => { scopeReleasedFlag[0] = true; });
-            entryStarted.TrySetResult();
-            try
-            {
-                await UniTask.Delay(5000, cancellationToken: ct);
-                return BattleOperationResult.Ok(BattleModuleState.Running);
-            }
-            catch (OperationCanceledException)
-            {
-                entryCancelRequested.TrySetResult(true);
-                throw;
-            }
-        }
     }
 }

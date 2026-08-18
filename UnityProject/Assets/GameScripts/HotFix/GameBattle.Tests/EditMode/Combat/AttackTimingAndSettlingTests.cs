@@ -189,10 +189,12 @@ namespace GameBattle.Tests.EditMode.Combat
             AttackResolver resolver,
             EnemyManager enemyManager,
             int targetId = 1,
-            int damage = 30)
+            int damage = 30,
+            float attackRange = 50f,
+            float cellSize = 40f)
         {
             var effect = new KnifeAttackEffect();
-            effect.Launch(owner, resolver, enemyManager, targetId, damage);
+            effect.Launch(owner, resolver, enemyManager, targetId, damage, attackRange, cellSize);
             return effect;
         }
 
@@ -357,7 +359,12 @@ namespace GameBattle.Tests.EditMode.Combat
             Assert.AreEqual(2, enemy.HitCount, "150ms 时两段应各命中一次");
             // 总伤害 = 60*0.5 + 60*0.5 = 60。
             Assert.AreEqual(100 - 60, enemy.Health, "总伤害应为 60（两段各 30）");
-            Assert.AreEqual(0, manager.ActiveCount, "两段命中后应移除");
+            Assert.AreEqual(2, manager.ActiveCount, "150ms 命中后两个效果仍应处于 120ms 回收段");
+
+            // 再推进 120ms：累计 270ms，两个效果完成并移除，且不会重复命中。
+            manager.Update(120);
+            Assert.AreEqual(2, enemy.HitCount, "回收段不应重复命中");
+            Assert.AreEqual(0, manager.ActiveCount, "270ms 满后两个效果均应移除");
         }
 
         [Test]

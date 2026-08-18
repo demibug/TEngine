@@ -83,10 +83,15 @@ namespace GameBattle.Tests.EditMode.Combat
                 StateChanges.Add(state);
             }
 
-            public void Attack()
+            public void Attack(EnemyTargetDto initialTarget)
             {
                 AttackCount++;
+                // 记录调度器传入的初始目标，供验证初始目标单次传递。
+                LastAttackTargetId = initialTarget.Id;
             }
+
+            /// <summary>最近一次 Attack 收到的初始目标 ID（验证初始目标单次传递）。</summary>
+            public int LastAttackTargetId;
 
             /// <summary>重置可观察状态（复用同一实例做多场景测试）。</summary>
             public void Reset()
@@ -101,6 +106,7 @@ namespace GameBattle.Tests.EditMode.Combat
                 AttackIntervalSeconds = 1f;
                 LastAttackTimeMs = 0;
                 AttackCount = 0;
+                LastAttackTargetId = 0;
                 StateChanges.Clear();
                 // 回到 Idle 态
                 if (CurrentState != AttackUnitState.Idle)
@@ -440,6 +446,8 @@ namespace GameBattle.Tests.EditMode.Combat
             Assert.AreEqual(1000, unit.LastAttackTimeMs, "应写回 LastAttackTimeMs=FrameNowMs(1000)");
             // 有目标时不切换状态，保持 Attack 态。
             Assert.AreEqual(0, unit.StateChanges.Count, "有目标攻击不应切换状态");
+            // design 决策 2：调度器把选定的第一个目标作为本次攻击初始目标传入单位。
+            Assert.AreEqual(1, unit.LastAttackTargetId, "应把第一个目标作为初始目标传入 Attack");
         }
 
         // ====================================================================
@@ -766,10 +774,11 @@ namespace GameBattle.Tests.EditMode.Combat
                 StateChanges.Add(state);
             }
 
-            public void Attack()
+            public void Attack(EnemyTargetDto initialTarget)
             {
                 AttackCount++;
                 // 模拟攻击导致目标死亡 → TryFreeze 成功。
+                _ = initialTarget;
                 _actionScheduler.Freeze();
             }
 

@@ -171,6 +171,16 @@ namespace GameBattle.Tests.EditMode.Unit
             return enemy;
         }
 
+        /// <summary>
+        /// 构造本次攻击的初始目标 DTO（design 决策 2：初始目标由调度器单次选择并传入）。
+        /// <para>测试中模拟 AttackScheduler 把第一个查询结果作为初始目标传入 Attack。</para>
+        /// </summary>
+        private static EnemyTargetDto InitialTarget(TestEnemy enemy) =>
+            new EnemyTargetDto(enemy.IdValue, enemy.XValue, enemy.YValue, float.PositiveInfinity);
+
+        /// <summary>无目标哨兵：模拟调度查询无目标时不会调用 Attack，测试直接传入无效值。</summary>
+        private static EnemyTargetDto NoTarget => EnemyTargetDto.Invalid;
+
         // ====================================================================
         // 士兵初始化辅助（暴露 internal API 供测试）
         // ====================================================================
@@ -268,14 +278,14 @@ namespace GameBattle.Tests.EditMode.Unit
             var enemyManager = new EnemyManager(GridSize, null);
             var resolver = new AttackResolver();
             var effectManager = new AttackEffectManager();
-            CreateAndRegisterEnemy(enemyManager, id: 1, x: 400f, y: 300f);
+            TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, id: 1, x: 400f, y: 300f);
 
             KnifeSoldier soldier = SetupKnifeSoldier(enemyManager, resolver, effectManager);
 
             // 攻击前无效果。
             Assert.AreEqual(0, effectManager.ActiveCount, "攻击前应无活动效果");
 
-            soldier.Attack();
+            soldier.Attack(InitialTarget(enemy));
 
             // 攻击后应登记一个效果。
             Assert.AreEqual(1, effectManager.ActiveCount, "KnifeSoldier 应创建并登记 1 个效果");
@@ -287,19 +297,25 @@ namespace GameBattle.Tests.EditMode.Unit
         }
 
         [Test]
-        [Description("KnifeSoldier.PerformAttack 无目标时不创建效果。")]
-        public void KnifeSoldier_PerformAttack_NoTarget_NoEffect()
+        [Description("KnifeSoldier 经 AttackScheduler 调度时无目标不触发 Attack。")]
+        public void KnifeSoldier_NoTarget_AttackSchedulerGuardPreventsAttack()
         {
             var enemyManager = new EnemyManager(GridSize, null);
             var resolver = new AttackResolver();
             var effectManager = new AttackEffectManager();
-            // 不注册敌人。
+            // 不注册敌人，AttackScheduler 查询无目标。
 
             KnifeSoldier soldier = SetupKnifeSoldier(enemyManager, resolver, effectManager);
+            var actionScheduler = new BattleActionScheduler();
+            actionScheduler.BeginFrame(1000);
+            var scheduler = new AttackScheduler(actionScheduler, resolver, CellSize, CellSize);
+            var units = new List<IAttackUnit> { soldier };
 
-            soldier.Attack();
+            int count = scheduler.Update(units, enemyManager);
 
-            Assert.AreEqual(0, effectManager.ActiveCount, "无目标时不应创建效果");
+            Assert.AreEqual(0, count, "无目标时 AttackScheduler 不应触发攻击");
+            Assert.AreEqual(0, effectManager.ActiveCount,
+                "无目标时 KnifeSoldier 不应创建效果（AttackScheduler 守卫已拦截）");
         }
 
         [Test]
@@ -312,7 +328,7 @@ namespace GameBattle.Tests.EditMode.Unit
             TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, id: 1, x: 420f, y: 300f);
 
             KnifeSoldier soldier = SetupKnifeSoldier(enemyManager, resolver, effectManager);
-            soldier.Attack();
+            soldier.Attack(InitialTarget(enemy));
 
             // 推进 499ms，不命中。
             effectManager.Update(499);
@@ -347,7 +363,8 @@ namespace GameBattle.Tests.EditMode.Unit
             Assert.AreEqual(0, effectManager.ActiveCount, "攻击前应无活动效果");
             Assert.AreEqual(0, projManager.ActiveCount, "攻击前应无活动投射物");
 
-            soldier.Attack();
+            // 模拟调度器传入初始目标（design 决策 2）。
+            soldier.Attack(new EnemyTargetDto(1, 600f, 300f, float.PositiveInfinity));
 
             // 攻击瞬间只登记延迟释放效果，箭矢尚未创建。
             Assert.AreEqual(1, effectManager.ActiveCount, "BowSoldier 应登记 1 个延迟释放效果");
@@ -364,8 +381,8 @@ namespace GameBattle.Tests.EditMode.Unit
         }
 
         [Test]
-        [Description("BowSoldier.PerformAttack 无目标时不创建箭矢或效果。")]
-        public void BowSoldier_PerformAttack_NoTarget_NoArrow()
+        [Description("BowSoldier 经 AttackScheduler 调度时无目标不触发 Attack。")]
+        public void BowSoldier_NoTarget_AttackSchedulerGuardPreventsAttack()
         {
             ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
             var projManager = new ProjectileManager(factory);
@@ -373,10 +390,16 @@ namespace GameBattle.Tests.EditMode.Unit
             var effectManager = new AttackEffectManager();
 
             BowSoldier soldier = SetupBowSoldier(enemyManager, resolver, effectManager, factory, projManager);
+            var actionScheduler = new BattleActionScheduler();
+            actionScheduler.BeginFrame(1000);
+            var scheduler = new AttackScheduler(actionScheduler, resolver, CellSize, CellSize);
+            var units = new List<IAttackUnit> { soldier };
 
-            soldier.Attack();
+            int count = scheduler.Update(units, enemyManager);
 
-            Assert.AreEqual(0, effectManager.ActiveCount, "无目标时不应创建效果");
+            Assert.AreEqual(0, count, "无目标时 AttackScheduler 不应触发攻击");
+            Assert.AreEqual(0, effectManager.ActiveCount,
+                "无目标时 BowSoldier 不应创建效果（AttackScheduler 守卫已拦截）");
             Assert.AreEqual(0, projManager.ActiveCount, "无目标时不应创建投射物");
         }
 
@@ -418,7 +441,7 @@ namespace GameBattle.Tests.EditMode.Unit
 
             Assert.AreEqual(0, effectManager.ActiveCount, "攻击前应无活动效果");
 
-            soldier.Attack();
+            soldier.Attack(new EnemyTargetDto(1, 420f, 300f, float.PositiveInfinity));
 
             Assert.AreEqual(1, effectManager.ActiveCount, "SpearSoldier 应创建并登记 1 个效果");
             IReadOnlyList<IAttackEffect> snapshot = effectManager.GetEffectsSnapshot();
@@ -436,7 +459,7 @@ namespace GameBattle.Tests.EditMode.Unit
             TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, id: 1, x: 420f, y: 300f);
 
             SpearSoldier soldier = SetupSpearSoldier(enemyManager, resolver, effectManager);
-            soldier.Attack();
+            soldier.Attack(InitialTarget(enemy));
 
             // 推进 359ms，不命中。
             effectManager.Update(359);
@@ -446,6 +469,69 @@ namespace GameBattle.Tests.EditMode.Unit
             effectManager.Update(10);
             Assert.AreEqual(1, enemy.HitCount, "360ms 应命中一次");
             Assert.AreEqual(AttackDamage, enemy.TotalHitDamage, "伤害应等于士兵攻击力");
+        }
+
+        [Test]
+        [Description("范围攻击：枪兵初始朝向目标在命中前死亡，但范围内有其他目标 → 仍按范围命中（不被改成锁定型）。")]
+        public void SpearSoldier_InitialAimTargetDead_RangeStillHitsOthers()
+        {
+            var enemyManager = new EnemyManager(GridSize, null);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy initialAim = CreateAndRegisterEnemy(enemyManager, id: 1, x: 420f, y: 300f);
+            TestEnemy other = CreateAndRegisterEnemy(enemyManager, id: 2, x: 430f, y: 300f);
+
+            SpearSoldier soldier = SetupSpearSoldier(enemyManager, resolver, effectManager);
+            // 初始朝向目标为 initialAim，命中前死亡。
+            soldier.Attack(InitialTarget(initialAim));
+            initialAim.GameOver();
+
+            // 推进到 360ms+，PikeAttackEffect 按范围查询命中 other（范围语义不变）。
+            effectManager.Update(370);
+            Assert.AreEqual(0, initialAim.HitCount, "已死亡的初始朝向目标不应被命中");
+            Assert.AreEqual(1, other.HitCount, "范围内其他目标应按范围命中");
+        }
+
+        [Test]
+        [Description("范围攻击：枪兵命中时范围内无目标 → 无伤害，并在完整效果时长后结束。")]
+        public void SpearSoldier_RangeEmpty_NoDamageCompletes()
+        {
+            var enemyManager = new EnemyManager(GridSize, null);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy initialAim = CreateAndRegisterEnemy(enemyManager, id: 1, x: 420f, y: 300f);
+
+            SpearSoldier soldier = SetupSpearSoldier(enemyManager, resolver, effectManager);
+            soldier.Attack(InitialTarget(initialAim));
+            // 命中前唯一目标死亡，范围内无其他目标。
+            initialAim.GameOver();
+
+            effectManager.Update(370);
+            Assert.AreEqual(0, initialAim.HitCount, "范围内无目标时不应命中");
+            Assert.AreEqual(1, effectManager.ActiveCount, "360ms 命中判定后仍应保留 120ms 效果收尾阶段");
+
+            effectManager.Update(110);
+            Assert.AreEqual(0, effectManager.ActiveCount, "完整 480ms 效果时长结束后应被清理");
+        }
+
+        [Test]
+        [Description("范围攻击：同一目标每个 Effect 只命中一次（hitSet 去重，枪兵 360ms 单次）。")]
+        public void SpearSoldier_SameTarget_HitOncePerEffect()
+        {
+            var enemyManager = new EnemyManager(GridSize, null);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, id: 1, x: 420f, y: 300f, health: 1000);
+
+            SpearSoldier soldier = SetupSpearSoldier(enemyManager, resolver, effectManager);
+            soldier.Attack(InitialTarget(enemy));
+
+            // 推进到 360ms 后再多次推进，同一 Effect 不重复命中。
+            effectManager.Update(370);
+            effectManager.Update(100);
+            effectManager.Update(100);
+
+            Assert.AreEqual(1, enemy.HitCount, "同一 PikeAttackEffect 对同一目标只命中一次");
         }
 
         [Test]
@@ -496,7 +582,8 @@ namespace GameBattle.Tests.EditMode.Unit
 
             Assert.AreEqual(0, effectManager.ActiveCount, "攻击前应无活动效果");
 
-            soldier.Attack();
+            // 骑兵为范围攻击，不消费单目标锁定，传入任意初始目标即可。
+            soldier.Attack(NoTarget);
 
             // 应登记两个效果（双段横扫）。
             Assert.AreEqual(2, effectManager.ActiveCount, "CavalrySoldier 应创建并登记 2 个效果");
@@ -517,7 +604,7 @@ namespace GameBattle.Tests.EditMode.Unit
             TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, id: 1, x: 420f, y: 300f);
 
             CavalrySoldier soldier = SetupCavalrySoldier(enemyManager, resolver, effectManager);
-            soldier.Attack();
+            soldier.Attack(InitialTarget(enemy));
 
             // 推进 149ms，不命中。
             effectManager.Update(149);
@@ -542,7 +629,7 @@ namespace GameBattle.Tests.EditMode.Unit
             TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, id: 1, x: 420f, y: 300f);
 
             CavalrySoldier soldier = SetupCavalrySoldier(enemyManager, resolver, effectManager);
-            soldier.Attack();
+            soldier.Attack(InitialTarget(enemy));
 
             // 推进到 150ms+，两段各自命中。
             effectManager.Update(160);
@@ -654,7 +741,7 @@ namespace GameBattle.Tests.EditMode.Unit
                     enemyManager, resolver, effectManager, factory, projectileManager,
                     attackIntervalSeconds: 0.8f);
                 soldier.SetAttackSpeedMultiplier(multiplier);
-                soldier.Attack();
+                soldier.Attack(new EnemyTargetDto(1, 600f, 300f, float.PositiveInfinity));
 
                 long releaseDelayMs = (long)Math.Ceiling(effectiveInterval * 1000d * 17d / 30d);
                 effectManager.Update(releaseDelayMs - 1L);
@@ -693,7 +780,7 @@ namespace GameBattle.Tests.EditMode.Unit
                 attackIntervalSeconds: 0.8f);
 
             // 攻击设置旋转意图（原工程：箭矢初始切线角 + 90°）。
-            soldier.Attack();
+            soldier.Attack(new EnemyTargetDto(1, 600f, 300f, float.PositiveInfinity));
             Assert.IsTrue(soldier.HasBodyRotation, "攻击后应设置旋转意图");
             Assert.AreEqual(45f, soldier.BodyRotationDegrees, 0.0001f,
                 "目标在右下方且曲线控制点上移 120px 时，原工程的初始攻击角应为 45°");
@@ -717,7 +804,7 @@ namespace GameBattle.Tests.EditMode.Unit
             SpearSoldier soldier = SetupSpearSoldier(enemyManager, resolver, effectManager);
 
             // 攻击设置武器瞄准意图（PerformAttack 中 SetWeaponAim）。
-            soldier.Attack();
+            soldier.Attack(new EnemyTargetDto(1, 420f, 300f, float.PositiveInfinity));
             Assert.IsTrue(soldier.HasWeaponAim, "攻击后应设置武器瞄准意图");
 
             // 模拟 AttackScheduler 锁定目标切到 Attack，随后目标丢失切回 Idle。
@@ -740,7 +827,7 @@ namespace GameBattle.Tests.EditMode.Unit
             BowSoldier soldier = SetupBowSoldier(
                 enemyManager, resolver, effectManager, factory, projManager,
                 attackIntervalSeconds: 0.8f);
-            soldier.Attack();
+            soldier.Attack(new EnemyTargetDto(1, 600f, 300f, float.PositiveInfinity));
             soldier.SetState(AttackUnitState.Attack);
             Assert.IsTrue(soldier.HasBodyRotation, "攻击后应设置旋转意图");
 
@@ -763,7 +850,7 @@ namespace GameBattle.Tests.EditMode.Unit
             BowSoldier soldier = SetupBowSoldier(
                 enemyManager, resolver, effectManager, factory, projManager,
                 attackIntervalSeconds: 0.8f);
-            soldier.Attack();
+            soldier.Attack(new EnemyTargetDto(1, 600f, 300f, float.PositiveInfinity));
 
             Assert.AreEqual(1, effectManager.ActiveCount, "攻击后应登记延迟释放效果");
 
@@ -773,6 +860,130 @@ namespace GameBattle.Tests.EditMode.Unit
             // 推进效果管理器到超过释放延迟，箭矢不应创建。
             effectManager.Update(700);
             Assert.AreEqual(0, projManager.ActiveCount, "取消后即使超过释放延迟也不应创建箭矢");
+        }
+
+        // ====================================================================
+        // 弓兵释放点有限重选测试（design 决策 4.2/4.3，task 4.4）
+        // ====================================================================
+
+        [Test]
+        [Description("弓兵释放前原目标死亡且存在替代目标 → 只发射一支箭。")]
+        public void BowRelease_PreferredDead_HasAlternative_FiresOneArrow()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy first = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+            TestEnemy second = CreateAndRegisterEnemy(enemyManager, id: 2, x: 620f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            // 初始目标为 first，释放前 first 死亡。
+            soldier.Attack(InitialTarget(first));
+            first.GameOver();
+
+            // 0.8s × 17 / 30 ≈ 454ms。
+            effectManager.Update(454);
+
+            Assert.AreEqual(1, projManager.ActiveCount, "释放点应只创建 1 支箭（回退到替代目标）");
+            Assert.AreEqual(1, effectManager.ActiveCount,
+                "ReleaseEffect 完成后管理器中应只剩新建箭矢对应的 ProjectileAttackEffect");
+        }
+
+        [Test]
+        [Description("弓兵释放前原目标死亡且无替代目标 → 不创建箭矢并正常完成。")]
+        public void BowRelease_PreferredDead_NoAlternative_NoArrow()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy first = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            soldier.Attack(InitialTarget(first));
+            first.GameOver();
+
+            effectManager.Update(454);
+
+            Assert.AreEqual(0, projManager.ActiveCount, "无替代目标时不应创建箭矢");
+            Assert.AreEqual(0, effectManager.ActiveCount, "无箭矢也应正常完成 ReleaseEffect");
+        }
+
+        [Test]
+        [Description("弓兵释放点首选目标仍有效 → 发射一支箭，不切换。")]
+        public void BowRelease_PreferredValid_FiresOneArrowNoSwitch()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy first = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+            TestEnemy second = CreateAndRegisterEnemy(enemyManager, id: 2, x: 620f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            soldier.Attack(InitialTarget(first));
+            // first 仍存活。
+            effectManager.Update(454);
+
+            Assert.AreEqual(1, projManager.ActiveCount, "首选有效时应只发射 1 支箭");
+        }
+
+        [Test]
+        [Description("弓兵 Cancel 后不发射箭矢（取消路径不触发重选/发射）。")]
+        public void BowRelease_Cancelled_NoArrowNoResolve()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy first = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+            TestEnemy second = CreateAndRegisterEnemy(enemyManager, id: 2, x: 620f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            soldier.Attack(InitialTarget(first));
+            first.GameOver();
+            // 释放前取消（如弓兵死亡/回池）。
+            Assert.IsTrue(soldier.GameOver(), "首次回收应成功");
+
+            effectManager.Update(454);
+
+            Assert.AreEqual(0, projManager.ActiveCount, "Cancel 后即使到释放点也不应创建箭矢");
+        }
+
+        [Test]
+        [Description("同一 BowReleaseEffect 只释放一次：重复 Update 不创建第二支箭。")]
+        public void BowRelease_RepeatUpdate_OnlyOneArrow()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            soldier.Attack(new EnemyTargetDto(1, 600f, 300f, float.PositiveInfinity));
+
+            effectManager.Update(454);
+            effectManager.Update(100);
+            effectManager.Update(100);
+
+            Assert.AreEqual(1, projManager.ActiveCount, "同一 ReleaseEffect 只应释放一次");
         }
     }
 }

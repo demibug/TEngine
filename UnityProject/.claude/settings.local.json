@@ -110,7 +110,8 @@
       "Bash(powershell.exe -NoProfile -Command \"Get-Process Unity -ErrorAction SilentlyContinue | Select-Object Id,ProcessName,MainWindowTitle | Format-Table -AutoSize\")",
       "Bash(git -C \"E:/MyWork/MyTD/TEngine/UnityProject\" log --oneline -3 -- \"Assets/Editor/Battle/BattleSpriteImportPostprocessor.cs\")",
       "Bash(tail -5 \"C:/Users/Administrator/AppData/Local/Unity/Editor/Editor.log\")",
-      "WebFetch(domain:docs.unity.cn)"
+      "WebFetch(domain:docs.unity.cn)",
+      "Bash(openspec validate *)"
     ],
     "ask": [
       "Bash(rm *)",

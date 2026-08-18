@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 
@@ -57,7 +58,9 @@ namespace GameBattle
 
         /// <inheritdoc/>
         /// <remarks>Null 实现：立即返回 <see cref="UniTask.CompletedTask"/>，不执行任何 IO。</remarks>
-        public UniTask PreloadAsync(CancellationToken cancellationToken)
+        public UniTask PreloadAsync(
+            IReadOnlyList<string> enemyResourceAddresses,
+            CancellationToken cancellationToken)
         {
             // 取消令牌已取消时保留取消异常语义（与 IBattleModule 一致）。
             cancellationToken.ThrowIfCancellationRequested();
@@ -83,8 +86,8 @@ namespace GameBattle
         // ====================================================================
 
         /// <inheritdoc/>
-        /// <remarks>Null 实现：空操作。</remarks>
-        public void OnEnemySpawned(int runtimeId, bool isPlayerLane, float logicX, float logicY)
+        /// <remarks>Null 实现：空操作，不创建敌人表现对象。</remarks>
+        public void OnEnemySpawned(EnemySpawnViewData dto)
         {
             // 空操作：不创建敌人表现对象。
         }
@@ -94,6 +97,11 @@ namespace GameBattle
         public void OnEnemyRemoved(int runtimeId, bool playDeathEffect)
         {
             // 空操作：不销毁敌人表现对象。
+        }
+
+        public void OnBossSkillIntent(int runtimeId, string animationKey, bool active)
+        {
+            // 空操作：纯逻辑运行不创建 Boss 表现。
         }
 
         /// <inheritdoc/>

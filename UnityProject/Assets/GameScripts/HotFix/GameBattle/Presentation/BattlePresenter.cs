@@ -488,6 +488,7 @@ namespace GameBattle
                 _enemyManager.EnemySpawned += OnEnemySpawned;
                 _enemyManager.EnemyRemoved += OnEnemyRemoved;
                 _enemyManager.EnemyHealthChanged += OnEnemyHealthChanged;
+                _enemyManager.BossSkillIntentChanged += OnBossSkillIntentChanged;
             }
 
             if (_unitRegistry != null)
@@ -512,6 +513,7 @@ namespace GameBattle
                 _enemyManager.EnemySpawned -= OnEnemySpawned;
                 _enemyManager.EnemyRemoved -= OnEnemyRemoved;
                 _enemyManager.EnemyHealthChanged -= OnEnemyHealthChanged;
+                _enemyManager.BossSkillIntentChanged -= OnBossSkillIntentChanged;
             }
 
             if (_unitRegistry != null)
@@ -529,9 +531,9 @@ namespace GameBattle
             }
         }
 
-        private void OnEnemySpawned(int runtimeId, bool isPlayerLane, float logicX, float logicY)
+        private void OnEnemySpawned(EnemySpawnViewData dto)
         {
-            try { _viewPort.OnEnemySpawned(runtimeId, isPlayerLane, logicX, logicY); }
+            try { _viewPort.OnEnemySpawned(dto); }
             catch (Exception ex) { Log.Error($"{LogTag} 创建敌人表现异常: {ex}"); }
         }
 
@@ -539,6 +541,12 @@ namespace GameBattle
         {
             try { _viewPort.OnEnemyRemoved(runtimeId, playDeathEffect); }
             catch (Exception ex) { Log.Error($"{LogTag} 移除敌人表现异常: {ex}"); }
+        }
+
+        private void OnBossSkillIntentChanged(int runtimeId, string animationKey, bool active)
+        {
+            try { _viewPort.OnBossSkillIntent(runtimeId, animationKey, active); }
+            catch (Exception ex) { Log.Error($"{LogTag} Boss 技能表现异常: {ex}"); }
         }
 
         private void OnEnemyHealthChanged(int runtimeId, int currentHealth, int maxHealth, int delta)
@@ -555,7 +563,14 @@ namespace GameBattle
                         float ratio = maxHealth > 0
                             ? Mathf.Clamp01((float)currentHealth / maxHealth)
                             : (currentHealth > 0 ? 1f : 0f);
-                        healthBar.ShowWithRatio(ratio);
+                        if (ratio <= 0f)
+                        {
+                            healthBar.ResetAndHide();
+                        }
+                        else
+                        {
+                            healthBar.ShowWithRatio(ratio);
+                        }
                     }
                 }
             }
@@ -939,7 +954,7 @@ namespace GameBattle
             }
 
             /// <summary>
-            /// 缓存表现对象的初始 localRotation，供 <see cref="ResetUnitToIdle"/> 复位。
+            /// 缓存表现对象的初始 localRotation，供 <see cref="ResetUnitPose"/> 复位。
             /// </summary>
             private Quaternion GetInitialRotation(GameObject go)
             {
@@ -1041,21 +1056,22 @@ namespace GameBattle
                 go.GetComponent<SpearWeaponView>()?.PlayAttack();
             }
 
-            public void ResetUnitToIdle(object viewObject)
+            public void ResetUnitPose(object viewObject)
             {
                 if (!(viewObject is GameObject go) || go == null)
                 {
                     return;
                 }
 
-                // 恢复根节点初始旋转（弓兵攻击会按目标方向旋转角色本体）。
+                // design 决策 5：普通 Attack→Idle 只恢复根节点初始旋转（弓兵攻击会按目标方向
+                // 旋转角色本体）。不调用 SoldierSpriteAnimator.ResetToIdle() 或
+                // SpearWeaponView.ResetView()——时间驱动的攻击动画与武器表现由各自 Update
+                // 自然完成，普通 Idle 不等于正在播放的表现必须被取消。
+                // 回池/Settling 的强制完整复位由 UnityBattleViewPort 的 Acquire/ReturnToPool 承担。
                 if (_initialRotations.TryGetValue(go, out Quaternion initialRotation))
                 {
                     go.transform.localRotation = initialRotation;
                 }
-
-                go.GetComponent<SoldierSpriteAnimator>()?.ResetToIdle();
-                go.GetComponent<SpearWeaponView>()?.ResetView();
             }
         }
 
@@ -1181,7 +1197,7 @@ namespace GameBattle
                 // 空操作：Null 实现。
             }
 
-            public void ResetUnitToIdle(object viewObject)
+            public void ResetUnitPose(object viewObject)
             {
                 // 空操作：Null 实现。
             }

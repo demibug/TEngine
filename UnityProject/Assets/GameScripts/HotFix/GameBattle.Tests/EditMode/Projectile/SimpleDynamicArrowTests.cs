@@ -395,7 +395,7 @@ namespace GameBattle.Tests.EditMode.Projectile
             Assert.IsTrue(recovered, "首次 Release 应成功");
 
             // 验证状态清除
-            Assert.IsTrue(arrow.IsRecovered, "回收后 IsRecovered=true");
+            Assert.IsFalse(arrow.IsRecovered, "入池 Reset 后应等价于新构造，不保留 recovered 标记");
             Assert.AreEqual(ProjectileBase.InvalidId, arrow.ProjectileId, "回收后 ID 应为 InvalidId");
             Assert.IsNull(arrow.Movement, "回收后移动策略引用应清除");
             Assert.IsNull(arrow.HitStrategy, "回收后命中策略引用应清除");

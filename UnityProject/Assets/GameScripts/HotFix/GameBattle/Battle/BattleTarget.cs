@@ -490,8 +490,20 @@ namespace GameBattle
         {
             // 校验绑定状态：未绑定的目标不能受击。
             // 对应原 JS if (!this.battleState) throw new Error('...')（BattleTarget.js:45）。
-            if (_state == null || _manager == null || _resultBuilder == null
-                || _targetState != TargetState.Active)
+            if (_state == null || _manager == null || _resultBuilder == null)
+            {
+                throw new InvalidOperationException(
+                    "[BattleTarget] 目标未绑定或非 Active 状态，不能受击。先调用 Bind。");
+            }
+
+            // Destroyed 仍保留本局绑定，只拒绝迟到伤害；必须先于 Active 状态校验，
+            // 否则生命归零后的下一次接触会抛异常，违背死亡目标返回 false 的契约。
+            if (_targetState == TargetState.Destroyed)
+            {
+                return false;
+            }
+
+            if (_targetState != TargetState.Active)
             {
                 throw new InvalidOperationException(
                     "[BattleTarget] 目标未绑定或非 Active 状态，不能受击。先调用 Bind。");

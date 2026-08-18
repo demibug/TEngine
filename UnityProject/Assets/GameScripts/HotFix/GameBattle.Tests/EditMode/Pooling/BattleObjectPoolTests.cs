@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace GameBattle.Tests.EditMode.Pooling
 {
@@ -474,6 +477,7 @@ namespace GameBattle.Tests.EditMode.Pooling
             FakePoolable active = pool.Acquire();
             Assert.AreEqual(1, pool.ActiveCount, "有 1 个活动租借。");
 
+            LogAssert.Expect(LogType.Error, new Regex(".*ClearForNewBattle 时仍有 1 个活动租借未归还.*"));
             Assert.IsFalse(pool.ClearForNewBattle(), "有活动租借时返回 false。");
 
             // 清理。
@@ -569,6 +573,8 @@ namespace GameBattle.Tests.EditMode.Pooling
             var pool = scope.GetPool<FakePoolable>(() => new FakePoolable());
             FakePoolable active = pool.Acquire();
 
+            LogAssert.Expect(LogType.Error, new Regex(".*ClearForNewBattle 时仍有 1 个活动租借未归还.*"));
+            LogAssert.Expect(LogType.Error, new Regex(".*BattlePoolScope.*ClearForNewBattle 发现仍有活动租借未归还.*"));
             Assert.IsFalse(scope.ClearForNewBattle(), "有活动租借时返回 false。");
 
             pool.Release(active);
@@ -601,6 +607,7 @@ namespace GameBattle.Tests.EditMode.Pooling
             Assert.IsTrue(scope.AssertAllActiveReleased(), "无活动租借时返回 true。");
 
             FakePoolable active = pool.Acquire();
+            LogAssert.Expect(LogType.Error, new Regex(".*池 FakePoolable 仍有 1 个活动租借未归还.*"));
             Assert.IsFalse(scope.AssertAllActiveReleased(), "有活动租借时返回 false。");
 
             pool.Release(active);

@@ -99,6 +99,12 @@ namespace GameBattle
         /// </summary>
         public readonly BattleConfigSnapshot ConfigSnapshot;
 
+        /// <summary>本局确定性 Buff 所有者。</summary>
+        public readonly BuffManager BuffManager;
+
+        /// <summary>本局 Boss 技能运行器。</summary>
+        public readonly SkillRunner SkillRunner;
+
         /// <summary>
         /// 本次组装产生的攻击效果管理器（task 5.3 产物）。
         /// <para>由 Factory 构造，<see cref="BattleRuntime"/> 接管后持有。
@@ -161,8 +167,8 @@ namespace GameBattle
         /// <summary>
         /// 本次组装产生的战斗规则协调器（task 3.10 产物）。
         /// <para>由 Factory 构造，持有 WaveManager/BattleEconomy/BattleResultBuilder 引用。
-        /// Runtime 在 phaseHandlers 的 WaveSpawn 阶段回调
-        /// <see cref="BattleManager.UpdateSpawnState"/>，在 EnterSettling 步骤 7 调用
+        /// 波次推进由 WaveSpawn phase 唯一调用 <c>waveManager.Update(stepMs)</c>（任务 4.6），
+        /// Runtime 在 EnterSettling 步骤 7 调用
         /// <see cref="BattleManager.GameOver"/> 重置规则状态。</para>
         /// </summary>
         public readonly BattleManager BattleManager;
@@ -170,7 +176,8 @@ namespace GameBattle
         /// <summary>
         /// 本次组装产生的波次管理器（task 3.9 产物）。
         /// <para>由 Factory 构造，提供确定性 Mob0 波次计划。Runtime 在 EnterSettling
-        /// 步骤 7 调用 <see cref="WaveManager.GameOver"/> 清理波次状态。</para>
+        /// 步骤先调用 <see cref="WaveManager.Stop"/> 停止推进，再在清理尾部调用
+        /// <see cref="WaveManager.Cleanup"/> 释放本局波次所有权与 Boss 端口。</para>
         /// </summary>
         public readonly WaveManager WaveManager;
 
@@ -215,11 +222,8 @@ namespace GameBattle
         /// 本次组装产生的单局内部信号中枢（task 7.1 产物）。
         /// <para>由 Factory 构造并登记到 Scope（<see cref="BattleRuntimeScope.TrackSignalHub"/>），
         /// <see cref="BattleRuntime"/> 接管后持有。仅承载需要一对多的单局低频内部事实，
-        /// 不承担核心一致性（直接调用）与跨程序集通信（<c>IBattlePublicEvent</c>）。</para>
-        /// <para>Factory 在构造后把 <see cref="WaveManager.OnRoundSpawnPrepared"/> 桥接到
-        /// <see cref="BattleInternalSignalHub.RoundSpawnPrepared"/>，使波次准备完成事实
-        /// 经信号中枢一对多分发。订阅随 Scope 批量解除（spec "Event subscriptions follow
-        /// runtime lifetime"）。</para>
+        /// 不承担核心一致性（直接调用）与跨程序集通信（<c>IBattlePublicEvent</c>）。
+        /// 订阅随 Scope 批量解除（spec "Event subscriptions follow runtime lifetime"）。</para>
         /// </summary>
         public readonly BattleInternalSignalHub SignalHub;
 
@@ -338,6 +342,8 @@ namespace GameBattle
             BattleLoadoutDto loadout,
             CancellationTokenSource runtimeTokenSource,
             BattleConfigSnapshot configSnapshot,
+            BuffManager buffManager,
+            SkillRunner skillRunner,
             AttackEffectManager attackEffectManager,
             ProjectileManager projectileManager,
             UnitFactory unitFactory,
@@ -369,6 +375,8 @@ namespace GameBattle
             Loadout = loadout;
             RuntimeTokenSource = runtimeTokenSource;
             ConfigSnapshot = configSnapshot;
+            BuffManager = buffManager;
+            SkillRunner = skillRunner;
             AttackEffectManager = attackEffectManager;
             ProjectileManager = projectileManager;
             UnitFactory = unitFactory;
@@ -403,6 +411,8 @@ namespace GameBattle
             BattleLoadoutDto loadout,
             CancellationTokenSource runtimeTokenSource,
             BattleConfigSnapshot configSnapshot,
+            BuffManager buffManager,
+            SkillRunner skillRunner,
             AttackEffectManager attackEffectManager,
             ProjectileManager projectileManager,
             UnitFactory unitFactory,
@@ -434,6 +444,8 @@ namespace GameBattle
                 loadout,
                 runtimeTokenSource,
                 configSnapshot,
+                buffManager,
+                skillRunner,
                 attackEffectManager,
                 projectileManager,
                 unitFactory,
@@ -473,6 +485,8 @@ namespace GameBattle
                 loadout: default,
                 runtimeTokenSource: null,
                 configSnapshot: null,
+                buffManager: null,
+                skillRunner: null,
                 attackEffectManager: null,
                 projectileManager: null,
                 unitFactory: null,
@@ -587,11 +601,8 @@ namespace GameBattle
         /// MapData 从 configSnapshot.Map 获取，BattleConfigSnapshot 直接注入。phaseHandlers
         /// 接入与 StartGame/GameOver 生命周期钩子调用属于 task 6.10 闭环范畴，此处只构造实例。</item>
         /// <item>构造 Phase 6 <see cref="BattleInternalSignalHub"/>（task 7.1 产物）并登记到 Scope
-        /// （<see cref="BattleRuntimeScope.TrackSignalHub"/>）。在 WaveManager 构造后把
-        /// <see cref="WaveManager.OnRoundSpawnPrepared"/> 桥接到
-        /// <see cref="BattleInternalSignalHub.RoundSpawnPrepared"/>，使波次准备完成事实
-        /// 经信号中枢一对多分发。订阅随 Scope 批量解除（spec "Event subscriptions follow
-        /// runtime lifetime"）。</item>
+        /// （<see cref="BattleRuntimeScope.TrackSignalHub"/>）。订阅随 Scope 批量解除
+        /// （spec "Event subscriptions follow runtime lifetime"）。</item>
         /// </list>
         /// <para>任一步骤失败：记录日志，调用 <see cref="BattleRuntimeScope.Rollback"/>
         /// 只释放本次已取得的所有权，返回失败产物。不抛出预期失败异常（决策 0.7）。</para>
@@ -603,7 +614,7 @@ namespace GameBattle
             CancellationToken cancellationToken = default,
             BattlePoolScope poolScope = null)
         {
-            return Create(loadout, cancellationToken, poolScope, bindings: null);
+            return Create(loadout, cancellationToken, poolScope, bindings: null, configSnapshot: null);
         }
 
         /// <summary>
@@ -619,6 +630,25 @@ namespace GameBattle
             BattlePoolScope poolScope,
             BattleMapBindings bindings)
         {
+            return Create(loadout, cancellationToken, poolScope, bindings, configSnapshot: null);
+        }
+
+        /// <summary>
+        /// 以已准备的地图绑定与配置快照组装战斗运行时（生产入口）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>消费已准备 Context（design.md 决策 3 / task 3.5）：</b>
+        /// <paramref name="configSnapshot"/> 由 <see cref="BattleStartupContext.Prepare"/>
+        /// 一次性解析并校验；本方法直接复用，避免二次读取配置。为 null 时保持
+        /// 旧兼容路径：从 ConfigSystem.Tables 内部读取（测试/兼容调用）。</para>
+        /// </remarks>
+        internal static BattleRuntimeAssembly Create(
+            BattleLoadoutDto loadout,
+            CancellationToken cancellationToken,
+            BattlePoolScope poolScope,
+            BattleMapBindings bindings,
+            BattleConfigSnapshot configSnapshot)
+        {
             // 步骤 1：创建本次组装的所有权作用域。这是本次 Create 取得全部所有权的根，
             // 失败时只回滚这个 Scope，不触碰调用方的外部对象。
             Log.Info($"{LogTag} 开始组装一局运行时依赖，mapId={loadout.MapId} round={loadout.Round} seed={loadout.RandomSeed}");
@@ -630,7 +660,8 @@ namespace GameBattle
             BattleSimulation simulation = null;
             CancellationTokenSource runtimeTokenSource = null;
             BattleActionScheduler actionScheduler = null;
-            BattleConfigSnapshot configSnapshot = null;
+            BuffManager buffManager = null;
+            SkillRunner skillRunner = null;
             AttackEffectManager attackEffectManager = null;
             ProjectileManager projectileManager = null;
             UnitFactory unitFactory = null;
@@ -729,13 +760,29 @@ namespace GameBattle
                 }
 
                 // 步骤 6：从应用级 ConfigSystem.Tables 复制不可变配置快照（task 3.4）。
-                Log.Info($"{LogTag} 步骤 5/12：从 ConfigSystem.Tables 复制战斗配置快照");
+                // task 3.5：生产路径由 BattleModule 经 BattleStartupContext.Prepare 一次性
+                // 解析并校验配置快照并传入本参数，此处直接复用避免二次读取；
+                // 为 null 时（测试/兼容调用）保持旧路径内部读取。
+                Log.Info($"{LogTag} 步骤 5/12：获取战斗配置快照（已准备则复用）");
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    Tables tables = ConfigSystem.Instance.Tables;
-                    var provider = new LubanBattleConfigProvider(tables);
-                    configSnapshot = provider.GetSnapshot();
+                    if (configSnapshot == null)
+                    {
+                        Tables tables = ConfigSystem.Instance.Tables;
+                        var provider = new LubanBattleConfigProvider(tables);
+                        configSnapshot = provider.GetSnapshot(loadout.MapId);
+                    }
+                }
+                catch (BattleMapConfigMissingException configMissingEx)
+                {
+                    // 指定 MapId 的地图行缺失：返回 ConfigMissing（spec "Reject an unknown map"）。
+                    Log.Error($"{LogTag} 配置快照复制失败（地图行缺失）: {configMissingEx}");
+                    scope.Rollback();
+                    return BattleRuntimeAssembly.Fail(
+                        BattleErrorCode.ConfigMissing,
+                        $"MapId={configMissingEx.MapId} 无对应地图行",
+                        scope);
                 }
                 catch (Exception configEx)
                 {
@@ -751,7 +798,9 @@ namespace GameBattle
                 // 步骤 7：校验配置快照（task 3.5 BattleConfigValidator）。
                 Log.Info($"{LogTag} 步骤 6/12：校验配置快照（BattleConfigValidator）");
                 cancellationToken.ThrowIfCancellationRequested();
-                BattleConfigValidationResult validationResult = BattleConfigValidator.Validate(configSnapshot);
+                BattleConfigValidationResult validationResult =
+                    BattleConfigValidator.Validate(
+                        configSnapshot, BattleRuntimeCapabilities.Production);
                 if (!validationResult.IsValid)
                 {
                     Log.Warning($"{LogTag} 配置校验失败 code={validationResult.ErrorCode} " +
@@ -762,6 +811,19 @@ namespace GameBattle
                         validationResult.DiagnosticMessage,
                         scope);
                 }
+
+                bool hasSelectedBoss = false;
+                foreach (WavePlanEntry row in configSnapshot.OrderedWavePlan.Rows)
+                {
+                    if (row.Kind == WavePlanKind.Boss)
+                    {
+                        hasSelectedBoss = true;
+                        break;
+                    }
+                }
+
+                buffManager = new BuffManager(configSnapshot.BuffCatalog, actionScheduler);
+                scope.TrackDisposable(buffManager, "BuffManager");
 
                 // 步骤 8：构造 BattleState / BattleReadModel / BattleResultBuilder（task 3.7/3.11 产物）。
                 // task 6.10 闭环：这些状态/服务在构造 Manager 前先构造，因为 BattleManager 依赖
@@ -795,7 +857,7 @@ namespace GameBattle
                 // 及其依赖链（Phase 3/4 产物）。
                 Log.Info($"{LogTag} 步骤 8/12：构造 EnemyManager / AttackEffectManager / ProjectileManager");
                 cancellationToken.ThrowIfCancellationRequested();
-                enemyManager = new EnemyManager(gridSize);
+                enemyManager = new EnemyManager(gridSize, buffManager: buffManager);
                 attackEffectManager = new AttackEffectManager();
                 var attackResolver = new AttackResolver();
                 BattleObjectPool<SimpleDynamicArrow> arrowPool =
@@ -803,16 +865,43 @@ namespace GameBattle
                 var projectileFactory = new ProjectileFactory(idAllocator, arrowPool, enemyManager, cellSize);
                 projectileManager = new ProjectileManager(projectileFactory);
 
-                // task 6.10 闭环返工：构造 EnemyFactory，供 OnSpawnEnemy 委托实际创建敌人。
-                // EnemyFactory 持有 RuntimeIdAllocator + Mob0Enemy 对象池，
-                // Acquire 分配新 RuntimeId，Release 回收并 ResetState（池复用无污染）。
-                BattleObjectPool<Mob0Enemy> mob0Pool =
-                    effectivePoolScope.GetPool(() => new Mob0Enemy());
-                var enemyFactory = new EnemyFactory(idAllocator, mob0Pool);
+                // task 3.4/3.5：用 configSnapshot.EnemyCatalog + 本次池作用域构造类型化
+                // EnemyFactory（封闭 key 注册表 + 四个独立类型池）。生产路径绝不再走
+                // 旧链（EnemyFactory(RuntimeIdAllocator, BattleObjectPool<Mob0Enemy>)）。
+                // 目录缺失时构造抛 ArgumentNullException，落入外层 catch 返回结构化失败。
+                var enemyFactory = new EnemyFactory(idAllocator, configSnapshot.EnemyCatalog, effectivePoolScope);
+
+                BossFactory bossFactory = null;
+                if (hasSelectedBoss)
+                {
+                    if (!configSnapshot.EnemyCatalog.TryGetByTypeIndex(
+                            configSnapshot.Map.EnemyTypeIndex, out EnemyDefinitionSnapshot bossBaseline))
+                    {
+                        throw new InvalidOperationException(
+                            $"{LogTag} 无法按地图 EnemyTypeIndex={configSnapshot.Map.EnemyTypeIndex} 解析 Boss 基线敌人");
+                    }
+
+                    bossFactory = new BossFactory(
+                        idAllocator, configSnapshot.BossCatalog, bossBaseline, effectivePoolScope);
+                }
 
                 // 敌军回收桥接：EnemyManager 统一移除时（Killed/ReachedEndPoint/Forced）
-                // 经本回调归还到 EnemyFactory 对象池，保证每次 Acquire 恰好对应一次 Release。
-                enemyManager.ReleaseEnemy = enemy => enemyFactory.Release((Mob0Enemy)enemy);
+                // 经本回调按 ConfiguredEnemyBase/实际 key 归还到正确类型池，保证每次
+                // Acquire 恰好对应一次 Release。禁止 (Mob0Enemy) 强转（四类型独立池）。
+                enemyManager.ReleaseEnemy = enemy =>
+                {
+                    if (enemy is BossBase boss)
+                    {
+                        if (bossFactory == null || !bossFactory.Release(boss))
+                        {
+                            Log.Error($"{LogTag} Boss 回收失败 key='{boss.BossKey}'");
+                        }
+                    }
+                    else if (enemy is ConfiguredEnemyBase configured)
+                    {
+                        enemyFactory.Release(configured);
+                    }
+                };
 
                 // 步骤 10：构造 UnitFactory / UnitRegistry / BattleEconomy / DeckManager /
                 // PlacementReservationRegistry / BattleInputController / WaveManager / BattleManager /
@@ -859,12 +948,40 @@ namespace GameBattle
                     cellSize, opponentAttackMultiplier,
                     levelService);
 
-                unitRegistry = new UnitRegistry(unitFactory, cellSize);
+                // 玩家默认武器（本 change 起）：从配置快照的 WeaponCatalog 构造
+                // BasicWeaponResolver 并注入 UnitRegistry。生产 Luban Provider 恒构造
+                // 目录（且步骤 7 校验已保证启用集合合法），因此生产路径一定装配真实
+                // resolver；玩家目录缺失或不兼容默认 MUST 失败而非 fallback——
+                // resolver 构造在启用集合非法时抛错，落入外层 catch 终止组装。
+                // 旧兼容快照 WeaponCatalog 为 null 时不装配（保持旧测试行为）。
+                BasicWeaponResolver weaponResolver = configSnapshot.WeaponCatalog != null
+                    ? new BasicWeaponResolver(configSnapshot.WeaponCatalog)
+                    : null;
+
+                unitRegistry = new UnitRegistry(unitFactory, cellSize, buffManager, weaponResolver);
 
                 int refreshCostIncrement = configSnapshot.Economy.RefreshCostIncrement;
                 battleEconomy = new BattleEconomy(battleState, refreshCostIncrement);
 
                 reservationRegistry = new PlacementReservationRegistry();
+
+                if (hasSelectedBoss)
+                {
+                    if (!configSnapshot.SkillCatalog.TryGetByKey(
+                            "SoulCapture", out SkillDefinitionSnapshot soulCaptureDefinition))
+                    {
+                        throw new InvalidOperationException($"{LogTag} 缺少 SoulCapture 技能定义");
+                    }
+
+                    var skillHandlers = new SkillHandlerRegistry();
+                    skillHandlers.Register(
+                        "SoulCapture",
+                        new SoulCaptureHandler(
+                            soulCaptureDefinition, enemyManager, unitRegistry, buffManager, cellSize));
+                    skillRunner = new SkillRunner(
+                        configSnapshot.SkillCatalog, skillHandlers, actionScheduler);
+                    scope.TrackDisposable(skillRunner, "SkillRunner");
+                }
 
                 inputController = new BattleInputController(
                     slotBoard,
@@ -875,20 +992,97 @@ namespace GameBattle
                     configSnapshot,
                     signalHub);
 
-                // WaveManager 依赖 configSnapshot / battleState / randomSource（skipBoss 模式下 randomSource 可为 null）。
-                // 使用与 DeckManager 相同的确定性随机源实例，保证波次 Boss 决策可复现。
-                // SeededRandomSource.NextUnit() 返回 [0,1) float，对应 WaveManager 的 Func<float> 随机源委托。
-                waveManager = new WaveManager(configSnapshot, battleState, randomSource.NextUnit);
+                // WaveManager 新生产链（task 4.6）：直接消费 OrderedWavePlanSnapshot +
+                // Normal spawn handler + 生产默认不可用 Boss 端口，构造契约固定为
+                // (OrderedWavePlanSnapshot, NormalWaveSpawnHandler, IBossWavePort)。
+                //
+                // normalSpawnHandler：把 WaveManager 解析出的 NormalWaveSpawnRequest 翻译为
+                // EnemySpawnRequest（补齐地图/终点/回调）后经 EnemyFactory.Acquire → Register
+                // 走新生产链，登记失败归还正确池；成功返回 WaveEntityHandle.FromEnemyLease。
+                // playerTarget/opponentTarget 在 BattleManager 之后绑定，handler 通过闭包捕获
+                // 变量，实际出生发生在模拟 phase（此时两个 target 均已绑定）。
+                BattleTarget playerTarget = null;
+                BattleTarget opponentTarget = null;
+                NormalWaveSpawnHandler normalSpawnHandler = request =>
+                {
+                    // 从目录确认定义（未知 key 显式失败，禁止占位）。
+                    if (!configSnapshot.EnemyCatalog.TryGetByKey(
+                            request.EnemyKey, out EnemyDefinitionSnapshot definition))
+                    {
+                        throw new InvalidOperationException(
+                            $"{LogTag} 波次出生未知敌人键 '{request.EnemyKey}'（order={request.WaveOrder}）");
+                    }
 
-                // task 7.1 闭环：把 WaveManager 的唯一 ROUND_SPAWN_PREPARED(plan) 事实
-                // 桥接到 BattleInternalSignalHub.RoundSpawnPrepared，使该低频一对多事实可被
-                // 多个内部组件订阅（spec "Event signatures are unambiguous"：唯一带 plan 签名）。
-                // WaveManager 仍按直接调用语义触发委托（design 决策 4：内部一致性优先直接调用），
-                // SignalHub 只负责把事实一对多分发给订阅者；不新增无参重载。
-                // BattleManager 不二次发布同名事件（task 3.9 约束）。
-                waveManager.OnRoundSpawnPrepared = plan => signalHub.RoundSpawnPrepared.Publish(plan);
+                    // 选择正确 lane endpoint：玩家路 → 玩家方目标，电脑路 → 对手方目标。
+                    IEnemyEndPointAttackTarget endPointTarget =
+                        request.IsPlayerLane ? playerTarget : opponentTarget;
+
+                    var spawnRequest = new EnemySpawnRequest(
+                        enemyKey: request.EnemyKey,
+                        isPlayerLane: request.IsPlayerLane,
+                        waveOrder: request.WaveOrder,
+                        difficultyIndex: request.DifficultyIndex,
+                        strategyProfile: request.StrategyProfile,
+                        map: configSnapshot.Map,
+                        cellSize: cellSize,
+                        endPointTarget: endPointTarget,
+                        onEnemyKilled: (killedId, attackerId, reward, lane) =>
+                        {
+                            // 击杀奖励仍由 EnemyBase 在死亡点提交（KillRewardValue），本 handler 不重复发奖。
+                        },
+                        onDeathRequested: (killedId, reason) => enemyManager.RequestRemoveEnemy(killedId, reason),
+                        width: 40f,
+                        height: 40f);
+
+                    // 新生产链单点契约（decision 3）：acquire → ConfiguredInit → Register；
+                    // 初始化或登记失败都归还本次租借到正确池后重新抛出。
+                    ConfiguredEnemyBase enemy = enemyFactory.Acquire(spawnRequest);
+                    try
+                    {
+                        enemyManager.Register(enemy);
+                    }
+                    catch
+                    {
+                        enemyFactory.Release(enemy);
+                        throw;
+                    }
+
+                    return WaveEntityHandle.FromEnemyLease(enemy.CurrentLease);
+                };
+
+                IBossWavePort bossWavePort = UnavailableBossWavePort.Instance;
+                if (hasSelectedBoss)
+                {
+                    bossWavePort = new ZhangLiangBossWavePort(
+                        configSnapshot.BossCatalog,
+                        configSnapshot.SkillCatalog,
+                        bossFactory,
+                        enemyManager,
+                        skillRunner,
+                        configSnapshot.Map,
+                        cellSize,
+                        isPlayerLane => isPlayerLane ? playerTarget : opponentTarget,
+                        (rewardGold, isPlayerLane) =>
+                        {
+                            battleEconomy.Award(isPlayerLane, rewardGold, "kill");
+                            battleState.ApplyEnemyKill();
+                            battleState.ApplyBossKill();
+                        });
+                }
+
+                waveManager = new WaveManager(
+                    configSnapshot.OrderedWavePlan, normalSpawnHandler, bossWavePort);
+
+                // 任务 5.2：EnemyManager 的波次所有权移除事实接到 waveManager.OnEntityRemoved(handle)。
+                // reason（Killed/ReachedEndPoint/Forced）不改变波次计数；handle 携带完整
+                // runtimeId/generation/waveOrder/kind（普通敌人=Normal、Boss=Boss），
+                // WaveManager 以完整值幂等匹配，无有效 waveOrder 自然不命中。
+                // 不得轮询 EnemyManager.Count。订阅接线放在 Factory（Enemy 实现/Manager 语义不修改）。
+                enemyManager.WaveEntityRemoved += (handle, _) => waveManager.OnEntityRemoved(handle);
 
                 // BattleManager 依赖 configSnapshot / battleState / waveManager / battleEconomy / resultBuilder。
+                // 构造时订阅 waveManager.WaveStarted（CurrentRound 同步）与
+                // AllConfiguredWavesCompleted（唯一成功闸 → TryFreeze(true)）。
                 battleManager = new BattleManager(
                     configSnapshot, battleState, waveManager, battleEconomy, resultBuilder);
 
@@ -897,82 +1091,22 @@ namespace GameBattle
                 // BattleTarget.ApplyDamage → BattleState.ApplyDamage → BattleManager.CheckHealthFreeze
                 // → ResultBuilder.TryFreeze 完成实际战斗结算（而非 maxRounds 超时触发冻结）。
                 // 玩家方目标（isPlayerLaneTarget=true）受击 → CheckHealthFreeze(true) → 玩家败；
-                // 对手方目标（isPlayerLaneTarget=false）受击 → CheckHealthFreeze(false) → 玩家胜。
-                var playerTarget = new BattleTarget();
+                // 对手方目标（isPlayerLaneTarget=false）受击 → CheckHealthFreeze(false) → 只保留状态，
+                // 不直接成功（成功必须等 AllConfiguredWavesCompleted）。
+                playerTarget = new BattleTarget();
                 playerTarget.Bind(
                     battleState,
                     battleManager,
                     resultBuilder,
                     isPlayerLaneTarget: true,
                     signalHub: signalHub);
-                var opponentTarget = new BattleTarget();
+                opponentTarget = new BattleTarget();
                 opponentTarget.Bind(
                     battleState,
                     battleManager,
                     resultBuilder,
                     isPlayerLaneTarget: false,
                     signalHub: signalHub);
-
-                // task 6.10 闭环返工：注入 OnSpawnEnemy 委托，使 BattleManager.SpawnPairWhenDue
-                // 真正创建敌人并登记到 EnemyManager，而非只推进 spawnIndex 状态机。
-                // 委托负责 Acquire → Configure → InitializeStats → Init → BeginMoving → Register 全流程。
-                // 委托内捕获 enemyFactory / enemyManager / configSnapshot / playerTarget / opponentTarget，
-                // 这些依赖已在上方构造完成，闭包捕获安全（单局生命周期内不释放）。
-                EnemyConfigSnapshot enemyConfig = configSnapshot.Enemy;
-                MapData mapData = configSnapshot.Map;
-                battleManager.OnSpawnEnemy = (isPlayerLane, typeIndex) =>
-                {
-                    // 1. 从工厂获取 Mob0Enemy（含新 RuntimeId 分配）。
-                    Mob0Enemy enemy = enemyFactory.Acquire();
-
-                    // 2. 注入运行时依赖（地图、终点攻击目标、击杀回调）。
-                    //    EnemyBase.Configure 为 protected，只能在子类内调用。
-                    //    本委托不在 EnemyBase 继承链中，需通过反射调用 Configure
-                    //    注入 map/cellSize/endPointTarget/onEnemyKilled 四个依赖。
-                    //    反射只在 spawn 时调用（低频），不引入性能问题。
-                    //    终点攻击目标按车道绑定：玩家车道敌→玩家阿斗，对手车道敌→对手阿斗。
-                    IEnemyEndPointAttackTarget endPointTarget =
-                        isPlayerLane ? playerTarget : opponentTarget;
-                    EnemyKilledHandler killedHandler = (killedId, attackerId, reward, lane) =>
-                    {
-                        // 本期最简链：击杀奖励经 EnemyBase 内置 experienceReward=1，
-                        // 不额外经 BattleEconomy 发放金币（task 3.12 已确认最简链在死亡点直接结算）。
-                    };
-                    // 移除请求回调：敌人血量归零（Killed）或抵达终点（ReachedEndPoint）时
-                    // 通知 EnemyManager 入队，遍历结束后统一移除并归还对象池。
-                    EnemyDeathRequestHandler deathRequestHandler = (killedId, reason) =>
-                    {
-                        enemyManager.RequestRemoveEnemy(killedId, reason);
-                    };
-                    // 反射调用 protected Configure（EnemyBase.cs:519）。
-                    // 签名：Configure(MapData map, float cellSize, IEnemyEndPointAttackTarget, EnemyKilledHandler, EnemyDeathRequestHandler)。
-                    typeof(EnemyBase).InvokeMember(
-                        "Configure",
-                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.InvokeMethod,
-                        null, enemy, new object[] { mapData, cellSize, endPointTarget, killedHandler, deathRequestHandler });
-
-                    // 3. 初始化 Mob0 数值（healthByWave / speed / contactDamage / rewardGold）。
-                    //    rewardGold 取 EnemyBase 内置值 1（普通敌人），此处显式传 1 保持一致。
-                    var initStats = new Mob0EnemyInitStats(
-                        healthByWave: enemyConfig.HealthByWave,
-                        speed: enemyConfig.Speed,
-                        contactDamage: enemyConfig.ContactDamage,
-                        rewardGold: 1);
-                    enemy.InitializeStats(initStats);
-
-                    // 4. 初始化出生状态（阵营、血量、位置、SPAWNING 状态）。
-                    //    Init 为 protected internal virtual，可通过 InternalsVisibleTo 调用。
-                    //    maxHealth 取 GetInitialHealth（healthByWave[0]）。
-                    //    width/height 取 40f（与 EnemyIntegrationTests 一致，对应 visual.width/height）。
-                    int maxHealth = enemy.GetInitialHealth();
-                    enemy.Init(isPlayerLane, maxHealth, width: 40f, height: 40f);
-
-                    // 5. 从 SPAWNING 切换到 MOVING（敌人立即开始沿路径移动）。
-                    enemy.BeginMoving();
-
-                    // 6. 登记到 EnemyManager（参与 Update 推进与目标查询）。
-                    enemyManager.Register(enemy);
-                };
 
                 // AttackScheduler 依赖 actionScheduler / attackResolver / cellWidth / cellHeight。
                 attackScheduler = new AttackScheduler(actionScheduler, attackResolver, cellSize, cellSize);
@@ -984,7 +1118,8 @@ namespace GameBattle
                 //   Enemy → EnemyManager.Update
                 //   Projectile → ProjectileManager.Update
                 //   AttackRelease → 空操作（攻击释放由单位攻击调度内的效果/投射物创建同步完成）
-                //   WaveSpawn → BattleManager.UpdateSpawnState
+                //   WaveSpawn → waveManager.Update（有序波次状态机唯一时间推进入口，
+                //     任务 4.6：不再调用 BattleManager 旧 UpdateSpawnState）
                 //   UnitAttack → AttackScheduler.Update（遍历 UnitRegistry 活动单位）
                 //   AttackEffect → AttackEffectManager.Update
                 Log.Info($"{LogTag} 步骤 10/12：构造 BattleSimulation（phaseHandlers 接入实际 Manager）");
@@ -1010,9 +1145,10 @@ namespace GameBattle
                 phaseHandlers[(int)BattleUpdatePhase.AttackRelease] =
                     (frameNow, step, phase) => { };
 
-                // WaveSpawn：波次/生成阶段，推进波次状态机并按间隔刷怪。
+                // WaveSpawn：波次/生成阶段。WaveManager 有序波次状态机是逐波唯一 owner，
+                // 只在本 phase 经 Update(stepMs) 推进（任务 4.6）。保持七 phase 顺序与唯一时间源不变。
                 phaseHandlers[(int)BattleUpdatePhase.WaveSpawn] =
-                    (frameNow, step, phase) => battleManager.UpdateSpawnState(frameNow, step);
+                    (frameNow, step, phase) => waveManager.Update(step);
 
                 // UnitAttack：单位攻击调度，每子步只推进一次单位冷却、选取目标并触发一次攻击。
                 phaseHandlers[(int)BattleUpdatePhase.UnitAttack] =
@@ -1054,15 +1190,15 @@ namespace GameBattle
                 if (bindings != null)
                 {
                     viewPort = new UnityBattleViewPort(bindings);
+                    audioPort = new UnityBattleAudioPort();
                     vfxPort = new UnityBattleVfxPort(bindings);
                 }
                 else
                 {
                     viewPort = new NullBattleViewPort();
+                    audioPort = new NullBattleAudioPort();
                     vfxPort = new NullBattleVfxPort();
                 }
-
-                audioPort = new UnityBattleAudioPort();
 
                 // task 7.4 闭环：构造表现层组装器 BattlePresenter。
                 // task 7.6 接入：传入 enemyManager/unitRegistry/projectileManager，
@@ -1098,6 +1234,8 @@ namespace GameBattle
                     loadout,
                     runtimeTokenSource,
                     configSnapshot,
+                    buffManager,
+                    skillRunner,
                     attackEffectManager,
                     projectileManager,
                     unitFactory,
@@ -1145,6 +1283,8 @@ namespace GameBattle
 
         /// <summary>
         /// 校验装载信息，返回结构化错误码而非抛异常（决策 0.7）。
+        /// <para>内部可见：<see cref="BattleStartupContext.Prepare"/> 在配置准备阶段
+        /// 复用本校验，保证在世界加载前拒绝非法 loadout（design.md 决策 3）。</para>
         /// </summary>
         /// <param name="loadout">待校验的装载信息。</param>
         /// <param name="errorCode">校验失败时的稳定错误码。</param>
@@ -1167,7 +1307,7 @@ namespace GameBattle
         /// <see cref="BattleConfigValidator"/> 承担（task 3.5）。</item>
         /// </list>
         /// </remarks>
-        private static bool TryValidateLoadout(
+        internal static bool TryValidateLoadout(
             BattleLoadoutDto loadout,
             out BattleErrorCode errorCode,
             out string diagnosticMessage)

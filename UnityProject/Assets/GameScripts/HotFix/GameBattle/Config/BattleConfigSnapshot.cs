@@ -58,17 +58,100 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 敌人配置（不可变）。
+        /// 敌人目录（不可变，按 enemyKey/typeIndex 双索引）——本 change 起的新生产链权威。
         /// </summary>
-        public EnemyConfigSnapshot Enemy { get; }
+        /// <remarks>
+        /// <para>spec "Enemy configuration is a keyed immutable catalog"：Mob0～Mob3 的目录与数值
+        /// 按 enemyKey 关联为不可变目录，运行时不再持有原始配置集合。</para>
+        /// <para>可为 null（旧兼容构造路径）；<see cref="BattleConfigValidator"/> 以
+        /// MissingSection 拒绝 null 目录。</para>
+        /// </remarks>
+        public EnemyCatalogSnapshot EnemyCatalog { get; }
+
+        /// <summary>
+        /// 有序波次计划（不可变，按 order 升序）——本 change 起的新生产链权威。
+        /// </summary>
+        /// <remarks>
+        /// <para>spec "Battle selects one configured wave plan"：按 ActivePlanId 精确选择
+        /// 一份逐波计划并复制为本局不可变快照，计划选择完成后不再读取原始配置行。</para>
+        /// <para>可为 null（旧兼容构造路径）；<see cref="BattleConfigValidator"/> 以
+        /// MissingSection 拒绝 null 计划。</para>
+        /// </remarks>
+        public OrderedWavePlanSnapshot OrderedWavePlan { get; }
+
+        /// <summary>
+        /// Buff 目录（不可变，按 type 索引）——本 change 起的 Buff 配置权威。
+        /// </summary>
+        /// <remarks>
+        /// <para>spec "Buff definitions form a validated immutable catalog"：全部 Buff 定义
+        /// 归一化为不可变目录，按 type 唯一查询；运行时的申请/叠层/到期只消费本目录，
+        /// 规则层不得再散读 Luban <c>TbBuff</c> 单例。</para>
+        /// <para>可为 null（旧兼容构造路径）；<see cref="BattleConfigValidator"/> 以
+        /// MissingSection 拒绝 null 目录。</para>
+        /// </remarks>
+        public BuffCatalogSnapshot BuffCatalog { get; }
+
+        /// <summary>
+        /// Skill 目录（不可变，按 key 索引）——本 change 起的 Skill 配置权威。
+        /// </summary>
+        /// <remarks>
+        /// <para>spec "Skill definitions are validated before use"：全部 Skill 定义
+        /// 归一化为不可变目录，按 key 唯一查询；目录可含未实现 handler 的技能行，
+        /// 但这类技能不得 attach。运行时的 attach/激活/冷却只消费本目录，规则层
+        /// 不得再散读 Luban <c>TbSkill</c> 单例。</para>
+        /// <para>可为 null（旧兼容构造路径）；<see cref="BattleConfigValidator"/> 以
+        /// MissingSection 拒绝 null 目录。</para>
+        /// </remarks>
+        public SkillCatalogSnapshot SkillCatalog { get; }
+
+        /// <summary>
+        /// Boss 目录（不可变，按 key 索引）——本 change 起的 Boss 配置权威。
+        /// </summary>
+        /// <remarks>
+        /// <para>spec "Luban Boss rows are copied into immutable definitions"：全部
+        /// Boss 行归一化为不可变目录，按 key 唯一查询；运行时只消费本目录，不保留
+        /// Luban row，也不做运行时 fallback。</para>
+        /// <para>可为 null（旧兼容构造路径）；只有所选计划含 Boss 行时才要求非 null
+        /// （Boss 波启动门禁），无 Boss 行的计划不因本字段为 null 被拒。</para>
+        /// </remarks>
+        public BossCatalogSnapshot BossCatalog { get; }
+
+        /// <summary>
+        /// 武器目录（不可变，按 id 索引）——本 change 起的武器配置权威。
+        /// </summary>
+        /// <remarks>
+        /// <para>spec "Exactly four basic weapon definitions are enabled"：全部
+        /// Weapon 行（含其余 40 把禁用特殊武器）归一化为不可变目录，按 id 唯一
+        /// 查询；运行时只消费本目录，不保留 Luban row，也不做运行时 fallback。
+        /// 首期只有 id ∈ {0, 10, 20, 31} 四条 Basic +1 启用，其余行不产生运行时状态。</para>
+        /// <para>可为 null（旧兼容构造路径/旧测试直接构造快照）；生产 Luban Provider
+        /// 恒构造本目录。为 null 时玩家默认武器不装配（兼容语义），生产装配的
+        /// 玩家目录缺失或不兼容默认 MUST 失败而非 fallback。</para>
+        /// </remarks>
+        public WeaponCatalogSnapshot WeaponCatalog { get; }
 
         // ====================================================================
-        // 波次配置
+        // 波次配置（legacy）
         // ====================================================================
 
         /// <summary>
-        /// 波次配置（不可变）。
+        /// 【legacy】单敌人配置快照（不可变）。
         /// </summary>
+        /// <remarks>
+        /// <para>本字段为迁移期兼容保留：<see cref="WaveManager"/>/<see cref="BattleManager"/>
+        /// 等旧生产链仍消费它。新的生产链权威为 <see cref="EnemyCatalog"/>；
+        /// 后续 change（3.x/4.x）移除旧消费后本字段随之淘汰。</para>
+        /// </remarks>
+        public EnemyConfigSnapshot Enemy { get; }
+
+        /// <summary>
+        /// 【legacy】并行数组式波次配置快照（不可变）。
+        /// </summary>
+        /// <remarks>
+        /// <para>本字段为迁移期兼容保留：<see cref="WaveManager"/>/<see cref="BattleManager"/>
+        /// 等旧生产链仍消费它。新的生产链权威为 <see cref="OrderedWavePlan"/>；
+        /// 后续 change（3.x/4.x）移除旧消费后本字段随之淘汰。</para>
+        /// </remarks>
         public WaveConfigSnapshot Wave { get; }
 
         // ====================================================================
@@ -139,8 +222,8 @@ namespace GameBattle
         /// 构造不可变战斗配置快照。
         /// </summary>
         /// <param name="map">地图数据。</param>
-        /// <param name="enemy">敌人配置。</param>
-        /// <param name="wave">波次配置。</param>
+        /// <param name="enemy">【legacy】单敌人配置。</param>
+        /// <param name="wave">【legacy】并行数组式波次配置。</param>
         /// <param name="units">单位配置列表。</param>
         /// <param name="unitLevel">单位等级配置。</param>
         /// <param name="economy">经济配置。</param>
@@ -148,6 +231,12 @@ namespace GameBattle
         /// <param name="projectile">投射物配置。</param>
         /// <param name="missingFieldNotes">缺失字段标注列表（可为空）。</param>
         /// <param name="sourceTag">配置来源标识（"Json" 或 "Luban"）。</param>
+        /// <param name="enemyCatalog">敌人目录（新生产链权威；旧兼容路径可为 null）。</param>
+        /// <param name="orderedWavePlan">有序波次计划（新生产链权威；旧兼容路径可为 null）。</param>
+        /// <param name="buffCatalog">Buff 目录（新生产链权威；旧兼容路径可为 null）。</param>
+        /// <param name="skillCatalog">Skill 目录（新生产链权威；旧兼容路径可为 null）。</param>
+        /// <param name="bossCatalog">Boss 目录（本 change 起权威；旧兼容路径可为 null）。</param>
+        /// <param name="weaponCatalog">武器目录（本 change 起权威；旧兼容路径可为 null）。</param>
         public BattleConfigSnapshot(
             MapData map,
             EnemyConfigSnapshot enemy,
@@ -158,7 +247,13 @@ namespace GameBattle
             DeckConfigSnapshot deck,
             ProjectileConfigSnapshot projectile,
             IReadOnlyList<string> missingFieldNotes,
-            string sourceTag)
+            string sourceTag,
+            EnemyCatalogSnapshot enemyCatalog = null,
+            OrderedWavePlanSnapshot orderedWavePlan = null,
+            BuffCatalogSnapshot buffCatalog = null,
+            SkillCatalogSnapshot skillCatalog = null,
+            BossCatalogSnapshot bossCatalog = null,
+            WeaponCatalogSnapshot weaponCatalog = null)
         {
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Enemy = enemy ?? throw new ArgumentNullException(nameof(enemy));
@@ -170,6 +265,12 @@ namespace GameBattle
             Projectile = projectile ?? throw new ArgumentNullException(nameof(projectile));
             MissingFieldNotes = missingFieldNotes ?? Array.Empty<string>();
             SourceTag = sourceTag ?? string.Empty;
+            EnemyCatalog = enemyCatalog;
+            OrderedWavePlan = orderedWavePlan;
+            BuffCatalog = buffCatalog;
+            SkillCatalog = skillCatalog;
+            BossCatalog = bossCatalog;
+            WeaponCatalog = weaponCatalog;
         }
     }
 
@@ -178,8 +279,13 @@ namespace GameBattle
     // ========================================================================
 
     /// <summary>
-    /// 敌人配置快照（不可变）。
+    /// 【legacy】单敌人配置快照（不可变）。
     /// </summary>
+    /// <remarks>
+    /// <para>迁移期兼容保留：<c>WaveManager</c>/<c>BattleManager</c> 等旧生产链仍消费本类型，
+    /// 它不再是新生产链权威。新权威为 <see cref="EnemyCatalogSnapshot"/>（Mob0～Mob3 目录），
+    /// 后续 change 移除旧消费后本类型淘汰。</para>
+    /// </remarks>
     public sealed class EnemyConfigSnapshot
     {
         /// <summary>敌人类型标识（本期唯一 "Mob0"）。</summary>
@@ -220,8 +326,13 @@ namespace GameBattle
     }
 
     /// <summary>
-    /// 波次配置快照（不可变）。
+    /// 【legacy】并行数组式波次配置快照（不可变）。
     /// </summary>
+    /// <remarks>
+    /// <para>迁移期兼容保留：<c>WaveManager</c>/<c>BattleManager</c> 等旧生产链仍消费本类型，
+    /// 它不再是新生产链权威。新权威为 <see cref="OrderedWavePlanSnapshot"/>（逐波计划），
+    /// 后续 change 移除旧消费后本类型淘汰。</para>
+    /// </remarks>
     public sealed class WaveConfigSnapshot
     {
         /// <summary>各波次怪物数量。</summary>

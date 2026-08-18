@@ -109,7 +109,7 @@ namespace GameBattle.Tests.EditMode.Unit
             }
 
             /// <inheritdoc/>
-            public override void Attack()
+            public override void Attack(EnemyTargetDto initialTarget)
             {
                 AttackCallCount++;
             }
@@ -534,7 +534,7 @@ namespace GameBattle.Tests.EditMode.Unit
             internal bool HasAttackResolver => GetAttackResolverPresent();
 
             /// <inheritdoc/>
-            protected internal override void PerformAttack()
+            protected internal override void PerformAttack(EnemyTargetDto initialTarget)
             {
                 PerformAttackCallCount++;
             }
@@ -753,7 +753,7 @@ namespace GameBattle.Tests.EditMode.Unit
             // 未 ActivatePlacement，IsActive=false。
             Assert.IsFalse(soldier.IsActive, "尚未激活。");
 
-            soldier.Attack();
+            soldier.Attack(EnemyTargetDto.Invalid);
             Assert.AreEqual(0, soldier.PerformAttackCallCount, "非活动状态不触发 PerformAttack。");
         }
 
@@ -765,7 +765,7 @@ namespace GameBattle.Tests.EditMode.Unit
             soldier.ActivateAt(0f, 0f);
             Assert.IsTrue(soldier.IsActive, "已激活。");
 
-            soldier.Attack();
+            soldier.Attack(EnemyTargetDto.Invalid);
             Assert.AreEqual(1, soldier.PerformAttackCallCount, "活动状态触发 PerformAttack 一次。");
         }
 

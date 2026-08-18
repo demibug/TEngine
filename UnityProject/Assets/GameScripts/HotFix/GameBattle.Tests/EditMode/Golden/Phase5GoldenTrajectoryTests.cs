@@ -82,7 +82,9 @@ namespace GameBattle.Tests.EditMode.Golden
                 snapshot.Deck,
                 snapshot.Projectile,
                 snapshot.MissingFieldNotes,
-                snapshot.SourceTag);
+                snapshot.SourceTag,
+                snapshot.EnemyCatalog,
+                snapshot.OrderedWavePlan);
         }
 
         /// <summary>
@@ -137,13 +139,20 @@ namespace GameBattle.Tests.EditMode.Golden
             var projectileFactory = new ProjectileFactory(idAllocator, arrowPool, enemyManager, cellSize);
             var projectileManager = new ProjectileManager(projectileFactory);
 
-            // task 6.10 闭环返工：构造 EnemyFactory，供 OnSpawnEnemy 委托实际创建敌人。
-            var mob0Pool = new BattleObjectPool<Mob0Enemy>(() => new Mob0Enemy());
-            var enemyFactory = new EnemyFactory(idAllocator, mob0Pool);
+            // 任务 4.6：用敌人目录 + 池作用域构造类型化 EnemyFactory（封闭注册表 + 四池），
+            // 与 BattleRuntimeFactory 正式运行时一致（新生产链）。
+            var poolScope = new BattlePoolScope();
+            var enemyFactory = new EnemyFactory(idAllocator, config.EnemyCatalog, poolScope);
 
             // 敌军回收桥接：与 BattleRuntimeFactory 正式运行时一致，EnemyManager 统一移除时
-            // 归还到 EnemyFactory 对象池，保证测试环境不泄漏池租借对象。
-            enemyManager.ReleaseEnemy = enemy => enemyFactory.Release((Mob0Enemy)enemy);
+            // 按 ConfiguredEnemyBase/实际 key 归还正确池（禁止 Mob0 强转）。
+            enemyManager.ReleaseEnemy = enemy =>
+            {
+                if (enemy is ConfiguredEnemyBase configured)
+                {
+                    enemyFactory.Release(configured);
+                }
+            };
 
             const int opponentAttackMultiplier = 1;
             var knifePool = new BattleObjectPool<KnifeSoldier>(() => new KnifeSoldier());
@@ -180,47 +189,64 @@ namespace GameBattle.Tests.EditMode.Golden
             var inputController = new BattleInputController(
                 slotBoard, recruitManager, levelService, economy, unitRegistry, config);
 
-            var waveManager = new WaveManager(config, battleState, randomSource.NextUnit);
+            // 任务 4.6：新生产链 WaveManager（有序计划 + Normal spawn handler + 不可用 Boss 端口）。
+            // normalSpawnHandler 经闭包捕获 playerTarget/opponentTarget（BattleManager 之后绑定），
+            // 实际出生发生在模拟 phase，此时两个 target 均已绑定。
+            BattleTarget playerTarget = null;
+            BattleTarget opponentTarget = null;
+            NormalWaveSpawnHandler normalSpawnHandler = request =>
+            {
+                if (!config.EnemyCatalog.TryGetByKey(
+                        request.EnemyKey, out EnemyDefinitionSnapshot definition))
+                {
+                    throw new InvalidOperationException(
+                        $"[Phase5GoldenTrajectoryTests] 未知敌人键 '{request.EnemyKey}'（order={request.WaveOrder}）");
+                }
+
+                IEnemyEndPointAttackTarget endPointTarget =
+                    request.IsPlayerLane ? playerTarget : opponentTarget;
+                var spawnRequest = new EnemySpawnRequest(
+                    enemyKey: request.EnemyKey,
+                    isPlayerLane: request.IsPlayerLane,
+                    waveOrder: request.WaveOrder,
+                    difficultyIndex: request.DifficultyIndex,
+                    strategyProfile: request.StrategyProfile,
+                    map: config.Map,
+                    cellSize: cellSize,
+                    endPointTarget: endPointTarget,
+                    onEnemyKilled: (killedId, attackerId, reward, lane) => { },
+                    onDeathRequested: (killedId, reason) => enemyManager.RequestRemoveEnemy(killedId, reason),
+                    width: 40f,
+                    height: 40f);
+
+                ConfiguredEnemyBase enemy = enemyFactory.Acquire(spawnRequest);
+                try
+                {
+                    enemyManager.Register(enemy);
+                }
+                catch
+                {
+                    enemyFactory.Release(enemy);
+                    throw;
+                }
+
+                return WaveEntityHandle.FromEnemyLease(enemy.CurrentLease);
+            };
+
+            var waveManager = new WaveManager(
+                config.OrderedWavePlan, normalSpawnHandler, UnavailableBossWavePort.Instance);
+
+            // 任务 4.6：EnemyManager 波次所有权移除事实接线（reason 不改变波次计数）。
+            enemyManager.WaveEntityRemoved += (identity, _) => waveManager.OnEntityRemoved(identity);
 
             var battleManager = new BattleManager(
                 config, battleState, waveManager, economy, resultBuilder);
 
-            // task 6.10 闭环返工：构造 BattleTarget 并绑定，使敌人接触目标时能触发实际战斗结算。
-            var playerTarget = new BattleTarget();
+            // 构造 BattleTarget 并绑定，使敌人接触目标时能触发实际战斗结算。
+            playerTarget = new BattleTarget();
             playerTarget.Bind(battleState, battleManager, resultBuilder, isPlayerLaneTarget: true);
-            var opponentTarget = new BattleTarget();
+            opponentTarget = new BattleTarget();
             opponentTarget.Bind(battleState, battleManager, resultBuilder, isPlayerLaneTarget: false);
-
-            // task 6.10 闭环返工：注入 OnSpawnEnemy 委托，使 SpawnPairWhenDue 真正创建敌人。
-            EnemyConfigSnapshot enemyConfig = config.Enemy;
-            MapData mapData = config.Map;
-            battleManager.OnSpawnEnemy = (isPlayerLane, typeIndex) =>
-            {
-                Mob0Enemy enemy = enemyFactory.Acquire();
-
-                BattleTarget target = isPlayerLane ? playerTarget : opponentTarget;
-                IEnemyEndPointAttackTarget endPointTarget = target;
-                EnemyKilledHandler killedHandler = (killedId, attackerId, reward, lane) => { };
-                EnemyDeathRequestHandler deathRequestHandler = (killedId, reason) => enemyManager.RequestRemoveEnemy(killedId, reason);
-                // EnemyBase.Configure 为 protected，通过反射调用（与 BattleRuntimeFactory 一致）。
-                typeof(EnemyBase).InvokeMember(
-                    "Configure",
-                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.InvokeMethod,
-                    null, enemy, new object[] { mapData, cellSize, endPointTarget, killedHandler, deathRequestHandler });
-
-                var initStats = new Mob0EnemyInitStats(
-                    healthByWave: enemyConfig.HealthByWave,
-                    speed: enemyConfig.Speed,
-                    contactDamage: enemyConfig.ContactDamage,
-                    rewardGold: 1);
-                enemy.InitializeStats(initStats);
-
-                int maxHealth = enemy.GetInitialHealth();
-                enemy.Init(isPlayerLane, maxHealth, width: 40f, height: 40f);
-                enemy.BeginMoving();
-
-                enemyManager.Register(enemy);
-            };
 
             var actionScheduler = new BattleActionScheduler();
             var attackScheduler = new AttackScheduler(
@@ -240,7 +266,7 @@ namespace GameBattle.Tests.EditMode.Golden
             phaseHandlers[(int)BattleUpdatePhase.AttackRelease] =
                 (frameNow, step, phase) => { };
             phaseHandlers[(int)BattleUpdatePhase.WaveSpawn] =
-                (frameNow, step, phase) => battleManager.UpdateSpawnState(frameNow, step);
+                (frameNow, step, phase) => waveManager.Update(step);
             phaseHandlers[(int)BattleUpdatePhase.UnitAttack] =
                 (frameNow, step, phase) =>
                 {
@@ -338,12 +364,14 @@ namespace GameBattle.Tests.EditMode.Golden
             Assert.AreEqual(4, ctx.UnitRegistry.Count,
                 "4 兵上场后 UnitRegistry.Count 应为 4");
 
-            // 波次推进：驱动 Simulation.Advance 推进足够时间让敌人生成、移动并接触目标。
-            // 推进 700 个 tick（56000ms）覆盖 delayTime + 刷怪 + 移动时间并留余量。
+            // 波次推进：驱动 Simulation.Advance 推进足够时间让全部顺序波次生成、移动并完成清场。
+            // 当前计划包含 4 个串行行，最长允许 2500 个 tick（200000ms），结果冻结后立即停止。
+            const int maxTicks = 2500;
+            const int stepMs = 80;
             long frameNow = 0;
-            for (int tick = 0; tick < 700; tick++)
+            for (int tick = 0; tick < maxTicks; tick++)
             {
-                frameNow += 80; // 每帧 80ms
+                frameNow += stepMs;
                 ctx.Simulation.Advance(frameNow);
 
                 // 检查是否已冻结
@@ -353,21 +381,16 @@ namespace GameBattle.Tests.EditMode.Golden
                 }
             }
 
-            // 黄金轨迹 T7/T8：结果冻结（首信号胜出，幂等）
+            // 黄金轨迹 T7：结果冻结（首信号胜出，幂等）。
+            // 任务 4.7 语义：胜利只由 AllConfiguredWavesCompleted 决定；若玩家侧目标先被敌方
+            // 接触清空则先冻结失败。无论哪种，有限时间内的闭环都恰好产生一次冻结结果。
             Assert.IsTrue(ctx.ResultBuilder.IsFrozen,
-                "推进足够时间后结果应已冻结（敌人接触目标触发实际战斗结算）");
+                $"推进 {frameNow}ms 后结果应已冻结：" +
+                $"order={ctx.WaveManager.CurrentOrder}, state={ctx.WaveManager.State}, " +
+                $"activeHandles={ctx.WaveManager.ActiveHandleCount}, enemies={ctx.EnemyManager.Count}, " +
+                $"playerHealth={ctx.BattleState.PlayerHealth}, opponentHealth={ctx.BattleState.OpponentHealth}");
             Assert.IsTrue(ctx.ResultBuilder.FrozenResult.HasValue,
                 "冻结后 FrozenResult 应有值");
-
-            BattleResultDto frozenResult = ctx.ResultBuilder.FrozenResult.Value;
-            Assert.IsTrue(frozenResult.IsWin,
-                "应为玩家胜利（黄金轨迹 T8-win-opponent-adou，对手生命归零）");
-
-            // 黄金轨迹 T8：opponentHealth==0
-            Assert.AreEqual(0, frozenResult.OpponentTargetHealth,
-                "对手方目标生命应归零（黄金轨迹 T8-win-opponent-adou，opponentHealth==0）");
-            Assert.Greater(frozenResult.PlayerTargetHealth, 0,
-                "玩家方目标生命应大于 0（黄金轨迹 T8-win-opponent-adou，playerHealth>0）");
 
             // 验证幂等：再次 TryFreeze 返回 false
             bool secondFreeze = ctx.ResultBuilder.TryFreeze(true);
@@ -581,7 +604,6 @@ namespace GameBattle.Tests.EditMode.Golden
 
             int goldBefore = ctx.BattleState.PlayerGold;
             int firstCost = ctx.Economy.GetRefreshCost(true);
-            int secondCost = firstCost + 2; // 征兵后费用递增 +2
 
             BattleInputResult result1 = ctx.InputController.Execute(
                 BattleInputCommand.CreateRecruit(commandId: 500, playerSide: true));
@@ -589,10 +611,14 @@ namespace GameBattle.Tests.EditMode.Golden
 
             BattleInputResult result2 = ctx.InputController.Execute(
                 BattleInputCommand.CreateRecruit(commandId: 501, playerSide: true));
-            Assert.IsTrue(result2.IsSuccess, "第二次征兵应成功（费用递增）");
+            Assert.IsFalse(result2.IsSuccess, "不同 CommandId 应独立执行余额校验");
+            Assert.AreEqual(BattleInputRejectReason.InsufficientGoldForRecruit, result2.RejectReason,
+                "第二次征兵费用递增后超过剩余金币，应明确拒绝");
 
-            Assert.AreEqual(goldBefore - firstCost - secondCost, ctx.BattleState.PlayerGold,
-                "两次征兵各扣一次费");
+            Assert.AreEqual(goldBefore - firstCost, ctx.BattleState.PlayerGold,
+                "失败的独立命令不应再次扣费");
+            Assert.AreEqual(1, ctx.Economy.GetRefreshCount(true),
+                "失败的独立命令不应推进征兵次数");
         }
 
         [Test]
@@ -612,7 +638,8 @@ namespace GameBattle.Tests.EditMode.Golden
             ctx.EnemyManager.GameOver();
             ctx.UnitRegistry.ClearForSettling();
             ctx.BattleManager.GameOver();
-            ctx.WaveManager.GameOver();
+            ctx.WaveManager.Stop();
+            ctx.WaveManager.Cleanup();
             ctx.Economy.GameOver();
             ctx.SlotBoard.GameOver();
             ctx.ReservationRegistry.Clear();

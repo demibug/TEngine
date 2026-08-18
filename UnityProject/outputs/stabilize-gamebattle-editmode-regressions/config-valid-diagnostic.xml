@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="1" result="Failed(Child)" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.1155905">
+  <test-suite type="TestSuite" id="1000" name="Unity" fullname="Unity" runstate="Runnable" testcasecount="1094" result="Failed" site="Child" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.115591" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+    <properties>
+      <property name="platform" value="EditMode" />
+    </properties>
+    <failure>
+      <message><![CDATA[One or more child tests had errors]]></message>
+    </failure>
+    <test-suite type="Assembly" id="2066" name="GameBattle.Tests.dll" fullname="E:/MyWork/MyTD/TEngine/UnityProject/Library/ScriptAssemblies/GameBattle.Tests.dll" runstate="Runnable" testcasecount="1000" result="Failed" site="Child" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.096798" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="19852" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+        <property name="EditorOnly" value="True" />
+      </properties>
+      <failure>
+        <message><![CDATA[One or more child tests had errors]]></message>
+      </failure>
+      <test-suite type="TestSuite" id="2067" name="GameBattle" fullname="GameBattle" runstate="Runnable" testcasecount="1000" result="Failed" site="Child" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.087671" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <failure>
+          <message><![CDATA[One or more child tests had errors]]></message>
+        </failure>
+        <test-suite type="TestSuite" id="2068" name="Tests" fullname="GameBattle.Tests" runstate="Runnable" testcasecount="1000" result="Failed" site="Child" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.074797" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <failure>
+            <message><![CDATA[One or more child tests had errors]]></message>
+          </failure>
+          <test-suite type="TestSuite" id="2071" name="EditMode" fullname="GameBattle.Tests.EditMode" runstate="Runnable" testcasecount="989" result="Failed" site="Child" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.068412" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <failure>
+              <message><![CDATA[One or more child tests had errors]]></message>
+            </failure>
+            <test-suite type="TestSuite" id="2085" name="Config" fullname="GameBattle.Tests.EditMode.Config" runstate="Runnable" testcasecount="100" result="Failed" site="Child" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.043949" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <failure>
+                <message><![CDATA[One or more child tests had errors]]></message>
+              </failure>
+              <test-suite type="TestFixture" id="1755" name="BattleConfigValidatorTests" fullname="GameBattle.Tests.EditMode.Config.BattleConfigValidatorTests" classname="GameBattle.Tests.EditMode.Config.BattleConfigValidatorTests" runstate="Runnable" testcasecount="47" result="Failed" site="Child" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.040226" total="1" passed="0" failed="1" inconclusive="0" skipped="0" asserts="0">
+                <properties />
+                <failure>
+                  <message><![CDATA[One or more child tests had errors]]></message>
+                </failure>
+                <test-case id="1756" name="Validate_GoldenSnapshot_IsValid" fullname="GameBattle.Tests.EditMode.Config.BattleConfigValidatorTests.Validate_GoldenSnapshot_IsValid" methodname="Validate_GoldenSnapshot_IsValid" classname="GameBattle.Tests.EditMode.Config.BattleConfigValidatorTests" runstate="Runnable" seed="940393908" result="Failed" start-time="2026-08-16 15:56:57Z" end-time="2026-08-16 15:56:57Z" duration="0.021772" asserts="0">
+                  <properties>
+                    <property name="Description" value="黄金基线合法快照校验通过，返回 IsValid=true 与 ErrorCode=None。" />
+                    <property name="retryIteration" value="0" />
+                    <property name="repeatIteration" value="0" />
+                  </properties>
+                  <failure>
+                    <message><![CDATA[  黄金基线快照应校验通过。配置校验失败，共 24 条错误；首条: [RouteMarkerMismatch] Player.Path[1]: Player 路径点[1] (1,8) 落在 Blocked 格上，应为 Passage(通道)；route marker 若仅属表现不得作为游戏路径点
+  Expected: True
+  But was:  False
+]]></message>
+                    <stack-trace><![CDATA[at GameBattle.Tests.EditMode.Config.BattleConfigValidatorTests.Validate_GoldenSnapshot_IsValid () [0x0000e] in E:\MyWork\MyTD\TEngine\UnityProject\Assets\GameScripts\HotFix\GameBattle.Tests\EditMode\Config\BattleConfigValidatorTests.cs:98
+]]></stack-trace>
+                  </failure>
+                  <output><![CDATA[<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+Saving results to: E:\MyWork\MyTD\TEngine\UnityProject\outputs\stabilize-gamebattle-editmode-regressions\config-valid-diagnostic.xml
+]]></output>
+                </test-case>
+              </test-suite>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

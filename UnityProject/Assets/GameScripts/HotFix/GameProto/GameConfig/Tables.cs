@@ -453,6 +453,27 @@ public partial class Tables
             m_TbSoldierVisual.ResolveRef(this);
         }
     }
+    /// <summary>
+    /// 波次计划表
+    /// </summary>
+    private battle.TbWavePlan m_TbWavePlan;
+    public battle.TbWavePlan TbWavePlan 
+    {
+        get
+        {
+            if (m_TbWavePlan == null)
+            {
+                m_TbWavePlan = new battle.TbWavePlan(defaultLoader("battle_tbwaveplan"));
+                m_TbWavePlan.ResolveRef(this);
+            }
+            return m_TbWavePlan;
+        }
+        set
+        {
+            m_TbWavePlan = value;
+            m_TbWavePlan.ResolveRef(this);
+        }
+    }
 
     #endregion
 

@@ -77,6 +77,176 @@ namespace GameBattle
 
         /// <summary>route marker 仅属表现却被当作游戏路径点（误判）。</summary>
         RouteMarkerMismatch = 28,
+
+        /// <summary>路径相邻点曼哈顿距离不为 1（路径不连续）。</summary>
+        PathDiscontinuous = 29,
+
+        /// <summary>路径首点/末点与配置起终点不一致。</summary>
+        PathEndpointMismatch = 30,
+
+        /// <summary>双路入口越界或与对应起点不相邻。</summary>
+        EntryInvalid = 31,
+
+        /// <summary>表现层路径标记超出 marker 坐标域（0..Width × 0..Height）。</summary>
+        RouteMarkerOutOfBounds = 32,
+
+        /// <summary>敌人类型索引为负。</summary>
+        EnemyTypeIndexInvalid = 33,
+
+        /// <summary>地图身份（MapIndex）与预期 MapId 不一致。</summary>
+        InvalidMapIdentity = 34,
+
+        /// <summary>地图呈现数据非法（名称为空、世界资源地址为空等），映射 ConfigInvalid。</summary>
+        InvalidMapPresentation = 35,
+
+        /// <summary>地图路径为空或不可用（属于字段非法而非缺表，映射 ConfigInvalid）。</summary>
+        InvalidMapPath = 36,
+
+        // ----------------------------------------------------------------
+        // 敌人目录 / 有序波次计划（tasks 2.7/2.9，本 change 新增）
+        // ----------------------------------------------------------------
+
+        /// <summary>敌人目录或计划无法构建：普通敌人缺 EnemyStats 行（Provider 抛）。</summary>
+        EnemyStatsMissing = 40,
+
+        /// <summary>敌人目录 typeIndex 重复冲突，无法构建合法双索引目录（Provider 抛）。</summary>
+        EnemyTypeIndexConflict = 41,
+
+        /// <summary>Normal 行引用了目录中不存在的 enemyKey。</summary>
+        EnemyKeyUnknown = 42,
+
+        /// <summary>地图默认敌人索引（EnemyTypeIndex）无法在目录中解析（未知/越界）。</summary>
+        EnemyTypeIndexUnknown = 43,
+
+        /// <summary>敌人目录条目数值非法（空资源地址、非正速度/血量、负接触伤害/奖励等）。</summary>
+        EnemyCatalogInvalid = 44,
+
+        /// <summary>波次计划缺失：activePlanId 为空、不存在或对应计划没有任何行。</summary>
+        WavePlanMissing = 45,
+
+        /// <summary>同一计划内存在重复 order。</summary>
+        WaveOrderDuplicate = 46,
+
+        /// <summary>同一计划内 order 缺号/不连续（应从 1 开始严格连续）。</summary>
+        WaveOrderGap = 47,
+
+        /// <summary>未知波次类型（不在 WavePlanKind.Normal/Boss 内）。</summary>
+        WaveKindUnknown = 48,
+
+        /// <summary>非法时序（preDelay/spawnInterval/postDelay 为负）。</summary>
+        WaveTimingInvalid = 49,
+
+        /// <summary>两个出生车道都关闭。</summary>
+        WaveLaneInvalid = 50,
+
+        /// <summary>Normal 行数量非正。</summary>
+        WaveCountInvalid = 51,
+
+        /// <summary>Boss 行缺少 bossKey。</summary>
+        WaveBossKeyMissing = 52,
+
+        /// <summary>难度索引越界（超出血量曲线或策略 profile 乘数长度）。</summary>
+        DifficultyIndexInvalid = 53,
+
+        /// <summary>逐行 strategyProfile 引用无效（越界或未被计划保留）。</summary>
+        StrategyProfileInvalid = 54,
+
+        /// <summary>所选计划含 Boss 行但当前运行时能力未声明支持（能力 gate 失败）。</summary>
+        BossCapabilityUnsupported = 55,
+
+        // ----------------------------------------------------------------
+        // Buff 目录（tasks 3.5，本 change 新增）
+        // ----------------------------------------------------------------
+
+        /// <summary>未知 Buff Kind（handler 类别，合法 0 Numeric/1 State/2 Custom）。</summary>
+        BuffKindUnknown = 56,
+
+        /// <summary>未知 Buff 叠层策略 StackPolicy（合法 Add/Refresh/Replace）。</summary>
+        BuffStackPolicyUnknown = 57,
+
+        /// <summary>Buff 目录存在重复 type，无法构建按 type 索引目录（Provider 抛）。</summary>
+        BuffTypeDuplicate = 58,
+
+        /// <summary>Buff 定义含未知通道值（不在合法通道 0..6 集合内）。</summary>
+        BuffChannelInvalid = 59,
+
+        /// <summary>Numeric/State Buff 定义缺少通道（Custom 才允许空通道）。</summary>
+        BuffChannelMissing = 60,
+
+        /// <summary>Buff 定义 maxStacks 非正。</summary>
+        BuffMaxStacksInvalid = 61,
+
+        // ----------------------------------------------------------------
+        // Skill 目录（tasks 2.2/2.3，本 change 新增；新增类别只能追加到末尾）
+        // ----------------------------------------------------------------
+
+        /// <summary>Skill 定义 key 为空（缺失主键，Validator 拒绝）。</summary>
+        SkillKeyInvalid = 62,
+
+        /// <summary>Skill 目录存在重复 key，无法构建按 key 索引目录（Provider/构造抛）。</summary>
+        SkillKeyDuplicate = 63,
+
+        /// <summary>未知 Skill Category（合法 active/boss/passive，严格映射不 fallback）。</summary>
+        SkillCategoryUnknown = 64,
+
+        /// <summary>Skill 冷却非法：CooldownSeconds 为空或为负，或 CooldownMs 为负。</summary>
+        SkillCooldownInvalid = 65,
+
+        /// <summary>Skill 定义 handlerKey 为空（必填，缺配置时在 xlsx 补齐，运行时不 fallback）。</summary>
+        SkillHandlerKeyMissing = 67,
+
+        // ----------------------------------------------------------------
+        // Boss 目录与依赖（task 4.1-4.3，本 change 新增；新增类别只能追加到末尾）
+        // ----------------------------------------------------------------
+
+        /// <summary>Boss 目录存在重复 key，无法构建按 key 索引目录（Provider/构造抛）。</summary>
+        BossKeyDuplicate = 68,
+
+        /// <summary>所选计划含 Boss 行但配置快照没有 Boss 目录（启动门禁）。</summary>
+        BossCatalogMissing = 69,
+
+        /// <summary>Boss 定义数值非法（非正生命倍率/移动速度/逻辑尺寸、负接触伤害/奖励等）。</summary>
+        BossConfigInvalid = 70,
+
+        /// <summary>Boss 行引用了目录中不存在的 bossKey。</summary>
+        BossKeyUnknown = 71,
+
+        /// <summary>Boss 行引用的 Boss 定义未启用（disabled，不得出生）。</summary>
+        BossDisabled = 72,
+
+        /// <summary>Boss 定义缺少技能键（skillKey 为空）。</summary>
+        BossSkillKeyMissing = 73,
+
+        /// <summary>Boss 引用的技能键在 Skill 目录中不存在。</summary>
+        BossSkillDefinitionMissing = 74,
+
+        /// <summary>Boss 引用的技能 handlerKey 为空（缺 handler 配置，运行时不 fallback）。</summary>
+        BossSkillHandlerMissing = 75,
+
+        /// <summary>Boss 引用的技能缺少效果 Buff 或 Buff 不在 Buff 目录中（如 SoulCapture/Buff13 缺失）。</summary>
+        BossEffectBuffMissing = 76,
+
+        /// <summary>Boss 技能时间轴非法（effect/complete 为负或 effect &gt;= complete）。</summary>
+        BossTimelineInvalid = 77,
+
+        /// <summary>Boss 技能范围/持续等 effect 配置字段缺失（SoulCapture 专用配置）。</summary>
+        BossSkillEffectConfigMissing = 78,
+
+        // ----------------------------------------------------------------
+        // 武器目录（tasks 3.1-3.3，本 change 新增；新增类别只能追加到末尾）
+        // ----------------------------------------------------------------
+
+        /// <summary>未知武器类型（合法 0 Bow/1 Spear/2 Knife/3 Sword，Provider 严格映射不 fallback）。</summary>
+        WeaponTypeUnknown = 79,
+
+        /// <summary>武器目录存在重复 id，无法构建按 id 索引目录（Provider/构造抛）。</summary>
+        WeaponIdDuplicate = 80,
+
+        /// <summary>武器定义数值非法（负附加攻击力等）。</summary>
+        WeaponConfigInvalid = 81,
+
+        /// <summary>启用行集合非法：不是恰好四条 Basic +1 基础武器（id 0/10/20/31 类别匹配）。</summary>
+        WeaponEnabledSetInvalid = 82,
     }
 
     /// <summary>

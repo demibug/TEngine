@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Spine.Unity;
 using TEngine;
 using UnityEngine;
 using YooAsset;
@@ -44,7 +45,6 @@ namespace GameBattle
     /// </summary>
     internal sealed class UnityBattleViewPort : IBattleViewPort
     {
-        private const string Mob0Address = "Mob0";
         private const string ArrowAddress = "Arrow";
         private const int MaxLevelNumber = 8;
         private const string LevelNumberAddressPrefix = "Sprites/LevelBadge/level_number_";
@@ -60,7 +60,7 @@ namespace GameBattle
         private readonly Dictionary<string, GameObject> _prefabs = new Dictionary<string, GameObject>();
         private readonly Dictionary<int, SoldierAnimationFrames> _unitAnimations =
             new Dictionary<int, SoldierAnimationFrames>();
-        private readonly List<AssetHandle> _assetHandles = new List<AssetHandle>();
+        private readonly List<IBattleAssetLease> _assetLeases = new List<IBattleAssetLease>();
         private readonly Dictionary<string, Stack<GameObject>> _pools =
             new Dictionary<string, Stack<GameObject>>();
         private readonly Dictionary<int, ActiveInstance> _activeInstances =
@@ -72,9 +72,26 @@ namespace GameBattle
         private SpriteRenderer[] _opponentHealthPoints;
         private Sprite[] _levelNumberSprites;
 
+        /// <summary>
+        /// 资源加载接缝。生产默认由 <see cref="GetOrCreateLoader"/> 惰性创建
+        /// <see cref="UnityResourceAssetLoader"/>；测试注入替身以驱动成功/失败/取消与句柄释放。
+        /// </summary>
+        private IBattleViewAssetLoader _loader;
+
         internal UnityBattleViewPort(BattleMapBindings bindings)
+            : this(bindings, null)
+        {
+        }
+
+        /// <summary>
+        /// 以可注入的资源加载接缝构造端口（供 EditMode 测试驱动预加载与释放语义）。
+        /// </summary>
+        /// <param name="bindings">地图节点绑定（非 null）。</param>
+        /// <param name="loader">资源加载接缝；null 时在预加载时惰性创建生产实现。</param>
+        internal UnityBattleViewPort(BattleMapBindings bindings, IBattleViewAssetLoader loader)
         {
             _bindings = bindings ?? throw new ArgumentNullException(nameof(bindings));
+            _loader = loader;
         }
 
         internal void ConfigureRegistry(BattleViewRegistry registry)
@@ -101,7 +118,14 @@ namespace GameBattle
         /// <summary>
         /// 加载本端口的全部必需 Prefab。失败时释放本端口已取得的所有句柄。
         /// </summary>
-        public async UniTask PreloadAsync(CancellationToken cancellationToken)
+        /// <param name="enemyResourceAddresses">
+        /// 本局所选计划解析后会使用的去重普通敌人资源地址；只为本局实际引用的敌人
+        /// 加载 Prefab 并建立表现池，不再固定预加载 Mob0。
+        /// </param>
+        /// <param name="cancellationToken">取消令牌。</param>
+        public async UniTask PreloadAsync(
+            IReadOnlyList<string> enemyResourceAddresses,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (_preloaded)
@@ -109,28 +133,42 @@ namespace GameBattle
                 return;
             }
 
-            var requiredPrefabs = new List<KeyValuePair<string, string>>
+            IBattleViewAssetLoader loader = GetOrCreateLoader();
+
+            var requiredPrefabs = new List<PrefabLoadEntry>();
+            if (enemyResourceAddresses != null)
             {
-                new KeyValuePair<string, string>("enemy_mob0", Mob0Address),
-                new KeyValuePair<string, string>("unit_KnifeSoldier", "KnifeSoldier"),
-                new KeyValuePair<string, string>("unit_BowSoldier", "BowSoldier"),
-                new KeyValuePair<string, string>("unit_SpearSoldier", "SpearSoldier"),
-                new KeyValuePair<string, string>("unit_CavalrySoldier", "CavalrySoldier"),
-                new KeyValuePair<string, string>("projectile_arrow", ArrowAddress),
-            };
+                foreach (string address in enemyResourceAddresses)
+                {
+                    // 敌人以 resourceAddress 为预加载池键（可内部加前缀但映射唯一）。
+                    requiredPrefabs.Add(new PrefabLoadEntry(
+                        address, address, ViewObjectCategory.Enemy));
+                }
+            }
+
+            requiredPrefabs.Add(new PrefabLoadEntry(
+                "unit_KnifeSoldier", "KnifeSoldier", ViewObjectCategory.Unit));
+            requiredPrefabs.Add(new PrefabLoadEntry(
+                "unit_BowSoldier", "BowSoldier", ViewObjectCategory.Unit));
+            requiredPrefabs.Add(new PrefabLoadEntry(
+                "unit_SpearSoldier", "SpearSoldier", ViewObjectCategory.Unit));
+            requiredPrefabs.Add(new PrefabLoadEntry(
+                "unit_CavalrySoldier", "CavalrySoldier", ViewObjectCategory.Unit));
+            requiredPrefabs.Add(new PrefabLoadEntry(
+                "projectile_arrow", ArrowAddress, ViewObjectCategory.Projectile));
 
             try
             {
-                IResourceModule resource = GetRequiredResourceModule();
                 for (int index = 0; index < requiredPrefabs.Count; index++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    KeyValuePair<string, string> requiredPrefab = requiredPrefabs[index];
-                    await LoadRequiredPrefabAsync(resource, requiredPrefab.Key, requiredPrefab.Value, cancellationToken);
+                    PrefabLoadEntry entry = requiredPrefabs[index];
+                    await LoadRequiredPrefabAsync(
+                        loader, entry.AssetKey, entry.Address, entry.Category, cancellationToken);
                 }
 
-                await LoadUnitAnimationsAsync(resource, cancellationToken);
-                await LoadLevelNumberSpritesAsync(resource, cancellationToken);
+                await LoadUnitAnimationsAsync(loader, cancellationToken);
+                await LoadLevelNumberSpritesAsync(loader, cancellationToken);
 
                 _preloaded = true;
             }
@@ -159,14 +197,47 @@ namespace GameBattle
 
         public void OnBattleFinished(bool playerWin, int resultStar) { }
 
-        public void OnEnemySpawned(int runtimeId, bool isPlayerLane, float logicX, float logicY)
+        public void OnEnemySpawned(EnemySpawnViewData dto)
         {
+            if (dto == null)
+            {
+                throw new ArgumentNullException(nameof(dto));
+            }
+
+            // 按 DTO.resourceAddress 选择已预加载 Prefab 与对应表现池，不再固定 Mob0。
+            // 空地址（测试替身/非普通实体）显式失败，禁止静默 fallback。
+            string address = dto.ResourceAddress;
+            if (string.IsNullOrEmpty(address))
+            {
+                throw new BattlePresentationLoadException(
+                    "instantiate",
+                    "<empty-enemy-address>",
+                    new InvalidOperationException(
+                        "敌人出生 DTO 缺少 resourceAddress（非生产普通敌人不得伪装为普通敌人）"));
+            }
+
             GameObject instance = SpawnInstance(
-                runtimeId,
+                dto.RuntimeId,
                 ViewObjectCategory.Enemy,
-                "enemy_mob0",
-                _bindings.LogicToWorld(logicX, logicY),
+                address,
+                _bindings.LogicToWorld(dto.LogicX, dto.LogicY),
                 _bindings.EnemyRoot);
+
+            if (dto.Kind == EnemyPresentationKind.Boss)
+            {
+                SkeletonAnimation spine = instance.GetComponentInChildren<SkeletonAnimation>(true);
+                if (spine == null || spine.AnimationState == null)
+                {
+                    DespawnInstance(dto.RuntimeId);
+                    throw new BattlePresentationLoadException(
+                        "bind-boss-spine",
+                        address,
+                        new InvalidOperationException(
+                            $"Boss '{dto.BossKey}' Prefab 缺少可初始化的 SkeletonAnimation"));
+                }
+
+                spine.AnimationState.SetAnimation(0, dto.IdleAnimationKey, true);
+            }
 
             // 出生时血条保持隐藏、复位到满血（池复用不残留旧显示状态）。
             EnemyHealthBarView healthBar = instance.GetComponent<EnemyHealthBarView>();
@@ -174,12 +245,14 @@ namespace GameBattle
             {
                 healthBar = instance.AddComponent<EnemyHealthBarView>();
                 Transform bg = instance.transform.Find("VisualRoot/hpBgImg");
-                Transform fill = instance.transform.Find("VisualRoot/hpBgImg/hpImg1");
+                Transform fill = instance.transform.Find("VisualRoot/hpBgImg/hpImg2");
+                Transform standbyFill = instance.transform.Find("VisualRoot/hpBgImg/hpImg1");
                 if (bg != null && fill != null)
                 {
                     healthBar.Bind(
                         bg.GetComponent<SpriteRenderer>(),
-                        fill.GetComponent<SpriteRenderer>());
+                        fill.GetComponent<SpriteRenderer>(),
+                        standbyFill == null ? null : standbyFill.GetComponent<SpriteRenderer>());
                 }
             }
             else
@@ -191,6 +264,27 @@ namespace GameBattle
         public void OnEnemyRemoved(int runtimeId, bool playDeathEffect)
         {
             DespawnInstance(runtimeId);
+        }
+
+        public void OnBossSkillIntent(int runtimeId, string animationKey, bool active)
+        {
+            if (string.IsNullOrEmpty(animationKey)
+                || !_activeInstances.TryGetValue(runtimeId, out ActiveInstance activeInstance))
+            {
+                return;
+            }
+
+            SkeletonAnimation spine =
+                activeInstance.GameObject.GetComponentInChildren<SkeletonAnimation>(true);
+            if (spine == null || spine.AnimationState == null)
+            {
+                throw new BattlePresentationLoadException(
+                    "boss-skill-animation",
+                    activeInstance.AssetKey,
+                    new InvalidOperationException("Boss 表现缺少 SkeletonAnimation"));
+            }
+
+            spine.AnimationState.SetAnimation(0, animationKey, loop: !active);
         }
 
         public void OnUnitPlaced(int runtimeId, bool isPlayerSide, int soldierType, int gridX, int gridY, int level)
@@ -395,25 +489,44 @@ namespace GameBattle
                 new InvalidOperationException("IResourceModule 未初始化"));
         }
 
+        /// <summary>
+        /// 取得资源加载接缝：测试注入的替身优先，否则惰性创建生产实现。
+        /// </summary>
+        private IBattleViewAssetLoader GetOrCreateLoader()
+        {
+            if (_loader != null)
+            {
+                return _loader;
+            }
+
+            _loader = new UnityResourceAssetLoader(GetRequiredResourceModule());
+            return _loader;
+        }
+
         private async UniTask LoadRequiredPrefabAsync(
-            IResourceModule resource,
+            IBattleViewAssetLoader loader,
             string assetKey,
             string address,
+            ViewObjectCategory category,
             CancellationToken cancellationToken)
         {
-            AssetHandle handle;
+            IBattleAssetLease lease;
             try
             {
-                handle = resource.LoadAssetAsyncHandle<GameObject>(address);
-                if (handle == null)
+                lease = loader.LoadAsync<GameObject>(address);
+                if (lease == null)
                 {
-                    throw new InvalidOperationException("资源模块返回空 AssetHandle");
+                    throw new InvalidOperationException("资源加载接缝返回空租约");
                 }
 
-                _assetHandles.Add(handle);
-                await UniTask.WaitUntil(() => handle.IsDone, cancellationToken: cancellationToken);
+                _assetLeases.Add(lease);
+                await UniTask.WaitUntil(() => lease.IsDone, cancellationToken: cancellationToken);
             }
             catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (BattlePresentationLoadException)
             {
                 throw;
             }
@@ -422,7 +535,7 @@ namespace GameBattle
                 throw new BattlePresentationLoadException("load", address, ex);
             }
 
-            if (!handle.IsValid)
+            if (!lease.IsValid)
             {
                 throw new BattlePresentationLoadException(
                     "validate-handle",
@@ -430,7 +543,7 @@ namespace GameBattle
                     new InvalidOperationException("AssetHandle 无效"));
             }
 
-            if (!(handle.AssetObject is GameObject prefab) || prefab == null)
+            if (!(lease.AssetObject is GameObject prefab) || prefab == null)
             {
                 throw new BattlePresentationLoadException(
                     "validate-asset",
@@ -438,19 +551,22 @@ namespace GameBattle
                     new InvalidCastException("AssetObject 不是 GameObject"));
             }
 
-            ValidateInstantiation(assetKey, address, prefab);
+            ValidateInstantiation(address, category, prefab);
 
             _prefabs.Add(assetKey, prefab);
         }
 
-        private void ValidateInstantiation(string assetKey, string address, GameObject prefab)
+        /// <summary>
+        /// 实例化校验探针。按类别选择父节点，支持 Mob0..3 且不误分类 unit/projectile。
+        /// </summary>
+        private void ValidateInstantiation(string address, ViewObjectCategory category, GameObject prefab)
         {
             GameObject probe = null;
             try
             {
-                Transform parent = assetKey == "enemy_mob0"
+                Transform parent = category == ViewObjectCategory.Enemy
                     ? _bindings.EnemyRoot
-                    : assetKey == "projectile_arrow"
+                    : category == ViewObjectCategory.Projectile
                         ? _bindings.ProjectileRoot
                         : _bindings.SoldierRoot;
                 probe = UnityEngine.Object.Instantiate(prefab, parent);
@@ -579,7 +695,7 @@ namespace GameBattle
         }
 
         private async UniTask LoadUnitAnimationsAsync(
-            IResourceModule resource,
+            IBattleViewAssetLoader loader,
             CancellationToken cancellationToken)
         {
             int[] idleCounts = { 7, 7, 8, 6 };
@@ -587,15 +703,15 @@ namespace GameBattle
             for (int soldierType = 0; soldierType < idleCounts.Length; soldierType++)
             {
                 Sprite[] idleFrames = await LoadSpriteFramesAsync(
-                    resource, soldierType, "skeleton-zhan", idleCounts[soldierType], cancellationToken);
+                    loader, soldierType, "skeleton-zhan", idleCounts[soldierType], cancellationToken);
                 Sprite[] attackFrames = await LoadSpriteFramesAsync(
-                    resource, soldierType, "skeleton-attack", attackCounts[soldierType], cancellationToken);
+                    loader, soldierType, "skeleton-attack", attackCounts[soldierType], cancellationToken);
                 _unitAnimations[soldierType] = new SoldierAnimationFrames(idleFrames, attackFrames);
             }
         }
 
         private async UniTask<Sprite[]> LoadSpriteFramesAsync(
-            IResourceModule resource,
+            IBattleViewAssetLoader loader,
             int soldierType,
             string animationName,
             int frameCount,
@@ -611,16 +727,33 @@ namespace GameBattle
                 string address =
                     $"Sprites/Extracted/GameObject/soldier/anim/soldier_{soldierType}/" +
                     frameName;
-                AssetHandle handle = resource.LoadAssetAsyncHandle<Sprite>(address);
-                if (handle == null)
+
+                IBattleAssetLease lease;
+                try
                 {
-                    throw new BattlePresentationLoadException(
-                        "load-animation", address, new InvalidOperationException("资源模块返回空 AssetHandle"));
+                    lease = loader.LoadAsync<Sprite>(address);
+                    if (lease == null)
+                    {
+                        throw new InvalidOperationException("资源加载接缝返回空租约");
+                    }
+
+                    _assetLeases.Add(lease);
+                    await UniTask.WaitUntil(() => lease.IsDone, cancellationToken: cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (BattlePresentationLoadException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    throw new BattlePresentationLoadException("load-animation", address, ex);
                 }
 
-                _assetHandles.Add(handle);
-                await UniTask.WaitUntil(() => handle.IsDone, cancellationToken: cancellationToken);
-                if (!handle.IsValid || !(handle.AssetObject is Sprite sprite) || sprite == null)
+                if (!lease.IsValid || !(lease.AssetObject is Sprite sprite) || sprite == null)
                 {
                     throw new BattlePresentationLoadException(
                         "validate-animation", address, new InvalidOperationException("序列帧 Sprite 无效"));
@@ -636,7 +769,7 @@ namespace GameBattle
         /// 预加载 1 至 8 的等级数字 Sprite（index = level - 1），每个数字独立单图。
         /// </summary>
         private async UniTask LoadLevelNumberSpritesAsync(
-            IResourceModule resource,
+            IBattleViewAssetLoader loader,
             CancellationToken cancellationToken)
         {
             var sprites = new Sprite[MaxLevelNumber];
@@ -644,17 +777,33 @@ namespace GameBattle
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 string address = LevelNumberAddressPrefix + (index + 1);
-                AssetHandle handle = resource.LoadAssetAsyncHandle<Sprite>(address);
-                if (handle == null)
+
+                IBattleAssetLease lease;
+                try
                 {
-                    throw new BattlePresentationLoadException(
-                        "load-level-number", address,
-                        new InvalidOperationException("资源模块返回空 AssetHandle"));
+                    lease = loader.LoadAsync<Sprite>(address);
+                    if (lease == null)
+                    {
+                        throw new InvalidOperationException("资源加载接缝返回空租约");
+                    }
+
+                    _assetLeases.Add(lease);
+                    await UniTask.WaitUntil(() => lease.IsDone, cancellationToken: cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (BattlePresentationLoadException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    throw new BattlePresentationLoadException("load-level-number", address, ex);
                 }
 
-                _assetHandles.Add(handle);
-                await UniTask.WaitUntil(() => handle.IsDone, cancellationToken: cancellationToken);
-                if (!handle.IsValid || !(handle.AssetObject is Sprite sprite) || sprite == null)
+                if (!lease.IsValid || !(lease.AssetObject is Sprite sprite) || sprite == null)
                 {
                     throw new BattlePresentationLoadException(
                         "validate-level-number", address,
@@ -700,16 +849,17 @@ namespace GameBattle
         {
             _levelNumberSprites = null;
 
-            for (int index = 0; index < _assetHandles.Count; index++)
+            // 对称释放至今取得的所有资源租约（生产租约内部 Release 对应 AssetHandle）。
+            for (int index = 0; index < _assetLeases.Count; index++)
             {
-                AssetHandle handle = _assetHandles[index];
-                if (handle != null && handle.IsValid)
+                IBattleAssetLease lease = _assetLeases[index];
+                if (lease != null)
                 {
-                    handle.Release();
+                    lease.Dispose();
                 }
             }
 
-            _assetHandles.Clear();
+            _assetLeases.Clear();
             _prefabs.Clear();
             _unitAnimations.Clear();
             _preloaded = false;
@@ -717,7 +867,6 @@ namespace GameBattle
 
         private string GetAddress(string assetKey)
         {
-            if (assetKey == "enemy_mob0") return Mob0Address;
             if (assetKey == "projectile_arrow") return ArrowAddress;
             return assetKey.StartsWith("unit_", StringComparison.Ordinal)
                 ? assetKey.Substring("unit_".Length)
@@ -726,10 +875,33 @@ namespace GameBattle
 
         private static void Destroy(GameObject gameObject)
         {
-            if (gameObject != null)
+            if (gameObject == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
             {
                 UnityEngine.Object.Destroy(gameObject);
+                return;
             }
+
+            UnityEngine.Object.DestroyImmediate(gameObject);
+        }
+
+        /// <summary>预加载 Prefab 条目：池键 + YooAsset 地址 + 表现类别。</summary>
+        private readonly struct PrefabLoadEntry
+        {
+            internal PrefabLoadEntry(string assetKey, string address, ViewObjectCategory category)
+            {
+                AssetKey = assetKey;
+                Address = address;
+                Category = category;
+            }
+
+            internal string AssetKey { get; }
+            internal string Address { get; }
+            internal ViewObjectCategory Category { get; }
         }
 
         private sealed class ActiveInstance
@@ -867,6 +1039,113 @@ namespace GameBattle
             float effectiveInterval = intervalSeconds > 0f ? intervalSeconds : 1f;
             int effectiveFrameCount = frameCount > 0 ? frameCount : 1;
             return effectiveInterval / effectiveFrameCount;
+        }
+    }
+
+    // ============================================================================
+    // 资源加载接缝（task 5.4/5.5）：把 YooAsset AssetHandle 生命周期抽象为可注入租约
+    // ----------------------------------------------------------------------------
+    // 生产实现（UnityResourceAssetLoader + YooAssetBattleAssetLease）沿用现有
+    // IResourceModule.LoadAssetAsyncHandle<T> / AssetHandle.Release 语义；
+    // EditMode 测试注入替身驱动预加载成功/失败/取消并验证句柄对称释放与可重试。
+    // 不修改 GameModule.Resource 实现（contract 7）。
+    // ============================================================================
+
+    /// <summary>
+    /// 资源加载租约：屏蔽 YooAsset <see cref="AssetHandle"/> 细节的只读资源租约。
+    /// </summary>
+    /// <remarks>
+    /// <para>由 <see cref="IBattleViewAssetLoader"/> 创建，端口在预加载时登记并统一
+    /// 于 <see cref="IDisposable.Dispose"/> 释放（生产租约内部调用
+    /// <c>AssetHandle.Release()</c>）。测试可注入替身验证对称释放。</para>
+    /// </remarks>
+    internal interface IBattleAssetLease : IDisposable
+    {
+        /// <summary>是否加载完毕。</summary>
+        bool IsDone { get; }
+
+        /// <summary>句柄是否有效。</summary>
+        bool IsValid { get; }
+
+        /// <summary>加载到的资源对象（类型由调用方断言）。</summary>
+        object AssetObject { get; }
+    }
+
+    /// <summary>
+    /// 战斗表现资源加载接缝：按地址创建异步加载租约。
+    /// </summary>
+    /// <remarks>
+    /// <para>生产实现 <see cref="UnityResourceAssetLoader"/> 经
+    /// <c>IResourceModule.LoadAssetAsyncHandle&lt;T&gt;</c> 创建
+    /// <see cref="YooAssetBattleAssetLease"/>；测试注入替身即可控制预加载结果。</para>
+    /// </remarks>
+    internal interface IBattleViewAssetLoader
+    {
+        /// <summary>按地址创建异步加载租约（不等待完成）。</summary>
+        /// <typeparam name="T">资源类型（GameObject/Sprite）。</typeparam>
+        /// <param name="location">YooAsset location。</param>
+        /// <returns>资源租约；加载器内部失败时抛出
+        /// <see cref="BattlePresentationLoadException"/> 或返回 null（由端口显式失败）。</returns>
+        IBattleAssetLease LoadAsync<T>(string location) where T : UnityEngine.Object;
+    }
+
+    /// <summary>
+    /// 生产资源加载器：封装 <see cref="IResourceModule"/> 的异步句柄创建。
+    /// </summary>
+    internal sealed class UnityResourceAssetLoader : IBattleViewAssetLoader
+    {
+        private readonly IResourceModule _resource;
+
+        internal UnityResourceAssetLoader(IResourceModule resource)
+        {
+            _resource = resource ?? throw new ArgumentNullException(nameof(resource));
+        }
+
+        /// <inheritdoc/>
+        public IBattleAssetLease LoadAsync<T>(string location) where T : UnityEngine.Object
+        {
+            AssetHandle handle = _resource.LoadAssetAsyncHandle<T>(location);
+            if (handle == null)
+            {
+                throw new BattlePresentationLoadException(
+                    "load", location, new InvalidOperationException("资源模块返回空 AssetHandle"));
+            }
+
+            return new YooAssetBattleAssetLease(handle);
+        }
+    }
+
+    /// <summary>
+    /// YooAsset <see cref="AssetHandle"/> 的生产租约实现：Dispose 时对称 Release。
+    /// </summary>
+    internal sealed class YooAssetBattleAssetLease : IBattleAssetLease
+    {
+        private AssetHandle _handle;
+
+        internal YooAssetBattleAssetLease(AssetHandle handle)
+        {
+            _handle = handle ?? throw new ArgumentNullException(nameof(handle));
+        }
+
+        /// <inheritdoc/>
+        public bool IsDone => _handle == null || _handle.IsDone;
+
+        /// <inheritdoc/>
+        public bool IsValid => _handle != null && _handle.IsValid;
+
+        /// <inheritdoc/>
+        public object AssetObject => _handle?.AssetObject;
+
+        /// <inheritdoc/>
+        /// <remarks>释放底层 AssetHandle（若仍有效）；幂等。</remarks>
+        public void Dispose()
+        {
+            if (_handle != null && _handle.IsValid)
+            {
+                _handle.Release();
+            }
+
+            _handle = null;
         }
     }
 }

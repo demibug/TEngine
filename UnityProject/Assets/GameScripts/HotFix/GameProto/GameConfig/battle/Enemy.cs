@@ -25,6 +25,8 @@ public sealed partial class Enemy : Luban.BeanBase
         if(_buf.ReadBool()){ Resource = _buf.ReadString(); } else { Resource = null; }
         if(_buf.ReadBool()){ Deferred = _buf.ReadString(); } else { Deferred = null; }
         {int n0 = _buf.ReadSize(); LevelMultipliers = new System.Collections.Generic.List<float>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { float _e0;  _e0 = _buf.ReadFloat(); LevelMultipliers.Add(_e0);}}
+        if(_buf.ReadBool()){ TypeIndex = _buf.ReadInt(); } else { TypeIndex = null; }
+        if(_buf.ReadBool()){ ResourceAddress = _buf.ReadString(); } else { ResourceAddress = null; }
     }
 
     public static Enemy DeserializeEnemy(ByteBuf _buf)
@@ -32,30 +34,20 @@ public sealed partial class Enemy : Luban.BeanBase
         return new battle.Enemy(_buf);
     }
 
-    /// <summary>
-    /// 键(主键)
-    /// </summary>
     public readonly string Key;
-    /// <summary>
-    /// 符号
-    /// </summary>
     public readonly string Symbol;
-    /// <summary>
-    /// 状态
-    /// </summary>
     public readonly string Status;
-    /// <summary>
-    /// 资源路径
-    /// </summary>
     public readonly string Resource;
-    /// <summary>
-    /// 延迟项
-    /// </summary>
     public readonly string Deferred;
-    /// <summary>
-    /// 等级倍数
-    /// </summary>
     public readonly System.Collections.Generic.List<float> LevelMultipliers;
+    /// <summary>
+    /// 类型索引
+    /// </summary>
+    public readonly int? TypeIndex;
+    /// <summary>
+    /// 资源地址
+    /// </summary>
+    public readonly string ResourceAddress;
    
     public const int __ID__ = 1095086770;
     public override int GetTypeId() => __ID__;
@@ -73,6 +65,8 @@ public sealed partial class Enemy : Luban.BeanBase
         + "resource:" + Resource + ","
         + "deferred:" + Deferred + ","
         + "levelMultipliers:" + Luban.StringUtil.CollectionToString(LevelMultipliers) + ","
+        + "typeIndex:" + TypeIndex + ","
+        + "resourceAddress:" + ResourceAddress + ","
         + "}";
     }
 }

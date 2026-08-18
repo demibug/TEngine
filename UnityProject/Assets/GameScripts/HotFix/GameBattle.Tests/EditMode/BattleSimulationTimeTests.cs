@@ -367,6 +367,7 @@ namespace GameBattle.Tests.EditMode
             var recorder = new PhaseCallRecorder();
             var handlers = new Action<long, long, BattleUpdatePhase>[Enum.GetValues(typeof(BattleUpdatePhase)).Length];
             BattleSimulation sim = null;
+            bool shouldFreeze = false;
             for (int i = 0; i < handlers.Length; i++)
             {
                 handlers[i] = (frameNow, step, phase) =>
@@ -374,12 +375,13 @@ namespace GameBattle.Tests.EditMode
                     recorder.Invocations.Add((frameNow, step, phase));
                     if (phase == BattleUpdatePhase.Enemy)
                     {
+                        shouldFreeze = true;
                         sim.TryFreeze();
                     }
                 };
             }
 
-            sim = new BattleSimulation(handlers, tryFreezeHandler: () => true);
+            sim = new BattleSimulation(handlers, tryFreezeHandler: () => shouldFreeze);
             sim.Advance(80);
 
             Assert.AreEqual(2, recorder.Invocations.Count,
@@ -399,14 +401,16 @@ namespace GameBattle.Tests.EditMode
             var recorder = new PhaseCallRecorder();
             var handlers = new Action<long, long, BattleUpdatePhase>[Enum.GetValues(typeof(BattleUpdatePhase)).Length];
             BattleSimulation sim = null;
+            bool shouldFreeze = false;
             // 在 Enemy 阶段首次进入时触发冻结。
             handlers[(int)BattleUpdatePhase.Enemy] = (frameNow, step, phase) =>
             {
                 recorder.Invocations.Add((frameNow, step, phase));
+                shouldFreeze = true;
                 sim.TryFreeze();
             };
 
-            sim = new BattleSimulation(handlers, tryFreezeHandler: () => true);
+            sim = new BattleSimulation(handlers, tryFreezeHandler: () => shouldFreeze);
 
             sim.Advance(550);
 

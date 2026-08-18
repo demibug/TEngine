@@ -46,6 +46,8 @@ namespace GameBattle.Tests.EditMode.Config
             Assert.IsNotNull(snapshot.Economy, "Economy 不应为 null");
             Assert.IsNotNull(snapshot.Deck, "Deck 不应为 null");
             Assert.IsNotNull(snapshot.Projectile, "Projectile 不应为 null");
+            Assert.IsNotNull(snapshot.BuffCatalog, "BuffCatalog 不应为 null");
+            Assert.IsNotNull(snapshot.SkillCatalog, "SkillCatalog 不应为 null");
             Assert.IsNotNull(snapshot.MissingFieldNotes, "MissingFieldNotes 不应为 null");
 
             // JSON Provider 不产生缺失标注
@@ -307,6 +309,129 @@ namespace GameBattle.Tests.EditMode.Config
                 "MissingFieldNotes 应为 IReadOnlyList<string>");
             Assert.IsTrue(snapshot.Enemy.HealthByWave is IReadOnlyList<int>,
                 "HealthByWave 应为 IReadOnlyList<int>");
+        }
+
+        // ====================================================================
+        // 敌人目录 / 有序波次计划测试（tasks 2.1/2.2/2.6）
+        // ====================================================================
+
+        [Test]
+        public void Snapshot_JsonProvider_EnemyCatalog_HasFourMobs()
+        {
+            var provider = new JsonBattleConfigProvider();
+            BattleConfigSnapshot snapshot = provider.GetSnapshot();
+
+            Assert.IsNotNull(snapshot.EnemyCatalog, "EnemyCatalog 不应为 null");
+            Assert.AreEqual(4, snapshot.EnemyCatalog.Definitions.Count, "敌人目录应有 4 个定义");
+
+            // 按 typeIndex 升序的稳定键列表
+            Assert.AreEqual(4, snapshot.EnemyCatalog.NormalKeys.Count, "NormalKeys 应有 4 个键");
+            Assert.AreEqual("Mob0", snapshot.EnemyCatalog.NormalKeys[0], "首个普通敌人键应为 Mob0");
+            Assert.AreEqual("Mob3", snapshot.EnemyCatalog.NormalKeys[3], "末个普通敌人键应为 Mob3");
+
+            // 双索引查询
+            Assert.IsTrue(snapshot.EnemyCatalog.TryGetByKey("Mob2", out EnemyDefinitionSnapshot byKey),
+                "应按 enemyKey 命中 Mob2");
+            Assert.AreEqual(2, byKey.TypeIndex, "Mob2 的 typeIndex 应为 2");
+            Assert.IsTrue(snapshot.EnemyCatalog.TryGetByTypeIndex(3, out EnemyDefinitionSnapshot byTypeIndex),
+                "应按 typeIndex 命中");
+            Assert.AreEqual("Mob3", byTypeIndex.Key, "typeIndex=3 应为 Mob3");
+            Assert.IsFalse(snapshot.EnemyCatalog.TryGetByKey("Zombie", out _), "未知键不应命中");
+        }
+
+        [Test]
+        public void Snapshot_JsonProvider_EnemyCatalog_DefinitionsAreValid()
+        {
+            var provider = new JsonBattleConfigProvider();
+            BattleConfigSnapshot snapshot = provider.GetSnapshot();
+
+            foreach (EnemyDefinitionSnapshot def in snapshot.EnemyCatalog.Definitions)
+            {
+                Assert.IsFalse(string.IsNullOrEmpty(def.ResourceAddress), "资源地址不应为空");
+                Assert.Greater(def.MoveSpeed, 0, "移动速度应为正");
+                Assert.Greater(def.HealthByWave.Count, 0, "血量曲线不应为空");
+                Assert.Greater(def.EarlyRoundHealthMultipliers.Count, 0, "早期乘数不应为空");
+                Assert.GreaterOrEqual(def.ContactDamage, 0, "接触伤害应非负");
+                Assert.GreaterOrEqual(def.RewardGold, 0, "击杀奖励应非负");
+            }
+        }
+
+        [Test]
+        public void Snapshot_JsonProvider_OrderedWavePlan_HasOrderedRowsAndProfiles()
+        {
+            var provider = new JsonBattleConfigProvider();
+            BattleConfigSnapshot snapshot = provider.GetSnapshot();
+
+            Assert.IsNotNull(snapshot.OrderedWavePlan, "OrderedWavePlan 不应为 null");
+            Assert.AreEqual("golden", snapshot.OrderedWavePlan.ActivePlanId, "activePlanId 应为 golden");
+
+            IReadOnlyList<WavePlanEntry> rows = snapshot.OrderedWavePlan.Rows;
+            Assert.AreEqual(4, rows.Count, "黄金计划应有 4 行");
+            for (int i = 0; i < rows.Count; i++)
+            {
+                Assert.AreEqual(i + 1, rows[i].Order, "行应按 order 升序");
+            }
+
+            // 显式引用的策略 profile（0/1/2）被保留
+            Assert.AreEqual(3, snapshot.OrderedWavePlan.ReferencedProfileIndexes.Count, "应保留 3 个 profile");
+            Assert.IsTrue(snapshot.OrderedWavePlan.TryGetProfile(0, out IReadOnlyList<float> profile0));
+            Assert.AreEqual(20, profile0.Count, "profile0 应有 20 项乘数");
+        }
+
+        [Test]
+        public void Snapshot_JsonProvider_JsonAndLuban_EquivalentKeyFields()
+        {
+            // Json/Luban 等价性关键字段校验：目录与计划在 JSON 黄金路径下应满足
+            // 与生产 Provider 相同的结构约束（行升序、键可解析、profile 显式引用）。
+            var provider = new JsonBattleConfigProvider();
+            BattleConfigSnapshot snapshot = provider.GetSnapshot();
+
+            BattleConfigValidationResult result = BattleConfigValidator.Validate(snapshot);
+            Assert.IsTrue(result.IsValid, "黄金 JSON 快照的目录+计划应通过校验。");
+        }
+
+        // ====================================================================
+        // 深拷贝与不可变性测试（tasks 2.1/2.2）
+        // ====================================================================
+
+        [Test]
+        public void EnemyDefinitionSnapshot_DeepCopiesSourceCollections()
+        {
+            var sourceHealth = new List<int> { 10, 11, 12 };
+            var sourceMultipliers = new List<float> { 0.6f, 0.7f };
+            var definition = new EnemyDefinitionSnapshot(
+                0, "Mob0", "Mob0", 50, sourceHealth, sourceMultipliers, 1, 1);
+
+            // 源集合后续修改不影响快照
+            sourceHealth.Add(999);
+            sourceMultipliers[0] = 0f;
+
+            Assert.AreEqual(3, definition.HealthByWave.Count, "快照血量曲线应为构造时的深拷贝");
+            Assert.AreEqual(10, definition.HealthByWave[0], "首项血量不应被源修改影响");
+            Assert.AreEqual(0.6f, definition.EarlyRoundHealthMultipliers[0], "早期乘数不应被源修改影响");
+        }
+
+        [Test]
+        public void OrderedWavePlanSnapshot_DeepCopiesProfiles()
+        {
+            var sourceProfile = new List<float> { 1f, 1.2f, 1.5f };
+            var profiles = new Dictionary<int, IReadOnlyList<float>>
+            {
+                [0] = sourceProfile,
+            };
+            var plan = new OrderedWavePlanSnapshot("golden", new[] { NormalRowFixture(1) }, profiles);
+
+            sourceProfile[0] = 99f;
+
+            Assert.IsTrue(plan.TryGetProfile(0, out IReadOnlyList<float> profile));
+            Assert.AreEqual(1f, profile[0], "profile 应为构造时的深拷贝");
+        }
+
+        private static WavePlanEntry NormalRowFixture(int order)
+        {
+            return new WavePlanEntry(
+                "golden", order, WavePlanKind.Normal, "Mob0", 3, 0, "",
+                1000, 500, 500, true, true, 0);
         }
     }
 }

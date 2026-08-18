@@ -291,9 +291,8 @@ namespace GameBattle.Tests.EditMode.Projectile
 
             // 创建并发射箭矢。
             SimpleDynamicArrow arrow = AcquireAndFire(factory, targetId: 1, damage: 30);
-            projManager.Add(arrow);
 
-            // 创建 ProjectileAttackEffect 桥接到效果系统。
+            // 创建 ProjectileAttackEffect 桥接到效果系统；Launch 负责唯一一次登记。
             var effect = new ProjectileAttackEffect();
             effect.Launch(owner, projManager, arrow);
 

@@ -80,9 +80,11 @@ namespace GameBattle
     /// <para><b>Settling 静默清理（spec "Runtime quiescence and cleanup have one ordered owner"）：</b></para>
     /// <para>首次 TryFreeze 成功后，BattleModule 进入 Settling 状态，调用 <see cref="EnterSettling"/>
     /// 执行幂等静默清理，按依赖顺序：关闭命令和生产入口 → 停止模拟并取消 Token/到期动作/回调 →
-    /// 清理攻击效果 → 清理投射物 → 清理敌人及空间索引 → 清理单位及监听 → 清理波次/牌组/预留 →
-    /// 解除剩余局部监听 → 断言无活动对象 → 发布已冻结结果。
-    /// 当前骨架实现已实现部分（停止模拟、取消 Token、释放 Scope），后续 Phase 接入 Manager 后
+    /// 清理攻击效果 → 清理投射物 → 先停止 WaveManager 再清理敌人及空间索引（task 4.9：
+    /// 波次停止必须前置，使 Forced 移除事实不促成波次完成或误判胜利）→ 清理单位及监听 →
+    /// 清理波次/牌组/预留（含 WaveManager.Cleanup 与 Boss 端口）→ 解除剩余局部监听 →
+    /// 断言无活动对象 → 发布已冻结结果。</para>
+    /// <para>当前骨架实现已实现部分（停止模拟、取消 Token、释放 Scope），后续 Phase 接入 Manager 后
     /// 在对应清理步骤处补充。</para>
     /// </remarks>
     internal sealed class BattleRuntime : IDisposable
@@ -146,6 +148,12 @@ namespace GameBattle
         /// 也不由本类型卸载应用级配置资源。</para>
         /// </summary>
         public BattleConfigSnapshot ConfigSnapshot { get; }
+
+        /// <summary>本局确定性 Buff 所有者。</summary>
+        public BuffManager BuffManager { get; }
+
+        /// <summary>本局 Boss 技能生命周期所有者。</summary>
+        internal SkillRunner SkillRunner { get; }
 
         // ====================================================================
         // Phase 4 Manager（task 5.3 / 5.8 产物）
@@ -232,16 +240,20 @@ namespace GameBattle
 
         /// <summary>
         /// 本局战斗规则协调器（task 3.10 产物）。
-        /// <para>管理波次运行态、战斗规则和胜负条件。Runtime 在 phaseHandlers 的 WaveSpawn
-        /// 阶段回调 <see cref="BattleManager.UpdateSpawnState"/>，在 EnterSettling 步骤 7
-        /// 调用 <see cref="BattleManager.GameOver"/> 重置规则状态。</para>
+        /// <para>管理波次运行态、战斗规则和胜负条件。波次推进唯一由 WaveManager 在
+        /// phaseHandlers 的 WaveSpawn 阶段经 <see cref="WaveManager.Update"/> 驱动，
+        /// 本类型不再持有旧 UpdateSpawnState。Runtime 在 EnterSettling/Dispose 清理时
+        /// 调用 <see cref="BattleManager.GameOver"/> 重置规则状态（内部幂等再停止
+        /// WaveManager）。</para>
         /// </summary>
         public BattleManager BattleManager { get; }
 
         /// <summary>
-        /// 本局波次管理器（task 3.9 产物）。
-        /// <para>生成确定性 Mob0 波次计划并按子步刷怪。Runtime 在 EnterSettling 步骤 7
-        /// 调用 <see cref="WaveManager.GameOver"/> 清理波次状态。</para>
+        /// 本局波次管理器（task 3.9 产物，task 4.2-4.5 改造为有序波次状态机）。
+        /// <para>消费 <see cref="OrderedWavePlanSnapshot"/> 逐行推进 Normal/Boss 波，
+        /// 不再按固定 Mob0 计划刷怪。Runtime 在 EnterSettling/Dispose 清理时先调用
+        /// <see cref="WaveManager.Stop"/> 停止推进，再在清理尾部调用
+        /// <see cref="WaveManager.Cleanup"/> 释放本局波次所有权与 Boss 端口。</para>
         /// </summary>
         public WaveManager WaveManager { get; }
 
@@ -501,6 +513,8 @@ namespace GameBattle
             RuntimeTokenSource = assembly.RuntimeTokenSource;
             Loadout = assembly.Loadout;
             ConfigSnapshot = assembly.ConfigSnapshot;
+            BuffManager = assembly.BuffManager;
+            SkillRunner = assembly.SkillRunner;
             AttackEffectManager = assembly.AttackEffectManager;
             ProjectileManager = assembly.ProjectileManager;
             UnitFactory = assembly.UnitFactory;
@@ -609,9 +623,14 @@ namespace GameBattle
         /// <item>停止 <see cref="BattleSimulation"/> 并取消运行时 Token、到期动作和动画回调。</item>
         /// <item>清理 AttackEffectManager（task 5.3 接入）。</item>
         /// <item>清理 ProjectileManager（task 5.8 接入）。</item>
-        /// <item>清理 EnemyManager 的接触 Timer、实体和空间索引（待 task 6.10 接入属性后补充）。</item>
+        /// <item>先停止 <see cref="WaveManager"/>（task 4.9：Stop 置 stopped、清待出生与 handle、
+        /// 幂等停止 Boss 端口），再清理 EnemyManager 的接触 Timer、实体和空间索引——
+        /// 波次停止必须前置，使 Forced 移除事实不促成波次完成或误判胜利。</item>
         /// <item>清理 UnitRegistry 的监听、Timer 和实体（task 6.3 接入）。</item>
-        /// <item>清理波次、牌组、预留及其他单局注册表（后续 Phase 2/5 接入）。</item>
+        /// <item>清理波次、牌组、预留及其他单局注册表：BattleManager.GameOver 重置规则状态，
+        /// WaveManager.Cleanup（含 <c>IBossWavePort.Cleanup</c>）释放本局波次所有权，
+        /// BattleEconomy.GameOver 重置经济计数，SlotBoard.GameOver 清空槽位，
+        /// PlacementReservationRegistry.Clear 清空预留。</item>
         /// <item>解除剩余局部监听（task 7.1 接入：BattleInternalSignalHub.Clear）。</item>
         /// <item>断言没有活动 Timer、回调或租借对象。</item>
         /// <item>完成静默后发布一次已冻结的不可变结果。</item>
@@ -619,8 +638,8 @@ namespace GameBattle
         /// <para>当前实现已执行步骤 1（标记 Settling + 关闭 InputController + 清空
         /// CommandId 缓存 task 6.8）、步骤 2（停止模拟 + 取消 Token + 冻结调度器）、
         /// 步骤 3（清理 AttackEffectManager）、步骤 4（清理 ProjectileManager）、步骤 5
-        /// （清理 EnemyManager）、步骤 6（清理 UnitRegistry）、步骤 7（清理
-        /// BattleManager/WaveManager/BattleEconomy/DeckManager/PlacementReservationRegistry）
+        /// （先停止 WaveManager 再清理 EnemyManager，task 4.9）、步骤 6（清理 UnitRegistry）、
+        /// 步骤 7（清理 BattleManager/WaveManager/BattleEconomy/SlotBoard/PlacementReservationRegistry）
         /// 和步骤 8（清理 BattleInternalSignalHub）。步骤 9-10（断言与结果发布）
         /// 在后续 Phase 接入对应 Manager 后补充。</para>
         /// </remarks>
@@ -735,62 +754,23 @@ namespace GameBattle
             }
 
             // ----------------------------------------------------------
-            // 步骤 5：清理 EnemyManager 的接触 Timer、实体和空间索引（task 6.10 接入）。
-            // GameOver 逐个通知敌人 gameOver（触发敌人自身清理），再清空管理器集合与空间索引。
-            // 幂等：重复调用安全。
+            // 步骤 5-7：先停止波次，再清理敌人/单位/波次所有权（task 4.9）。
+            // 顺序契约（task 4.9/4.10）：
+            //   1. 先停止 WaveManager：Stop 先置 stopped，清待出生与活动 handle，并幂等停止
+            //      Boss 端口。EnterSettling 一旦置 settling/停止推进，必须在任何
+            //      EnemyManager.GameOver/实体批量移除前先 Stop，使 EnemyManager 清理时发布的
+            //      Forced 移除事实不会令已停止的 WaveManager 完成或误判胜利。
+            //   2. 再清理 EnemyManager（逐个 gameOver → 清集合/空间索引 → 归还对象池）。
+            //   3. 清理 UnitRegistry（监听/Timer/实体回池）。
+            //   4. BattleManager.GameOver 重置规则状态（内部幂等再停止 WaveManager）。
+            //   5. WaveManager.Cleanup 释放本局波次所有权并调用 IBossWavePort.Cleanup。
+            // 全部步骤幂等，单步异常只记录 warning 不阻断后续（保留原清理异常隔离）。
             // spec "Runtime quiescence and cleanup have one ordered owner"：
-            //   清理 EnemyManager 的接触 Timer、实体和空间索引。
+            //   清理敌人/单位/波次的接触 Timer、实体与空间索引。
             // ----------------------------------------------------------
-            try
-            {
-                EnemyManager?.GameOver();
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"{LogTag} Settling 清理 EnemyManager 异常: {ex}");
-            }
+            StopWavesAndClearCombatants();
 
-            // ----------------------------------------------------------
-            // 步骤 6：清理 UnitRegistry 的监听、Timer 和实体（task 6.3 接入）。
-            // 移除全部活动单位并归还池：每个单位先调 GameOver（取消本单位发起的活动
-            // 攻击效果并标记 inPool/destroyed），再从集合移除并经 UnitFactory.Release
-            // 归还池。ClearForSettling 幂等，等价于 GameOver，重复调用安全。
-            // spec "Runtime quiescence and cleanup have one ordered owner"：
-            //   清理 UnitRegistry 的监听、Timer 和实体。
-            // ----------------------------------------------------------
-            try
-            {
-                UnitRegistry?.ClearForSettling();
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"{LogTag} Settling 清理 UnitRegistry 异常: {ex}");
-            }
-
-            // ----------------------------------------------------------
-            // 步骤 7-8：清理波次、牌组、预留及其他单局注册表；解除剩余局部监听。
-            // task 6.10 闭环接入：BattleManager.GameOver 重置规则状态，
-            // WaveManager.GameOver 清理波次计划，BattleEconomy.GameOver 重置经济计数，
-            // DeckManager.GameOver 清理牌组，PlacementReservationRegistry.Clear 清空预留。
-            // ----------------------------------------------------------
-            try
-            {
-                BattleManager?.GameOver();
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"{LogTag} Settling 清理 BattleManager 异常: {ex}");
-            }
-
-            try
-            {
-                WaveManager?.GameOver();
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"{LogTag} Settling 清理 WaveManager 异常: {ex}");
-            }
-
+            // 经济计数重置与槽位/预留清理（独立于波次/敌人/单位的清理契约）。
             try
             {
                 BattleEconomy?.GameOver();
@@ -870,8 +850,8 @@ namespace GameBattle
             }
 
             Log.Info($"{LogTag} Settling 静默清理完成（已停止模拟、取消 Token、冻结调度器、" +
-                "清理 AttackEffect/Projectile/Enemy/UnitRegistry Manager、清理 BattleManager/" +
-                "WaveManager/BattleEconomy/DeckManager/PlacementReservationRegistry）");
+                "先停止 WaveManager 再清理 Enemy/UnitRegistry，清理 BattleManager/WaveManager/" +
+                "BattleEconomy/SlotBoard/PlacementReservationRegistry）");
         }
 
         // ====================================================================
@@ -897,8 +877,12 @@ namespace GameBattle
         /// Runtime（经 Factory 产生新 Assembly），不复用本实例的 Simulation、Scope 或状态。</para>
         ///
         /// <para><b>Settling 未完成时 Dispose：</b>若未调用 <see cref="EnterSettling"/> 就直接
-        /// Dispose（如 Exit 从 Running 状态直接退出），本方法仍会释放全部所有权，
-        /// 包括取消 Token、冻结调度器、逆序释放 Scope。</para>
+        /// Dispose（如 Exit 从 Running 状态直接退出），本方法仍会释放全部所有权：先停止
+        /// WaveManager、清理敌人/单位实体并归还对象池、完成 BattleManager/Wave/Boss cleanup
+        /// （task 4.9：不能只依赖 Scope 强清导致 callbacks/ownership 残留），再取消 Token、
+        /// 冻结调度器、逆序释放 Scope。</para>
+        /// <para><b>已进入 Settling 后 Dispose：</b>EnterSettling 已完成波次/实体清理，
+        /// 本方法跳过重复清理（幂等），只逆序释放 Scope，不重复产生副作用（task 4.9/4.10）。</para>
         /// </remarks>
         public void Dispose()
         {
@@ -955,6 +939,12 @@ namespace GameBattle
                 {
                     Log.Error($"{LogTag} Dispose 冻结 ActionScheduler 异常: {ex}");
                 }
+
+                // task 4.9：未进入 Settling 的 Dispose（取消/退出/异常清理）也必须先停止
+                // WaveManager，再 EnemyManager.GameOver 清活动实体/回池，再完成
+                // BattleManager/Wave/Boss cleanup。不能只依赖 Scope 强清导致 callbacks/
+                // ownership 残留（敌人/单位池租借不在 BattleRuntimeScope 登记）。
+                StopWavesAndClearCombatants();
             }
 
             // 逆序释放 Scope 全部登记所有权（CTS Dispose、GameEvent Clear、资源句柄 Release、
@@ -977,6 +967,132 @@ namespace GameBattle
 
             IsDisposed = true;
             Log.Info($"{LogTag} Dispose 完成，Runtime 已销毁");
+        }
+
+        // ====================================================================
+        // 波次/实体清理（task 4.9 顺序契约）
+        // ====================================================================
+
+        /// <summary>
+        /// 停止波次并清理敌人/单位/波次所有权（EnterSettling 与未 Settling 的 Dispose 共用）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>顺序契约（task 4.9/4.10）：</b>
+        /// <list type="number">
+        /// <item>先 <see cref="WaveManager.Stop"/>：置 stopped、清待出生与活动 handle、幂等停止
+        /// Boss 端口。EnterSettling 一旦置 settling/停止推进，必须在任何
+        /// <see cref="EnemyManager.GameOver"/> / 实体批量移除前先 Stop，使 Forced 移除事实
+        /// 不会令已停止的 WaveManager 完成或误判胜利。</item>
+        /// <item><see cref="EnemyManager.GameOver"/>：逐个通知敌人 gameOver、清空集合与空间索引、
+        /// 归还对象池（此时 WaveManager 已停止，Forced 移除事实为幂等空操作）。</item>
+        /// <item><see cref="UnitRegistry.ClearForSettling"/>：移除全部活动单位并归还池。</item>
+        /// <item><see cref="BattleManager.GameOver"/>：重置规则状态（内部幂等再停止 WaveManager）。</item>
+        /// <item><see cref="WaveManager.Cleanup"/>：释放本局波次所有权、调用
+        /// <c>IBossWavePort.Cleanup</c>；不重启、不发布完成。</item>
+        /// </list></para>
+        /// <para><b>幂等与异常隔离：</b>所有步骤幂等，重复调用安全；单步异常只记录 Error，
+        /// 不阻断后续步骤（保留原清理异常隔离），不改变外部事件顺序、Scope ownership 或
+        /// 结果发布条件。</para>
+        /// </remarks>
+        private void StopWavesAndClearCombatants()
+        {
+            // 1. 先停止 WaveManager（波次停止前置，task 4.9）。
+            try
+            {
+                WaveManager?.Stop();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} 清理先停止 WaveManager 异常: {ex}");
+            }
+
+            // 2. scheduler 已由调用方冻结；先取消全部技能时间线与 owner。
+            try
+            {
+                SkillRunner?.Clear();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} 清理 SkillRunner 异常: {ex}");
+            }
+
+            // 3. 先移除 Boss，确保池归还前已解除技能所有权。
+            try
+            {
+                EnemyManager?.ForceRemoveBosses();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} 强制移除 Boss 异常: {ex}");
+            }
+
+            // 4. 清理 Buff；此时普通目标仍有效，且 scheduler 已冻结。
+            try
+            {
+                BuffManager?.GameOver();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} 清理 BuffManager 异常: {ex}");
+            }
+
+            // 5. 清理剩余敌人实体/回池。
+            try
+            {
+                EnemyManager?.GameOver();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} 清理 EnemyManager 异常: {ex}");
+            }
+
+            // 6. 清理单位注册表（监听/Timer/实体回池）。
+            try
+            {
+                UnitRegistry?.ClearForSettling();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} 清理 UnitRegistry 异常: {ex}");
+            }
+
+            // 7. 规则协调器 GameOver（重置权威状态；内部再次 Stop WaveManager 幂等）。
+            try
+            {
+                BattleManager?.GameOver();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} 清理 BattleManager 异常: {ex}");
+            }
+
+            // 8. WaveManager Cleanup（Boss 端口再次清理为空操作）。
+            try
+            {
+                WaveManager?.Cleanup();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} 清理 WaveManager 所有权/Boss 端口异常: {ex}");
+            }
+
+            if (BuffManager != null
+                && (BuffManager.ActiveInstanceCount != 0
+                    || BuffManager.RegisteredTargetCount != 0
+                    || BuffManager.OwnedScheduleCount != 0))
+            {
+                Log.Error(
+                    $"{LogTag} Buff 清理后仍有残留：instances={BuffManager.ActiveInstanceCount} " +
+                    $"targets={BuffManager.RegisteredTargetCount} schedules={BuffManager.OwnedScheduleCount}");
+            }
+
+            if (SkillRunner != null
+                && (SkillRunner.OwnerCount != 0 || SkillRunner.RunningActivationCount != 0))
+            {
+                Log.Error(
+                    $"{LogTag} Skill 清理后仍有残留：owners={SkillRunner.OwnerCount} " +
+                    $"running={SkillRunner.RunningActivationCount}");
+            }
         }
     }
 }

@@ -75,26 +75,7 @@ namespace GameBattle
     /// </summary>
     /// <remarks>
     /// <para><b>契约来源（EnemyBase.js 推断）：</b>
-    /// EnemyBase（task 4.3 并行创建）将实现本接口。接口成员对应 EnemyBase.js 的字段：
-    /// <list type="bullet">
-    /// <item><see cref="Id"/> ← <c>this.id</c>（运行时 ID，由 RuntimeIdAllocator 分配）</item>
-    /// <item><see cref="IsPlayerLane"/> ← <c>this.isPlayerLane</c>（阵营）</item>
-    /// <item><see cref="CurrentState"/> ← <c>this.currentState</c>（EnemyRuntimeState 枚举）</item>
-    /// <item><see cref="X"/>/<see cref="Y"/> ← <c>this.visual.x/y</c>（逻辑位置，C# 移植为纯逻辑属性）</item>
-    /// <item><see cref="Width"/>/<see cref="Height"/> ← <c>this.visual.width/height</c>（逻辑尺寸）</item>
-    /// <item><see cref="RemainingPathDistance"/> ← <c>this.remainingPathDistance</c>（剩余路径距离）</item>
-    /// <item><see cref="CurrentPathIndex"/> ← <c>this.currentPathIndex</c>（当前路径点索引）</item>
-    /// <item><see cref="Health"/> ← <c>this.health</c>（当前血量）</item>
-    /// <item><see cref="Update"/> ← <c>enemy.update(deltaMs)</c></item>
-    /// <item><see cref="Hit"/> ← <c>enemy.hit(damage, attacker)</c></item>
-    /// <item><see cref="GameOver"/> ← <c>enemy.gameOver()</c></item>
-    /// <item><see cref="IsTargetableBy"/> ← <c>enemy.isTargetableBy(playerLane)</c></item>
-    /// </list></para>
-    ///
-    /// <para><b>EnemyRuntimeState 枚举值（EnemyBase.js:12-18）：</b>
-    /// SPAWNING=0, MOVING=1, SKILL=2, STUNNED=3, DEAD=4。本接口以 int 暴露 CurrentState，
-    /// 避免与 task 4.3 的枚举定义产生编译期循环依赖。</para>
-    ///
+    /// EnemyBase（task 4.3 并行创建）将实现本接口。接口成员对应 EnemyBase.js 的字段：</para>
     /// <para><b>本接口为 internal：</b>只供 GameBattle 内部 EnemyManager 与测试使用。</para>
     /// </remarks>
     internal interface IEnemyEntity
@@ -170,6 +151,26 @@ namespace GameBattle
         /// <param name="playerSide">true=玩家方攻击者，false=对手方攻击者。</param>
         /// <returns>非 SPAWNING/DEAD 且阵营匹配且 targetable 时返回 true。</returns>
         bool IsTargetableBy(bool playerSide);
+    }
+
+    /// <summary>
+    /// 波次拥有的敌对实体窄契约：暴露当前租借身份与波次实体种类（Normal/Boss）。
+    /// </summary>
+    /// <remarks>
+    /// <para>design.md 决策 1 / specs/zhang-liang-boss-runtime/spec.md：普通配置敌人
+    /// 返回 <see cref="WaveEntityKind.Normal"/>，<see cref="BossBase"/> 返回
+    /// <see cref="WaveEntityKind.Boss"/>。EnemyManager 移除事实据此发布完整
+    /// <see cref="WaveEntityHandle"/>（runtimeId + generation + waveOrder + kind），
+    /// WaveManager 以完整值幂等匹配，stale generation/kind 的迟到事实被忽略。</para>
+    /// <para>本接口为 internal：只供 GameBattle 内部 EnemyManager 与 Boss 实现使用。</para>
+    /// </remarks>
+    internal interface IWaveOwnedEnemyEntity : IEnemyEntity
+    {
+        /// <summary>当前租借身份（runtimeId + generation + waveOrder；池复用后更新）。</summary>
+        EnemyLeaseIdentity CurrentLease { get; }
+
+        /// <summary>波次实体种类（普通敌人=Normal，Boss=Boss）。</summary>
+        WaveEntityKind WaveKind { get; }
     }
 
     /// <summary>
@@ -272,6 +273,9 @@ namespace GameBattle
         /// </summary>
         private readonly Func<float> _randomSource;
 
+        /// <summary>本局 Buff 所有者；未装配时保持旧测试行为。</summary>
+        private readonly BuffManager _buffManager;
+
         // ====================================================================
         // 主集合：按 ID 查找 + 有序 ID 列表
         // ====================================================================
@@ -324,6 +328,19 @@ namespace GameBattle
             new Dictionary<int, string>();
 
         // ====================================================================
+        // 租借身份索引（design.md 决策 5 / task 3.6/3.7）
+        // ====================================================================
+
+        /// <summary>
+        /// 敌人运行时 ID → 该 ID 当前登记时记录的租借身份。
+        /// <para>仅用于诊断与移除事实；移除队列处理时的世代守卫读取的是
+        /// <b>实体自身的当前租借身份</b>（<see cref="GetCurrentLease"/>），
+        /// 而非本索引，以防池复用后本索引滞后。</para>
+        /// </summary>
+        private readonly Dictionary<int, EnemyLeaseIdentity> _leaseById =
+            new Dictionary<int, EnemyLeaseIdentity>();
+
+        // ====================================================================
         // 移除队列：同子步死亡请求先入队，遍历结束后统一处理
         // ====================================================================
 
@@ -331,17 +348,48 @@ namespace GameBattle
         /// 延迟移除队列：移除请求入队，遍历结束后由 ProcessRemoveQueue 统一处理。
         /// <para>对应决策 0.4 "TryFreeze 不在嵌套伤害调用栈内重入销毁集合"——
         /// 同子步内多个移除请求不重入修改集合，先入队再统一处理。</para>
-        /// <para>队列元素携带 <see cref="EnemyRemovalReason"/>，驱动注销时是否播放死亡表现，
-        /// 并保证同一 ID 无论重复请求多少次都只回收一次。</para>
+        /// <para>队列元素携带 <see cref="EnemyLeaseIdentity"/>（generation-aware 租借身份，
+        /// task 3.6/3.7）+ <see cref="EnemyRemovalReason"/>。同一 ID 无论重复请求多少次都只
+        /// 入队一次；处理时核对当前实体租借身份，旧世代迟到请求幂等忽略
+        /// （spec "Ignore a stale removal callback"）。</para>
         /// </summary>
-        private readonly List<(int id, EnemyRemovalReason reason)> _removeQueue =
-            new List<(int id, EnemyRemovalReason reason)>();
+        private readonly List<(EnemyLeaseIdentity identity, EnemyRemovalReason reason)> _removeQueue =
+            new List<(EnemyLeaseIdentity identity, EnemyRemovalReason reason)>();
 
-        /// <summary>敌人完成登记后的低频表现事实。</summary>
-        internal event Action<int, bool, float, float> EnemySpawned;
+        /// <summary>敌人完成登记后的低频表现事实（携带不可变出生表现 DTO）。</summary>
+        /// <remarks>
+        /// <para><b>task 5.1：</b>出生参数收敛为 <see cref="EnemySpawnViewData"/>（runtimeId +
+        /// enemyKey/resourceAddress + 车道 + 逻辑坐标），表现层不再接收散参数。</para>
+        /// <para>配置化普通敌人（<see cref="ConfiguredEnemyBase"/>）携带其固定 EnemyKey 与
+        /// 本次租借注入的 ResourceAddress；测试替身/非普通实体为空串（Unity 端口显式失败，
+        /// 禁止静默回退 Mob0）。</para>
+        /// </remarks>
+        internal event Action<EnemySpawnViewData> EnemySpawned;
 
         /// <summary>敌人从活动集合移除后的低频表现事实。</summary>
         internal event Action<int, bool> EnemyRemoved;
+
+        /// <summary>Boss 技能开始/结束的低频表现意图。</summary>
+        internal event Action<int, string, bool> BossSkillIntentChanged;
+
+        /// <summary>
+        /// 波次所有权内部移除事实：敌人以指定原因离场（恰好一次）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>内部事实（design.md 决策 5 / task 3.7/5.2）：</b>携带完整
+        /// <see cref="WaveEntityHandle"/>（runtimeId + generation + waveOrder + kind，
+        /// kind 来自 <see cref="IWaveOwnedEnemyEntity.WaveKind"/>：普通敌人=Normal、
+        /// Boss=Boss）与 <see cref="EnemyRemovalReason"/>（Killed/ReachedEndPoint/
+        /// Forced 可区分），供下一波 WaveManager 以完整 handle 幂等解除波次活动计数，
+        /// 抵抗池复用迟到回调。本事实不承载表现：既有 <see cref="EnemyRemoved"/>
+        /// 表现事实签名不变。</para>
+        /// <para><b>恰好一次：</b>由 <see cref="ProcessRemoveQueue"/>（入队请求）与
+        /// <see cref="GameOver"/>（战斗结束批量清理，原因 Forced）保证每个敌人只触发一次；
+        /// 旧世代迟到请求在队列处理时被世代守卫忽略，不触发本事实。</para>
+        /// <para><b>不引入全局 GameEvent：</b>本事件为单局内部一对多事实，不跨程序集
+        /// 广播（design 决策 4：内部一致性优先直接调用）。</para>
+        /// </remarks>
+        internal event Action<WaveEntityHandle, EnemyRemovalReason> WaveEntityRemoved;
 
         /// <summary>敌人血量变化后的低频表现事实。</summary>
         /// <remarks>
@@ -409,10 +457,14 @@ namespace GameBattle
         /// 调用方（Factory）从配置快照的等价字段注入。task 4.3/4.4 的 EnemyBase/Mob0Enemy
         /// 实现后，spawn 流程由 EnemyFactory（task 4.5）接入。</para>
         /// </remarks>
-        internal EnemyManager(int gridSize = DefaultGridSize, Func<float> randomSource = null)
+        internal EnemyManager(
+            int gridSize = DefaultGridSize,
+            Func<float> randomSource = null,
+            BuffManager buffManager = null)
         {
             _gridSize = gridSize > 0 ? gridSize : DefaultGridSize;
             _randomSource = randomSource ?? DefaultRandom;
+            _buffManager = buffManager;
             IsFrozen = false;
             IsCleared = false;
         }
@@ -453,9 +505,20 @@ namespace GameBattle
                 throw new ArgumentException($"敌人 Id={id} 已登记，不可重复登记", nameof(enemy));
             }
 
+            if (_buffManager != null && enemy is IBuffTarget buffTarget)
+            {
+                BuffOperationResult result = _buffManager.RegisterTarget(buffTarget);
+                if (!result.IsSuccess)
+                {
+                    throw new InvalidOperationException(
+                        $"敌人 Id={id} 注册 Buff 目标失败：{result.Status} {result.Message}");
+                }
+            }
+
             _enemiesById[id] = enemy;
             _orderedIds.Add(id);
             IndexEnemy(id, enemy);
+            _leaseById[id] = GetCurrentLease(enemy, id);
 
             // 注入血量变化回调：受击扣血后经本管理器统一转发低频表现事实。
             if (enemy is EnemyBase enemyBase)
@@ -464,7 +527,72 @@ namespace GameBattle
                     EnemyHealthChanged?.Invoke(changedId, current, max, delta));
             }
 
-            EnemySpawned?.Invoke(id, enemy.IsPlayerLane, enemy.X, enemy.Y);
+            if (enemy is BossBase registeredBoss)
+            {
+                registeredBoss.SkillIntentChanged += OnBossSkillIntentChanged;
+            }
+
+            // task 5.1：出生表现 DTO 贯通。配置化普通敌人携带固定 EnemyKey 与本次租借注入
+            // 的 ResourceAddress；Boss 携带 BossKey 与资源路径；其余实体（测试替身/技能召唤
+            // 占位）为空串，表现端口显式失败而非静默回退 Mob0。
+            string enemyKey = string.Empty;
+            string resourceAddress = string.Empty;
+            if (enemy is BossBase boss)
+            {
+                resourceAddress = boss.ResourceAddress;
+            }
+            else if (enemy is ConfiguredEnemyBase configured)
+            {
+                enemyKey = configured.EnemyKey;
+                resourceAddress = configured.ResourceAddress;
+            }
+
+            BossDefinitionSnapshot bossDefinition = (enemy as BossBase)?.Definition;
+            EnemySpawned?.Invoke(new EnemySpawnViewData(
+                id,
+                enemyKey,
+                resourceAddress,
+                enemy.IsPlayerLane,
+                enemy.X,
+                enemy.Y,
+                bossDefinition == null ? EnemyPresentationKind.Normal : EnemyPresentationKind.Boss,
+                bossDefinition?.Key,
+                bossDefinition?.LogicalWidth ?? 0f,
+                bossDefinition?.LogicalHeight ?? 0f,
+                bossDefinition?.IdleAnimation,
+                bossDefinition?.AttackAnimation));
+        }
+
+        /// <summary>
+        /// 读取实体当前租借身份：波次拥有的敌对实体（配置化敌人/Boss）返回其
+        /// <see cref="IWaveOwnedEnemyEntity.CurrentLease"/>，其余实体（测试替身/旧链集成敌）
+        /// 返回合成身份（generation=0、waveOrder=0）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>世代守卫的数据源（design.md 决策 5）：</b>移除队列处理时读取的是
+        /// 实体<b>当前</b>租借身份，而非登记时索引——池复用后实体被重新租借（新 runtimeId/
+        /// generation/waveOrder），实体自身身份与旧登记/旧请求不一致时即视为迟到请求。</para>
+        /// </remarks>
+        private static EnemyLeaseIdentity GetCurrentLease(IEnemyEntity enemy, int id)
+        {
+            if (enemy is IWaveOwnedEnemyEntity waveOwned)
+            {
+                return waveOwned.CurrentLease;
+            }
+
+            return new EnemyLeaseIdentity(id, 0, 0);
+        }
+
+        /// <summary>
+        /// 按实体当前波次种类构造完整移除 handle（普通敌人=Normal，Boss=Boss）。
+        /// </summary>
+        private static WaveEntityHandle BuildRemovalHandle(IEnemyEntity enemy, EnemyLeaseIdentity identity)
+        {
+            WaveEntityKind kind = enemy is IWaveOwnedEnemyEntity waveOwned
+                ? waveOwned.WaveKind
+                : WaveEntityKind.Normal;
+            return new WaveEntityHandle(
+                identity.RuntimeId, identity.Generation, identity.WaveOrder, kind);
         }
 
         /// <summary>
@@ -483,10 +611,26 @@ namespace GameBattle
                 return;
             }
 
+            if (_buffManager != null && enemy is IBuffTarget buffTarget)
+            {
+                _buffManager.UnregisterTarget(buffTarget.Handle);
+            }
+
+            if (enemy is BossBase boss)
+            {
+                boss.SkillIntentChanged -= OnBossSkillIntentChanged;
+            }
+
             UnindexEnemy(id);
             _enemiesById.Remove(id);
             _orderedIds.Remove(id);
+            _leaseById.Remove(id);
             EnemyRemoved?.Invoke(id, playDeathEffect ?? (enemy.CurrentState == StateDead));
+        }
+
+        private void OnBossSkillIntentChanged(int runtimeId, string animationKey, bool active)
+        {
+            BossSkillIntentChanged?.Invoke(runtimeId, animationKey, active);
         }
 
         // ====================================================================
@@ -1087,6 +1231,38 @@ namespace GameBattle
         }
 
         /// <summary>
+        /// 按 Boss kind 强制移除全部活动 Boss 并处理移除队列（Boss 波端口 Cleanup 使用）。
+        /// </summary>
+        /// <returns>被强制移除的 Boss 数量。</returns>
+        /// <remarks>
+        /// <para>design.md 决策 1：<see cref="ZhangLiangBossWavePort"/> 不维护第二个
+        /// active dictionary，Cleanup 经本方法请求 EnemyManager 强制移除 Boss-kind 实体；
+        /// 实际释放仍由唯一移除点（<see cref="ProcessRemoveQueue"/> → ReleaseEnemy →
+        /// Boss 工厂池）完成。幂等：无活动 Boss 时返回 0。</para>
+        /// </remarks>
+        internal int ForceRemoveBosses()
+        {
+            var bossIds = new List<int>();
+            foreach (int id in _orderedIds)
+            {
+                if (_enemiesById.TryGetValue(id, out IEnemyEntity enemy)
+                    && enemy is IWaveOwnedEnemyEntity waveOwned
+                    && waveOwned.WaveKind == WaveEntityKind.Boss)
+                {
+                    bossIds.Add(id);
+                }
+            }
+
+            for (int i = 0; i < bossIds.Count; i++)
+            {
+                ForceRemove(bossIds[i]);
+            }
+
+            ProcessRemoveQueue();
+            return bossIds.Count;
+        }
+
+        /// <summary>
         /// 请求按指定原因移除敌人（供敌人死亡/终点攻击回调注入）。
         /// </summary>
         /// <param name="id">敌人运行时 ID。</param>
@@ -1105,19 +1281,22 @@ namespace GameBattle
                 return;
             }
 
-            // 调用 gameOver 触发敌人自身清理（回收表现、清除定时器等）。
-            enemy.GameOver();
+            // 捕获当前租借身份（generation-aware，task 3.6/3.7）。
+            // 入队身份 = 当前实体身份；处理时再核对实体当前身份，旧世代迟到请求幂等忽略。
+            EnemyLeaseIdentity identity = GetCurrentLease(enemy, id);
 
             // 入队移除队列，遍历结束后统一处理。重复请求同 ID 只入队一次（首次 reason 生效）。
             for (int index = 0; index < _removeQueue.Count; index++)
             {
-                if (_removeQueue[index].id == id)
+                if (_removeQueue[index].identity.RuntimeId == id)
                 {
                     return;
                 }
             }
 
-            _removeQueue.Add((id, reason));
+            // 只在首次请求时调用 gameOver，避免重复请求重复清理实体内部状态。
+            enemy.GameOver();
+            _removeQueue.Add((identity, reason));
         }
 
         /// <summary>
@@ -1137,14 +1316,26 @@ namespace GameBattle
                 return;
             }
 
-            foreach ((int id, EnemyRemovalReason reason) in _removeQueue)
+            foreach ((EnemyLeaseIdentity identity, EnemyRemovalReason reason) in _removeQueue)
             {
-                if (!_enemiesById.TryGetValue(id, out IEnemyEntity enemy))
+                if (!_enemiesById.TryGetValue(identity.RuntimeId, out IEnemyEntity enemy))
+                {
+                    // 幂等：ID 不存在则跳过（可能在遍历中被移除）。
+                    continue;
+                }
+
+                // 世代守卫（design.md 决策 5 / spec "Ignore a stale removal callback"）：
+                // 核对当前字典实体的租借身份；与入队身份不一致 = 池复用后的新租借，
+                // 迟到旧世代请求幂等忽略，不得误删新租借、不得触发移除事实。
+                EnemyLeaseIdentity current = GetCurrentLease(enemy, identity.RuntimeId);
+                if (current != identity)
                 {
                     continue;
                 }
 
-                Unregister(id, playDeathEffect: reason == EnemyRemovalReason.Killed);
+                Unregister(identity.RuntimeId, playDeathEffect: reason == EnemyRemovalReason.Killed);
+                // task 5.2：以完整 handle（runtimeId+generation+waveOrder+kind）发布移除事实。
+                WaveEntityRemoved?.Invoke(BuildRemovalHandle(enemy, identity), reason);
                 ReleaseEnemy?.Invoke(enemy);
             }
             _removeQueue.Clear();
@@ -1170,6 +1361,17 @@ namespace GameBattle
         internal IReadOnlyList<int> GetOrderedIdsSnapshot()
         {
             return _orderedIds.ToArray();
+        }
+
+        /// <summary>
+        /// 获取指定 ID 登记时记录的租借身份（诊断/测试用）。
+        /// </summary>
+        /// <param name="id">敌人运行时 ID。</param>
+        /// <param name="identity">命中的登记身份；未命中时为空。</param>
+        /// <returns>ID 已登记时返回 true。</returns>
+        internal bool TryGetLeaseIdentity(int id, out EnemyLeaseIdentity identity)
+        {
+            return _leaseById.TryGetValue(id, out identity);
         }
 
         // ====================================================================
@@ -1201,6 +1403,7 @@ namespace GameBattle
             _updateBuffer.Clear();
             _cellToEnemyIds.Clear();
             _enemyIdToCell.Clear();
+            _leaseById.Clear();
             _removeQueue.Clear();
             IsCleared = true;
             // 不在此设置 IsFrozen：IsFrozen 语义是"冻结以进入 Settling"，
@@ -1236,9 +1439,18 @@ namespace GameBattle
             {
                 if (_enemiesById.TryGetValue(id, out IEnemyEntity enemy))
                 {
+                    EnemyLeaseIdentity identity = GetCurrentLease(enemy, id);
+                    if (_buffManager != null && enemy is IBuffTarget buffTarget)
+                    {
+                        _buffManager.UnregisterTarget(buffTarget.Handle);
+                    }
+
                     enemy.GameOver();
                     // 结算清理是静默回收，不播放死亡表现；注销后归还对象池（恰好一次）。
                     Unregister(id, playDeathEffect: false);
+                    // 战斗结束批量清理也提交 Forced 移除事实（恰好一次），
+                    // 供下一波 WaveManager 在停止状态下解除波次活动计数。
+                    WaveEntityRemoved?.Invoke(BuildRemovalHandle(enemy, identity), EnemyRemovalReason.Forced);
                     ReleaseEnemy?.Invoke(enemy);
                 }
             }

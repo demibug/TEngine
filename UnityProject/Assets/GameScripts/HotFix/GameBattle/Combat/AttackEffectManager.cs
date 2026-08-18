@@ -420,6 +420,13 @@ namespace GameBattle
                 // cancelOwner 已入队但 ProcessRemoveQueue 在遍历后执行；此处效果仍在 _effects）。
                 // 若效果已不在 _effects，跳过（不应发生，因为移除在遍历后处理）。
 
+                // 已收到取消请求的效果不得再推进。集合移除仍延迟到遍历后的安全点，
+                // 但取消语义从入队时起立即生效，避免迟到 Update 创建投射物或提交伤害。
+                if (_removeQueue.Contains(effect))
+                {
+                    continue;
+                }
+
                 // 遍历前 inactive 的效果直接移除回收（对应 JS if (!effect.active) _release('effect-inactive')）。
                 if (!effect.Active)
                 {

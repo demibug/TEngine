@@ -166,7 +166,26 @@ public static class LayaBattlePrefabImporter
     }
 
     /// <summary>
-    /// 由 mob.lh 壳体与 mob_0 主体生成以脚底中心为原点的敌人 Prefab。
+    /// 生成四个以脚底中心为原点的敌人 Prefab（Mob0～Mob3）。
+    /// 根名与 Body Sprite 由 enemy.xlsx 的 resourceAddress（Mob0～Mob3）与
+    /// resources/img/gameObject/enemy/mob_0～mob_3.png 唯一对应。
+    /// </summary>
+    [MenuItem("Tools/Battle/生成 Mob Prefabs")]
+    public static void GenerateMobPrefabs()
+    {
+        AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        LayaAtlasExtractor.ExtractAll();
+
+        GenerateMobPrefab("Mob0", 0);
+        GenerateMobPrefab("Mob1", 1);
+        GenerateMobPrefab("Mob2", 2);
+        GenerateMobPrefab("Mob3", 3);
+
+        Debug.Log("[LayaBattlePrefabImporter] 已生成四个敌人 Prefab（Mob0～Mob3）。");
+    }
+
+    /// <summary>
+    /// 由 mob.lh 壳体与 mob_0 主体生成 Mob0 敌人 Prefab（兼容既有菜单入口）。
     /// </summary>
     [MenuItem("Tools/Battle/生成 Mob0")]
     public static void GenerateMob0()
@@ -174,7 +193,28 @@ public static class LayaBattlePrefabImporter
         AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
         LayaAtlasExtractor.ExtractAll();
 
-        GameObject mobRoot = new GameObject("Mob0");
+        GenerateMobPrefab("Mob0", 0);
+    }
+
+    /// <summary>
+    /// 由 mob.lh 壳体与对应 mob_&lt;index&gt; 主体生成以脚底中心为原点的敌人 Prefab。
+    /// </summary>
+    /// <param name="mobName">敌人 Prefab 根名（须与 enemy.xlsx resourceAddress 一致）。</param>
+    /// <param name="bodyIndex">Body 主体 Sprite 索引（0～3，对应 mob_0～mob_3）。</param>
+    private static void GenerateMobPrefab(string mobName, int bodyIndex)
+    {
+        if (string.IsNullOrWhiteSpace(mobName))
+        {
+            throw new ArgumentException("敌人 Prefab 根名不能为空。", nameof(mobName));
+        }
+
+        if (bodyIndex < 0 || bodyIndex > 3)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(bodyIndex), "敌人 Body Sprite 索引仅支持 0～3。");
+        }
+
+        GameObject mobRoot = new GameObject(mobName);
         try
         {
             LayaImportContext context = new LayaImportContext();
@@ -192,12 +232,12 @@ public static class LayaBattlePrefabImporter
                 ["y"] = 21f,
                 ["width"] = 51f,
                 ["height"] = 50f,
-                ["skin"] = "resources/img/gameObject/enemy/mob_0.png",
+                ["skin"] = $"resources/img/gameObject/enemy/mob_{bodyIndex}.png",
             };
             LayaImportNode bodyNode = ParseNode(
                 bodyData,
-                "<generated:Mob0>",
-                "/Mob0/VisualRoot/Body[0]");
+                $"<generated:{mobName}>",
+                $"/{mobName}/VisualRoot/Body[0]");
             GameObject body = CreateUnityNode(bodyNode, visualRoot.transform, context);
             SpriteRenderer bodyRenderer = body.GetComponent<SpriteRenderer>();
             bodyRenderer.drawMode = SpriteDrawMode.Simple;
@@ -222,6 +262,12 @@ public static class LayaBattlePrefabImporter
             CenterHealthBarFill(FindRequiredChild(hpBgTransform, "hpImg1"));
             CenterHealthBarFill(FindRequiredChild(hpBgTransform, "hpImg2"));
 
+            // 血条仅在受击后由 EnemyHealthBarView 显示。hpImg2 是当前红色血量条，
+            // hpImg1 预留给后续延迟掉血条，本期始终隐藏。
+            SetRequiredSpriteVisible(visualRoot.transform, "hpBgImg", false);
+            SetRequiredSpriteVisible(visualRoot.transform, "hpBgImg/hpImg1", false);
+            SetRequiredSpriteVisible(visualRoot.transform, "hpBgImg/hpImg2", false);
+
             // TODO: 待 Buff/Debuff 系统接入后，由状态表现层根据眩晕状态控制该节点显隐。
             FindRequiredChild(visualRoot.transform, "stun").gameObject.SetActive(false);
 
@@ -232,8 +278,8 @@ public static class LayaBattlePrefabImporter
 
             SavePrefabDeterministic(
                 mobRoot,
-                $"{PREFAB_OUTPUT_ROOT}/Enemies/Mob0.prefab");
-            Debug.Log("[LayaBattlePrefabImporter] 已生成 Mob0 敌人 Prefab。");
+                $"{PREFAB_OUTPUT_ROOT}/Enemies/{mobName}.prefab");
+            Debug.Log($"[LayaBattlePrefabImporter] 已生成 {mobName} 敌人 Prefab。");
         }
         finally
         {
@@ -656,6 +702,22 @@ public static class LayaBattlePrefabImporter
         Vector3 position = target.localPosition;
         position.z = sortingOrder * SORTING_DEPTH_STEP;
         target.localPosition = position;
+    }
+
+    private static void SetRequiredSpriteVisible(
+        Transform root,
+        string relativePath,
+        bool visible)
+    {
+        Transform target = root.Find(relativePath);
+        SpriteRenderer renderer = target == null ? null : target.GetComponent<SpriteRenderer>();
+        if (renderer == null)
+        {
+            throw new InvalidOperationException(
+                $"导入布局缺少 SpriteRenderer：{root.name}/{relativePath}");
+        }
+
+        renderer.enabled = visible;
     }
 
     private static void OrganizeThemeRoot(Transform themeRoot)

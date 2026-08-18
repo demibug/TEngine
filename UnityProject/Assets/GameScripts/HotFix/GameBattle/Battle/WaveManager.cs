@@ -4,647 +4,575 @@ using System.Collections.Generic;
 namespace GameBattle
 {
     // ============================================================================
-    // 任务 3.9：WaveManager —— 确定性 Mob0 波次计划与唯一 ROUND_SPAWN_PREPARED(plan) 发布
+    // WaveManager —— 有序波次状态机（OrderedWavePlanSnapshot 唯一生产模型）
     // ----------------------------------------------------------------------------
-    // 职责（design.md 目录表 / Battle/WaveManager.cs / specs/battle-simulation/spec.md
-    //   / specs/battle-event-boundary/spec.md "Event signatures are unambiguous"）：
-    //   生成确定性 Mob0 波次计划并按子步刷 Mob0；本期显式跳过 Boss。
-    //   通过唯一 ROUND_SPAWN_PREPARED(plan) 签名发布波次准备完成事实，
-    //   禁止 BattleManager 二次发布同名无参事件。
+    // 职责（design.md 决策 4/5/8 / specs/ordered-wave-plan/spec.md / task 4.1-4.5）：
+    //   直接消费 OrderedWavePlanSnapshot，按 Pending→PreDelay→Spawning→
+    //   WaitingForClear→Completed 逐行推进；每次成功 spawn 返回 WaveEntityHandle
+    //   并登记 HashSet，完整值幂等移除；最后一行完成时发布 AllConfiguredWavesCompleted
+    //   单次事实。
     //
-    // 来源证据（WaveManager.js:1-46）：
-    //   还原工程 WaveManager 继承 SingletonBase，持有 currentPlan/started/roundPlans/planHistory。
-    //   configure 注入 gameData/enemyManager/bossManager/eventBus/randomSource/logger/skipBoss。
-    //   planRound(round) 依据 waveUnitCounts 计算 normalCount，依据 bossWaveNumbers/
-    //   bossSpawnChances/randomSource 决定 boss，生成 plan 并经 EventBus 发送
-    //   GameEvents.ROUND_SPAWN_PREPARED(plan)。
-    //   beginRound(round) 调 planRound 并在 boss=true 时触发 bossManager.spawn。
-    //   spawnNormalPair(index,...) 调 enemyManager.spawn 生成一对 Mob0。
-    //   skipBoss=true 时 boss 始终为 false，不读 bossWaveNumbers/bossSpawnChances，
-    //   bossManager 从必填降为可选。
+    // 时间语义（仅由 Update(stepMs) 推进，stepMs<0 显式失败）：
+    //   - 行首次进入后，preDelay 达到的该次更新提交首个出生序号；
+    //     preDelay=0 可在进入行的该次更新出生。
+    //   - Normal 后续出生序号按 spawnInterval；每个序号内双路启用时先玩家路、后电脑路；
+    //     normalCount 是每个启用车道数量。
+    //   - Boss 在 preDelay 到期时按启用车道各 Spawn 一次，玩家路先于电脑路；不冒充 Normal。
+    //   - 最后一批 Spawn 后立即转 WaitingForClear 并从此刻开始 postDelay，
+    //     但同一更新不把该行判 Completed。
+    //   - WaitingForClear 仅在全部出生已提交/取消、postDelay 到期、本行活动 handle
+    //     集合为空时提交一次 Completed。
+    //   - 行 Completed 后绝不在同一次 Update 进入下一行；下一行最早下一次 Update 开始，
+    //     零延迟也不可一子步穿越多行。
     //
-    // 还原工程 BattleManager.js:111-129 _beginWave：
-    //   currentRound += 1; eventBus.event(ROUND_STARTED);
-    //   plan = waveManager.beginRound(currentRound); unitsThisWave = plan.normalCount;
-    //   ... eventBus.event(ROUND_SPAWN_PREPARED);  // ← 无参二次发布
-    //
-    // C# 移植决策（spec battle-event-boundary "Event signatures are unambiguous"）：
-    //   1. ROUND_SPAWN_PREPARED 只由 WaveManager 以带 plan 的唯一签名发布一次。
-    //   2. BattleManager（task 3.10）禁止二次发布同名无参事件——它只消费 plan，
-    //      不再自行 event(ROUND_SPAWN_PREPARED)。
-    //   3. 本期内部通信使用直接回调（Action<WaveSpawnPlan>），不引入全局 EventBus
-    //      （design 决策 4：内部一致性优先直接调用）。BattleInternalSignalHub（task 7.1）
-    //      接入后改为局部信号，仍保持唯一带 plan 签名。
-    //
-    // 确定性要求（spec battle-simulation "Simulation is reproducible"）：
-    //   - normalCount 只由配置 waveUnitCounts 与 round 确定，不依赖未声明随机。
-    //   - skipBoss=true 时 boss 决策完全跳过，不消耗随机源。
-    //   - plan 结果只由配置与 round 确定，相同配置+round 产生相同 plan。
+    // 生命周期（Stop / Cleanup）：
+    //   - Stop：先置 stopped，再清待出生序号与所有权，并幂等停止 Boss 端口。
+    //   - Cleanup：释放本局波次所有权并幂等清理 Boss 端口；置 stopped 防重启，
+    //     不重启状态机，也不发布 AllConfiguredWavesCompleted。
+    //   - AllConfiguredWavesCompleted 只在最后一行首次 Completed 且全局无活动 handle
+    //     时发布一次，是唯一成功闸。
     //
     // 不变量：
-    //   1. 独占单局状态：currentPlan/roundPlans/planHistory 归属本实例，不跨局复用。
-    //   2. ROUND_SPAWN_PREPARED(plan) 唯一签名：只发布一次、带 plan 参数。
-    //   3. skipBoss 显式行为：skipBoss=true 时 boss 始终 false，不访问 boss 配置字段。
-    //   4. normalCount 来自配置：不硬编码，不静默补默认值。
+    //   1. 只消费 OrderedWavePlanSnapshot，绝不读取 waveUnitCounts/Boss 概率数组/
+    //      randomSource/MaxRounds。
+    //   2. 每次成功出生登记完整 WaveEntityHandle；相同 runtimeId 但 generation/
+    //      waveOrder/kind 任一不同的迟到事实不匹配，不减少活动计数。
+    //   3. 每局由 BattleRuntimeFactory 新建，不跨局复用（spec "Restart creates clean
+    //      per-battle state"）。
     // ============================================================================
 
     /// <summary>
-    /// 确定性波次生成计划（不可变）。对应还原工程 WaveManager.js:38 plan 对象。
+    /// 有序波次状态机：直接消费 <see cref="OrderedWavePlanSnapshot"/>，按五态逐行推进，
+    /// 双路固定顺序出生并维护活动 <see cref="WaveEntityHandle"/> 的 generation 守卫。
     /// </summary>
     /// <remarks>
-    /// <para><b>确定性（spec "Simulation is reproducible"）：</b>
-    /// 相同配置快照 + round 产生相同 plan。normalCount 由 <c>WaveUnitCounts</c> 确定，
-    /// boss 由 <c>SkipBoss</c> + <c>BossWaveNumbers</c> + <c>BossSpawnChances</c> + 随机源确定
-    /// （skipBoss=true 时 boss 恒 false，不消耗随机源）。</para>
-    ///
-    /// <para><b>唯一 ROUND_SPAWN_PREPARED(plan) 签名载荷：</b>
-    /// 本对象作为 ROUND_SPAWN_PREPARED 事实的唯一参数传递给订阅者
-    /// （spec "Event signatures are unambiguous"）。BattleManager 不再二次发布同名无参事件。</para>
-    ///
-    /// <para><b>字段对照（WaveManager.js:38）：</b>
-    /// <list type="bullet">
-    /// <item>round: 波次号（1-based）。</item>
-    /// <item>normalCount: 该波 Mob0 生成数量，来自 waveUnitCounts。</item>
-    /// <item>normalTypeIndex: Mob0 类型索引，来自 MapEnemyTypeIndex。</item>
-    /// <item>boss: 是否为 Boss 波（skipBoss=true 时恒 false）。</item>
-    /// <item>bossIndex: Boss 类型索引（boss=false 时为 -1）。</item>
-    /// <item>bossKey: Boss 类型键（boss=false 时为 null）。</item>
-    /// <item>bossSpawned: Boss 是否已生成（本期 skipBoss 固定 false）。</item>
-    /// <item>spawnStrategyIndex: 选定的生成策略索引（用于确定性回放诊断）。</item>
-    /// </list>
-    /// </para>
-    /// </remarks>
-    internal sealed class WaveSpawnPlan
-    {
-        /// <summary>波次号（1-based，对应 BattleState.CurrentRound）。</summary>
-        public int Round { get; }
-
-        /// <summary>该波 Mob0 生成数量（来自 WaveUnitCounts，endlessMode 下按公式外推）。</summary>
-        public int NormalCount { get; }
-
-        /// <summary>Mob0 敌人类型索引（来自 EnemyConfigSnapshot.MapEnemyTypeIndex）。</summary>
-        public int NormalTypeIndex { get; }
-
-        /// <summary>是否为 Boss 波。skipBoss=true 时恒 false。</summary>
-        public bool Boss { get; }
-
-        /// <summary>Boss 类型索引。boss=false 时为 -1。</summary>
-        public int BossIndex { get; }
-
-        /// <summary>Boss 类型键。boss=false 时为 null。</summary>
-        public string BossKey { get; }
-
-        /// <summary>Boss 是否已生成。本期 skipBoss 固定 false。</summary>
-        public bool BossSpawned { get; internal set; }
-
-        /// <summary>
-        /// 选定的生成策略索引（来自 startGame 时 weightedIndex 选择）。
-        /// 用于确定性回放诊断，不直接参与 normalCount 计算。
-        /// </summary>
-        public int SpawnStrategyIndex { get; }
-
-        /// <summary>
-        /// 构造不可变波次生成计划。
-        /// </summary>
-        /// <param name="round">波次号（1-based）。</param>
-        /// <param name="normalCount">Mob0 生成数量。</param>
-        /// <param name="normalTypeIndex">Mob0 类型索引。</param>
-        /// <param name="boss">是否为 Boss 波。</param>
-        /// <param name="bossIndex">Boss 类型索引（boss=false 时传 -1）。</param>
-        /// <param name="bossKey">Boss 类型键（boss=false 时传 null）。</param>
-        /// <param name="bossSpawned">Boss 是否已生成。</param>
-        /// <param name="spawnStrategyIndex">选定的生成策略索引。</param>
-        internal WaveSpawnPlan(
-            int round,
-            int normalCount,
-            int normalTypeIndex,
-            bool boss,
-            int bossIndex,
-            string bossKey,
-            bool bossSpawned,
-            int spawnStrategyIndex)
-        {
-            Round = round;
-            NormalCount = normalCount;
-            NormalTypeIndex = normalTypeIndex;
-            Boss = boss;
-            BossIndex = bossIndex;
-            BossKey = bossKey;
-            BossSpawned = bossSpawned;
-            SpawnStrategyIndex = spawnStrategyIndex;
-        }
-
-        /// <summary>
-        /// 返回计划的浅拷贝快照（用于 planHistory，防止外部修改 currentPlan 影响历史记录）。
-        /// </summary>
-        internal WaveSpawnPlan CloneSnapshot()
-        {
-            return new WaveSpawnPlan(
-                Round, NormalCount, NormalTypeIndex, Boss, BossIndex, BossKey, BossSpawned,
-                SpawnStrategyIndex);
-        }
-    }
-
-    /// <summary>
-    /// 确定性 Mob0 波次计划生成与刷怪管理器。
-    /// </summary>
-    /// <remarks>
-    /// <para><b>职责（design.md Battle/WaveManager.cs）：</b>
-    /// 生成确定性波次计划并按子步刷 Mob0；本期显式跳过 Boss。
-    /// 替代还原工程 <c>WaveManager.js</c> 全局单例（<c>WaveManager.js:10-45</c>）。</para>
-    ///
-    /// <para><b>确定性波次计划（spec "Simulation is reproducible"）：</b>
-    /// <see cref="PlanRound"/> 依据配置快照的 <c>WaveUnitCounts</c> 与 round 计算
-    /// <c>normalCount</c>，不依赖未声明随机。skipBoss=true 时 boss 决策完全跳过。
-    /// 相同配置 + round 产生相同 plan（boss 决策由随机源确定时，相同随机序列产生相同 boss 结果）。</para>
-    ///
-    /// <para><b>唯一 ROUND_SPAWN_PREPARED(plan) 签名（spec "Event signatures are unambiguous"）：</b>
-    /// <see cref="PlanRound"/> 通过 <see cref="OnRoundSpawnPrepared"/> 回调发布一次带 plan 的事实。
-    /// BattleManager（task 3.10）MUST NOT 二次发布同名无参事件——它只消费 plan，
-    /// 不再自行调用 <c>OnRoundSpawnPrepared</c>。本期使用直接回调（design 决策 4：
-    /// 内部一致性优先直接调用），BattleInternalSignalHub（task 7.1）接入后改为局部信号，
-    /// 仍保持唯一带 plan 签名。</para>
-    ///
-    /// <para><b>显式 skipBoss 行为（WaveManager.js:27）：</b>
-    /// skipBoss=true 时 boss 始终为 false，不读 <c>BossWaveNumbers</c>/<c>BossSpawnChances</c>，
-    /// 不消耗随机源。Boss 生成入口（<see cref="BeginRound"/>）在 skipBoss 模式下不触发任何 Boss 操作。</para>
-    ///
-    /// <para><b>每局新建/销毁（spec "Restart creates clean per-battle state"）：</b>
-    /// 重开销毁旧 Runtime，新建 Runtime 时由 Factory 产生新 WaveManager。
-    /// <see cref="StartGame"/> 重置 currentPlan/roundPlans/planHistory。</para>
-    ///
-    /// <para><b>本类型为 internal：</b>只供 GameBattle 内部 BattleManager 使用，不对其他程序集暴露。</para>
+    /// <para><b>职责（design.md 决策 4/5/8 / specs/ordered-wave-plan/spec.md）：</b>
+    /// 逐行消费 <see cref="OrderedWavePlanSnapshot"/>；每次成功 spawn 返回
+    /// <see cref="WaveEntityHandle"/> 并登记 <c>HashSet</c>，完整值幂等移除；
+    /// 最后一行完成时发布 <see cref="AllConfiguredWavesCompleted"/> 单次事实。</para>
+    /// <para><b>时间推进唯一入口：</b><see cref="Update"/>；行 Completed 后绝不在
+    /// 同一次 Update 进入下一行。</para>
+    /// <para><b>本类型为 internal：</b>只供 GameBattle 内部
+    /// <see cref="BattleRuntimeFactory"/> 与测试使用，不对其他程序集暴露。</para>
     /// </remarks>
     internal sealed class WaveManager
     {
         // ====================================================================
-        // 日志标签
+        // 新链注入依赖（不可变，构造时注入）
         // ====================================================================
 
-        private const string LogTag = "[WaveManager]";
+        /// <summary>本局有序波次计划快照（不可变；新生产链唯一计划来源）。</summary>
+        private readonly OrderedWavePlanSnapshot _orderedPlan;
+
+        /// <summary>普通敌人出生 handler（新链出生端口）。</summary>
+        private readonly NormalWaveSpawnHandler _normalSpawnHandler;
+
+        /// <summary>Boss 波交接端口（生产默认注入不可用实现）。</summary>
+        private readonly IBossWavePort _bossPort;
 
         // ====================================================================
-        // 配置依赖（不可变，构造时注入）
+        // 新链运行时状态（单局可变）
         // ====================================================================
 
-        /// <summary>
-        /// 本局波次配置快照（不可变）。来自 <see cref="BattleConfigSnapshot.Wave"/>。
-        /// </summary>
-        private readonly WaveConfigSnapshot _waveConfig;
+        /// <summary>当前行索引（-1 表示尚未进入任何行）。</summary>
+        private int _rowIndex = -1;
 
-        /// <summary>
-        /// 本局敌人配置快照（不可变）。来自 <see cref="BattleConfigSnapshot.Enemy"/>，
-        /// 用于读取 <c>MapEnemyTypeIndex</c> 作为 normalTypeIndex。
-        /// </summary>
-        private readonly EnemyConfigSnapshot _enemyConfig;
+        /// <summary>当前行状态（Pending 表示未开始）。</summary>
+        private WaveRuntimeState _rowState = WaveRuntimeState.Pending;
 
-        /// <summary>
-        /// 本局战斗状态。用于读取 <c>EndlessMode</c>/<c>MaxRounds</c> 判断无尽模式外推。
-        /// </summary>
-        private readonly BattleState _battleState;
+        /// <summary>当前行首次出生前置延迟剩余（毫秒，PreDelay 状态使用）。</summary>
+        private long _preDelayRemaining;
 
-        /// <summary>
-        /// 随机源委托，用于 Boss 决策（skipBoss=true 时不调用）。
-        /// 对应还原工程 WaveManager.js:12 randomSource 参数。
-        /// 签约定：返回 [0,1) 区间 float，等价 JS Math.random()。
-        /// </summary>
-        private readonly Func<float> _randomSource;
+        /// <summary>下一个出生序号距到期剩余（毫秒，Spawning 状态使用）。</summary>
+        private long _spawnTimer;
 
-        /// <summary>
-        /// Boss 类型键列表，对应还原工程 EnemyFactory.js:75 BOSS_TYPE_KEYS。
-        /// skipBoss=true 时不访问此列表。
-        /// </summary>
-        private static readonly string[] BossTypeKeys =
-        {
-            "ZhangLiang", "ZhangBao", "ZhangJiao", "SunShangXiang",
-            "ZhenFu", "DiaoChan", "HuaXiong", "LvBu",
-            "DongZhuo", "DianWei", "XiaHouDun", "CaoCao",
-        };
+        /// <summary>当前行清场结束等待剩余（毫秒，WaitingForClear 状态使用）。</summary>
+        private long _postDelayRemaining;
 
-        // ====================================================================
-        // 运行时状态（单局可变）
-        // ====================================================================
+        /// <summary>下一个待提交的出生序号（0-based，批序号）。</summary>
+        private int _nextOrdinal;
 
-        /// <summary>
-        /// 当前波次计划。null 表示尚未 beginRound 或已 gameOver。
-        /// 对应还原工程 WaveManager.js:11 currentPlan。
-        /// </summary>
-        private WaveSpawnPlan _currentPlan;
+        /// <summary>当前行出生批序号总数。</summary>
+        private int _totalOrdinals;
 
-        /// <summary>
-        /// 是否已 startGame。对应还原工程 WaveManager.js:11 started。
-        /// </summary>
-        private bool _started;
+        /// <summary>是否已停止（GameOver/Cancel/Stop 先置 stopped 再清待出生与所有权）。</summary>
+        private bool _stopped;
 
-        /// <summary>
-        /// 各波次计划映射（round → plan），用于跨波次查询。
-        /// 对应还原工程 WaveManager.js:11 roundPlans。
-        /// </summary>
-        private readonly Dictionary<int, WaveSpawnPlan> _roundPlans = new Dictionary<int, WaveSpawnPlan>();
+        /// <summary>全部配置波是否已完成（最后一行完成且无活动 handle）。</summary>
+        private bool _allCompleted;
 
-        /// <summary>
-        /// 计划历史（按 beginRound 顺序），用于诊断与回放。
-        /// 对应还原工程 WaveManager.js:11 planHistory。
-        /// </summary>
-        private readonly List<WaveSpawnPlan> _planHistory = new List<WaveSpawnPlan>();
+        /// <summary>AllConfiguredWavesCompleted 是否已发布（单次事实守卫）。</summary>
+        private bool _allCompletedPublished;
 
-        /// <summary>
-        /// Boss 决策缓存（round → bool），确保同一波次 Boss 决策只做一次。
-        /// 对应还原工程 WaveManager.js:30 battle.bossDecisionByRound[round]。
-        /// skipBoss=true 时不使用此缓存。
-        /// </summary>
-        private readonly Dictionary<int, bool> _bossDecisionByRound = new Dictionary<int, bool>();
-
-        /// <summary>
-        /// Boss 类型缓存（round → bossIndex），确保同一波次 Boss 类型只选一次。
-        /// 对应还原工程 WaveManager.js:34 battle.bossTypeByRound[round]。
-        /// skipBoss=true 时不使用此缓存。
-        /// </summary>
-        private readonly Dictionary<int, int> _bossTypeByRound = new Dictionary<int, int>();
-
-        /// <summary>
-        /// Boss 轮换索引。对应还原工程 WaveManager.js:34 data.bossRotationIndex。
-        /// skipBoss=true 时不递增。
-        /// </summary>
-        private int _bossRotationIndex;
-
-        /// <summary>
-        /// 选定的生成策略索引。由 StartGame 时通过 weightedIndex 选择。
-        /// 对应还原工程 BattleManager.js:67 strategyIndex。
-        /// </summary>
-        private int _spawnStrategyIndex;
+        /// <summary>当前局活动 handle 集合（完整值幂等登记/移除）。</summary>
+        private readonly HashSet<WaveEntityHandle> _activeHandles = new HashSet<WaveEntityHandle>();
 
         // ====================================================================
-        // 事件回调（唯一 ROUND_SPAWN_PREPARED(plan) 发布入口）
+        // 新链事件（唯一 AllConfiguredWavesCompleted 事实）
         // ====================================================================
 
         /// <summary>
-        /// ROUND_SPAWN_PREPARED(plan) 事实的唯一发布回调。
+        /// 全部配置波完成事实（单次发布）。
         /// </summary>
         /// <remarks>
-        /// <para><b>唯一签名（spec "Event signatures are unambiguous"）：</b>
-        /// 本回调是 ROUND_SPAWN_PREPARED 事实的唯一发布入口，携带 <see cref="WaveSpawnPlan"/> 参数。
-        /// BattleManager（task 3.10）MUST NOT 二次发布同名无参事件。</para>
-        /// <para><b>本期使用直接回调（design 决策 4）：</b>
-        /// 内部一致性优先直接调用。BattleInternalSignalHub（task 7.1）接入后改为局部信号，
-        /// 仍保持唯一带 plan 签名，不新增无参重载。</para>
-        /// <para>可为 null：无订阅者时 <see cref="PlanRound"/> 仍生成计划，只跳过回调。</para>
+        /// <para>只在最后一行首次 Completed 且全局无活动 handle 时发布一次。
+        /// 本事实是唯一成功闸：BattleManager（4.7 接入）收到后调用单一成功协调入口
+        /// → 既有 TryFreeze(true)。Stop/取消后不得发布本事实。</para>
         /// </remarks>
-        public Action<WaveSpawnPlan> OnRoundSpawnPrepared { get; set; }
+        internal event Action AllConfiguredWavesCompleted;
+
+        /// <summary>
+        /// 单行波次开始事实（每行恰好一次）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>任务 4.8 接入（BattleState 同步）：</b>每行进入（BeginRow）时发布一次
+        /// <c>order</c>，供 <see cref="BattleManager"/> 同步
+        /// <see cref="BattleState.CurrentRound"/> 到真实 WaveManager.CurrentOrder（只读显示/统计），
+        /// 使结果冻结前 <c>CurrentRound</c> 保留最后真实 order。MaxRounds 绝不参与推进/成功。</para>
+        /// <para>仅为每行进入时的单次事实；Stop/取消后不再发布。</para>
+        /// </remarks>
+        internal event Action<int> WaveStarted;
 
         // ====================================================================
-        // 只读属性
+        // 新链只读状态（供测试 / Runtime 接入；不暴露可变集合）
         // ====================================================================
 
-        /// <summary>当前波次计划（null 表示尚未 beginRound 或已 gameOver）。</summary>
-        public WaveSpawnPlan CurrentPlan => _currentPlan;
+        /// <summary>当前行 order（未进入任何行时为 -1）。</summary>
+        internal int CurrentOrder => _rowIndex >= 0 ? _orderedPlan.Rows[_rowIndex].Order : -1;
 
-        /// <summary>是否已 startGame。</summary>
-        public bool IsStarted => _started;
+        /// <summary>当前行状态。</summary>
+        internal WaveRuntimeState State => _rowState;
 
-        /// <summary>计划历史只读视图（按 beginRound 顺序）。</summary>
-        public IReadOnlyList<WaveSpawnPlan> PlanHistory => _planHistory;
+        /// <summary>计划行数（派生显示轮数来源）。</summary>
+        internal int PlannedRowCount => _orderedPlan.Rows.Count;
+
+        /// <summary>当前局活动 handle 数量。</summary>
+        internal int ActiveHandleCount => _activeHandles.Count;
+
+        /// <summary>当前局活动 handle 只读快照（每次调用生成拷贝，不暴露内部集合）。</summary>
+        internal IReadOnlyList<WaveEntityHandle> ActiveHandles => GetActiveHandlesSnapshot();
+
+        /// <summary>是否已停止（停止后 Update/迟到移除不得出生或发布完成）。</summary>
+        internal bool IsStopped => _stopped;
+
+        /// <summary>全部配置波是否已完成。</summary>
+        internal bool AllWavesCompleted => _allCompleted;
 
         // ====================================================================
-        // 构造
+        // 构造 —— 新生产链（直接消费有序波次计划 + 出生端口）
         // ====================================================================
 
         /// <summary>
-        /// 构造波次管理器。
+        /// 构造有序波次状态机（新生产链入口）。
         /// </summary>
-        /// <param name="configSnapshot">本局不可变配置快照。</param>
-        /// <param name="battleState">本局战斗状态。</param>
-        /// <param name="randomSource">
-        /// 随机源委托，返回 [0,1) float，用于 Boss 决策。
-        /// skipBoss=true 时不调用，可传 null。
-        /// </param>
-        /// <exception cref="ArgumentNullException">
-        /// <paramref name="configSnapshot"/> 或 <paramref name="battleState"/> 为 null。
-        /// </exception>
+        /// <param name="plan">有序波次计划快照（不可为 null）。</param>
+        /// <param name="normalSpawnHandler">普通敌人出生 handler（不可为 null）。</param>
+        /// <param name="bossPort">Boss 波交接端口（不可为 null；生产注入
+        /// <see cref="UnavailableBossWavePort"/>）。</param>
+        /// <exception cref="ArgumentNullException">任一参数为 null。</exception>
         /// <remarks>
-        /// <para>由 <see cref="BattleRuntimeFactory"/> 在每次 Create 时构造新实例。
+        /// <para>由下一波 BattleRuntimeFactory/Runtime 在每次 Create 时构造新实例，
         /// 不跨局复用（spec "Restart creates clean per-battle state"）。</para>
-        /// <para>randomSource 在 skipBoss=true 时可为 null；skipBoss=false 时 MUST 非 null，
-        /// 否则 <see cref="PlanRound"/> 在 Boss 波次会抛 <see cref="InvalidOperationException"/>。</para>
+        /// <para>本构造只消费 <see cref="OrderedWavePlanSnapshot"/>，绝不读取
+        /// legacy 的 waveUnitCounts/Boss 概率数组/randomSource/MaxRounds。</para>
+        /// <para>计划为空时视为立即全部完成（防御；Validator 会拒绝空计划）。</para>
         /// </remarks>
         internal WaveManager(
-            BattleConfigSnapshot configSnapshot,
-            BattleState battleState,
-            Func<float> randomSource = null)
+            OrderedWavePlanSnapshot plan,
+            NormalWaveSpawnHandler normalSpawnHandler,
+            IBossWavePort bossPort)
         {
-            if (configSnapshot == null)
+            if (plan == null)
             {
-                throw new ArgumentNullException(nameof(configSnapshot));
+                throw new ArgumentNullException(nameof(plan));
             }
 
-            if (battleState == null)
+            if (normalSpawnHandler == null)
             {
-                throw new ArgumentNullException(nameof(battleState));
+                throw new ArgumentNullException(nameof(normalSpawnHandler));
             }
 
-            _waveConfig = configSnapshot.Wave
-                ?? throw new InvalidOperationException("configSnapshot.Wave 不可为 null");
-            _enemyConfig = configSnapshot.Enemy
-                ?? throw new InvalidOperationException("configSnapshot.Enemy 不可为 null");
-            _battleState = battleState;
-            _randomSource = randomSource;
-            _bossRotationIndex = 0;
-            _spawnStrategyIndex = -1;
-        }
-
-        // ====================================================================
-        // 生命周期
-        // ====================================================================
-
-        /// <summary>
-        /// 开始一局：重置局内波次状态。
-        /// 对应还原工程 WaveManager.js:19 startGame。
-        /// </summary>
-        /// <remarks>
-        /// 重置 currentPlan=null、started=true、roundPlans 清空、planHistory 清空。
-        /// 同时重置 bossDecisionByRound/bossTypeByRound/bossRotationIndex。
-        /// 选定生成策略索引（对应 BattleManager.js:67 weightedIndex）。
-        /// </remarks>
-        /// <param name="spawnStrategyIndex">
-        /// 由 BattleManager.startGame 通过 weightedIndex 选定的策略索引。
-        /// 传入 -1 表示未选择（使用默认策略 0）。
-        /// </param>
-        internal void StartGame(int spawnStrategyIndex = -1)
-        {
-            _started = true;
-            _currentPlan = null;
-            _roundPlans.Clear();
-            _planHistory.Clear();
-            _bossDecisionByRound.Clear();
-            _bossTypeByRound.Clear();
-            _bossRotationIndex = 0;
-
-            // 生成策略索引：由 BattleManager 在 startGame 时通过 weightedIndex 选择。
-            // 对应 BattleManager.js:67-69：
-            //   const strategyIndex = this.random.weightedIndex(spawnStrategyWeights);
-            //   this.battleState.spawnStrategy = spawnStrategies[strategyIndex];
-            // WaveManager 只记录索引用于 plan 诊断，不自行选择（权属在 BattleManager）。
-            _spawnStrategyIndex = spawnStrategyIndex >= 0
-                ? spawnStrategyIndex
-                : 0;
-        }
-
-        /// <summary>
-        /// 结束一局：重置波次状态。
-        /// 对应还原工程 WaveManager.js:44 gameOver。
-        /// </summary>
-        internal void GameOver()
-        {
-            _started = false;
-            _currentPlan = null;
-            _roundPlans.Clear();
-            _planHistory.Clear();
-            _bossDecisionByRound.Clear();
-            _bossTypeByRound.Clear();
-            _bossRotationIndex = 0;
-        }
-
-        // ====================================================================
-        // 波次计划生成（确定性）
-        // ====================================================================
-
-        /// <summary>
-        /// 生成指定波次的确定性 Mob0 生成计划，并通过 <see cref="OnRoundSpawnPrepared"/> 发布唯一事实。
-        /// 对应还原工程 WaveManager.js:20-40 planRound。
-        /// </summary>
-        /// <param name="round">波次号（1-based）。</param>
-        /// <returns>不可变波次生成计划。</returns>
-        /// <exception cref="InvalidOperationException">
-        /// 波次号超出 waveUnitCounts 范围且非无尽模式，或 skipBoss=false 但 randomSource 为 null。
-        /// </exception>
-        /// <remarks>
-        /// <para><b>确定性 normalCount 计算（WaveManager.js:23）：</b>
-        /// <code>
-        /// endlessMode &amp;&amp; round &gt; counts.Length
-        ///   ? counts[counts.Length - 1] + 2 * (round - counts.Length)
-        ///   : counts[Math.Min(round, counts.Length) - 1]
-        /// </code>
-        /// 非无尽模式只取 waveUnitCounts 内的值；无尽模式超出范围时按公式外推。</para>
-        ///
-        /// <para><b>显式 skipBoss 行为（WaveManager.js:27）：</b>
-        /// skipBoss=true 时 boss 始终 false，不读 BossWaveNumbers/BossSpawnChances，
-        /// 不消耗 randomSource。</para>
-        ///
-        /// <para><b>唯一 ROUND_SPAWN_PREPARED(plan) 发布：</b>
-        /// 计划生成后通过 <see cref="OnRoundSpawnPrepared"/> 回调发布一次。
-        /// BattleManager MUST NOT 二次发布同名无参事件（spec "Event signatures are unambiguous"）。</para>
-        /// </remarks>
-        internal WaveSpawnPlan PlanRound(int round)
-        {
-            // 计算 normalCount（确定性，来自 waveUnitCounts）
-            int normalCount = ComputeNormalCount(round);
-
-            // Boss 决策（skipBoss=true 时显式跳过）
-            bool boss = false;
-            int bossIndex = -1;
-            string bossKey = null;
-
-            if (!_waveConfig.SkipBoss)
+            if (bossPort == null)
             {
-                // skipBoss=false 路径：按 bossWaveNumbers/bossSpawnChances/randomSource 决策
-                // 对应 WaveManager.js:27-37
-                if (_randomSource == null)
+                throw new ArgumentNullException(nameof(bossPort));
+            }
+
+            _orderedPlan = plan;
+            _normalSpawnHandler = normalSpawnHandler;
+            _bossPort = bossPort;
+            _rowState = WaveRuntimeState.Pending;
+            _rowIndex = -1;
+
+            if (plan.Rows.Count == 0)
+            {
+                _allCompleted = true;
+            }
+        }
+
+        // ====================================================================
+        // Update —— 唯一时间推进入口
+        // ====================================================================
+
+        /// <summary>
+        /// 推进波次状态机一个时间步。
+        /// </summary>
+        /// <param name="stepMs">子步时长（毫秒，非负）。</param>
+        /// <exception cref="ArgumentOutOfRangeException">stepMs 为负。</exception>
+        /// <remarks>
+        /// <para>只由本方法推进；行 Completed 后绝不在同一次 Update 进入下一行，
+        /// 下一行最早下一次 Update 开始（零延迟也不可一子步穿越多行）。</para>
+        /// <para>已停止（<see cref="IsStopped"/>）或全部完成（<see cref="AllWavesCompleted"/>）
+        /// 时本方法为空操作，不产生出生也不发布完成。</para>
+        /// </remarks>
+        internal void Update(long stepMs)
+        {
+            if (stepMs < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(stepMs), $"Update stepMs 不能为负，实际 {stepMs}");
+            }
+
+            if (_stopped || _allCompleted)
+            {
+                return;
+            }
+
+            if (_rowIndex < 0)
+            {
+                // 首行：本次 Update 进入并立即推进。
+                BeginRow(0);
+            }
+            else if (_rowState == WaveRuntimeState.Completed)
+            {
+                // 上一行已 Completed：下一行最早本次 Update 开始（绝不在上一行完成的那次 Update 进入）。
+                if (_rowIndex + 1 >= _orderedPlan.Rows.Count)
+                {
+                    return;
+                }
+
+                BeginRow(_rowIndex + 1);
+            }
+
+            AdvanceRow(stepMs);
+        }
+
+        // ====================================================================
+        // 停止 / 移除 —— 取消与迟到事实边界
+        // ====================================================================
+
+        /// <summary>
+        /// 停止波次：先置 stopped，再清待出生序号与所有权，并幂等停止 Boss 端口。
+        /// </summary>
+        /// <remarks>
+        /// <para>GameOver/Cancel/Settling 前置调用（task 4.9 调整顺序：先停止 WaveManager
+        /// 再清理实体）。停止后 <see cref="Update"/> 为空操作，迟到 remove 不再出生或
+        /// 发布完成；调用 <see cref="IBossWavePort.Stop"/> 幂等。</para>
+        /// </remarks>
+        internal void Stop()
+        {
+            _stopped = true;
+            _nextOrdinal = _totalOrdinals;
+            _rowState = WaveRuntimeState.Pending;
+            _activeHandles.Clear();
+            _bossPort.Stop();
+        }
+
+        /// <summary>
+        /// 清理本局波次所有权并幂等清理 Boss 端口（GameOver/Cancel/Settling/Dispose 清理尾部调用）。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>职责（task 4.9）：</b>调用 <see cref="IBossWavePort.Cleanup"/> 移除本局
+        /// Boss 实体与所有权，并清空活动 handle 与本局行状态。幂等：重复调用安全。</para>
+        /// <para><b>与 <see cref="Stop"/> 的分工：</b><see cref="Stop"/> 阻断逻辑
+        /// （置 stopped、清待出生与 handle、调用 <c>IBossWavePort.Stop</c>）；本方法只负责
+        /// 所有权释放，置 stopped 防止重启，但<b>不会</b>重启状态机，也<b>不会</b>发布
+        /// <see cref="AllConfiguredWavesCompleted"/>。</para>
+        /// </remarks>
+        internal void Cleanup()
+        {
+            _stopped = true;
+            _rowIndex = -1;
+            _rowState = WaveRuntimeState.Pending;
+            _nextOrdinal = _totalOrdinals;
+            _preDelayRemaining = 0;
+            _spawnTimer = 0;
+            _postDelayRemaining = 0;
+            _activeHandles.Clear();
+            _bossPort.Cleanup();
+        }
+
+        /// <summary>
+        /// 按完整 <see cref="WaveEntityHandle"/> 幂等移除活动实体（同一 handle 重复移除为空操作）。
+        /// </summary>
+        /// <param name="handle">完整波次所有权 handle（含 runtimeId/generation/waveOrder/kind）。</param>
+        /// <remarks>
+        /// <para>相同 runtimeId 但 generation 不同的迟到事实不匹配，不减少活动计数；
+        /// 停止后调用亦为空操作。本方法不直接提交行完成——完成只在后续
+        /// <see cref="Update"/> 的 WaitingForClear 判定中发生。</para>
+        /// </remarks>
+        internal void OnEntityRemoved(WaveEntityHandle handle)
+        {
+            _activeHandles.Remove(handle);
+        }
+
+        /// <summary>
+        /// 按普通敌人租借身份幂等移除（把 <see cref="EnemyLeaseIdentity"/> 转换为
+        /// Normal handle 后移除；供 EnemyManager 移除事实接线）。
+        /// </summary>
+        /// <param name="lease">普通敌人租借身份。</param>
+        internal void OnEntityRemoved(EnemyLeaseIdentity lease)
+        {
+            OnEntityRemoved(WaveEntityHandle.FromEnemyLease(lease));
+        }
+
+        // ====================================================================
+        // 状态机推进（私有）
+        // ====================================================================
+
+        /// <summary>进入指定行：置 PreDelay 并初始化该行时序/出生序号。</summary>
+        private void BeginRow(int index)
+        {
+            _rowIndex = index;
+            WavePlanEntry entry = _orderedPlan.Rows[index];
+            _rowState = WaveRuntimeState.PreDelay;
+            _preDelayRemaining = entry.PreDelayMs;
+            _spawnTimer = 0;
+            _postDelayRemaining = 0;
+            _nextOrdinal = 0;
+            _totalOrdinals = ComputeTotalOrdinals(entry);
+
+            // 任务 4.8：每行开始发布单次 WaveStarted(order) 事实，
+            // 供 BattleManager 同步 BattleState.CurrentRound 到真实 order。
+            WaveStarted?.Invoke(entry.Order);
+        }
+
+        /// <summary>按当前行状态推进一个时间步。</summary>
+        private void AdvanceRow(long stepMs)
+        {
+            switch (_rowState)
+            {
+                case WaveRuntimeState.PreDelay:
+                    AdvancePreDelay(stepMs);
+                    break;
+
+                case WaveRuntimeState.Spawning:
+                    AdvanceSpawning(stepMs);
+                    break;
+
+                case WaveRuntimeState.WaitingForClear:
+                    AdvanceWaitingForClear(stepMs);
+                    break;
+
+                case WaveRuntimeState.Completed:
+                case WaveRuntimeState.Pending:
+                default:
+                    // Completed：不在此推进，下一行由 Update 下一次调用进入。
+                    break;
+            }
+        }
+
+        /// <summary>PreDelay 推进：到期时提交首个出生序号，并按剩余时间结转间隔计时。</summary>
+        private void AdvancePreDelay(long stepMs)
+        {
+            long leftover = stepMs;
+            if (_preDelayRemaining > 0)
+            {
+                if (leftover < _preDelayRemaining)
+                {
+                    _preDelayRemaining -= leftover;
+                    return;
+                }
+
+                leftover -= _preDelayRemaining;
+                _preDelayRemaining = 0;
+            }
+
+            // preDelay 已到期（preDelay=0 时进入行的该次更新即可出生）：提交首个出生序号。
+            CommitOrdinal(0);
+            _nextOrdinal = 1;
+            _rowState = WaveRuntimeState.Spawning;
+
+            WavePlanEntry entry = _orderedPlan.Rows[_rowIndex];
+            _spawnTimer = entry.SpawnIntervalMs - leftover;
+            while (_nextOrdinal < _totalOrdinals && _spawnTimer <= 0)
+            {
+                CommitOrdinal(_nextOrdinal);
+                _nextOrdinal++;
+                _spawnTimer += entry.SpawnIntervalMs;
+            }
+
+            if (_nextOrdinal >= _totalOrdinals)
+            {
+                EnterWaitingForClear();
+            }
+        }
+
+        /// <summary>Spawning 推进：间隔到期时提交出生序号，全部提交后立即转 WaitingForClear。</summary>
+        private void AdvanceSpawning(long stepMs)
+        {
+            WavePlanEntry entry = _orderedPlan.Rows[_rowIndex];
+            _spawnTimer -= stepMs;
+            while (_nextOrdinal < _totalOrdinals && _spawnTimer <= 0)
+            {
+                CommitOrdinal(_nextOrdinal);
+                _nextOrdinal++;
+                _spawnTimer += entry.SpawnIntervalMs;
+            }
+
+            if (_nextOrdinal >= _totalOrdinals)
+            {
+                EnterWaitingForClear();
+            }
+        }
+
+        /// <summary>WaitingForClear 推进：postDelay 到期且本行活动集合为空时提交一次 Completed。</summary>
+        private void AdvanceWaitingForClear(long stepMs)
+        {
+            _postDelayRemaining -= stepMs;
+            if (_postDelayRemaining > 0)
+            {
+                return;
+            }
+
+            if (CountActiveForOrder(_orderedPlan.Rows[_rowIndex].Order) > 0)
+            {
+                return;
+            }
+
+            CompleteRow();
+        }
+
+        /// <summary>进入 WaitingForClear：最后一次出生后立即从此刻开始 postDelay，本更新不判 Completed。</summary>
+        private void EnterWaitingForClear()
+        {
+            _rowState = WaveRuntimeState.WaitingForClear;
+            _postDelayRemaining = _orderedPlan.Rows[_rowIndex].PostDelayMs;
+        }
+
+        /// <summary>提交本行 Completed（仅一次）；最后一行完成时发布 AllConfiguredWavesCompleted 单次事实。</summary>
+        private void CompleteRow()
+        {
+            _rowState = WaveRuntimeState.Completed;
+
+            if (_rowIndex != _orderedPlan.Rows.Count - 1)
+            {
+                return;
+            }
+
+            if (_activeHandles.Count > 0)
+            {
+                return;
+            }
+
+            _allCompleted = true;
+            if (!_allCompletedPublished)
+            {
+                _allCompletedPublished = true;
+                AllConfiguredWavesCompleted?.Invoke();
+            }
+        }
+
+        /// <summary>提交一个出生序号：Normal 按启用车道（先玩家路、后电脑路），Boss 按端口。</summary>
+        private void CommitOrdinal(int ordinal)
+        {
+            WavePlanEntry entry = _orderedPlan.Rows[_rowIndex];
+            if (entry.PlayerLane)
+            {
+                SpawnForLane(entry, isPlayerLane: true);
+            }
+
+            if (entry.OpponentLane)
+            {
+                SpawnForLane(entry, isPlayerLane: false);
+            }
+        }
+
+        /// <summary>按行类型与车道请求出生并登记成功 handle。</summary>
+        /// <exception cref="InvalidOperationException">Boss 端口不可用或 spawn 返回无效 handle。</exception>
+        private void SpawnForLane(WavePlanEntry entry, bool isPlayerLane)
+        {
+            WaveEntityHandle handle;
+            if (entry.Kind == WavePlanKind.Boss)
+            {
+                if (!_bossPort.IsAvailable)
                 {
                     throw new InvalidOperationException(
-                        $"skipBoss=false 但 randomSource 为 null，round={round} 的 Boss 决策需要随机源");
+                        $"Boss 波端口不可用：order={entry.Order} 的 Boss 行无法出生，禁止静默跳过/降级");
                 }
 
-                int bossWaveIndex = IndexOfBossWave(round);
-                if (bossWaveIndex >= 0)
-                {
-                    // Boss 决策缓存：同一波次只决策一次
-                    if (!_bossDecisionByRound.TryGetValue(round, out bool decision))
-                    {
-                        float chance = _waveConfig.BossSpawnChances[bossWaveIndex];
-                        decision = _randomSource() < chance;
-                        _bossDecisionByRound[round] = decision;
-                    }
-
-                    boss = decision;
-                    if (boss)
-                    {
-                        // Boss 类型选择（缓存的 bossIndex 优先）
-                        if (_bossTypeByRound.TryGetValue(round, out int cachedIndex))
-                        {
-                            bossIndex = cachedIndex;
-                        }
-                        else
-                        {
-                            // 对应 WaveManager.js:34：
-                            // bossIndex = map.mapIndex * 3 + data.bossRotationIndex
-                            // 本期 mapIndex=0，故 bossIndex = bossRotationIndex
-                            bossIndex = _bossRotationIndex % BossTypeKeys.Length;
-                            _bossTypeByRound[round] = bossIndex;
-                            _bossRotationIndex = (_bossRotationIndex + 1) % BossTypeKeys.Length;
-                        }
-
-                        bossKey = BossTypeKeys[bossIndex];
-                        if (string.IsNullOrEmpty(bossKey))
-                        {
-                            throw new InvalidOperationException(
-                                $"未知 Boss 类型索引 {bossIndex}，round={round}");
-                        }
-                    }
-                }
+                handle = _bossPort.Spawn(new BossWaveSpawnRequest(
+                    entry.BossKey,
+                    isPlayerLane,
+                    entry.Order,
+                    entry.DifficultyIndex,
+                    entry.StrategyProfile,
+                    ResolveProfile(entry.StrategyProfile)));
             }
-
-            // 构造不可变计划
-            var plan = new WaveSpawnPlan(
-                round: round,
-                normalCount: normalCount,
-                normalTypeIndex: _enemyConfig.MapEnemyTypeIndex,
-                boss: boss,
-                bossIndex: bossIndex,
-                bossKey: bossKey,
-                bossSpawned: false,
-                spawnStrategyIndex: _spawnStrategyIndex);
-
-            // 登记到 roundPlans 与 planHistory
-            _roundPlans[round] = plan;
-            _planHistory.Add(plan.CloneSnapshot());
-            _currentPlan = plan;
-
-            // 唯一 ROUND_SPAWN_PREPARED(plan) 发布
-            // spec "Event signatures are unambiguous"：
-            //   只使用一个已定义的签名发布该事实，不保留冲突重载。
-            // BattleManager（task 3.10）禁止二次发布同名无参事件。
-            OnRoundSpawnPrepared?.Invoke(plan);
-
-            return plan;
-        }
-
-        /// <summary>
-        /// 开始一个波次：生成计划并（boss=true 时）触发 Boss 生成。
-        /// 对应还原工程 WaveManager.js:42 beginRound。
-        /// </summary>
-        /// <param name="round">波次号（1-based）。</param>
-        /// <returns>该波次的生成计划。</returns>
-        /// <remarks>
-        /// <para>本期 skipBoss=true 时 BeginRound 只生成计划，不触发任何 Boss 操作。
-        /// bossManager 在 skipBoss 模式下不注入（对应 JS 中 bossManager null-guard）。</para>
-        /// <para>boss=true 且 plan.bossSpawned=false 时，应由 BattleManager 负责实际 Boss 生成
-        /// （本期不实现 Boss 生成，task 3.10 BattleManager 接入时处理）。</para>
-        /// </remarks>
-        internal WaveSpawnPlan BeginRound(int round)
-        {
-            WaveSpawnPlan plan = PlanRound(round);
-
-            // Boss 生成入口（skipBoss=true 时 boss 恒 false，此分支不执行）
-            // 对应 WaveManager.js:42：
-            //   if(plan.boss && !plan.bossSpawned && this.bossManager)
-            //     this.bossManager.spawn(plan.bossKey, true); ... plan.bossSpawned = true;
-            // 本期不注入 bossManager，Boss 生成由 BattleManager（task 3.10）负责。
-            // 标记 bossSpawned 由 BattleManager 在实际生成后调用 MarkBossSpawned。
-
-            return plan;
-        }
-
-        /// <summary>
-        /// 标记 Boss 已生成。由 BattleManager 在 Boss 生成完成后调用。
-        /// 对应还原工程 WaveManager.js:42 plan.bossSpawned=true。
-        /// </summary>
-        /// <param name="round">波次号。</param>
-        internal void MarkBossSpawned(int round)
-        {
-            if (_currentPlan != null && _currentPlan.Round == round)
+            else
             {
-                _currentPlan.BossSpawned = true;
+                handle = _normalSpawnHandler(new NormalWaveSpawnRequest(
+                    entry.EnemyKey,
+                    isPlayerLane,
+                    entry.Order,
+                    entry.DifficultyIndex,
+                    entry.StrategyProfile,
+                    ResolveProfile(entry.StrategyProfile)));
             }
 
-            // 同步到 planHistory 最后一条
-            if (_planHistory.Count > 0)
-            {
-                WaveSpawnPlan last = _planHistory[_planHistory.Count - 1];
-                if (last.Round == round)
-                {
-                    last.BossSpawned = true;
-                }
-            }
-        }
-
-        // ====================================================================
-        // 确定性 normalCount 计算
-        // ====================================================================
-
-        /// <summary>
-        /// 计算指定波次的 Mob0 生成数量。
-        /// 对应还原工程 WaveManager.js:23。
-        /// </summary>
-        /// <param name="round">波次号（1-based）。</param>
-        /// <returns>Mob0 生成数量。</returns>
-        /// <exception cref="InvalidOperationException">
-        /// 波次号超出 waveUnitCounts 范围且非无尽模式，或 waveUnitCounts 为空。
-        /// </exception>
-        private int ComputeNormalCount(int round)
-        {
-            IReadOnlyList<int> counts = _waveConfig.WaveUnitCounts;
-            if (counts.Count == 0)
+            if (!handle.IsValid)
             {
                 throw new InvalidOperationException(
-                    "WaveUnitCounts 为空，无法计算 normalCount");
+                    $"波次出生返回无效 handle（runtimeId<=0）：order={entry.Order}, kind={entry.Kind}");
             }
 
-            bool endlessMode = _battleState.EndlessMode;
-
-            // 对应 WaveManager.js:23：
-            //   endlessMode && round > counts.length
-            //     ? counts[counts.length - 1] + 2 * (round - counts.length)
-            //     : counts[Math.min(round, counts.length) - 1]
-            if (endlessMode && round > counts.Count)
-            {
-                int last = counts[counts.Count - 1];
-                return last + 2 * (round - counts.Count);
-            }
-
-            // 非无尽模式：取 waveUnitCounts[min(round, len) - 1]
-            int index = Math.Min(round, counts.Count) - 1;
-            if (index < 0)
-            {
-                throw new InvalidOperationException(
-                    $"波次号 {round} 非法，计算索引 {index} 为负");
-            }
-
-            int normalCount = counts[index];
-            if (!IsFinite(normalCount))
-            {
-                throw new InvalidOperationException(
-                    $"波次 {round} 的 normalCount={normalCount} 非有限值");
-            }
-
-            return normalCount;
+            _activeHandles.Add(handle);
         }
 
-        /// <summary>
-        /// 查找波次号在 BossWaveNumbers 中的索引。
-        /// 对应还原工程 WaveManager.js:28 data.bossWaveNumbers.indexOf(round)。
-        /// </summary>
-        private int IndexOfBossWave(int round)
+        /// <summary>解析策略 profile：按行显式引用的源表索引返回只读乘数数组。</summary>
+        /// <exception cref="InvalidOperationException">索引未被计划引用（应已被 Validator 拒绝）。</exception>
+        private IReadOnlyList<float> ResolveProfile(int profileIndex)
         {
-            IReadOnlyList<int> bossWaves = _waveConfig.BossWaveNumbers;
-            for (int i = 0; i < bossWaves.Count; i++)
+            if (_orderedPlan.TryGetProfile(profileIndex, out IReadOnlyList<float> profile))
             {
-                if (bossWaves[i] == round)
+                return profile;
+            }
+
+            throw new InvalidOperationException(
+                $"策略 profile 索引 {profileIndex} 未被所选计划引用（order={(_rowIndex >= 0 ? _orderedPlan.Rows[_rowIndex].Order : 0)}）");
+        }
+
+        /// <summary>计算当前行出生批序号总数（Normal=normalCount；Boss=1）。</summary>
+        private static int ComputeTotalOrdinals(WavePlanEntry entry)
+        {
+            if (entry.Kind == WavePlanKind.Boss)
+            {
+                return 1;
+            }
+
+            return entry.NormalCount;
+        }
+
+        /// <summary>统计指定 waveOrder 的活动 handle 数量。</summary>
+        private int CountActiveForOrder(int waveOrder)
+        {
+            int count = 0;
+            foreach (WaveEntityHandle handle in _activeHandles)
+            {
+                if (handle.WaveOrder == waveOrder)
                 {
-                    return i;
+                    count++;
                 }
             }
 
-            return -1;
+            return count;
         }
 
-        /// <summary>
-        /// 判断 int 值是否"有限"（非 int.MinValue/MaxValue 边界异常值）。
-        /// 对应 JS Number.isFinite，C# int 不会产生 NaN/Infinity，
-        /// 此处只防御极端哨兵值。
-        /// </summary>
-        private static bool IsFinite(int value)
+        /// <summary>返回活动 handle 只读快照（数组拷贝，不暴露内部集合）。</summary>
+        private IReadOnlyList<WaveEntityHandle> GetActiveHandlesSnapshot()
         {
-            return value != int.MinValue && value != int.MaxValue;
+            var copy = new WaveEntityHandle[_activeHandles.Count];
+            _activeHandles.CopyTo(copy);
+            return copy;
         }
     }
 }

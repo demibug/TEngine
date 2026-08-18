@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace GameBattle
 {
     // ============================================================================
@@ -111,16 +109,17 @@ namespace GameBattle
 
         /// <inheritdoc/>
         /// <summary>
-        /// 执行枪兵攻击：创建 360ms <see cref="PikeAttackEffect"/> 并登记到管理器。
+        /// 执行枪兵攻击：用初始目标计算武器朝向，创建 360ms <see cref="PikeAttackEffect"/> 并登记到管理器。
         /// </summary>
+        /// <param name="initialTarget">调度器为本次攻击选定的唯一初始目标（仅用于武器朝向）。</param>
         /// <remarks>
         /// <para><b>对应 JS <c>attack()</c>：</b>
-        /// 创建 PikeAttackEffect → Launch → Add 到管理器。</para>
+        /// 用初始目标计算朝向 → 创建 PikeAttackEffect → Launch → Add 到管理器。</para>
         ///
-        /// <para><b>不查询目标（与刀兵/弓兵不同）：</b>
-        /// 枪兵 <c>attack()</c> 直接创建效果，<see cref="PikeAttackEffect"/> 在 360ms 命中时
-        /// 自行查询半径内目标（对应 JS <c>hit()</c> 经 <c>queryEnemyObjects</c>）。
-        /// AttackScheduler 已保证调用前存在目标，此处不需要二次查询。</para>
+        /// <para><b>不查询目标（与刀兵/弓兵不同，design 决策 2）：</b>
+        /// 枪兵 <c>attack()</c> 不二次查询目标，初始目标仅用于武器朝向。
+        /// <see cref="PikeAttackEffect"/> 在 360ms 命中时自行查询半径内目标
+        /// （对应 JS <c>hit()</c> 经 <c>queryEnemyObjects</c>），范围语义不变。</para>
         ///
         /// <para><b>伤害值：</b>使用 <see cref="SoldierBase.AttackDamage"/>。</para>
         ///
@@ -132,25 +131,15 @@ namespace GameBattle
         /// <see cref="AttackEffectManager.Add"/> 登记后，由 Manager 唯一推进，
         /// 360ms 后命中半径内敌人，480ms 完成回收。</para>
         /// </remarks>
-        protected internal override void PerformAttack()
+        protected internal override void PerformAttack(EnemyTargetDto initialTarget)
         {
-            // 仅用于武器朝向的目标查询（对应 JS selectTarget → resolver.queryTargets）。
-            // 取第一个目标，计算枪兵中心指向目标的角度，只写入纯表现状态供武器表现层同步。
+            // 用调度器传入的初始目标计算武器朝向（design 决策 2：一次攻击只选择一次初始目标）。
+            // 不再在 PerformAttack 开头重复 QueryTargets。只写入纯表现状态供武器表现层同步。
             // 不改变 PikeAttackEffect 的范围伤害、命中半径与时序。
-            List<EnemyTargetDto> targets = AttackResolver.QueryTargets(
-                EnemyManager,
-                CenterX, CenterY,
-                AttackRange,
-                Side,
-                CellSize, CellSize);
-            if (targets != null && targets.Count > 0)
-            {
-                EnemyTargetDto target = targets[0];
-                // DisplayAngle 语义：0°朝上、90°朝右（与 ProjectileMath 一致，供表现层换算）。
-                float angleDegrees = (float)ProjectileMath.DisplayAngle(
-                    CenterX, CenterY, target.X, target.Y);
-                SetWeaponAim(angleDegrees);
-            }
+            // DisplayAngle 语义：0°朝上、90°朝右（与 ProjectileMath 一致，供表现层换算）。
+            float angleDegrees = (float)ProjectileMath.DisplayAngle(
+                CenterX, CenterY, initialTarget.X, initialTarget.Y);
+            SetWeaponAim(angleDegrees);
 
             // 创建枪兵攻击效果并启动（对应 JS attack → PikeAttackEffect.launch）。
             // radius=AttackRange 对应 JS radius:this.attackRange（SpearSoldier.js:54）。

@@ -21,10 +21,10 @@ namespace GameBattle
     //      GameCommon/IBattlePublicEvent 定义的开始/完成等不可变 DTO
     //      （spec "Cross-assembly events use immutable common contracts"）。
     //
-    // 本类型只负责第 2 层。核心一致性（第 1 层）继续使用直接调用，
+    //   本类型只负责第 2 层。核心一致性（第 1 层）继续使用直接调用，
     //   不因本类型存在而把所有内部通信都改成信号订阅。判断准则：
     //   - 一对一且同步即时的调用 → 直接调用（如 EnemyManager.Register、AttackResolver.SubmitDamage）。
-    //   - 一对多且低频的事实 → 经本类型发布（如 ROUND_SPAWN_PREPARED(plan)、HEALTH_CHANGED）。
+    //   - 一对多且低频的事实 → 经本类型发布（如 HEALTH_CHANGED、GOLD_CHANGED）。
     //   - 高频逐实体推进（如每子步的位置/动画） → 不经本类型，避免全局分发成本
     //     （design.md 第 4 节：不把 59 个模块全部迁成事件驱动）。
     //
@@ -38,7 +38,7 @@ namespace GameBattle
     // 事件签名唯一性（spec "Event signatures are unambiguous"）：
     //   每个类型化事实具有唯一参数契约；相同名称不得同时以有参数和无参数形式发布。
     //   本类型通过强类型 Signal<T> 槽位保证：每个槽位对应一个已定义签名，
-    //   不提供同名无参重载。例如 RoundSpawnPrepared 只接受 WaveSpawnPlan 参数。
+    //   不提供同名无参重载。
     //
     // 不变量：
     //   1. 仅承载单局低频一对多内部事实，不承担核心一致性。
@@ -59,7 +59,7 @@ namespace GameBattle
     /// <para><b>事件三层边界（design.md 第 4 节 / spec battle-event-boundary）：</b>
     /// <list type="number">
     /// <item>内部一致性：直接调用（如 <c>EnemyManager.Register</c>、<c>AttackResolver.SubmitDamage</c>）。</item>
-    /// <item>单局一对多低频事实：本类型（如 <see cref="RoundSpawnPrepared"/>、<see cref="HealthChanged"/>）。</item>
+    /// <item>单局一对多低频事实：本类型（如 <see cref="HealthChanged"/>、<see cref="GoldChanged"/>）。</item>
     /// <item>跨程序集事实：<c>GameCommon/IBattlePublicEvent</c> 不可变 DTO（开始/完成）。</item>
     /// </list>
     /// 本类型只负责第 2 层。</para>
@@ -71,8 +71,7 @@ namespace GameBattle
     /// 新一局信号不会回调旧运行时对象（spec "Restart after listeners were registered"）。</para>
     ///
     /// <para><b>签名唯一性（spec "Event signatures are unambiguous"）：</b>
-    /// 每个信号槽位对应一个已定义的强类型签名，不提供同名无参重载。
-    /// 例如 <see cref="RoundSpawnPrepared"/> 只接受 <see cref="WaveSpawnPlan"/> 参数。</para>
+    /// 每个信号槽位对应一个已定义的强类型签名，不提供同名无参重载。</para>
     ///
     /// <para><b>不跨局复用：</b>每局由 <see cref="BattleRuntimeFactory"/> 新建，
     /// 随 <see cref="BattleRuntime"/> 销毁而 <see cref="Clear"/>。</para>
@@ -89,26 +88,6 @@ namespace GameBattle
         // 新增信号槽位时必须保证：签名唯一、低频、一对多、单局内部事实。
         // 不承载核心一致性（直接调用）与跨程序集事实（IBattlePublicEvent）。
         // ====================================================================
-
-        /// <summary>
-        /// 波次生成计划准备完成事实（对应还原工程 ROUND_SPAWN_PREPARED(plan)）。
-        /// </summary>
-        /// <remarks>
-        /// <para><b>签名唯一性（spec "Event signatures are unambiguous"）：</b>
-        /// 本信号只以带 <see cref="WaveSpawnPlan"/> 参数的唯一签名发布，不保留无参重载。
-        /// <see cref="WaveManager.PlanRound"/> 是该事实的唯一发布源；
-        /// <c>BattleManager</c> 不二次发布同名无参事件（task 3.9 约束）。</para>
-        ///
-        /// <para><b>发布源接入（task 7.1）：</b>
-        /// <see cref="BattleRuntimeFactory"/> 在组装阶段把
-        /// <see cref="WaveManager.OnRoundSpawnPrepared"/> 桥接到本信号：
-        /// <c>waveManager.OnRoundSpawnPrepared = plan => hub.RoundSpawnPrepared.Publish(plan)</c>。
-        /// 这样 <see cref="WaveManager"/> 仍按直接调用语义触发委托（design 决策 4），
-        /// 本信号负责把事实一对多分发给需要订阅的内部组件。</para>
-        ///
-        /// <para><b>低频依据：</b>每波次只发布一次，属于单局低频事实。</para>
-        /// </remarks>
-        public Signal<WaveSpawnPlan> RoundSpawnPrepared { get; } = new Signal<WaveSpawnPlan>();
 
         /// <summary>
         /// 战斗目标生命变化事实（对应还原工程 HEALTH_CHANGED）。
@@ -205,7 +184,6 @@ namespace GameBattle
             }
 
             IsCleared = true;
-            TryClearSignal(RoundSpawnPrepared, nameof(RoundSpawnPrepared));
             TryClearSignal(HealthChanged, nameof(HealthChanged));
             TryClearSignal(GoldChanged, nameof(GoldChanged));
             TryClearSignal(BattleFrozen, nameof(BattleFrozen));

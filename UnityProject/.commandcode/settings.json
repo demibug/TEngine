@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(.git/**)",
+      "Write(.git/**)",
+      "Shell(git push:*)",
+      "Shell(git reset --hard*)",
+      "Shell(git clean:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "write|edit|shell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -NonInteractive -File .codex/skills/agent-worker/scripts/guards/commandcode-guard.ps1",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -74,7 +74,7 @@ namespace GameBattle
             };
 
             BuildableSide side = cellKind == GridCellKind.Buildable
-                ? (lane == 0 ? BuildableSide.Player : BuildableSide.Opponent)
+                ? (lane == 1 ? BuildableSide.Player : BuildableSide.Opponent)
                 : BuildableSide.None;
 
             return new GridCell(cellKind, side);
@@ -85,7 +85,7 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 从列优先 grid[x][y] 字符串网格构造 <see cref="MapData"/>。
+        /// 从列优先 grid[x][y] 字符串网格构造 <see cref="MapData"/>（兼容 map0 数据旧入口）。
         /// </summary>
         /// <param name="columnMajorGrid">列优先嵌套字符串数组：columnMajorGrid[x][y]。</param>
         /// <param name="mapIndex">地图索引。</param>
@@ -95,10 +95,10 @@ namespace GameBattle
         /// <param name="opponentEnd">对手路径终点。</param>
         /// <param name="playerPath">玩家路径点序列。</param>
         /// <param name="opponentPath">对手路径点序列。</param>
-        /// <returns>规范化 <see cref="MapData"/>。</returns>
+        /// <returns>规范化 <see cref="MapData"/>（新增运行字段按 map0 数据填充）。</returns>
         /// <remarks>
-        /// <para>源 grid[x][y] 列优先布局只在 <see cref="MapData.FromColumnMajorGrid"/> 读取一次，
-        /// 之后业务层经坐标 API 访问，保证源布局不泄漏、非对称地图不转置。</para>
+        /// 旧入口只保留为现有夹具/兼容调用的 map0 adapter；生产 Provider 必须使用
+        /// 完整参数重载消费整行地图配置（design.md 决策 1）。
         /// </remarks>
         internal static MapData NormalizeMap(
             IReadOnlyList<IReadOnlyList<string>> columnMajorGrid,
@@ -110,6 +110,68 @@ namespace GameBattle
             IReadOnlyList<GridPosition> playerPath,
             IReadOnlyList<GridPosition> opponentPath)
         {
+            return NormalizeMap(
+                columnMajorGrid,
+                mapIndex,
+                playerStart,
+                playerEnd,
+                opponentStart,
+                opponentEnd,
+                playerPath,
+                opponentPath,
+                name: "Map0",
+                resourceAddress: "BattleMap0",
+                cellWidth: 80,
+                cellHeight: 80,
+                playerEntry: new GridPosition(playerStart.X, playerStart.Y + 1),
+                opponentEntry: new GridPosition(opponentStart.X, opponentStart.Y - 1),
+                routeMarkers: Array.Empty<GridPosition>(),
+                enemyTypeIndex: 0);
+        }
+
+        /// <summary>
+        /// 从列优先 grid[x][y] 字符串网格构造完整地图运行快照（生产入口）。
+        /// </summary>
+        /// <param name="columnMajorGrid">列优先嵌套字符串数组：columnMajorGrid[x][y]。</param>
+        /// <param name="mapIndex">地图索引。</param>
+        /// <param name="playerStart">玩家路径起点。</param>
+        /// <param name="playerEnd">玩家路径终点。</param>
+        /// <param name="opponentStart">对手路径起点。</param>
+        /// <param name="opponentEnd">对手路径终点。</param>
+        /// <param name="playerPath">玩家路径点序列。</param>
+        /// <param name="opponentPath">对手路径点序列。</param>
+        /// <param name="name">地图诊断名称。</param>
+        /// <param name="resourceAddress">Unity/YooAsset 地图资源地址。</param>
+        /// <param name="cellWidth">格子像素宽。</param>
+        /// <param name="cellHeight">格子像素高。</param>
+        /// <param name="playerEntry">玩家入口坐标。</param>
+        /// <param name="opponentEntry">对手入口坐标。</param>
+        /// <param name="routeMarkers">表现层路径标记。</param>
+        /// <param name="enemyTypeIndex">本图敌人类型索引。</param>
+        /// <returns>完整地图运行快照。</returns>
+        /// <remarks>
+        /// <para>源 grid[x][y] 列优先布局只在 <see cref="MapData.FromColumnMajorGrid"/> 读取一次，
+        /// 之后业务层经坐标 API 访问，保证源布局不泄漏、非对称地图不转置。</para>
+        /// <para>生产 Provider 必须使用本完整入口消费整行地图配置（design.md 决策 1）。</para>
+        /// </remarks>
+        internal static MapData NormalizeMap(
+            IReadOnlyList<IReadOnlyList<string>> columnMajorGrid,
+            int mapIndex,
+            GridPosition playerStart,
+            GridPosition playerEnd,
+            GridPosition opponentStart,
+            GridPosition opponentEnd,
+            IReadOnlyList<GridPosition> playerPath,
+            IReadOnlyList<GridPosition> opponentPath,
+            string name,
+            string resourceAddress,
+            int cellWidth,
+            int cellHeight,
+            GridPosition playerEntry,
+            GridPosition opponentEntry,
+            IReadOnlyList<GridPosition> routeMarkers,
+            int enemyTypeIndex)
+        {
             return MapData.FromColumnMajorGrid(
                 columnMajorGrid,
                 DecodeCell,
@@ -119,7 +181,15 @@ namespace GameBattle
                 opponentStart,
                 opponentEnd,
                 playerPath,
-                opponentPath);
+                opponentPath,
+                name,
+                resourceAddress,
+                cellWidth,
+                cellHeight,
+                playerEntry,
+                opponentEntry,
+                routeMarkers,
+                enemyTypeIndex);
         }
 
         // ====================================================================

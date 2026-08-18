@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace GameBattle
 {
@@ -128,8 +127,26 @@ namespace GameBattle
     /// <para><b>本类型为 internal abstract：</b>只供 GameBattle 内部 4 兵种（task 6.2）
     /// 继承使用，不对其他程序集暴露，不可直接实例化。</para>
     /// </remarks>
-    internal abstract class SoldierBase : UnitBase, IAttackEffectOwner
+    internal abstract class SoldierBase : UnitBase, IAttackEffectOwner, IBuffTarget
     {
+        private static readonly BuffTargetCapabilities BuffCapabilities =
+            new BuffTargetCapabilities(
+                new[]
+                {
+                    BuffNumericChannel.AttackPower,
+                    BuffNumericChannel.AttackSpeed,
+                    BuffNumericChannel.AttackRange,
+                },
+                new[]
+                {
+                    // 稳定状态通道：攻击禁用/压制（攻击门控）+ 移动禁用/目标改变
+                    // （SoulCapture/Buff13 混乱可申请；其玩法效果由后续玩法实现）。
+                    BuffStateChannel.MovementDisabled,
+                    BuffStateChannel.AttackDisabled,
+                    BuffStateChannel.TargetingAltered,
+                    BuffStateChannel.Suppressed,
+                });
+
         // ====================================================================
         // 可变状态字段（对应 SoldierBase.js:12-25 constructor）
         // ====================================================================
@@ -142,14 +159,32 @@ namespace GameBattle
         /// <summary>1 级基础攻击力（最终方案：保存 1 级基础值供 ApplyLevel 重算）。</summary>
         private int _baseAttackPowerLevel1;
 
-        /// <summary>附加攻击力（对应 addAttackPower，SoldierBase.js:16）。本期 buff 暂缓，ResetState 清零。</summary>
+        /// <summary>基础武器 ID（对应 weapon.id；-1=无武器）。由 <see cref="ApplyBasicWeapon"/> 写入，ResetState 清零。</summary>
+        private int _weaponId = -1;
+
+        /// <summary>基础武器附加攻击力（对应 weapon.addAttPower；玩家默认 1，对手/无武器为 0）。</summary>
+        private int _weaponAttackPower;
+
+        /// <summary>Buff 聚合后的附加攻击力（对应 addAttackPower，SoldierBase.js:16），ResetState 清零。</summary>
         private int _addAttackPower;
 
-        /// <summary>范围加成格数（对应 rangeBonusCells，SoldierBase.js:17）。本期 buff 暂缓，ResetState 清零。</summary>
+        /// <summary>Buff 聚合后的范围加成格数（对应 rangeBonusCells，SoldierBase.js:17），ResetState 清零。</summary>
         private float _rangeBonusCells;
 
         /// <summary>攻击速度倍率。1 表示基础攻速，值越大攻击间隔越短。</summary>
         private float _attackSpeedMultiplier = 1f;
+
+        /// <summary>攻击禁用状态 Buff 是否生效。</summary>
+        private bool _buffAttackDisabled;
+
+        /// <summary>压制状态 Buff 是否生效。</summary>
+        private bool _buffSuppressed;
+
+        /// <summary>移动禁用状态 Buff 是否生效（SoulCapture/Buff13 可申请；单位静止，供后续玩法消费）。</summary>
+        private bool _buffMovementDisabled;
+
+        /// <summary>目标改变状态 Buff 是否生效（SoulCapture/Buff13 可申请；供后续玩法消费）。</summary>
+        private bool _buffTargetingAltered;
 
         /// <summary>基础攻击范围（像素，对应 baseAttackRange/w_，UnitBase.js:45）。由 InitializeStats 设置。</summary>
         /// <remarks>
@@ -167,18 +202,7 @@ namespace GameBattle
         /// <summary>等级数值服务（最终方案：由 ConfigureLevel 注入，供 ApplyLevel 重算倍率）。</summary>
         private UnitLevelService _levelService;
 
-        // --- 目标与兵种标识 ---
-
-        /// <summary>
-        /// 当前目标列表（对应 targets/lx，SoldierBase.js:22）。
-        /// AttackScheduler 每次调度查询目标，单位不缓存跨子步目标。
-        /// </summary>
-        /// <remarks>
-        /// <para>保留列表供具体兵种在 <see cref="PerformAttack"/> 中二次查询与选择目标
-        /// （对应 JS <c>this.targets = resolver.queryTargets(...)</c>）。</para>
-        /// <para><b>池复用清理：</b>ResetState 清空列表（Clear，不释放实例引用，避免 GC）。</para>
-        /// </remarks>
-        private readonly List<EnemyTargetDto> _targets = new List<EnemyTargetDto>();
+        // --- 兵种标识 ---
 
         /// <summary>兵种索引（对应 typeIndex，SoldierBase.js:24）。0=刀, 1=弓, 2=枪, 3=骑。-1 表示未初始化。</summary>
         private int _typeIndex;
@@ -236,6 +260,13 @@ namespace GameBattle
         /// <inheritdoc/>
         /// <summary>逻辑中心 Y（对应 displayObject.y + height/2）。</summary>
         float IAttackEffectOwner.CenterY => CenterY;
+
+        BuffTargetHandle IBuffTarget.Handle =>
+            new BuffTargetHandle(BuffEntityKind.Unit, Id, LifecycleGeneration);
+
+        bool IBuffTarget.IsAvailable => Id > 0 && !InPool;
+
+        BuffTargetCapabilities IBuffTarget.Capabilities => BuffCapabilities;
 
         // ====================================================================
         // 保护属性（供 4 兵种 task 6.2 访问）
@@ -319,6 +350,10 @@ namespace GameBattle
         /// <summary>当前攻击伤害（对应 SoldierBase.js:125-128 attackDamage getter）。</summary>
         /// <remarks>
         /// <para>对应 JS <c>attackDamage = (baseAttackPower + addAttackPower) * (side ? 1 : opponentAttackMultiplier)</c>。</para>
+        /// <para><b>武器平值（本 change 起）：</b>有效攻击力 = 等级缩放后的基础攻击力
+        /// + 基础武器附加攻击力 + Buff 聚合附加攻击力，再按阵营乘对手方倍率。武器平值
+        /// 只进入本公式一次，不复制攻击/选敌/投射物/范围命中或表现链
+        /// （spec "Weapon attack power composes exactly once"）。</para>
         /// <para>本期 opponentAttackMultiplier 固定 1（BattleState.OpponentAttackMultiplier），
         /// 故玩家方与对手方伤害相同。保留倍率字段供后续配置注入。</para>
         /// </remarks>
@@ -326,13 +361,24 @@ namespace GameBattle
         {
             get
             {
-                int baseValue = _baseAttackPower + _addAttackPower;
+                int baseValue = _baseAttackPower + _weaponAttackPower + _addAttackPower;
                 return Side ? baseValue : baseValue * _opponentAttackMultiplier;
             }
         }
 
         /// <summary>当前攻击伤害（测试访问器，供等级数值测试断言）。</summary>
         internal int AttackDamageForTest => AttackDamage;
+
+        /// <summary>当前基础武器 ID（-1 表示无武器）。玩家默认武器在初始化后写入，对手保持无武器。</summary>
+        internal int WeaponId => _weaponId;
+
+        /// <summary>当前基础武器附加攻击力（无武器时为 0）。只经 <see cref="ApplyBasicWeapon"/> 写入一次。</summary>
+        internal int WeaponAttackPower => _weaponAttackPower;
+
+        /// <summary>
+        /// 是否已装备基础武器。
+        /// </summary>
+        internal bool HasWeapon => _weaponId >= 0;
 
         /// <summary>敌人管理器（供 4 兵种在 PerformAttack 中查询目标）。</summary>
         protected EnemyManager EnemyManager => _enemyManager;
@@ -345,13 +391,6 @@ namespace GameBattle
 
         /// <summary>格子尺寸（像素，供 4 兵种计算攻击范围与命中半径）。</summary>
         protected float CellSize => _cellSize;
-
-        /// <summary>当前目标列表（供 4 兵种在 PerformAttack 中二次查询与选择目标）。</summary>
-        /// <remarks>
-        /// 供子类读取 AttackScheduler 已查询的目标，或在 PerformAttack 中自行查询后赋值。
-        /// 对应 JS <c>this.targets</c>。
-        /// </remarks>
-        protected List<EnemyTargetDto> Targets => _targets;
 
         // ====================================================================
         // 构造（对应 SoldierBase.js:12-25 constructor）
@@ -388,11 +427,16 @@ namespace GameBattle
             _addAttackPower = 0;
             _rangeBonusCells = 0f;
             _attackSpeedMultiplier = 1f;
+            _buffAttackDisabled = false;
+            _buffSuppressed = false;
+            _buffMovementDisabled = false;
+            _buffTargetingAltered = false;
             _baseAttackRange = 0f;
             _baseAttackIntervalSeconds = 1f;
             _baseAttackIntervalSecondsLevel1 = 1f;
 
-            _targets.Clear();
+            _weaponId = -1;
+            _weaponAttackPower = 0;
 
             _typeIndex = -1;
             _animationKey = null;
@@ -407,6 +451,128 @@ namespace GameBattle
             _levelService = null;
             _cellSize = 0f;
             _opponentAttackMultiplier = 1;
+        }
+
+        /// <summary>
+        /// 应用基础武器数值（玩家默认武器唯一写入入口，只允许初始化路径调用一次）。
+        /// </summary>
+        /// <param name="id">武器 ID（-1 表示清除武器）。</param>
+        /// <param name="power">武器附加攻击力（负值按 0 处理）。</param>
+        /// <remarks>
+        /// <para><b>调用时机（design.md 决策 3/4）：</b>由 <see cref="UnitRegistry"/> 在玩家
+        /// Soldier 完成配置/等级初始化后、进入可攻击集合前（Acquire 之后、Register 之前）
+        /// 调用 <see cref="BasicWeaponResolver"/> 解析并写入；对手跳过（保持无武器）。
+        /// 解析或写入失败沿现有单位创建事务回滚，<see cref="ResetState"/> 保证无残留。</para>
+        /// <para><b>单一写入者：</b>武器平值是独立 base input，不覆盖 Buff 拥有的附加攻击
+        /// 字段（<see cref="_addAttackPower"/> 仍由 Buff 聚合写入）。
+        /// <see cref="ApplyLevel"/> 不触碰武器字段，等级倍率不会再次放大武器值
+        /// （spec "The level multiplier MUST NOT multiply the Weapon flat value again"）。</para>
+        /// </remarks>
+        internal void ApplyBasicWeapon(int id, int power)
+        {
+            _weaponId = id;
+            _weaponAttackPower = power > 0 ? power : 0;
+        }
+
+        bool IBuffTarget.TryGetNumericBase(BuffNumericChannel channel, out double value)
+        {
+            switch (channel)
+            {
+                case BuffNumericChannel.AttackPower:
+                    // 攻击力 base input = 等级缩放后的基础攻击力 + 基础武器平值
+                    // （spec "Weapon attack power composes exactly once"）。
+                    value = _baseAttackPower + _weaponAttackPower;
+                    return true;
+                case BuffNumericChannel.AttackSpeed:
+                    value = 1d;
+                    return true;
+                case BuffNumericChannel.AttackRange:
+                    value = _baseAttackRange;
+                    return true;
+                default:
+                    value = 0d;
+                    return false;
+            }
+        }
+
+        void IBuffTarget.CommitNumericAggregate(
+            BuffNumericChannel channel,
+            double effectiveValue,
+            BuffSourceHandle source)
+        {
+            _ = source;
+            switch (channel)
+            {
+                case BuffNumericChannel.AttackPower:
+                    // 附加攻击力 = Buff 聚合有效值 - 同一 base input（基础 + 武器）。
+                    // 与 TryGetNumericBase 减去同一 base，保证无 Buff 时 add=0、
+                    // 武器+Buff 只聚合一次，不重复计入武器。
+                    int attackPower = ClampToInt(effectiveValue, 0);
+                    _addAttackPower = attackPower - (_baseAttackPower + _weaponAttackPower);
+                    break;
+                case BuffNumericChannel.AttackSpeed:
+                    _attackSpeedMultiplier = (float)Math.Max(0.01d, effectiveValue);
+                    AttackIntervalSecondsField = ComputeAttackIntervalSeconds();
+                    break;
+                case BuffNumericChannel.AttackRange:
+                    float attackRange = (float)Math.Max(0d, effectiveValue);
+                    _rangeBonusCells = _cellSize > 0f
+                        ? (attackRange - _baseAttackRange) / _cellSize
+                        : 0f;
+                    AttackRangeField = attackRange;
+                    break;
+            }
+        }
+
+        void IBuffTarget.CommitStateAggregate(
+            BuffStateChannel channel,
+            bool active,
+            BuffInstanceSnapshot payloadSource)
+        {
+            _ = payloadSource;
+            switch (channel)
+            {
+                case BuffStateChannel.AttackDisabled:
+                    _buffAttackDisabled = active;
+                    break;
+                case BuffStateChannel.Suppressed:
+                    _buffSuppressed = active;
+                    break;
+                case BuffStateChannel.MovementDisabled:
+                    _buffMovementDisabled = active;
+                    break;
+                case BuffStateChannel.TargetingAltered:
+                    _buffTargetingAltered = active;
+                    break;
+                default:
+                    return;
+            }
+
+            SetBuffDisabled(_buffAttackDisabled || _buffSuppressed);
+        }
+
+        void IBuffTarget.ClearBuffAggregates()
+        {
+            _addAttackPower = 0;
+            _rangeBonusCells = 0f;
+            _attackSpeedMultiplier = 1f;
+            _buffAttackDisabled = false;
+            _buffSuppressed = false;
+            _buffMovementDisabled = false;
+            _buffTargetingAltered = false;
+            SetBuffDisabled(false);
+            AttackRangeField = _baseAttackRange;
+            AttackIntervalSecondsField = ComputeAttackIntervalSeconds();
+        }
+
+        private static int ClampToInt(double value, int minimum)
+        {
+            if (value <= minimum)
+            {
+                return minimum;
+            }
+
+            return value >= int.MaxValue ? int.MaxValue : (int)value;
         }
 
         // ====================================================================
@@ -566,7 +732,7 @@ namespace GameBattle
                 interval = _levelService.ResolveAttackInterval(_baseAttackIntervalSecondsLevel1, level);
             }
 
-            // 基础攻击力（供 AttackDamage 计算）。_addAttackPower 本期恒 0。
+            // 基础攻击力（供 AttackDamage 计算）；Buff 聚合值由 _addAttackPower 叠加。
             _baseAttackPower = damage;
             _baseAttackIntervalSeconds = interval;
             AttackRangeField = _baseAttackRange + _rangeBonusCells * _cellSize;
@@ -647,7 +813,7 @@ namespace GameBattle
         /// <item>经 AttackEffectManager.Add 登记效果（含回收委托）。</item>
         /// </list>
         /// </remarks>
-        public override void Attack()
+        public override void Attack(EnemyTargetDto initialTarget)
         {
             // 守卫：非活动/禁用/回池不攻击（AttackScheduler 已守卫，此处防御性二次检查）。
             if (!IsActive || Disabled || InPool)
@@ -655,26 +821,27 @@ namespace GameBattle
                 return;
             }
 
-            PerformAttack();
+            PerformAttack(initialTarget);
         }
 
         /// <summary>
         /// 执行具体兵种攻击效果创建（对应各兵种 performKnifeAttack/launchArrow 等）。
         /// 由 4 兵种（task 6.2）覆写。
         /// </summary>
+        /// <param name="initialTarget">调度器为本次攻击选定的唯一初始目标快照。</param>
         /// <remarks>
         /// <para><b>调用时机：</b>由 <see cref="Attack"/> 在守卫通过后调用。
-        /// AttackScheduler 已保证冷却完毕且存在目标。</para>
+        /// AttackScheduler 已保证冷却完毕且存在目标，并把第一个目标作为初始目标传入。</para>
         /// <para><b>子类实现：</b></para>
         /// <list type="bullet">
-        /// <item>KnifeSoldier：查询目标 → 创建 KnifeAttackEffect → AttackEffectManager.Add。</item>
-        /// <item>BowSoldier：查询目标 → 创建 ProjectileAttackEffect → AttackEffectManager.Add。</item>
-        /// <item>SpearSoldier：查询目标 → 创建 PikeAttackEffect → AttackEffectManager.Add。</item>
-        /// <item>CavalrySoldier：查询目标 → 创建 2 个 CavalrySweepEffect → AttackEffectManager.Add。</item>
+        /// <item>KnifeSoldier：用初始目标创建 KnifeAttackEffect → AttackEffectManager.Add。</item>
+        /// <item>BowSoldier：用初始目标计算前摇朝向并创建 BowReleaseEffect → AttackEffectManager.Add。</item>
+        /// <item>SpearSoldier：用初始目标计算武器朝向，创建 PikeAttackEffect → AttackEffectManager.Add。</item>
+        /// <item>CavalrySoldier：创建 2 个 CavalrySweepEffect → AttackEffectManager.Add。</item>
         /// </list>
         /// <para>本基类不提供默认实现（abstract），强制子类覆写。</para>
         /// </remarks>
-        protected internal abstract void PerformAttack();
+        protected internal abstract void PerformAttack(EnemyTargetDto initialTarget);
 
         // ====================================================================
         // 状态机回调（对应 SoldierBase.js:79-98 onEnterState/onExitState）
@@ -777,9 +944,6 @@ namespace GameBattle
                 _attackEffectManager.CancelOwner(this, "unit-game-over");
             }
 
-            // 清空目标列表（对应 JS resetData targets.length=0）。
-            _targets.Clear();
-
             return base.GameOver();
         }
 
@@ -799,15 +963,17 @@ namespace GameBattle
         /// 清除全部可变状态，使对象等价于新构造。回收后不得保留：
         /// </para>
         /// <list type="bullet">
-        /// <item><b>目标引用：</b>_targets 列表 Clear（对应 JS targets.length=0）。
-        ///   AttackScheduler 每次调度查询目标，不缓存在单位上；_targets 只在 PerformAttack
-        ///   内临时使用，ResetState 清空保证无残留。</item>
+        /// <item><b>目标引用：</b>单位不再缓存目标列表（初始目标由 AttackScheduler 单次选择并
+        ///   经 Attack(EnemyTargetDto) 传入，Effect 自身保存目标 ID）。回收后无残留目标状态。</item>
         /// <item><b>冷却时间戳：</b>由 base.ResetState 清除（_lastAttackTimeMs=0）。</item>
         /// <item><b>攻击效果引用：</b>_attackEffectManager/_attackResolver/_enemyManager 置 null。
         ///   本单位发起的活动攻击效果已在 GameOver 中经 CancelOwner 取消，此处只清引用。</item>
         /// <item><b>表现引用：</b>本类型不持有 animation/displayObject（纯逻辑）。</item>
         /// <item><b>攻击数值：</b>_baseAttackPower/_addAttackPower/_baseAttackRange/
         ///   _baseAttackIntervalSeconds/_rangeBonusCells/_attackSpeedMultiplier 清零/默认。</item>
+        /// <item><b>武器状态（本 change 起）：</b>_weaponId=-1、_weaponAttackPower=0，
+        ///   普通移除、merge consume、失败回滚和 pool reuse 后均无武器残留
+        ///   （spec "Pool reset removes weapon state"）。</item>
         /// <item><b>兵种标识：</b>_typeIndex=-1, _animationKey=null。</item>
         /// </list>
         /// <para><b>幂等性：</b>多次调用安全。</para>

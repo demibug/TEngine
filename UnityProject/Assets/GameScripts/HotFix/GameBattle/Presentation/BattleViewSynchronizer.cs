@@ -100,12 +100,16 @@ namespace GameBattle
         void SetUnitAttackTime(object viewObject, long attackTimeMs);
 
         /// <summary>
-        /// 执行一次单位待机复位：动画回待机、武器复位、根节点朝向恢复默认。
-        /// 只在单位逻辑状态从攻击切回待机的状态边沿调用一次，不能每帧调用，
-        /// 否则待机动画会不断回到第 0 帧。
+        /// 执行一次单位姿态复位：恢复根节点朝向到默认（弓兵攻击旋转复位），但不强制复位
+        /// 时间驱动的攻击动画与武器表现——它们由各自 Update 自然完成。
+        /// <para>只在单位逻辑状态从攻击切回待机的状态边沿调用一次，不能每帧调用，
+        /// 否则待机动画会不断回到第 0 帧。</para>
+        /// <para>design 决策 5：普通 Attack→Idle 只表示当前没有下一次攻击目标，不等于
+        /// 正在播放的表现必须被取消。回池/Settling 才拥有强制取消权（经
+        /// <see cref="UnityBattleViewPort"/> 的 Acquire/ReturnToPool 完整 Reset）。</para>
         /// </summary>
         /// <param name="viewObject">表现对象引用。</param>
-        void ResetUnitToIdle(object viewObject);
+        void ResetUnitPose(object viewObject);
     }
 
     /// <summary>
@@ -340,7 +344,7 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 同步单位逻辑状态：只在状态变化边沿（Attack → Idle）对表现对象执行一次待机复位。
+        /// 同步单位逻辑状态：只在状态变化边沿（Attack → Idle）对表现对象执行一次姿态复位。
         /// </summary>
         /// <remarks>
         /// <para><b>根因：</b>AttackScheduler 在目标丢失时调用
@@ -348,8 +352,11 @@ namespace GameBattle
         /// 最后朝向/瞄准角，没有同步状态，导致弓兵翻转、枪兵瞄准等旧表现残留。</para>
         /// <para><b>状态边沿触发：</b>保存每个已注册单位的上次状态，仅在
         /// "状态从 Attack 变为 Idle"时调用一次
-        /// <see cref="IViewObjectSync.ResetUnitToIdle"/>。不能每帧调用，
+        /// <see cref="IViewObjectSync.ResetUnitPose"/>。不能每帧调用，
         /// 否则待机动画会不断回到第 0 帧。</para>
+        /// <para><b>design 决策 5：</b>姿态复位只恢复根节点朝向，不强制复位时间驱动的
+        /// 攻击动画/武器表现——它们由各自 Update 自然完成。普通 Idle 只表示当前没有
+        /// 下一次攻击目标，不等于正在播放的表现必须被取消。</para>
         /// </remarks>
         private void SyncUnitStates()
         {
@@ -372,7 +379,9 @@ namespace GameBattle
 
                 if (isAttackToIdle)
                 {
-                    _objectSync.ResetUnitToIdle(entry.Value);
+                    // design 决策 5：普通 Attack→Idle 只复位姿态（根节点朝向），
+                    // 不强制复位时间驱动的攻击动画/武器表现，允许其自然完成。
+                    _objectSync.ResetUnitPose(entry.Value);
                 }
             }
         }

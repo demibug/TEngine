@@ -25,11 +25,18 @@ public sealed partial class Boss : Luban.BeanBase
         SourceRange = _buf.ReadString();
         SkillKey = _buf.ReadString();
         AnimationKey = _buf.ReadString();
-        ResourcePath = _buf.ReadString();
+        if(_buf.ReadBool()){ ResourcePath = _buf.ReadString(); } else { ResourcePath = null; }
         AttackAnimation = _buf.ReadString();
         if(_buf.ReadBool()){ FollowupAnimation = _buf.ReadString(); } else { FollowupAnimation = null; }
         IdleAnimation = _buf.ReadString();
         Timeline = global::GameConfig.boss.Timeline.DeserializeTimeline(_buf);
+        Enabled = _buf.ReadBool();
+        HealthMultiplier = _buf.ReadFloat();
+        MoveSpeed = _buf.ReadFloat();
+        ContactDamage = _buf.ReadInt();
+        RewardGold = _buf.ReadInt();
+        LogicalWidth = _buf.ReadFloat();
+        LogicalHeight = _buf.ReadFloat();
     }
 
     public static Boss DeserializeBoss(ByteBuf _buf)
@@ -81,6 +88,34 @@ public sealed partial class Boss : Luban.BeanBase
     /// 时间轴
     /// </summary>
     public readonly boss.Timeline Timeline;
+    /// <summary>
+    /// 是否启用
+    /// </summary>
+    public readonly bool Enabled;
+    /// <summary>
+    /// 生命倍率
+    /// </summary>
+    public readonly float HealthMultiplier;
+    /// <summary>
+    /// 移动速度
+    /// </summary>
+    public readonly float MoveSpeed;
+    /// <summary>
+    /// 终点接触伤害
+    /// </summary>
+    public readonly int ContactDamage;
+    /// <summary>
+    /// 击杀金币
+    /// </summary>
+    public readonly int RewardGold;
+    /// <summary>
+    /// 逻辑宽度
+    /// </summary>
+    public readonly float LogicalWidth;
+    /// <summary>
+    /// 逻辑高度
+    /// </summary>
+    public readonly float LogicalHeight;
    
     public const int __ID__ = -796046589;
     public override int GetTypeId() => __ID__;
@@ -104,6 +139,13 @@ public sealed partial class Boss : Luban.BeanBase
         + "followupAnimation:" + FollowupAnimation + ","
         + "idleAnimation:" + IdleAnimation + ","
         + "timeline:" + Timeline + ","
+        + "enabled:" + Enabled + ","
+        + "healthMultiplier:" + HealthMultiplier + ","
+        + "moveSpeed:" + MoveSpeed + ","
+        + "contactDamage:" + ContactDamage + ","
+        + "rewardGold:" + RewardGold + ","
+        + "logicalWidth:" + LogicalWidth + ","
+        + "logicalHeight:" + LogicalHeight + ","
         + "}";
     }
 }

@@ -1,0 +1,505 @@
+[Licensing::Module] Trying to connect to existing licensing client channel...
+Built from '6000.3/staging' branch; Version is '6000.3.19f1 (7689f4515d75) revision 7768564'; Using compiler version '194234433'; Build Type 'Release'
+OS: 'Windows 10  (10.0.19044) 64bit EnterpriseS' Language: 'zh' Physical Memory: 65190 MB
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Administrator" at "2026-08-16T15:56:48.3682025Z"
+System  architecture: x64
+Process architecture: x64
+Date: 2026-08-16T15:56:48Z
+
+COMMAND LINE ARGUMENTS:
+C:\Program Files\Unity 6000.3.19f1\Editor\Unity.exe
+-batchmode
+-nographics
+-projectPath
+E:\MyWork\MyTD\TEngine\UnityProject
+-runTests
+-testPlatform
+EditMode
+-testFilter
+GameBattle.Tests.EditMode.Config.BattleConfigValidatorTests.Validate_GoldenSnapshot_IsValid
+-testResults
+E:\MyWork\MyTD\TEngine\UnityProject\outputs\stabilize-gamebattle-editmode-regressions\config-valid-diagnostic.xml
+-logFile
+E:\MyWork\MyTD\TEngine\UnityProject\outputs\stabilize-gamebattle-editmode-regressions\config-valid-diagnostic.log
+Successfully changed project path to: E:\MyWork\MyTD\TEngine\UnityProject
+E:/MyWork/MyTD/TEngine/UnityProject
+[Licensing::Client] Error: HandshakeResponse reported an error:
+	ResponseCode: 505
+	ResponseStatus: Unsupported protocol version '1.18.1'.
+[Licensing::Module] Error: Failed to handshake to channel: "LicenseClient-Administrator"
+[Licensing::IpcConnector] LicenseClient-Administrator channel disconnected successfully.
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Administrator-6000.3.19" at "2026-08-16T15:56:48.9024016Z"
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 39376, path: "C:/Program Files/Unity 6000.3.19f1/Editor/Data/Resources/Licensing/Client/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.18.1+9fbee8e
+  Session Id:              1caafece20174139b6de17d03c25e18d
+  Correlation Id:          2732626797aa91eb29eb72bf00646ec0
+  External correlation Id: 3621583937090792183
+  Machine Id:              s7JK7KzmXLdt6xMUNdKjx4Kc5BM=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-Administrator-6000.3.19" (connect: 0.00s, validation: 0.00s, handshake: 0.00s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-Administrator-6000.3.19-notifications" at "2026-08-16T15:56:48.9061185Z"
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: ewogICJzdWJzR3JvdXAiIDogInVuaXR5IGVkaXRvciIsCiAgIm5hbWVzcGFjZSIgOiAidW5pdHlfZWRpdG9yIiwKICAidHlwZSIgOiAiRURJVE9SIiwKICAidGFnIiA6ICJVbml0eVBlcnNvbmFsXXXX
+  Product: Unity Personal Version
+  Type: Assigned
+  Expiration: Unlimited
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.00
+[Licensing::Module] Licensing Background thread has ended after 0.54s
+[UnityMemory] Configuration Parameters - Can be set up in boot.config
+    "memorysetup-temp-allocator-size-nav-mesh-worker=65536"
+    "memorysetup-temp-allocator-size-audio-worker=65536"
+    "memorysetup-temp-allocator-size-gfx=262144"
+    "memorysetup-allocator-temp-initial-block-size-main=262144"
+    "memorysetup-allocator-temp-initial-block-size-worker=262144"
+    "memorysetup-temp-allocator-size-background-worker=32768"
+    "memorysetup-temp-allocator-size-job-worker=262144"
+    "memorysetup-temp-allocator-size-preload-manager=33554432"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-temp-allocator-size-gi-baking-worker=262144"
+    "memorysetup-bucket-allocator-granularity=16"
+    "memorysetup-bucket-allocator-bucket-count=8"
+    "memorysetup-bucket-allocator-block-size=33554432"
+    "memorysetup-bucket-allocator-block-count=8"
+    "memorysetup-main-allocator-block-size=16777216"
+    "memorysetup-thread-allocator-block-size=16777216"
+    "memorysetup-gfx-main-allocator-block-size=16777216"
+    "memorysetup-gfx-thread-allocator-block-size=16777216"
+    "memorysetup-cache-allocator-block-size=4194304"
+    "memorysetup-typetree-allocator-block-size=2097152"
+    "memorysetup-profiler-bucket-allocator-granularity=16"
+    "memorysetup-profiler-bucket-allocator-bucket-count=8"
+    "memorysetup-profiler-bucket-allocator-block-size=33554432"
+    "memorysetup-profiler-bucket-allocator-block-count=8"
+    "memorysetup-profiler-allocator-block-size=16777216"
+    "memorysetup-profiler-editor-allocator-block-size=1048576"
+    "memorysetup-temp-allocator-size-main=16777216"
+    "memorysetup-job-temp-allocator-block-size=2097152"
+    "memorysetup-job-temp-allocator-block-size-background=1048576"
+    "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
+    "memorysetup-temp-allocator-size-cloud-worker=32768"
+Player connection [31676]  Target information:
+
+Player connection [31676]  * "[IP] 10.0.19.18 [Port] 55504 [Flags] 2 [Guid] 3841376752 [EditorId] 3841376752 [Version] 1048832 [Id] WindowsEditor(7,A13807) [Debug] 1 [PackageName] WindowsEditor [ProjectName] Editor" 
+
+Player connection [31676] Host joined multi-casting on [225.0.0.222:54997]...
+Player connection [31676] Host joined alternative multi-casting on [225.0.0.222:34997]...
+Input System module state changed to: Initialized.
+[Physics::Module] Initialized fallback backend.
+[Physics::Module] Id: 0xdecafbad
+[Package Manager] Connected to IPC stream "Upm-19852" after 0.0 seconds.
+[Licensing::Client] Successfully resolved entitlement details
+Library Redirect Path: Library/
+FMOD initialized on nosound output
+[Physics::Module] Selected backend.
+[Physics::Module] Name: PhysX
+[Physics::Module] Id: 0xf2b8ea05
+[Physics::Module] SDK Version: 4.1.2
+[Physics::Module] Integration Version: 1.0.0
+[Physics::Module] Threading Mode: Multi-Threaded
+Refreshing native plugins compatible for Editor in 0.20 ms, found 0 plugins.
+Preloading 0 native plugins for Editor in 0.00 ms.
+Initialize engine version: 6000.3.19f1 (7689f4515d75)
+[Subsystems] Discovering subsystems at path C:/Program Files/Unity 6000.3.19f1/Editor/Data/Resources/UnitySubsystems
+[Subsystems] Discovering subsystems at path E:/MyWork/MyTD/TEngine/UnityProject/Assets
+Forcing GfxDevice: Null
+GfxDevice: creating device client; kGfxThreadingModeNonThreaded
+NullGfxDevice:
+    Version:  NULL 1.0 [1.0]
+    Renderer: Null Device
+    Vendor:   Unity Technologies
+Initialize mono
+Mono path[0] = 'C:/Program Files/Unity 6000.3.19f1/Editor/Data/Managed'
+Mono path[1] = 'C:/Program Files/Unity 6000.3.19f1/Editor/Data/MonoBleedingEdge/lib/mono/unityjit-win32'
+Mono config path = 'C:/Program Files/Unity 6000.3.19f1/Editor/Data/MonoBleedingEdge/etc'
+Using monoOptions --debugger-agent=transport=dt_socket,embedding=1,server=y,suspend=n,address=127.0.0.1:56852
+Using cacheserver namespaces - metadata:defaultmetadata, artifacts:defaultartifacts
+Using cacheserver namespaces - metadata:defaultmetadata, artifacts:defaultartifacts
+ImportWorker Server TCP listen port: 0
+AcceleratorClientConnectionCallback - disconnected - :0
+Begin MonoManager ReloadAssembly
+Registering precompiled unity dll's ...
+Register platform support module: C:/Program Files/Unity 6000.3.19f1/Editor/Data/PlaybackEngines/WindowsStandaloneSupport/UnityEditor.WindowsStandalone.Extensions.dll
+Registered in 0.001448 seconds.
+- Loaded All Assemblies, in  0.302 seconds
+Native extension for WindowsStandalone target not found
+Package Manager log level set to [2]
+ScheduleIndexationOnStartup MainProcess:False IndexOnStartup:True
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  0.277 seconds
+Domain Reload Profiling: 577ms
+	BeginReloadAssembly (108ms)
+		ExecutionOrderSort (0ms)
+		DisableScriptedObjects (0ms)
+		BackupInstance (0ms)
+		ReleaseScriptingObjects (0ms)
+		CreateAndSetChildDomain (10ms)
+	RebuildCommonClasses (25ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (36ms)
+	LoadAllAssembliesAndSetupDomain (121ms)
+		LoadAssemblies (96ms)
+		RebuildTransferFunctionScriptingTraits (0ms)
+		AnalyzeDomain (118ms)
+			TypeCache.Refresh (116ms)
+				TypeCache.ScanAssembly (106ms)
+			BuildScriptInfoCaches (0ms)
+			ResolveRequiredComponents (0ms)
+	FinalizeReload (277ms)
+		ReleaseScriptCaches (0ms)
+		RebuildScriptCaches (0ms)
+		SetupLoadedEditorAssemblies (250ms)
+			LogAssemblyErrors (0ms)
+			InitializePlatformSupportModulesInManaged (31ms)
+			SetLoadedEditorAssemblies (3ms)
+			BeforeProcessingInitializeOnLoad (63ms)
+			ProcessInitializeOnLoadAttributes (97ms)
+			ProcessInitializeOnLoadMethodAttributes (56ms)
+			AfterProcessingInitializeOnLoad (0ms)
+			EditorAssembliesLoaded (0ms)
+		ExecutionOrderSort2 (0ms)
+		AwakeInstancesAfterBackupRestoration (0ms)
+[Licensing::Client] Successfully resolved entitlement details
+Application.AssetDatabase Initial Refresh Start
+[Package Manager] Restoring resolved packages state from cache
+[Licensing::Client] Successfully resolved entitlement details
+Embedded package [com.cysharp.unitask] was found in the directory [E:\MyWork\MyTD\TEngine\UnityProject\Packages\UniTask]. Please consider changing the directory name to match the package name.
+Embedded package [com.tuyoogame.yooasset] was found in the directory [E:\MyWork\MyTD\TEngine\UnityProject\Packages\YooAsset]. Please consider changing the directory name to match the package name.
+[Package Manager] Registered 50 packages:
+  Packages from [https://packages.unity.com]:
+    com.unity.ai.navigation@2.0.13 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.ai.navigation@42d896194035)
+    com.unity.ide.rider@3.0.40 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.ide.rider@e4950c6d131b)
+    com.unity.ide.visualstudio@2.0.26 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.ide.visualstudio@a99d56dec63f)
+    com.unity.ide.vscode@1.2.5 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.ide.vscode@82e68656b7bd)
+    com.unity.nuget.newtonsoft-json@3.2.2 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.nuget.newtonsoft-json@4dfd81071c64)
+    com.unity.scriptablebuildpipeline@2.6.1 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.scriptablebuildpipeline@36e3b5898ee2)
+  Built-in packages:
+    com.unity.multiplayer.center@1.0.1 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.multiplayer.center@f01f4ba8d00a)
+    com.unity.ugui@2.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.ugui@b95364aab964)
+    com.unity.modules.accessibility@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.accessibility)
+    com.unity.modules.adaptiveperformance@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.adaptiveperformance)
+    com.unity.modules.ai@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.ai)
+    com.unity.modules.androidjni@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.androidjni)
+    com.unity.modules.animation@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.animation)
+    com.unity.modules.assetbundle@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.assetbundle)
+    com.unity.modules.audio@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.audio)
+    com.unity.modules.cloth@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.cloth)
+    com.unity.modules.director@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.director)
+    com.unity.modules.imageconversion@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.imageconversion)
+    com.unity.modules.imgui@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.imgui)
+    com.unity.modules.jsonserialize@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.jsonserialize)
+    com.unity.modules.particlesystem@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.particlesystem)
+    com.unity.modules.physics@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.physics)
+    com.unity.modules.physics2d@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.physics2d)
+    com.unity.modules.screencapture@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.screencapture)
+    com.unity.modules.terrain@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.terrain)
+    com.unity.modules.terrainphysics@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.terrainphysics)
+    com.unity.modules.tilemap@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.tilemap)
+    com.unity.modules.ui@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.ui)
+    com.unity.modules.uielements@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.uielements)
+    com.unity.modules.umbra@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.umbra)
+    com.unity.modules.unityanalytics@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.unityanalytics)
+    com.unity.modules.unitywebrequest@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.unitywebrequest)
+    com.unity.modules.unitywebrequestassetbundle@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.unitywebrequestassetbundle)
+    com.unity.modules.unitywebrequestaudio@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.unitywebrequestaudio)
+    com.unity.modules.unitywebrequesttexture@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.unitywebrequesttexture)
+    com.unity.modules.unitywebrequestwww@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.unitywebrequestwww)
+    com.unity.modules.vectorgraphics@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.vectorgraphics)
+    com.unity.modules.vehicles@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.vehicles)
+    com.unity.modules.video@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.video)
+    com.unity.modules.vr@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.vr)
+    com.unity.modules.wind@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.wind)
+    com.unity.modules.xr@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.xr)
+    com.unity.modules.subsystems@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.subsystems)
+    com.unity.modules.hierarchycore@1.0.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.modules.hierarchycore)
+    com.unity.test-framework@1.6.0 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.test-framework@bd7f943e9647)
+    com.unity.ext.nunit@2.0.5 (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.unity.ext.nunit@d8c07649098d)
+  Embedded packages:
+    com.cysharp.unitask@file:E:\MyWork\MyTD\TEngine\UnityProject\Packages\UniTask (location: E:\MyWork\MyTD\TEngine\UnityProject\Packages\UniTask)
+    com.tuyoogame.yooasset@file:E:\MyWork\MyTD\TEngine\UnityProject\Packages\YooAsset (location: E:\MyWork\MyTD\TEngine\UnityProject\Packages\YooAsset)
+  Git packages:
+    com.code-philosophy.hybridclr@https://gitee.com/focus-creative-games/hybridclr_unity.git (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.code-philosophy.hybridclr@4df417e56ad8)
+    com.coplaydev.unity-mcp@https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main (location: E:\MyWork\MyTD\TEngine\UnityProject\Library\PackageCache\com.coplaydev.unity-mcp@8bd91ce7bd3a)
+[Package Manager] com.unity.ide.vscode is deprecated: Visual Studio Code package is not supported anymore. You can continue to use it, but we won't provide any update anymore.
+[Subsystems] No new subsystems found in resolved package list.
+[Package Manager] Done registering packages in 0.01 seconds
+[ScriptCompilation] Requested script compilation because: Assetdatabase observed changes in script compilation related files
+Assembly for Assembly Definition File 'Assets/GameScripts/HotFix/GamePlay/GamePlay.asmdef' will not be compiled, because it has no scripts associated with it.
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:LogFormat (UnityEngine.LogType,string,object[])
+UnityEngine.Debug:LogWarningFormat (string,object[])
+UnityEditor.Scripting.ScriptCompilation.EditorCompilation:WarnIfThereAreAssembliesWithoutAnyScripts (UnityEditor.Scripting.ScriptCompilation.ScriptAssemblySettings,UnityEditor.Scripting.ScriptCompilation.ScriptAssembly[])
+UnityEditor.Scripting.ScriptCompilation.EditorCompilation:CompileScriptsWithSettings (UnityEditor.Scripting.ScriptCompilation.ScriptAssemblySettings)
+UnityEditor.Scripting.ScriptCompilation.EditorCompilation:CompileScripts (UnityEditor.Scripting.ScriptCompilation.EditorScriptCompilationOptions,UnityEditor.BuildTarget,int,string[])
+UnityEditor.Scripting.ScriptCompilation.EditorCompilationInterface/<>c__DisplayClass21_0:<CompileScripts>b__0 ()
+UnityEditor.Scripting.ScriptCompilation.EditorCompilationInterface:EmitExceptionAsError<UnityEditor.Scripting.ScriptCompilation.EditorCompilation/CompileStatus> (System.Func`1<UnityEditor.Scripting.ScriptCompilation.EditorCompilation/CompileStatus>,UnityEditor.Scripting.ScriptCompilation.EditorCompilation/CompileStatus)
+UnityEditor.Scripting.ScriptCompilation.EditorCompilationInterface:CompileScripts (UnityEditor.Scripting.ScriptCompilation.EditorScriptCompilationOptions,UnityEditor.BuildTarget,int,string[])
+
+Starting: C:\Program Files\Unity 6000.3.19f1\Editor\Data\Tools\BuildPipeline\bee_backend.exe --ipc --defer-dag-verification --dagfile="Library/Bee/1900b0aEDbg.dag" --continue-on-failure --profile="Library/Bee/backend1.traceevents" ScriptAssemblies
+WorkingDir: E:/MyWork/MyTD/TEngine/UnityProject
+DisplayProgressbar: Compiling Scripts
+ExitCode: 0 Duration: 0s871ms
+[583/607    0s] Csc Library/Bee/artifacts/1900b0aEDbg.dag/GameBattle.dll (+2 others)
+Assets\GameScripts\HotFix\GameBattle\Unit\SpearSoldier.cs(78,23): warning CS0108: 'SpearSoldier.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)' hides inherited member 'SoldierBase.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)'. Use the new keyword if hiding was intended.
+
+Assets\GameScripts\HotFix\GameBattle\Unit\CavalrySoldier.cs(91,23): warning CS0108: 'CavalrySoldier.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)' hides inherited member 'SoldierBase.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)'. Use the new keyword if hiding was intended.
+
+Assets\GameScripts\HotFix\GameBattle\Unit\KnifeSoldier.cs(76,23): warning CS0108: 'KnifeSoldier.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)' hides inherited member 'SoldierBase.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)'. Use the new keyword if hiding was intended.
+
+Assets\GameScripts\HotFix\GameBattle\Projectile\Hit\HitEnemyStrategy.cs(256,18): warning CS0219: The variable 'hitAny' is assigned but its value is never used
+
+Assets\GameScripts\HotFix\GameBattle\Unit\UnitBase.cs(172,22): warning CS0414: The field 'UnitBase._destroyed' is assigned but its value is never used
+
+Assets\GameScripts\HotFix\GameBattle\Unit\UnitBase.cs(187,21): warning CS0414: The field 'UnitBase._experience' is assigned but its value is never used
+[597/607    0s] CopyFiles Library/ScriptAssemblies/GameBattle.pdb
+[603/607    0s] CopyFiles Library/ScriptAssemblies/GameBattle.dll
+[604/607    0s] Csc Library/Bee/artifacts/1900b0aEDbg.dag/GameBattle.Tests.dll (+2 others)
+[605/607    0s] CopyFiles Library/ScriptAssemblies/GameBattle.Tests.pdb
+[606/607    0s] CopyFiles Library/ScriptAssemblies/GameBattle.Tests.dll
+*** Tundra build success (0.84 seconds), 6 items updated, 607 evaluated
+Assets\GameScripts\HotFix\GameBattle\Unit\SpearSoldier.cs(78,23): warning CS0108: 'SpearSoldier.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)' hides inherited member 'SoldierBase.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)'. Use the new keyword if hiding was intended.
+Assets\GameScripts\HotFix\GameBattle\Unit\CavalrySoldier.cs(91,23): warning CS0108: 'CavalrySoldier.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)' hides inherited member 'SoldierBase.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)'. Use the new keyword if hiding was intended.
+Assets\GameScripts\HotFix\GameBattle\Unit\KnifeSoldier.cs(76,23): warning CS0108: 'KnifeSoldier.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)' hides inherited member 'SoldierBase.Configure(EnemyManager, AttackResolver, AttackEffectManager, float, int)'. Use the new keyword if hiding was intended.
+Assets\GameScripts\HotFix\GameBattle\Projectile\Hit\HitEnemyStrategy.cs(256,18): warning CS0219: The variable 'hitAny' is assigned but its value is never used
+Assets\GameScripts\HotFix\GameBattle\Unit\UnitBase.cs(172,22): warning CS0414: The field 'UnitBase._destroyed' is assigned but its value is never used
+Assets\GameScripts\HotFix\GameBattle\Unit\UnitBase.cs(187,21): warning CS0414: The field 'UnitBase._experience' is assigned but its value is never used
+AssetDatabase: script compilation time: 1.195052s
+Begin MonoManager ReloadAssembly
+- Loaded All Assemblies, in  0.975 seconds
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Terms_Description.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Tools_Categorize.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Tools_MergeTerms.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Warnings.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Tools_Scenes.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Inspectors/LocalizationEditor.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Spreadsheet_Google.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Tools.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Tools_CharSet.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Languages.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Tools_NoLocalized.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Tools_ParseTerms.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Terms.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Spreadsheet_Local.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+'Assets/TEngine/Editor/Localization/Localization/LocalizationEditor_Tools_Script.cs' contains partial class of Unity.Object, exactly 1 of the partial classes needs to be in a file with the same filename. This is to know the one that can be referenced from ie. GameObjects
+Refreshing native plugins compatible for Editor in 0.47 ms, found 0 plugins.
+Native extension for WindowsStandalone target not found
+ScheduleIndexationOnStartup MainProcess:True IndexOnStartup:True
+Mono: successfully reloaded assembly
+- Finished resetting the current domain, in  1.213 seconds
+Domain Reload Profiling: 2186ms
+	BeginReloadAssembly (287ms)
+		ExecutionOrderSort (0ms)
+		DisableScriptedObjects (16ms)
+		BackupInstance (0ms)
+		ReleaseScriptingObjects (0ms)
+		CreateAndSetChildDomain (154ms)
+	RebuildCommonClasses (33ms)
+	RebuildNativeTypeToScriptingClass (10ms)
+	initialDomainReloadingComplete (23ms)
+	LoadAllAssembliesAndSetupDomain (619ms)
+		LoadAssemblies (579ms)
+		RebuildTransferFunctionScriptingTraits (0ms)
+		AnalyzeDomain (120ms)
+			TypeCache.Refresh (92ms)
+				TypeCache.ScanAssembly (82ms)
+			BuildScriptInfoCaches (20ms)
+			ResolveRequiredComponents (5ms)
+	FinalizeReload (1213ms)
+		ReleaseScriptCaches (0ms)
+		RebuildScriptCaches (0ms)
+		SetupLoadedEditorAssemblies (1100ms)
+			LogAssemblyErrors (0ms)
+			InitializePlatformSupportModulesInManaged (20ms)
+			SetLoadedEditorAssemblies (4ms)
+			BeforeProcessingInitializeOnLoad (152ms)
+			ProcessInitializeOnLoadAttributes (871ms)
+			ProcessInitializeOnLoadMethodAttributes (50ms)
+			AfterProcessingInitializeOnLoad (4ms)
+			EditorAssembliesLoaded (0ms)
+		ExecutionOrderSort2 (0ms)
+		AwakeInstancesAfterBackupRestoration (14ms)
+Refreshing native plugins compatible for Editor in 0.38 ms, found 0 plugins.
+Preloading 0 native plugins for Editor in 0.00 ms.
+Asset Pipeline Refresh (id=086cdc92bac0a4b458d58d5a2beda512): Total: 3.686 seconds - Initiated by InitialRefreshV2(ForceSynchronousImport)
+	Summary:
+		Imports: total=0 (actual=0, local cache=0, cache server=0)
+		Asset DB Process Time: managed=0 ms, native=1400 ms
+		Asset DB Callback time: managed=61 ms, native=12 ms
+		Scripting: domain reloads=1, domain reload time=975 ms, compile time=1196 ms, other=40 ms
+		Project Asset Count: scripts=945, non-scripts=1262
+		Asset File Changes: new=0, changed=4, moved=0, deleted=0
+		Scan Filter Count: 0
+	InvokeCustomDependenciesCallbacks: 0.001ms
+	InvokePackagesCallback: 11.759ms
+	ApplyChangesToAssetFolders: 0.563ms
+	Scan: 29.967ms
+	OnSourceAssetsModified: 0.662ms
+	CategorizeAssetsWithTransientArtifact: 12.928ms
+	ProcessAssetsWithTransientArtifactChanges: 40.202ms
+	CategorizeAssets: 15.694ms
+	ImportOutOfDateAssets: 1216.745ms (20.224ms without children)
+		CompileScripts: 1196.049ms
+		ReloadNativeAssets: 0.000ms
+		UnloadImportedAssets: 0.092ms
+		EnsureUptoDateAssetsAreRegisteredWithGuidPM: 0.213ms
+		InitializingProgressBar: 0.000ms
+		OnDemandSchedulerStart: 0.168ms
+	PostProcessAllAssets: 61.481ms
+	Hotreload: 1.157ms
+	GatherAllCurrentPrimaryArtifactRevisions: 0.002ms
+	UnloadStreamsBegin: 0.996ms
+	PersistCurrentRevisions: 0.044ms
+	UnloadStreamsEnd: 0.001ms
+	GenerateScriptTypeHashes: 1.402ms
+	Untracked: 2293.948ms
+
+Application.AssetDatabase Initial Refresh End
+Scanning for USB devices : 33.761ms
+Initializing Unity extensions:
+[MODES] ModeService[none].Initialize
+[MODES] ModeService[none].LoadModes
+[MODES] Loading mode Default (0) for mode-current-id-Unity
+Unloading 50 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 3272 unused Assets / (7.8 MB). Loaded Objects now: 3858.
+Memory consumption went from 132.5 MB to 124.7 MB.
+Total: 10.618500 ms (FindLiveObjects: 0.371400 ms CreateObjectMapping: 0.222400 ms MarkObjects: 6.626000 ms  DeleteObjects: 3.397500 ms)
+
+Unity is running with Administrator privileges, which is not supported. Unity executes scripts and binary libraries in your project that may originate from third party sources and potentially be harmful to your computer. Unity may also execute scripts and binary libraries that are still under development and not yet fully tested. Running Unity with Administrator privileges may lead to catastrophic consequences, including but not limited to accidental data loss, change of global system settings or even bricking your device.
+Microsoft Media Foundation video decoding to texture disabled: graphics device is Null, only Direct3D 11 and Direct3D 12 (only on desktop) are supported for hardware-accelerated video decoding.
+[Project] Loading completed in 8.098 seconds
+	Project init time: 				7.878 seconds
+		Template init time: 		0.000 seconds
+		Package Manager init time: 		0.001 seconds
+		Asset Database init time: 		0.082 seconds
+		Global illumination init time: 	0.002 seconds
+		Assemblies load time: 			0.594 seconds
+		Unity extensions init time: 	0.004 seconds
+		Asset Database refresh time: 	3.686 seconds
+	Scene opening time: 			0.100 seconds
+##utp:{"type":"ProjectInfo","version":2,"phase":"Immediate","time":1786895816448,"processId":19852,"projectLoad":8.0982971,"projectInit":7.8780373,"templateInit":0.0,"packageManagerInit":0.0013517,"assetDatabaseInit":0.0819068,"globalIlluminationInit":0.0017563,"assembliesLoad":0.5937152,"unityExtensionsInit":0.0040943,"assetDatabaseRefresh":3.686226,"sceneOpening":0.0995294}
+##utp:{"type":"EditorInfo","version":2,"phase":"Immediate","time":1786895816448,"processId":19852,"editorVersion":"6000.3.19f1 (7689f4515d75)","branch":"6000.3/staging","buildType":"Release","platform":"Windows"}
+[Licensing::Client] Successfully resolved entitlement details
+Running tests for ExecutionSettings with details:
+targetPlatform = 
+playerHeartbeatTimeout = 600
+filters[0] = 
+   Filter with settings:
+   testMode = EditMode
+   targetPlatform = 
+   testNames = null
+   groupNames = GameBattle.Tests.EditMode.Config.BattleConfigValidatorTests.Validate_GoldenSnapshot_IsValid
+   categoryNames = null
+   assemblyNames = null
+ignoreTests = {}
+featureFlags = null
+
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+UnityEditor.TestTools.TestRunner.CommandLineTest.Executer:InitializeAndExecuteRun (string[]) (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/CommandLineTest/Executer.cs:53)
+UnityEditor.TestTools.TestRunner.CommandLineTest.TestStarter:InitializeAndExecuteRun () (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/CommandLineTest/TestStarter.cs:64)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/CommandLineTest/Executer.cs Line: 53)
+
+Launched and connected shader compiler UnityShaderCompiler.exe after 0.01 seconds
+Start Indexing on Editor startup
+[Indexing] Starting Initial Indexing for Assets
+[UnityConnectServicesConfig] config is NOT valid, switching to default
+Created GICache directory at C:/Users/Administrator/AppData/LocalLow/Unity/Caches/GiCache. Took: 0.007s, timestamps: [8.102 - 8.108]
+Unloading 132 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 107 unused Assets / (121.8 KB). Loaded Objects now: 3918.
+Memory consumption went from 165.1 MB to 164.9 MB.
+Total: 8.092000 ms (FindLiveObjects: 0.185000 ms CreateObjectMapping: 0.075100 ms MarkObjects: 7.588700 ms  DeleteObjects: 0.242500 ms)
+
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Applied No Throttling for test run.
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+MCPForUnity.Editor.Helpers.McpLog:Info (string,bool) (at ./Library/PackageCache/com.coplaydev.unity-mcp@8bd91ce7bd3a/Editor/Helpers/McpLog.cs:40)
+MCPForUnity.Editor.Services.TestRunnerNoThrottle:ApplyNoThrottling () (at ./Library/PackageCache/com.coplaydev.unity-mcp@8bd91ce7bd3a/Editor/Services/TestRunnerNoThrottle.cs:101)
+MCPForUnity.Editor.Services.TestRunnerNoThrottle/TestCallbacks:RunStarted (UnityEditor.TestTools.TestRunner.Api.ITestAdaptor) (at ./Library/PackageCache/com.coplaydev.unity-mcp@8bd91ce7bd3a/Editor/Services/TestRunnerNoThrottle.cs:138)
+UnityEditor.TestTools.TestRunner.Api.CallbacksDelegator/<>c__DisplayClass7_0:<RunStarted>b__0 (UnityEditor.TestTools.TestRunner.Api.ICallbacks) (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/Api/CallbacksDelegator.cs:42)
+UnityEditor.TestTools.TestRunner.Api.CallbacksDelegator:TryInvokeAllCallbacks (System.Action`1<UnityEditor.TestTools.TestRunner.Api.ICallbacks>) (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/Api/CallbacksDelegator.cs:135)
+UnityEditor.TestTools.TestRunner.Api.CallbacksDelegator:RunStarted (NUnit.Framework.Interfaces.ITest) (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/Api/CallbacksDelegator.cs:42)
+UnityEngine.Events.InvokableCall`1<NUnit.Framework.Interfaces.ITest>:Invoke (NUnit.Framework.Interfaces.ITest)
+UnityEngine.Events.UnityEvent`1<NUnit.Framework.Interfaces.ITest>:Invoke (NUnit.Framework.Interfaces.ITest)
+UnityEditor.TestTools.TestRunner.TestRun.Tasks.Events.RunStartedInvocationEvent/<Execute>d__0:MoveNext () (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/TestRun/Tasks/Events/RunStartedInvocationEvent.cs:15)
+UnityEditor.TestTools.TestRunner.TestRun.TestJobRunner:ExecuteStep () (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/TestRun/TestJobRunner.cs:173)
+UnityEditor.TestTools.TestRunner.TestRun.TestJobRunner:ExecuteCallback () (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/TestRun/TestJobRunner.cs:108)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: ./Library/PackageCache/com.coplaydev.unity-mcp@8bd91ce7bd3a/Editor/Helpers/McpLog.cs Line: 40)
+
+<b><color=#2EA3FF>MCP-FOR-UNITY</color></b>: [TestRunnerNoThrottle] Restored Interaction Mode after test run.
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+MCPForUnity.Editor.Helpers.McpLog:Info (string,bool) (at ./Library/PackageCache/com.coplaydev.unity-mcp@8bd91ce7bd3a/Editor/Helpers/McpLog.cs:40)
+MCPForUnity.Editor.Services.TestRunnerNoThrottle:RestoreThrottling () (at ./Library/PackageCache/com.coplaydev.unity-mcp@8bd91ce7bd3a/Editor/Services/TestRunnerNoThrottle.cs:114)
+MCPForUnity.Editor.Services.TestRunnerNoThrottle/TestCallbacks:RunFinished (UnityEditor.TestTools.TestRunner.Api.ITestResultAdaptor) (at ./Library/PackageCache/com.coplaydev.unity-mcp@8bd91ce7bd3a/Editor/Services/TestRunnerNoThrottle.cs:143)
+UnityEditor.TestTools.TestRunner.Api.CallbacksDelegator/<>c__DisplayClass9_0:<RunFinished>b__0 (UnityEditor.TestTools.TestRunner.Api.ICallbacks) (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/Api/CallbacksDelegator.cs:55)
+UnityEditor.TestTools.TestRunner.Api.CallbacksDelegator:TryInvokeAllCallbacks (System.Action`1<UnityEditor.TestTools.TestRunner.Api.ICallbacks>) (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/Api/CallbacksDelegator.cs:135)
+UnityEditor.TestTools.TestRunner.Api.CallbacksDelegator:RunFinished (NUnit.Framework.Interfaces.ITestResult) (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/Api/CallbacksDelegator.cs:55)
+UnityEngine.Events.InvokableCall`1<NUnit.Framework.Interfaces.ITestResult>:Invoke (NUnit.Framework.Interfaces.ITestResult)
+UnityEngine.Events.UnityEvent`1<NUnit.Framework.Interfaces.ITestResult>:Invoke (NUnit.Framework.Interfaces.ITestResult)
+UnityEditor.TestTools.TestRunner.TestRun.Tasks.Events.RunFinishedInvocationEvent/<Execute>d__0:MoveNext () (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/TestRun/Tasks/Events/RunFinishedInvocationEvent.cs:24)
+UnityEditor.TestTools.TestRunner.TestRun.TestJobRunner:ExecuteStep () (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/TestRun/TestJobRunner.cs:173)
+UnityEditor.TestTools.TestRunner.TestRun.TestJobRunner:ExecuteCallback () (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/TestRun/TestJobRunner.cs:108)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: ./Library/PackageCache/com.coplaydev.unity-mcp@8bd91ce7bd3a/Editor/Helpers/McpLog.cs Line: 40)
+
+Saving results to: E:\MyWork\MyTD\TEngine\UnityProject\outputs\stabilize-gamebattle-editmode-regressions\config-valid-diagnostic.xml
+Unloading 0 Unused Serialized files (Serialized files now loaded: 0)
+Unloading 0 unused Assets / (0 B). Loaded Objects now: 3919.
+Memory consumption went from 112.7 MB to 112.7 MB.
+Total: 7.207800 ms (FindLiveObjects: 0.144200 ms CreateObjectMapping: 0.054400 ms MarkObjects: 7.004400 ms  DeleteObjects: 0.004200 ms)
+
+DisplayProgressbar: Undo
+Test run completed. Exiting with code 2 (Failed). One or more tests failed.
+UnityEngine.Debug:ExtractStackTraceNoAlloc (byte*,int,string)
+UnityEngine.StackTraceUtility:ExtractStackTrace ()
+UnityEngine.DebugLogHandler:Internal_Log (UnityEngine.LogType,UnityEngine.LogOption,string,UnityEngine.Object)
+UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])
+UnityEngine.Logger:Log (UnityEngine.LogType,object)
+UnityEngine.Debug:Log (object)
+UnityEditor.TestTools.TestRunner.CommandLineTest.Executer:ExitApplication (UnityEditor.TestTools.TestRunner.CommandLineTest.Executer/ReturnCodes,string) (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/CommandLineTest/Executer.cs:81)
+UnityEditor.TestTools.TestRunner.CommandLineTest.Executer:ExitIfRunIsCompleted () (at ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/CommandLineTest/Executer.cs:74)
+UnityEditor.EditorApplication:Internal_CallUpdateFunctions ()
+
+(Filename: ./Library/PackageCache/com.unity.test-framework@bd7f943e9647/UnityEditor.TestRunner/CommandLineTest/Executer.cs Line: 81)
+
+[Physics::Module] Cleanup current backend.
+[Physics::Module] Id: 0xf2b8ea05
+Input System module state changed to: ShutdownInProgress.
+Input System polling thread exited.
+Input System module state changed to: Shutdown.
+[Licensing::IpcConnector] LicenseClient-Administrator-6000.3.19-notifications channel disconnected successfully.
+[Licensing::IpcConnector] LicenseClient-Administrator-6000.3.19 channel disconnected successfully.
+AcceleratorClientConnectionCallback - disconnected - :0
+Cleanup mono
+23:56:58.540 |V| RiderPlugin                    | :1                             | AppDomain.CurrentDomain.DomainUnload lifetimeDefinition.Terminate
+Checking for leaked weakptr:
+  Found no leaked weakptrs.
+[Package Manager] Server process was shutdown
+##utp:{"type":"MemoryLeaks","version":2,"phase":"Immediate","time":1786895818703,"processId":19852,"allocatedMemory":12270291,"memoryLabels":[{"Default":14409},{"Permanent":15236},{"NewDelete":67691},{"Thread":4230344},{"Manager":31824},{"VertexData":8},{"Geometry":816},{"Texture":296},{"Shader":79359},{"Material":24},{"GfxDevice":55872},{"Animation":392},{"Audio":3040},{"FreeType":8},{"FontEngine":736},{"Physics":2146},{"Physics2D":16},{"Serialization":720},{"Input":14984},{"JobScheduler":33024},{"TextLib":216},{"Mono":32},{"ScriptingNativeRuntime":155060},{"BaseObject":1620208},{"Resource":1336},{"Renderer":3000},{"Transform":4685},{"File":1016},{"WebCam":616},{"Culling":32},{"Terrain":11394},{"Wind":24},{"STL":40},{"String":14448},{"DynamicArray":109413},{"HashMap":91728},{"Utility":2660278},{"Curl":3096},{"PoolAlloc":2056},{"AI":80},{"TypeTree":11341},{"ScriptManager":512},{"RuntimeInitializeOnLoadManager":64},{"SpriteAtlas":112},{"GI":7792},{"Director":8240},{"CloudService":288},{"WebRequest":808},{"VR":47994},{"SceneManager":504},{"Video":64},{"LazyScriptCache":32},{"Camera":17},{"Secure":2377},{"SerializationCache":1576},{"APIUpdating":10320},{"Subsystems":336},{"VirtualTexturing":57888},{"StaticSafetyDebugInfo":278528},{"Analytics":336},{"Hierarchy":608},{"CoreStats":13112},{"Identifiers":6480},{"Gui":96},{"EditorUtility":110032},{"VersionControl":4},{"Undo":947},{"AssetDatabase":2435310},{"EditorGi":328},{"UnityConnect":29232},{"Upm":1896},{"AssetCompliance":64},{"DrivenProperties":72},{"LocalIPC":296},{"ProfilerEditor":9746},{"CoreBusinessMetrics":2612},{"Licensing":664},{"AssetReference":32},{"IPCStream":32}]}

@@ -198,6 +198,12 @@ namespace GameBattle.Tests.EditMode.Input
             int r0 = reserves[0].SlotId.Id;
             int r1 = reserves[1].SlotId.Id;
             Assert.IsFalse(_slotBoard.GetSlotById(r0).IsEmpty, "r0 有单位");
+
+            IReadOnlyList<UnitSlot> battle = _slotBoard.GetSlots(true, SlotZone.Battle);
+            int b0 = battle[0].SlotId.Id;
+            int b1 = battle[1].SlotId.Id;
+            Assert.IsTrue(_controller.Execute(BattleInputCommand.CreateDropUnit(900, r1, b1)).IsSuccess,
+                "测试准备：先把 r1 单位移到另一战场槽");
             Assert.IsTrue(_slotBoard.GetSlotById(r1).IsEmpty, "r1 空");
 
             BattleInputResult result1 = _controller.Execute(BattleInputCommand.CreateDropUnit(1, r0, r1));
@@ -206,8 +212,6 @@ namespace GameBattle.Tests.EditMode.Input
             Assert.IsFalse(_slotBoard.GetSlotById(r1).IsEmpty, "r1 承载单位");
 
             // 组合2：待上场 → 战场（激活战斗实例）。
-            IReadOnlyList<UnitSlot> battle = _slotBoard.GetSlots(true, SlotZone.Battle);
-            int b0 = battle[0].SlotId.Id;
             Assert.IsTrue(_slotBoard.GetSlotById(b0).IsEmpty, "b0 空战场槽");
 
             int movedUnitId = _slotBoard.GetSlotById(r1).OccupantUnitId;
@@ -228,13 +232,16 @@ namespace GameBattle.Tests.EditMode.Input
             // 上场：待上场 → 战场。
             int r0 = reserves[0].SlotId.Id;
             int b0 = battle[0].SlotId.Id;
+            int r1 = reserves[1].SlotId.Id;
+            int b1 = battle[1].SlotId.Id;
+            Assert.IsTrue(_controller.Execute(BattleInputCommand.CreateDropUnit(900, r1, b1)).IsSuccess,
+                "测试准备：先腾空 r1");
             _controller.Execute(BattleInputCommand.CreateDropUnit(1, r0, b0));
 
             int unitId = _slotBoard.GetSlotById(b0).OccupantUnitId;
             Assert.IsNotNull(_unitRegistry.GetActiveByUnitId(unitId), "上场后应有战斗实例");
 
             // 下场：战场 → 待上场（找空待上场槽）。
-            int r1 = reserves[1].SlotId.Id;
             Assert.IsTrue(_slotBoard.GetSlotById(r1).IsEmpty, "r1 空");
             BattleInputResult result = _controller.Execute(BattleInputCommand.CreateDropUnit(2, b0, r1));
 

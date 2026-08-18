@@ -112,6 +112,50 @@ namespace GameBattle
         public GridPosition OpponentEnd { get; }
 
         // ====================================================================
+        // 地图运行数据扩展（design.md 决策 1：MapData 是完整运行快照）
+        // ====================================================================
+
+        /// <summary>
+        /// 地图诊断名称（不参与战斗规则）。
+        /// </summary>
+        public string Name { get; }
+
+        /// <summary>
+        /// Unity/YooAsset 战斗地图资源地址（世界实例按此地址复用或替换）。
+        /// </summary>
+        public string ResourceAddress { get; }
+
+        /// <summary>
+        /// 格子像素宽（驱动 X 方向逻辑坐标换算）。
+        /// </summary>
+        public int CellWidth { get; }
+
+        /// <summary>
+        /// 格子像素高（驱动 Y 方向逻辑坐标换算）。
+        /// </summary>
+        public int CellHeight { get; }
+
+        /// <summary>
+        /// 玩家入口坐标（与玩家路径起点曼哈顿相邻）。
+        /// </summary>
+        public GridPosition PlayerEntry { get; }
+
+        /// <summary>
+        /// 对手入口坐标（与对手路径起点曼哈顿相邻）。
+        /// </summary>
+        public GridPosition OpponentEntry { get; }
+
+        /// <summary>
+        /// 表现层路径标记（可落在最外侧网格线，坐标域 0..Width × 0..Height）。
+        /// </summary>
+        public IReadOnlyList<GridPosition> RouteMarkers { get; }
+
+        /// <summary>
+        /// 本图敌人类型索引。
+        /// </summary>
+        public int EnemyTypeIndex { get; }
+
+        // ====================================================================
         // 构造（仅在适配层读取源布局一次）
         // ====================================================================
 
@@ -156,6 +200,57 @@ namespace GameBattle
             GridPosition opponentEnd,
             IReadOnlyList<GridPosition> playerPath,
             IReadOnlyList<GridPosition> opponentPath)
+            : this(
+                cells,
+                width,
+                height,
+                mapIndex,
+                name: "Map0",
+                resourceAddress: "BattleMap0",
+                cellWidth: 80,
+                cellHeight: 80,
+                playerStart: playerStart,
+                playerEnd: playerEnd,
+                opponentStart: opponentStart,
+                opponentEnd: opponentEnd,
+                playerEntry: new GridPosition(playerStart.X, playerStart.Y + 1),
+                opponentEntry: new GridPosition(opponentStart.X, opponentStart.Y - 1),
+                playerPath: playerPath,
+                opponentPath: opponentPath,
+                routeMarkers: Array.Empty<GridPosition>(),
+                enemyTypeIndex: 0)
+        {
+        }
+
+        /// <summary>
+        /// 构造地图数据，直接以扁平一维格子数组初始化（完整运行快照入口）。
+        /// </summary>
+        /// <remarks>
+        /// <para>本构造函数为内部适配层入口，业务代码不直接调用；生产 Provider
+        /// 必须使用本完整入口消费整行地图配置（design.md 决策 1）。旧入口只保留为
+        /// 兼容 map0 数据的适配路径。</para>
+        /// <para>入口（PlayerEntry/OpponentEntry）与路径标记（RouteMarkers）不在此
+        /// 强校验，由 <see cref="BattleConfigValidator.ValidateMapConfig"/> 在创建运行时前校验。</para>
+        /// </remarks>
+        internal MapData(
+            GridCell[] cells,
+            int width,
+            int height,
+            int mapIndex,
+            string name,
+            string resourceAddress,
+            int cellWidth,
+            int cellHeight,
+            GridPosition playerStart,
+            GridPosition playerEnd,
+            GridPosition opponentStart,
+            GridPosition opponentEnd,
+            GridPosition playerEntry,
+            GridPosition opponentEntry,
+            IReadOnlyList<GridPosition> playerPath,
+            IReadOnlyList<GridPosition> opponentPath,
+            IReadOnlyList<GridPosition> routeMarkers,
+            int enemyTypeIndex)
         {
             if (cells == null)
             {
@@ -170,6 +265,11 @@ namespace GameBattle
             if (opponentPath == null)
             {
                 throw new ArgumentNullException(nameof(opponentPath));
+            }
+
+            if (routeMarkers == null)
+            {
+                throw new ArgumentNullException(nameof(routeMarkers));
             }
 
             if (width <= 0 || height <= 0)
@@ -189,14 +289,25 @@ namespace GameBattle
             Width = width;
             Height = height;
             MapIndex = mapIndex;
-            _cells = cells;
+            // 防御性复制：不得保存调用方传入数组的源引用，保证调用方后续修改原数组
+            // 也无法改变本快照（spec "Keep source collections encapsulated"）。
+            _cells = (GridCell[])cells.Clone();
+
+            Name = name ?? string.Empty;
+            ResourceAddress = resourceAddress ?? string.Empty;
+            CellWidth = cellWidth;
+            CellHeight = cellHeight;
+            PlayerEntry = playerEntry;
+            OpponentEntry = opponentEntry;
+            RouteMarkers = CopyToReadOnlyList(routeMarkers);
+            EnemyTypeIndex = enemyTypeIndex;
 
             PlayerStart = playerStart;
             PlayerEnd = playerEnd;
             OpponentStart = opponentStart;
             OpponentEnd = opponentEnd;
-            _playerPath = playerPath;
-            _opponentPath = opponentPath;
+            _playerPath = CopyToReadOnlyList(playerPath);
+            _opponentPath = CopyToReadOnlyList(opponentPath);
 
             // 校验起终点在地图范围内。
             if (!IsInside(playerStart))
@@ -226,6 +337,27 @@ namespace GameBattle
                     $"opponentEnd {opponentEnd} 越界（width={width} height={height}）",
                     nameof(opponentEnd));
             }
+        }
+
+        /// <summary>
+        /// 复制路径/标记集合为不可向下转型修改的只读集合。
+        /// <para>先复制到新数组，再以 <see cref="Array.AsReadOnly{T}"/> 包装，
+        /// 调用方既不能通过修改源集合影响快照，也不能把返回的只读集合向下转型回可变数组。</para>
+        /// </summary>
+        private static IReadOnlyList<GridPosition> CopyToReadOnlyList(IReadOnlyList<GridPosition> source)
+        {
+            if (source == null)
+            {
+                throw new ArgumentNullException(nameof(source));
+            }
+
+            var copy = new GridPosition[source.Count];
+            for (int i = 0; i < source.Count; i++)
+            {
+                copy[i] = source[i];
+            }
+
+            return Array.AsReadOnly(copy);
         }
 
         // ====================================================================
@@ -268,6 +400,10 @@ namespace GameBattle
         /// <para>本方法为 internal，仅供同程序集的适配层（BattleConfigNormalizer/Provider，task 3.3）
         /// 与测试程序集（<c>InternalsVisibleTo</c>）调用，其他业务程序集不得直接构造 MapData，
         /// 只能经适配层获取实例后通过坐标 API 访问。</para>
+        /// <para><b>兼容入口：</b>本旧入口只保留为现有测试夹具/兼容调用的 map0 adapter：
+        /// 以 map0 数据填充新增运行字段（Name/ResourceAddress/CellWidth/CellHeight/双路入口/
+        /// RouteMarkers/EnemyTypeIndex）。生产 Provider 必须使用下方完整参数重载
+        /// 消费整行地图配置（design.md 决策 1）。</para>
         /// </remarks>
         internal static MapData FromColumnMajorGrid(
             IReadOnlyList<IReadOnlyList<string>> columnMajorGrid,
@@ -279,6 +415,72 @@ namespace GameBattle
             GridPosition opponentEnd,
             IReadOnlyList<GridPosition> playerPath,
             IReadOnlyList<GridPosition> opponentPath)
+        {
+            return FromColumnMajorGrid(
+                columnMajorGrid,
+                cellDecoder,
+                mapIndex,
+                playerStart,
+                playerEnd,
+                opponentStart,
+                opponentEnd,
+                playerPath,
+                opponentPath,
+                name: "Map0",
+                resourceAddress: "BattleMap0",
+                cellWidth: 80,
+                cellHeight: 80,
+                playerEntry: new GridPosition(playerStart.X, playerStart.Y + 1),
+                opponentEntry: new GridPosition(opponentStart.X, opponentStart.Y - 1),
+                routeMarkers: Array.Empty<GridPosition>(),
+                enemyTypeIndex: 0);
+        }
+
+        /// <summary>
+        /// 从列优先 grid[x][y] 构造完整地图运行快照（生产入口）。
+        /// </summary>
+        /// <param name="columnMajorGrid">列优先嵌套数组：columnMajorGrid[x][y]。</param>
+        /// <param name="cellDecoder">源格子编码解析函数。</param>
+        /// <param name="mapIndex">地图索引。</param>
+        /// <param name="playerStart">玩家路径起点。</param>
+        /// <param name="playerEnd">玩家路径终点。</param>
+        /// <param name="opponentStart">对手路径起点。</param>
+        /// <param name="opponentEnd">对手路径终点。</param>
+        /// <param name="playerPath">玩家路径点序列。</param>
+        /// <param name="opponentPath">对手路径点序列。</param>
+        /// <param name="name">地图诊断名称。</param>
+        /// <param name="resourceAddress">Unity/YooAsset 地图资源地址。</param>
+        /// <param name="cellWidth">格子像素宽。</param>
+        /// <param name="cellHeight">格子像素高。</param>
+        /// <param name="playerEntry">玩家入口坐标。</param>
+        /// <param name="opponentEntry">对手入口坐标。</param>
+        /// <param name="routeMarkers">表现层路径标记。</param>
+        /// <param name="enemyTypeIndex">本图敌人类型索引。</param>
+        /// <returns>完整地图运行快照。</returns>
+        /// <remarks>
+        /// <para><b>本方法是源 grid[x][y] 列优先布局的唯一读取点（决策 0.5）。</b></para>
+        /// <para>生产 Provider 必须使用本完整入口消费整行地图配置，业务调用方不得再
+        /// 读取 Luban 地图行或配置 fallback（spec "Selected map becomes one immutable
+        /// runtime snapshot"）。</para>
+        /// </remarks>
+        internal static MapData FromColumnMajorGrid(
+            IReadOnlyList<IReadOnlyList<string>> columnMajorGrid,
+            Func<string, GridCell> cellDecoder,
+            int mapIndex,
+            GridPosition playerStart,
+            GridPosition playerEnd,
+            GridPosition opponentStart,
+            GridPosition opponentEnd,
+            IReadOnlyList<GridPosition> playerPath,
+            IReadOnlyList<GridPosition> opponentPath,
+            string name,
+            string resourceAddress,
+            int cellWidth,
+            int cellHeight,
+            GridPosition playerEntry,
+            GridPosition opponentEntry,
+            IReadOnlyList<GridPosition> routeMarkers,
+            int enemyTypeIndex)
         {
             if (columnMajorGrid == null)
             {
@@ -298,6 +500,11 @@ namespace GameBattle
             if (opponentPath == null)
             {
                 throw new ArgumentNullException(nameof(opponentPath));
+            }
+
+            if (routeMarkers == null)
+            {
+                throw new ArgumentNullException(nameof(routeMarkers));
             }
 
             int width = columnMajorGrid.Count;
@@ -347,12 +554,20 @@ namespace GameBattle
                 width,
                 height,
                 mapIndex,
+                name,
+                resourceAddress,
+                cellWidth,
+                cellHeight,
                 playerStart,
                 playerEnd,
                 opponentStart,
                 opponentEnd,
+                playerEntry,
+                opponentEntry,
                 playerPath,
-                opponentPath);
+                opponentPath,
+                routeMarkers,
+                enemyTypeIndex);
         }
 
         // ====================================================================

@@ -377,6 +377,13 @@ namespace GameBattle.Tests.EditMode.Input
             UnitSlot source = reserves[0];
             UnitSlot target = reserves[1];
             Assert.IsFalse(source.IsEmpty, "源槽应有单位");
+
+            // 开局征兵会填满待上场槽；先把目标单位移到空战场槽，构造真实空目标。
+            UnitSlot stagingBattle = GetFirstPlayerBattleSlot();
+            BattleInputResult staged = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(900, target.SlotId.Id, stagingBattle.SlotId.Id));
+            Assert.IsTrue(staged.IsSuccess, "测试准备：目标单位应能先上场");
+            target = _slotBoard.GetSlotById(target.SlotId.Id);
             Assert.IsTrue(target.IsEmpty, "目标槽应为空");
 
             int sourceSlotId = source.SlotId.Id;
@@ -588,9 +595,10 @@ namespace GameBattle.Tests.EditMode.Input
         [Description("不同 CommandId 即使 payload 相同也独立执行（各扣一次费）。")]
         public void DifferentCommandId_Recruit_IndependentExecutions()
         {
-            int goldBefore = _economy.GetBalance(true);
             int firstCost = _economy.GetRefreshCost(true);
             int secondCost = firstCost + 2; // 征兵后费用递增 +2
+            _battleState.ApplyGoldDelta(true, firstCost + secondCost);
+            int goldBefore = _economy.GetBalance(true);
 
             BattleInputResult first = _controller.Execute(
                 BattleInputCommand.CreateRecruit(commandId: 60, playerSide: true));

@@ -24,6 +24,9 @@ public sealed partial class Buff : Luban.BeanBase
         if(_buf.ReadBool()){ Label = _buf.ReadString(); } else { Label = null; }
         Kind = _buf.ReadInt();
         {int n0 = _buf.ReadSize(); Channels = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); Channels.Add(_e0);}}
+        StackPolicy = _buf.ReadString();
+        MaxStacks = _buf.ReadInt();
+        if(_buf.ReadBool()){ ConflictKey = _buf.ReadString(); } else { ConflictKey = null; }
     }
 
     public static Buff DeserializeBuff(ByteBuf _buf)
@@ -51,6 +54,18 @@ public sealed partial class Buff : Luban.BeanBase
     /// 通道列表
     /// </summary>
     public readonly System.Collections.Generic.List<int> Channels;
+    /// <summary>
+    /// 叠层策略
+    /// </summary>
+    public readonly string StackPolicy;
+    /// <summary>
+    /// 最大层数
+    /// </summary>
+    public readonly int MaxStacks;
+    /// <summary>
+    /// 冲突键
+    /// </summary>
+    public readonly string ConflictKey;
    
     public const int __ID__ = -796041239;
     public override int GetTypeId() => __ID__;
@@ -67,6 +82,9 @@ public sealed partial class Buff : Luban.BeanBase
         + "label:" + Label + ","
         + "kind:" + Kind + ","
         + "channels:" + Luban.StringUtil.CollectionToString(Channels) + ","
+        + "stackPolicy:" + StackPolicy + ","
+        + "maxStacks:" + MaxStacks + ","
+        + "conflictKey:" + ConflictKey + ","
         + "}";
     }
 }

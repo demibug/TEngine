@@ -124,14 +124,15 @@ namespace GameBattle
         /// <summary>
         /// 执行骑兵攻击：创建两个 <see cref="CavalrySweepEffect"/>（不同半径），各自登记到管理器。
         /// </summary>
+        /// <param name="initialTarget">调度器为本次攻击选定的初始目标（骑兵为范围攻击，不消费单目标锁定）。</param>
         /// <remarks>
         /// <para><b>对应 JS <c>CavalrySoldier.attack()</c>（CavalrySoldier.js:41-58）：</b>
         /// 创建两个 CavalrySweepEffect 实例，multiplier 均为 0.5，半径分别为
         /// <c>attackRange/2</c> 与 <c>attackRange</c>。两实例各自 Launch + Add。</para>
         ///
-        /// <para><b>不查询目标（与刀兵/弓兵不同）：</b>
+        /// <para><b>不查询目标、不锁定单目标（design 决策 4.5）：</b>
         /// 骑兵 <c>attack()</c> 直接创建效果，<see cref="CavalrySweepEffect"/> 在 150ms 命中时
-        /// 自行查询半径内目标。</para>
+        /// 自行查询半径内目标。initialTarget 仅满足统一签名，不参与伤害。</para>
         ///
         /// <para><b>伤害值：</b>使用 <see cref="SoldierBase.AttackDamage"/> 作为基础伤害，
         /// 每段乘以 <see cref="SweepMultiplier"/>(0.5)。两段合计 = AttackDamage。</para>
@@ -145,8 +146,13 @@ namespace GameBattle
         /// 效果经 <see cref="AttackEffectManager.Add"/> 登记后，由 Manager 唯一推进，
         /// 150ms 后命中半径内敌人，270ms 完成回收。独立 hitSet 可命中同一敌人。</para>
         /// </remarks>
-        protected internal override void PerformAttack()
+        protected internal override void PerformAttack(EnemyTargetDto initialTarget)
         {
+            // 骑兵为范围攻击，不消费单目标锁定（design 决策 4.5：枪兵与骑兵保持范围命中语义）。
+            // initialTarget 仅满足统一签名，不参与伤害——CavalrySweepEffect 在 150ms 命中时
+            // 自行查询半径内目标。忽略 initialTarget 避免编译器告警。
+            _ = initialTarget;
+
             // --- 实例1：近段横扫，radius=AttackRange/2 ---
             var sweep1 = new CavalrySweepEffect();
             sweep1.Launch(

@@ -25,6 +25,7 @@ public sealed partial class Wave : Luban.BeanBase
         {int n0 = _buf.ReadSize(); SpawnStrategyWeights = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); SpawnStrategyWeights.Add(_e0);}}
         {int n0 = _buf.ReadSize(); SpawnStrategies = new System.Collections.Generic.List<System.Collections.Generic.List<float>>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { System.Collections.Generic.List<float> _e0;  {int n1 = _buf.ReadSize(); _e0 = new System.Collections.Generic.List<float>(n1);for(var i1 = 0 ; i1 < n1 ; i1++) { float _e1;  _e1 = _buf.ReadFloat(); _e0.Add(_e1);}} SpawnStrategies.Add(_e0);}}
         SkipBoss = _buf.ReadBool();
+        ActivePlanId = _buf.ReadString();
     }
 
     public static Wave DeserializeWave(ByteBuf _buf)
@@ -32,15 +33,34 @@ public sealed partial class Wave : Luban.BeanBase
         return new battle.Wave(_buf);
     }
 
+    /// <summary>
+    /// 【deprecated】旧字段，不再驱动有限波次
+    /// </summary>
     public readonly System.Collections.Generic.List<int> WaveUnitCounts;
+    /// <summary>
+    /// 【deprecated】旧字段，不再驱动有限波次
+    /// </summary>
     public readonly System.Collections.Generic.List<int> BossWaveNumbers;
+    /// <summary>
+    /// 【deprecated】旧字段，不再驱动有限波次
+    /// </summary>
     public readonly System.Collections.Generic.List<float> BossSpawnChances;
+    /// <summary>
+    /// 【deprecated】旧字段，不再驱动有限波次
+    /// </summary>
     public readonly System.Collections.Generic.List<int> SpawnStrategyWeights;
+    /// <summary>
+    /// 生成策略表，仅由逐波 strategyProfile 显式引用
+    /// </summary>
     public readonly System.Collections.Generic.List<System.Collections.Generic.List<float>> SpawnStrategies;
     /// <summary>
-    /// 本期显式跳过 Boss
+    /// 【deprecated】旧字段，不再驱动有限波次
     /// </summary>
     public readonly bool SkipBoss;
+    /// <summary>
+    /// 当前生效的波次计划ID
+    /// </summary>
+    public readonly string ActivePlanId;
    
     public const int __ID__ = -795434353;
     public override int GetTypeId() => __ID__;
@@ -58,6 +78,7 @@ public sealed partial class Wave : Luban.BeanBase
         + "spawnStrategyWeights:" + Luban.StringUtil.CollectionToString(SpawnStrategyWeights) + ","
         + "spawnStrategies:" + Luban.StringUtil.CollectionToString(SpawnStrategies) + ","
         + "skipBoss:" + SkipBoss + ","
+        + "activePlanId:" + ActivePlanId + ","
         + "}";
     }
 }

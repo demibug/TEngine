@@ -7,6 +7,7 @@
         "UnityEditor.TestRunner",
         "UniTask",
         "GameCommon",
+        "GameProto",
         "TEngine.Runtime"
     ],
     "includePlatforms": [

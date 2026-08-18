@@ -21,6 +21,7 @@ namespace GameBattle
         private AssetsReference _mapResourceReference;
         private BattleMapBindings _bindings;
         private AsyncLazy<GameObject> _worldLoadTask;
+        private string _currentResourceAddress;
         private Texture2D _placementTexture;
         private Sprite _placementSprite;
         private CameraSnapshot _cameraSnapshot;
@@ -69,7 +70,7 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 加载或复用 BattleMap0 实例；并发调用共享同一个加载任务。
+        /// 加载或复用 BattleMap0 实例（兼容 map0 数据入口）；并发调用共享同一个加载任务。
         /// </summary>
         internal async UniTask<GameObject> EnsureWorldAsync(
             CancellationToken cancellationToken = default)
@@ -90,11 +91,123 @@ namespace GameBattle
             return await _worldLoadTask.Task.AttachExternalCancellation(cancellationToken);
         }
 
+        /// <summary>
+        /// 按地图运行快照的 ResourceAddress 加载或复用世界实例，并按当前 MapData 重建绑定。
+        /// </summary>
+        /// <param name="map">当前地图运行快照（尺寸、cell 宽高、双路端点、资源地址）。</param>
+        /// <param name="cancellationToken">取消令牌。</param>
+        /// <returns>已就绪并完成当前地图绑定的世界实例。</returns>
+        /// <remarks>
+        /// <para><b>地址复用/替换（design.md 决策 4）：</b></para>
+        /// <list type="bullet">
+        /// <item>地址相同：复用已加载实例，仅按当前 MapData 重建绑定。</item>
+        /// <item>地址不同：先清理动态根与当前绑定，Destroy 旧实例（AssetsReference 自动归还引用），
+        /// 再异步加载新实例。</item>
+        /// <item>加载、取消或绑定失败：finally 销毁孤儿实例并清空加载任务，允许重试。</item>
+        /// </list>
+        /// </remarks>
+        internal async UniTask<GameObject> EnsureWorldForMapAsync(
+            MapData map,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (map == null)
+            {
+                throw new ArgumentNullException(nameof(map));
+            }
+
+            string address = map.ResourceAddress;
+            if (string.IsNullOrEmpty(address))
+            {
+                // 寻址无效：由入口处理器映射为 AssetMissing。
+                throw new BattleMapResourceAddressException(
+                    "地图运行快照 ResourceAddress 为空，无法加载世界",
+                    address ?? string.Empty);
+            }
+
+            Transform root = EnsureRoot();
+
+            // 若存在仍未提交实例的在途加载任务，先等待其收敛（可能属于另一地址 A）。
+            // 结束后按当前地址走单一替换流程，避免把地址 A 的任务/实例当作地址 B；
+            // 在途任务失败时其 finally 已对称清理，此处继续加载目标地址即可。
+            if (_mapInstance == null && _worldLoadTask != null)
+            {
+                try
+                {
+                    await _worldLoadTask.Task.AttachExternalCancellation(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    // 已清理，继续按当前地址替换加载。
+                }
+            }
+
+            // 地址不同：先清理动态根和当前绑定，销毁旧实例，再加载新实例。
+            if (_mapInstance != null && !string.Equals(
+                    _currentResourceAddress, address, StringComparison.Ordinal))
+            {
+                ClearDynamicRoots();
+                DestroyMapInstance();
+            }
+
+            if (_mapInstance == null)
+            {
+                if (_worldLoadTask == null)
+                {
+                    _worldLoadTask = UniTask.Lazy(
+                        () => LoadWorldForMapAsync(root, address, cancellationToken));
+                }
+
+                GameObject loaded = await _worldLoadTask.Task
+                    .AttachExternalCancellation(cancellationToken);
+                if (_mapInstance == null)
+                {
+                    throw new BattleMapLoadException(
+                        $"资源加载未提交有效实例：{address}",
+                        address);
+                }
+
+                _currentResourceAddress = address;
+            }
+
+            // 复用或新加载后，统一按当前地图重建绑定（Bindings 不再作为跨局地图状态缓存）。
+            BattleMapBindingResult bindingResult =
+                BattleMapBindings.TryCreate(_mapInstance.transform, map);
+            if (!bindingResult.IsValid)
+            {
+                // 绑定失败：销毁孤儿实例并清空加载状态，允许重试。
+                // 缺节点映射 AssetMissing，重复/几何无效映射 PartialInitializationFailed。
+                bool isMissingNode = bindingResult.MissingPaths.Count > 0;
+                string nodePath = isMissingNode
+                    ? bindingResult.MissingPaths[0]
+                    : (bindingResult.DuplicatePaths.Count > 0
+                        ? bindingResult.DuplicatePaths[0]
+                        : (bindingResult.InvalidPaths.Count > 0
+                            ? bindingResult.InvalidPaths[0]
+                            : string.Empty));
+                string diagnostic = bindingResult.DiagnosticMessage;
+                DestroyMapInstance();
+                throw new BattleMapBindingException(
+                    $"{address} 节点绑定失败：{diagnostic}",
+                    address,
+                    nodePath,
+                    isMissingNode);
+            }
+
+            _bindings = bindingResult.Bindings;
+            _currentResourceAddress = address;
+            return _mapInstance;
+        }
+
         internal void ActivateWorld()
         {
             if (_worldRootObject == null || _mapInstance == null || _bindings == null)
             {
-                throw new InvalidOperationException("BattleMap0 尚未完成加载与绑定。");
+                throw new InvalidOperationException("战斗世界尚未完成加载与绑定。");
             }
 
             _worldRootObject.SetActive(true);
@@ -174,6 +287,15 @@ namespace GameBattle
         }
 
         /// <summary>
+        /// 清空当前单局地图绑定（退出/回滚时调用；地图实例与资源引用保留以便地址复用）。
+        /// <para>必须在该局动态根清理完成后调用（动态根经绑定节点定位）。</para>
+        /// </summary>
+        internal void ClearBindings()
+        {
+            _bindings = null;
+        }
+
+        /// <summary>
         /// 在原生战斗场景中显示当前阵营可放置的棋盘格。
         /// </summary>
         internal void ShowPlacementSlots(MapData map, bool playerSide)
@@ -230,6 +352,7 @@ namespace GameBattle
             _mapResourceReference = null;
             _bindings = null;
             _worldLoadTask = null;
+            _currentResourceAddress = null;
             _resourceModule = null;
 
             DestroyUnityObject(_placementSprite, destroyImmediate);
@@ -252,7 +375,7 @@ namespace GameBattle
             try
             {
                 instance = _loadOverride == null
-                    ? await LoadFromResourceModuleAsync(root, cancellationToken)
+                    ? await LoadFromResourceModuleAsync(root, MAP_ADDRESS, cancellationToken)
                     : await _loadOverride(root, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (instance == null)
@@ -274,6 +397,7 @@ namespace GameBattle
                 _mapInstance = instance;
                 _mapResourceReference = instance.GetComponent<AssetsReference>();
                 _bindings = bindingResult.Bindings;
+                _currentResourceAddress = MAP_ADDRESS;
                 GameObject loadedInstance = instance;
                 instance = null;
                 return loadedInstance;
@@ -290,12 +414,93 @@ namespace GameBattle
                 if (_mapInstance == null)
                 {
                     _worldLoadTask = null;
+                    _currentResourceAddress = null;
                 }
             }
         }
 
+        private async UniTask<GameObject> LoadWorldForMapAsync(
+            Transform root,
+            string address,
+            CancellationToken cancellationToken)
+        {
+            GameObject instance = null;
+            try
+            {
+                try
+                {
+                    instance = _loadOverride == null
+                        ? await LoadFromResourceModuleAsync(root, address, cancellationToken)
+                        : await _loadOverride(root, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (BattleMapResourceAddressException)
+                {
+                    // YooAsset 寻址无效属于资源缺失，保留结构化异常供入口映射 AssetMissing。
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // 地址有效但加载失败：转换为结构化加载异常（映射 AssetLoadFailed）。
+                    throw new BattleMapLoadException(
+                        $"战斗地图资源加载失败：{address}（{ex.GetType().Name}: {ex.Message}）",
+                        address,
+                        ex);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                if (instance == null)
+                {
+                    throw new BattleMapLoadException(
+                        $"资源加载未返回有效实例：{address}",
+                        address);
+                }
+
+                _mapInstance = instance;
+                _mapResourceReference = instance.GetComponent<AssetsReference>();
+                _currentResourceAddress = address;
+                GameObject loadedInstance = instance;
+                instance = null;
+                return loadedInstance;
+            }
+            finally
+            {
+                // 取消或加载失败时所有权仍归本方法：立即销毁孤儿并清空加载状态，允许重试。
+                if (instance != null && _mapInstance == null)
+                {
+                    DestroyInstance(instance);
+                }
+
+                if (_mapInstance == null)
+                {
+                    _worldLoadTask = null;
+                    _currentResourceAddress = null;
+                }
+            }
+        }
+
+        /// <summary>销毁当前地图实例并清空绑定、引用与加载状态（地址替换/绑定失败用）。</summary>
+        private void DestroyMapInstance()
+        {
+            if (_mapInstance != null)
+            {
+                _mapInstance.transform.SetParent(null, false);
+                DestroyInstance(_mapInstance);
+            }
+
+            _mapInstance = null;
+            _mapResourceReference = null;
+            _bindings = null;
+            _worldLoadTask = null;
+            _currentResourceAddress = null;
+        }
+
         private async UniTask<GameObject> LoadFromResourceModuleAsync(
             Transform root,
+            string location,
             CancellationToken cancellationToken)
         {
             if (_resourceModule == null)
@@ -308,8 +513,15 @@ namespace GameBattle
                 throw new InvalidOperationException("IResourceModule 尚未初始化。");
             }
 
+            if (!_resourceModule.CheckLocationValid(location))
+            {
+                throw new BattleMapResourceAddressException(
+                    $"战斗地图资源地址未被 YooAsset 收集或不存在：{location}",
+                    location);
+            }
+
             return await _resourceModule.LoadGameObjectAsync(
-                MAP_ADDRESS,
+                location,
                 root,
                 cancellationToken);
         }
@@ -420,6 +632,75 @@ namespace GameBattle
                 Camera.clearFlags = _clearFlags;
                 Camera.backgroundColor = _backgroundColor;
             }
+        }
+    }
+
+    /// <summary>
+    /// 战斗地图资源寻址无效（地址为空、未被 YooAsset 收集或不存在）的结构化异常。
+    /// 由 <see cref="BattleWorldHost"/> 在加载前抛出，入口处理器映射为
+    /// <see cref="BattleErrorCode.AssetMissing"/>（design.md 决策 6）。
+    /// </summary>
+    internal sealed class BattleMapResourceAddressException : Exception
+    {
+        /// <summary>无法解析到有效资源的地址。</summary>
+        public string ResourceAddress { get; }
+
+        public BattleMapResourceAddressException(string message, string resourceAddress)
+            : base(message)
+        {
+            ResourceAddress = resourceAddress ?? string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// 战斗地图资源地址有效但加载失败的结构化异常。
+    /// 由 <see cref="BattleWorldHost"/> 在资源加载期间抛出，入口处理器映射为
+    /// <see cref="BattleErrorCode.AssetLoadFailed"/>（design.md 决策 6）。
+    /// </summary>
+    internal sealed class BattleMapLoadException : Exception
+    {
+        /// <summary>本次加载的资源地址。</summary>
+        public string ResourceAddress { get; }
+
+        public BattleMapLoadException(
+            string message,
+            string resourceAddress,
+            Exception innerException = null)
+            : base(message, innerException)
+        {
+            ResourceAddress = resourceAddress ?? string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// 战斗地图节点/运行几何绑定失败的结构化异常。
+    /// 由 <see cref="BattleWorldHost"/> 在绑定阶段抛出，入口处理器按 <see cref="IsMissingNode"/>
+    /// 映射为 <see cref="BattleErrorCode.AssetMissing"/>（缺节点）或
+    /// <see cref="BattleErrorCode.PartialInitializationFailed"/>（重复/几何无效），
+    /// 失败阶段固定为 <see cref="BattleFailureStage.MapBinding"/>（design.md 决策 6）。
+    /// </summary>
+    internal sealed class BattleMapBindingException : Exception
+    {
+        /// <summary>绑定失败涉及的地图资源地址。</summary>
+        public string ResourceAddress { get; }
+
+        /// <summary>首个失败节点路径（缺节点/重复/几何无效）。</summary>
+        public string NodePath { get; }
+
+        /// <summary>true 表示缺节点（映射 AssetMissing）；false 表示重复/几何无效（映射 PartialInitializationFailed）。</summary>
+        public bool IsMissingNode { get; }
+
+        public BattleMapBindingException(
+            string message,
+            string resourceAddress,
+            string nodePath,
+            bool isMissingNode,
+            Exception innerException = null)
+            : base(message, innerException)
+        {
+            ResourceAddress = resourceAddress ?? string.Empty;
+            NodePath = nodePath ?? string.Empty;
+            IsMissingNode = isMissingNode;
         }
     }
 }

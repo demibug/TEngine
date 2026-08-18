@@ -30,6 +30,8 @@ public sealed partial class Weapon : Luban.BeanBase
         AnchorY = _buf.ReadFloat();
         Intro = _buf.ReadString();
         FragmentNum = _buf.ReadInt();
+        Enabled = _buf.ReadBool();
+        HandlerKey = _buf.ReadString();
     }
 
     public static Weapon DeserializeWeapon(ByteBuf _buf)
@@ -81,6 +83,14 @@ public sealed partial class Weapon : Luban.BeanBase
     /// 碎片数
     /// </summary>
     public readonly int FragmentNum;
+    /// <summary>
+    /// 是否接入基础武器框架
+    /// </summary>
+    public readonly bool Enabled;
+    /// <summary>
+    /// 武器处理器键(禁用行可空)
+    /// </summary>
+    public readonly string HandlerKey;
    
     public const int __ID__ = 94848050;
     public override int GetTypeId() => __ID__;
@@ -103,6 +113,8 @@ public sealed partial class Weapon : Luban.BeanBase
         + "anchorY:" + AnchorY + ","
         + "intro:" + Intro + ","
         + "fragmentNum:" + FragmentNum + ","
+        + "enabled:" + Enabled + ","
+        + "handlerKey:" + HandlerKey + ","
         + "}";
     }
 }

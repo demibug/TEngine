@@ -7,7 +7,7 @@ namespace GameBattle.Tests.EditMode.Presentation
     // 任务 8.x：BattleViewSynchronizer 单位状态边沿复位测试
     // ----------------------------------------------------------------------------
     // 验证目标：
-    //   1. 状态从 Attack → Idle 时，Synchronizer 恰好调用一次 ResetUnitToIdle。
+    //   1. 状态从 Attack → Idle 时，Synchronizer 恰好调用一次 ResetUnitPose。
     //   2. Idle 持续时不重复调用（不每帧复位待机动画到第 0 帧）。
     //   3. 首次同步不触发复位（回池/再次创建时 AcquireFromPool 已复位表现）。
     //   4. 攻击（Idle → Attack）不触发复位。
@@ -102,15 +102,15 @@ namespace GameBattle.Tests.EditMode.Presentation
         }
 
         /// <summary>
-        /// 记录 ResetUnitToIdle 调用次数的表现对象同步桩。
+        /// 记录 ResetUnitPose 调用次数的表现对象同步桩。
         /// </summary>
         private sealed class StubObjectSync : IViewObjectSync
         {
-            internal int ResetToIdleCallCount;
+            internal int ResetPoseCallCount;
 
-            public void ResetUnitToIdle(object viewObject)
+            public void ResetUnitPose(object viewObject)
             {
-                ResetToIdleCallCount++;
+                ResetPoseCallCount++;
             }
 
             public void SetPosition(object viewObject, float logicX, float logicY) { }
@@ -150,7 +150,7 @@ namespace GameBattle.Tests.EditMode.Presentation
         // ====================================================================
 
         [Test]
-        [Description("单位状态从 Attack 变为 Idle 时，Synchronizer 恰好调用一次 ResetUnitToIdle。")]
+        [Description("单位状态从 Attack 变为 Idle 时，Synchronizer 恰好调用一次 ResetUnitPose（姿态复位）。")]
         public void Sync_AttackToIdle_TriggersResetOnce()
         {
             var fixture = new Fixture();
@@ -158,14 +158,14 @@ namespace GameBattle.Tests.EditMode.Presentation
 
             // 第一帧：首次同步 Attack 态，不触发复位（首帧复位见首次同步测试）。
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(0, fixture.ObjectSync.ResetToIdleCallCount,
-                "首次同步 Attack 态不应触发待机复位");
+            Assert.AreEqual(0, fixture.ObjectSync.ResetPoseCallCount,
+                "首次同步 Attack 态不应触发姿态复位");
 
-            // 第二帧：状态切回 Idle，触发一次复位。
+            // 第二帧：状态切回 Idle，触发一次姿态复位。
             fixture.ReadModel.UnitStates[UnitRuntimeId] = AttackUnitState.Idle;
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(1, fixture.ObjectSync.ResetToIdleCallCount,
-                "Attack → Idle 边沿应触发一次待机复位");
+            Assert.AreEqual(1, fixture.ObjectSync.ResetPoseCallCount,
+                "Attack → Idle 边沿应触发一次姿态复位");
         }
 
         [Test]
@@ -177,20 +177,20 @@ namespace GameBattle.Tests.EditMode.Presentation
 
             // 首次同步 Attack 态：不触发复位（首帧复位见首次同步测试）。
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(0, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(0, fixture.ObjectSync.ResetPoseCallCount,
                 "首次同步 Attack 态不应触发待机复位");
 
             // 切 Idle → 触发一次复位。
             fixture.ReadModel.UnitStates[UnitRuntimeId] = AttackUnitState.Idle;
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(1, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(1, fixture.ObjectSync.ResetPoseCallCount,
                 "Attack → Idle 应触发一次待机复位");
 
             // 持续 Idle 多帧：不再触发。
             fixture.Synchronizer.Sync(0f);
             fixture.Synchronizer.Sync(0f);
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(1, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(1, fixture.ObjectSync.ResetPoseCallCount,
                 "Idle 持续不应重复触发待机复位");
         }
 
@@ -204,13 +204,13 @@ namespace GameBattle.Tests.EditMode.Presentation
 
             // 首次同步：不触发复位（表现已在 AcquireFromPool 复位）。
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(0, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(0, fixture.ObjectSync.ResetPoseCallCount,
                 "首次同步不应触发待机复位");
 
             // 首次观测 Attack 态：同样不触发。
             fixture.ReadModel.UnitStates[UnitRuntimeId] = AttackUnitState.Attack;
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(0, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(0, fixture.ObjectSync.ResetPoseCallCount,
                 "首次观测 Attack 态不应触发待机复位");
         }
 
@@ -223,19 +223,19 @@ namespace GameBattle.Tests.EditMode.Presentation
 
             // 首次同步 Attack 态：不触发复位。
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(0, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(0, fixture.ObjectSync.ResetPoseCallCount,
                 "首次同步 Attack 态不应触发待机复位");
 
             // 切 Idle → 触发一次复位。
             fixture.ReadModel.UnitStates[UnitRuntimeId] = AttackUnitState.Idle;
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(1, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(1, fixture.ObjectSync.ResetPoseCallCount,
                 "Attack → Idle 应触发一次待机复位");
 
             // 再次进入 Attack 态：不触发复位（复位只针对进入待机）。
             fixture.ReadModel.UnitStates[UnitRuntimeId] = AttackUnitState.Attack;
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(1, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(1, fixture.ObjectSync.ResetPoseCallCount,
                 "Idle → Attack 不应触发待机复位");
         }
 
@@ -247,13 +247,13 @@ namespace GameBattle.Tests.EditMode.Presentation
             var fixture = new Fixture();
             fixture.ReadModel.UnitStates[UnitRuntimeId] = AttackUnitState.Attack;
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(0, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(0, fixture.ObjectSync.ResetPoseCallCount,
                 "首次同步 Attack 不应触发复位");
 
             // 状态切 Idle → 触发一次复位。
             fixture.ReadModel.UnitStates[UnitRuntimeId] = AttackUnitState.Idle;
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(1, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(1, fixture.ObjectSync.ResetPoseCallCount,
                 "Attack → Idle 应触发一次待机复位");
 
             // 单位移除（回池），从注册表注销。
@@ -264,7 +264,7 @@ namespace GameBattle.Tests.EditMode.Presentation
             var viewObject = new object();
             fixture.Registry.Register(ViewObjectCategory.Unit, UnitRuntimeId, viewObject);
             fixture.Synchronizer.Sync(0f);
-            Assert.AreEqual(1, fixture.ObjectSync.ResetToIdleCallCount,
+            Assert.AreEqual(1, fixture.ObjectSync.ResetPoseCallCount,
                 "回池后再次创建不应触发额外待机复位");
         }
     }

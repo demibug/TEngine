@@ -68,8 +68,6 @@ namespace GameBattle
     /// </remarks>
     public sealed class BattleModule : Module, IBattleModule, IUpdateModule
     {
-        private const bool ENABLE_COMPUTER_LANE_ENEMY_SPAWN = false;
-
         // ====================================================================
         // 可注入的加载/清理委托
         // ----------------------------------------------------------------
@@ -142,11 +140,21 @@ namespace GameBattle
         /// <summary>模块级战斗世界宿主，静态地图不进入单局 Scope。</summary>
         private readonly BattleWorldHost _worldHost = new BattleWorldHost();
 
+        /// <summary>
+        /// 与当前入口 Loadout 对应的已准备启动上下文。
+        /// <para>Context 仅在 Loadout 完全匹配时复用；退出、失败或显示新入口时清空
+        /// （design.md 决策 3）。</para>
+        /// </summary>
+        private BattleStartupContext _activeContext;
+
         /// <summary>模块关闭时取消地图准备和仍在等待的模块级异步操作。</summary>
         private CancellationTokenSource _moduleCts;
 
         /// <summary>入口世界准备的幂等任务；失败后清空以允许重试。</summary>
         private AsyncLazy<UnityEngine.GameObject> _entryPreparationTask;
+
+        /// <summary>入口世界准备任务对应的配置快照（用于识别是否仍匹配当前地图）。</summary>
+        private BattleConfigSnapshot _preparationSnapshot;
 
         /// <summary>最近一次入口装载，用于退出后重新显示入口。</summary>
         private BattleLoadoutDto _lastLoadout;
@@ -192,7 +200,41 @@ namespace GameBattle
                 }
 
                 _lastLoadout = loadout;
-                await EnsureEntryWorldAsync();
+
+                // 新入口（本分支已在 Idle 下执行，无活动 Runtime）：清除上一局残留的
+                // Context、入口世界准备缓存与单局 Bindings，再准备新 Context。
+                // 非 Idle 状态不进入本分支，因此不会破坏活动 Runtime（design.md 决策 3）。
+                _activeContext = null;
+                _entryPreparationTask = null;
+                _preparationSnapshot = null;
+                _worldHost.ClearDynamicRoots();
+                _worldHost.ClearBindings();
+
+                // 世界加载前先解析并校验配置（spec "Battle startup is transactional"）。
+                // 配置非法时只记录并返回，不加载世界、不显示入口，等待重试。
+                BattleStartupContext context = BattleStartupContext.Prepare(loadout);
+                if (!context.IsValid)
+                {
+                    Log.Warning(
+                        $"[BattleModule] 打开入口前配置准备失败 code={context.ErrorCode} " +
+                        $"msg={context.DiagnosticMessage}（MapId={loadout.MapId}）");
+                    _activeContext = null;
+                    return;
+                }
+
+                _activeContext = context;
+
+                try
+                {
+                    await EnsureEntryWorldAsync(context.Config);
+                }
+                catch
+                {
+                    // 世界准备失败：清空 Context，避免残留不匹配的缓存。
+                    _activeContext = null;
+                    throw;
+                }
+
                 await FUI.ShowAsync<BattleStartPanel>(
                     new BattleStartEntryArgs(loadout, StartAsync));
             }
@@ -203,19 +245,25 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 等待模块级地图准备；并发入口复用同一任务，失败后允许重试。
+        /// 等待模块级地图准备（按当前地图运行快照加载/复用世界）；并发入口复用同一任务。
         /// </summary>
-        private async UniTask EnsureEntryWorldAsync()
+        private async UniTask EnsureEntryWorldAsync(BattleConfigSnapshot config)
         {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
             if (_moduleCts == null)
             {
                 throw new InvalidOperationException("BattleModule 尚未初始化。");
             }
 
-            if (_entryPreparationTask == null)
+            if (_entryPreparationTask == null || !ReferenceEquals(_preparationSnapshot, config))
             {
+                _preparationSnapshot = config;
                 _entryPreparationTask = UniTask.Lazy(
-                    () => _worldHost.EnsureWorldAsync(_moduleCts.Token));
+                    () => _worldHost.EnsureWorldForMapAsync(config.Map, _moduleCts.Token));
             }
 
             try
@@ -224,7 +272,7 @@ namespace GameBattle
                 if (map == null || _worldHost.Bindings == null)
                 {
                     throw new InvalidOperationException(
-                        $"{BattleWorldHost.MAP_ADDRESS} 地图实例或节点绑定无效。");
+                        $"{config.Map.ResourceAddress} 地图实例或节点绑定无效。");
                 }
 
                 _worldHost.HideWorld();
@@ -232,6 +280,7 @@ namespace GameBattle
             catch
             {
                 _entryPreparationTask = null;
+                _preparationSnapshot = null;
                 throw;
             }
         }
@@ -271,8 +320,9 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 默认进入事务：确认模块级 BattleMap0 与节点绑定，激活战斗世界，
-        /// 严格预加载表现资源，组装并启动本局 Runtime，最后打开 BattleHudPanel。
+        /// 默认进入事务：先解析并校验 Loadout 对应配置（复用/即时准备 Context），
+        /// 再按所选地图加载世界与节点绑定，激活战斗世界，严格预加载表现资源，
+        /// 组装并启动本局 Runtime，最后打开 BattleHudPanel。
         /// 任一步骤失败均由调用方执行逆序回滚，且不会提交 Running 状态。
         /// </summary>
         private async UniTask<BattleOperationResult> DefaultEntryHandler(
@@ -283,13 +333,72 @@ namespace GameBattle
             cancellationToken.ThrowIfCancellationRequested();
             _lastLoadout = loadout;
 
+            // 世界加载前解析并校验配置：复用匹配的已准备 Context，否则即时准备
+            // （design.md 决策 3）。配置错误在世界加载前阻断，禁止回退 map0。
+            BattleStartupContext context = _activeContext;
+            if (context == null || !context.IsValid || !context.Matches(loadout))
+            {
+                context = BattleStartupContext.Prepare(loadout);
+                if (!context.IsValid)
+                {
+                    Log.Warning(
+                        $"[BattleModule] 配置准备失败 code={context.ErrorCode} msg={context.DiagnosticMessage}");
+                    return BattleOperationResult.Fail(
+                        context.ErrorCode,
+                        BattleModuleState.Idle,
+                        context.DiagnosticMessage,
+                        BattleFailureStage.WorldPreparation,
+                        resourceAddress: string.Empty,
+                        nodePath: $"MapId={loadout.MapId}");
+                }
+
+                _activeContext = context;
+            }
+
             try
             {
-                await EnsureEntryWorldAsync();
+                await EnsureEntryWorldAsync(context.Config);
             }
             catch (OperationCanceledException)
             {
                 throw;
+            }
+            catch (BattleMapResourceAddressException ex)
+            {
+                // 寻址无效（空地址、未收集或不存在）：映射 AssetMissing（design.md 决策 6）。
+                return BattleOperationResult.Fail(
+                    BattleErrorCode.AssetMissing,
+                    BattleModuleState.Idle,
+                    $"战斗地图资源地址无效，无法加载世界: {ex.Message}",
+                    BattleFailureStage.WorldPreparation,
+                    ex.ResourceAddress,
+                    exception: ex);
+            }
+            catch (BattleMapLoadException ex)
+            {
+                // 地址有效但加载失败：映射 AssetLoadFailed。
+                return BattleOperationResult.Fail(
+                    BattleErrorCode.AssetLoadFailed,
+                    BattleModuleState.Idle,
+                    $"准备战斗地图失败: {ex.Message}",
+                    BattleFailureStage.WorldPreparation,
+                    ex.ResourceAddress,
+                    exception: ex);
+            }
+            catch (BattleMapBindingException ex)
+            {
+                // 节点/运行几何绑定失败：阶段固定 MapBinding；
+                // 缺节点映射 AssetMissing，重复/几何无效映射 PartialInitializationFailed。
+                return BattleOperationResult.Fail(
+                    ex.IsMissingNode
+                        ? BattleErrorCode.AssetMissing
+                        : BattleErrorCode.PartialInitializationFailed,
+                    BattleModuleState.Idle,
+                    $"战斗地图节点绑定失败: {ex.Message}",
+                    BattleFailureStage.MapBinding,
+                    ex.ResourceAddress,
+                    ex.NodePath,
+                    exception: ex);
             }
             catch (Exception ex)
             {
@@ -298,7 +407,7 @@ namespace GameBattle
                     BattleModuleState.Idle,
                     $"准备战斗地图失败: {ex.Message}",
                     BattleFailureStage.WorldPreparation,
-                    BattleWorldHost.MAP_ADDRESS,
+                    context.Config.Map.ResourceAddress,
                     exception: ex);
             }
 
@@ -308,10 +417,10 @@ namespace GameBattle
                 return BattleOperationResult.Fail(
                     BattleErrorCode.AssetMissing,
                     BattleModuleState.Idle,
-                    "BattleMap0 节点绑定不存在。",
+                    "地图节点绑定不存在。",
                     BattleFailureStage.MapBinding,
-                    BattleWorldHost.MAP_ADDRESS,
-                    "BattleMap0");
+                    context.Config.Map.ResourceAddress,
+                    context.Config.Map.Name);
             }
 
             try
@@ -327,7 +436,7 @@ namespace GameBattle
                     BattleModuleState.Idle,
                     $"激活战斗世界失败: {ex.Message}",
                     BattleFailureStage.CameraSetup,
-                    BattleWorldHost.MAP_ADDRESS,
+                    context.Config.Map.ResourceAddress,
                     exception: ex);
             }
 
@@ -335,7 +444,8 @@ namespace GameBattle
                 loadout,
                 cancellationToken,
                 _poolScope,
-                bindings);
+                bindings,
+                context.Config);
             if (!assembly.IsSuccess)
             {
                 Log.Warning(
@@ -351,26 +461,20 @@ namespace GameBattle
                 assembly.ConfigSnapshot.Map,
                 playerSide: true);
 
-            if (!ENABLE_COMPUTER_LANE_ENEMY_SPAWN)
-            {
-                Action<bool, int> spawnEnemy = assembly.BattleManager.OnSpawnEnemy;
-                assembly.BattleManager.OnSpawnEnemy = (isPlayerLane, typeIndex) =>
-                {
-                    if (isPlayerLane)
-                    {
-                        spawnEnemy?.Invoke(isPlayerLane, typeIndex);
-                    }
-                };
-            }
-
             IBattleViewPort viewPort = assembly.ViewPort;
             IBattleAudioPort audioPort = assembly.AudioPort;
             IBattleVfxPort vfxPort = assembly.VfxPort;
 
             try
             {
+                // 只加载所选计划实际引用的普通敌人/Boss 地址；Null 端口允许纯逻辑运行，
+                // 生产端口对空 Boss resourcePath 明确失败，不创建占位表现。
+                IReadOnlyList<string> enemyResourceAddresses =
+                    BattlePresentationResourcePlan.CollectEnemyResourceAddresses(
+                        context.Config,
+                        requireBossPresentation: !(viewPort is NullBattleViewPort));
                 await UniTask.WhenAll(
-                    viewPort.PreloadAsync(cancellationToken),
+                    viewPort.PreloadAsync(enemyResourceAddresses, cancellationToken),
                     audioPort.PreloadAsync(cancellationToken),
                     vfxPort.PreloadAsync(cancellationToken));
             }
@@ -708,6 +812,8 @@ namespace GameBattle
             _worldHost.Release();
 #endif
             _entryPreparationTask = null;
+            _preparationSnapshot = null;
+            _activeContext = null;
             _moduleCts?.Dispose();
             _moduleCts = null;
             Log.Info("[BattleModule] Shutdown: 已取消异步操作、释放运行时、地图、根节点并恢复主相机。");
@@ -981,6 +1087,11 @@ namespace GameBattle
             BattleRuntimeScope scope = _activeScope;
             _activeScope = null;
 
+            // 进入失败：清空本次 Context 与入口世界准备任务（design.md 决策 3）。
+            _activeContext = null;
+            _entryPreparationTask = null;
+            _preparationSnapshot = null;
+
             if (runtime != null && !runtime.IsDisposed)
             {
                 try
@@ -1016,6 +1127,7 @@ namespace GameBattle
 
             _worldHost.ClearDynamicRoots();
             _worldHost.HideWorld();
+            _worldHost.ClearBindings();
 
             // Start/Restart 失败后模块回到 Idle，本次会话不再保留池容量。
             ClearPoolsForExit("进入失败回滚");
@@ -1096,6 +1208,11 @@ namespace GameBattle
             BattleRuntimeScope oldScope = _activeScope;
             _activeRuntime = null;
             _activeScope = null;
+
+            // 新一局使用新地图快照：清空旧 Context，由入口处理器按新 Loadout 即时准备。
+            _activeContext = null;
+            _entryPreparationTask = null;
+            _preparationSnapshot = null;
 
             try
             {
@@ -1353,6 +1470,21 @@ namespace GameBattle
             BattleRuntimeScope scopeToRelease = _activeScope;
             _activeScope = null;
 
+            // 退出完成：清空本局 Context 与入口世界准备任务（design.md 决策 3）。
+            _activeContext = null;
+            _entryPreparationTask = null;
+            _preparationSnapshot = null;
+
+            // 清空单局 Bindings（动态根已由退出处理器清理；地图实例保留供地址复用）。
+            try
+            {
+                _worldHost.ClearBindings();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning($"[BattleModule] {reason} 清空地图绑定异常: {ex.Message}");
+            }
+
             if (runtimeToRelease != null && !runtimeToRelease.IsDisposed)
             {
                 try
@@ -1398,6 +1530,9 @@ namespace GameBattle
             BattleRuntimeScope scope = _activeScope;
             _activeScope = null;
             _pendingExitTcs = null;
+            _activeContext = null;
+            _entryPreparationTask = null;
+            _preparationSnapshot = null;
 
             if (runtime != null && !runtime.IsDisposed)
             {

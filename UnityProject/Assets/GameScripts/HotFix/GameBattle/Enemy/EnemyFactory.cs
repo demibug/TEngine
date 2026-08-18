@@ -1,79 +1,47 @@
 using System;
+using System.Collections.Generic;
 using TEngine;
 
 namespace GameBattle
 {
     // ============================================================================
-    // 任务 4.5：EnemyFactory —— 只注册/创建/回收 Mob0 的敌人工厂
+    // 任务 3.4/3.5：EnemyFactory —— 封闭 key 注册表 + 四个独立类型池的敌人工厂
     // ----------------------------------------------------------------------------
-    // 职责（design.md 第 1 节目录表 / Enemy/EnemyFactory.cs）：
-    //   只注册/创建/回收 Mob0，并执行池重置契约。
-    //
-    // 来源证据（还原工程 EnemyFactory.js）：
-    //   - EnemyFactory 继承 SingletonBase，持 creators: Map<string, () => instance>。
-    //   - configure({ objectPool })：注入 ObjectPool，registerPooledClass 依赖它。
-    //   - registerPooledClass(typeName, ClassType, configureInstance)：
-    //       * 注册 creator = () => objectPool.takeByClass(ClassType, () => new ClassType());
-    //       * 取得实例后调用 configureInstance(instance)。
-    //   - create(typeName)：
-    //       * creators.get(typeName)；不存在抛 "未为类型 ... 注册创建器"。
-    //       * result = creator()；result 为空抛 "creator returned empty value"。
-    //       * createLog.push({ typeName, enemy: result })。
-    //       * 返回 result。
-    //   - produce(ClassType)：objectPool.takeByClass(ClassType)。
-    //   - recover(enemy)：objectPool.recoverByClass(enemy)；成功则 recoverLog.push(enemy)。
-    //   - resetForTests()：清空 creators/createLog/recoverLog，objectPool=null。
-    //
-    // 本期裁剪（design.md 决策 5 / 决策 6 / "NormalEnemyBase 合入 Mob0Enemy"）：
-    //   - 删除 SingletonBase（design 决策 5）：改为 internal sealed class，由
-    //     BattleRuntimeFactory 构造注入 RuntimeIdAllocator + BattleObjectPool<Mob0Enemy>。
-    //   - 只注册 Mob0（design 决策 5 / 本 change 范围 "只覆盖 Mob0"）：
-    //     不提供 register/registerPooledClass 公开 API；ENEMY_TYPE_KEYS / BOSS_TYPE_KEYS
-    //     等多类型注册能力延后到后续 change。未知类型在 Acquire 时显式失败。
-    //   - 合入 NormalEnemyBase 到 Mob0Enemy（design 决策 5 / task 4.4）：
-    //     工厂只与 Mob0Enemy 类型耦合，不引入 NormalEnemyBase 中间基类。
-    //   - 池复用不复用旧 ID（design.md 目录表 RuntimeIdAllocator / task 4.5）：
-    //     每次 Acquire 后调用 RuntimeIdAllocator.Allocate() 分配新 ID；
-    //     Release 后旧 ID/目标引用通过 Mob0Enemy.ResetState 清除（由 BattleObjectPool.Release
-    //     在入池前调用），旧 ID 不再有效。
+    // 职责（design.md 决策 6 / specs/configured-enemy-spawning/spec.md）：
+    //   - 新链：由 EnemyCatalogSnapshot 建封闭注册表（enemyKey → acquire/release 委托
+    //     + 定义快照），Mob0～Mob3 各自从 BattlePoolScope.GetPool<T> 获取独立池；
+    //     按 EnemySpawnRequest 完成租借、分配 runtimeId、解析数值、注入地图/目标/回调、
+    //     初始化车道与 waveOrder、开始移动；任一步失败都回滚本次租借。
+    //   - Release 按实际固定 key/type 分发，禁止 Mob0 强转。
+    //   - 旧链临时兼容：保留 RuntimeFactory/既有测试所需的旧构造/Acquire/Release
+    //     调用面（Acquire 返回 Mob0Enemy），下一波迁移并删除旧路径。
     //
     // 不变量：
-    //   1. 只注册 Mob0：构造即绑定 Mob0Enemy 类型；不提供运行时注册其他类型的能力。
-    //   2. 每次 Acquire 分配新 ID：通过 RuntimeIdAllocator.Allocate()，从 1 单调递增。
-    //   3. Release 后旧 ID/目标引用失效：BattleObjectPool.Release 调用 Mob0Enemy.ResetState
-    //      清除全部可变状态；工厂额外将 Mob0Enemy 的运行时 ID 重置为 0，确保旧 ID 不再可用。
-    //   4. Acquire/Release 对称：每次 Acquire 对应恰好一次 Release，由 BattleObjectPool 保证。
-    //   5. 不预热：池在首次 Acquire 时才创建 Mob0Enemy，不预先创建。
+    //   1. 封闭注册表：未知 enemyKey 在 Acquire 时显式失败，不创建占位敌人。
+    //   2. 每次租借分配新 RuntimeId（RuntimeIdAllocator，从 1 单调递增）。
+    //   3. Acquire/Release 对称：每次租借恰好一次 Release；初始化失败回滚到正确池。
+    //   4. 数值解析唯一：新链数值统一经 EnemyStatsResolver，不反查可变全局表。
+    //   5. 不预热：池在首次 Acquire 时才创建对象。
     // ============================================================================
 
     /// <summary>
-    /// 只注册/创建/回收 Mob0 的敌人工厂，执行池重置契约。
+    /// 封闭 key 注册表 + 四个独立类型池的敌人工厂（Mob0～Mob3）。
     /// </summary>
     /// <remarks>
-    /// <para><b>职责（design.md 目录表）：</b>只注册/创建/回收 Mob0，并执行池重置契约。
-    /// 替代还原工程 <c>EnemyFactory</c>（EnemyFactory.js）的多类型注册 + SingletonBase 模式。</para>
+    /// <para><b>新链（task 3.4）：</b>以 <see cref="EnemyCatalogSnapshot"/> 构造封闭注册表，
+    /// 每个普通敌人键绑定独立的 <see cref="BattleObjectPool{T}"/>（经
+    /// <see cref="BattlePoolScope.GetPool{T}"/> 惰性创建）。<see cref="Acquire(EnemySpawnRequest)"/>
+    /// 按请求完成租借→分配 runtimeId→解析数值→注入依赖→初始化车道/waveOrder→开始移动；
+    /// 任一步失败都把本次租借归还正确池后重新抛出。<see cref="Release(ConfiguredEnemyBase)"/>
+    /// 按敌人自身的固定键分发，不依赖 Mob0 强转。</para>
     ///
-    /// <para><b>只注册 Mob0（design.md 决策 5 / 本 change 范围）：</b>
-    /// 本期只覆盖 Mob0，不提供 <c>register/registerPooledClass</c> 公开 API。未知类型在
-    /// Acquire 时显式失败（<see cref="Acquire"/> 只返回 <see cref="Mob0Enemy"/>）。
-    /// 多类型注册能力延后到后续 change。</para>
-    ///
-    /// <para><b>每次 Acquire 分配新 ID（task 4.5）：</b>
-    /// <see cref="Acquire"/> 取得 <see cref="Mob0Enemy"/> 后立即调用
-    /// <see cref="RuntimeIdAllocator.Allocate"/> 分配新运行时 ID，并通过
-    /// <c>Mob0Enemy.AssignRuntimeId</c> 写入。池复用不复用旧 ID
-    /// （design.md 目录表 RuntimeIdAllocator）。</para>
-    ///
-    /// <para><b>Release 后旧 ID/目标引用失效（task 4.5）：</b>
-    /// <see cref="Release"/> 委托 <see cref="BattleObjectPool{T}.Release"/>，
-    /// 后者在入池前调用 <see cref="IPoolableBattleObject.ResetState"/>（即
-    /// <c>Mob0Enemy.ResetState</c>）清除全部可变状态（运行时 ID、阵营、生命、路径、
-    /// 目标引用、攻击冷却、接触回调标记、位置、击退、贡献者等）。
-    /// 回收后对象等价于新构造，旧 ID/目标引用不得继续有效。</para>
+    /// <para><b>旧链临时兼容（本 change 独立编译需要）：</b>保留
+    /// <c>EnemyFactory(RuntimeIdAllocator, BattleObjectPool&lt;Mob0Enemy&gt;)</c> 构造与
+    /// <c>Acquire()/Release(Mob0Enemy)</c> 调用面，供 <see cref="BattleRuntimeFactory"/>
+    /// 与既有测试继续使用。下一波迁移后会删除旧反射/固定数值生产路径。</para>
     ///
     /// <para><b>本类型为 internal：</b>只供 GameBattle 内部 EnemyManager / BattleRuntimeFactory
-    /// 使用，不对其他程序集暴露。Manager 是唯一注册/注销入口
-    /// （11_POOLING_AND_OWNERSHIP.md：UI 和 View 不得直接销毁 Domain 对象）。</para>
+    /// 使用，不对其他程序集暴露。</para>
     /// </remarks>
     internal sealed class EnemyFactory
     {
@@ -87,199 +55,384 @@ namespace GameBattle
         private const string LogTag = "[EnemyFactory]";
 
         // ====================================================================
-        // 运行时 ID 分配器（每局新建，注入）
+        // 固定类型索引表（供注册表一致性校验）
+        // ====================================================================
+
+        /// <summary>Mob0～Mob3 固定键与类型索引映射（键 → 类型索引）。</summary>
+        private static readonly IReadOnlyDictionary<string, int> FixedTypeIndexByKey =
+            new Dictionary<string, int>
+            {
+                ["Mob0"] = 0,
+                ["Mob1"] = 1,
+                ["Mob2"] = 2,
+                ["Mob3"] = 3,
+            };
+
+        // ====================================================================
+        // 注入依赖
         // ====================================================================
 
         /// <summary>
-        /// 运行时 ID 分配器。每次 <see cref="Acquire"/> 后分配新 ID，保证池复用不复用旧 ID。
-        /// <para>由 <see cref="BattleRuntimeFactory"/> 在每局构造时注入，每局独立，
-        /// 不跨局复用（design.md 目录表 RuntimeIdAllocator）。</para>
+        /// 运行时 ID 分配器。每次租借分配新 ID，保证池复用不复用旧 ID。
         /// </summary>
         private readonly RuntimeIdAllocator _idAllocator;
 
-        // ====================================================================
-        // Mob0 对象池（跨局复用容量，注入）
-        // ====================================================================
+        /// <summary>
+        /// 封闭注册表：普通敌人键 → 租借/回收委托 + 定义快照。
+        /// </summary>
+        private readonly IReadOnlyDictionary<string, EnemyTypeRegistration> _registry;
 
         /// <summary>
-        /// Mob0 对象池。Acquire 优先复用空闲对象，Release 归还并执行 ResetState。
-        /// <para>由 <see cref="BattleRuntimeFactory"/> 通过 <see cref="BattlePoolScope.GetPool{T}"/>
-        /// 获取并注入。池实例跨局复用空闲容量（task 4.1），活动对象逐局清空。</para>
-        /// <para>对应还原工程 <c>EnemyFactory.objectPool</c>（EnemyFactory.js:14-24），
-        /// 但从全局 ObjectPool.takeByClass/recoverByClass 改为强类型
-        /// <see cref="BattleObjectPool{Mob0Enemy}"/>。</para>
+        /// 旧链 Mob0 池（仅旧构造路径使用；新构造路径为 null）。
         /// </summary>
-        private readonly BattleObjectPool<Mob0Enemy> _mob0Pool;
+        private readonly BattleObjectPool<Mob0Enemy> _legacyMob0Pool;
 
         // ====================================================================
         // 诊断日志（对应 EnemyFactory.js createLog/recoverLog）
         // ====================================================================
 
-        /// <summary>
-        /// 创建日志：记录每次 Acquire 的 typeName 与 enemy 引用。
-        /// <para>对应还原工程 <c>EnemyFactory.createLog</c>（EnemyFactory.js:16）。
-        /// 诊断用，不参与规则逻辑。本期只记录 Mob0。</para>
-        /// </summary>
-        private readonly System.Collections.Generic.List<string> _createLog =
-            new System.Collections.Generic.List<string>();
+        private readonly List<string> _createLog = new List<string>();
 
-        /// <summary>
-        /// 回收日志：记录每次 Release 的 typeName。
-        /// <para>对应还原工程 <c>EnemyFactory.recoverLog</c>（EnemyFactory.js:17）。
-        /// 诊断用，不参与规则逻辑。本期只记录 Mob0。</para>
-        /// </summary>
-        private readonly System.Collections.Generic.List<string> _recoverLog =
-            new System.Collections.Generic.List<string>();
+        private readonly List<string> _recoverLog = new List<string>();
 
         // ====================================================================
         // 诊断属性
         // ====================================================================
 
-        /// <summary>
-        /// 已创建（Acquire）累计次数（诊断用）。
-        /// <para>对应还原工程 <c>createLog.length</c>。本期只统计 Mob0。</para>
-        /// </summary>
+        /// <summary>已创建（Acquire）累计次数（诊断用）。</summary>
         internal int CreateCount => _createLog.Count;
 
-        /// <summary>
-        /// 已回收（Release）累计次数（诊断用）。
-        /// <para>对应还原工程 <c>recoverLog.length</c>。本期只统计 Mob0。</para>
-        /// </summary>
+        /// <summary>已回收（Release）累计次数（诊断用）。</summary>
         internal int RecoverCount => _recoverLog.Count;
 
         // ====================================================================
-        // 构造
+        // 构造 —— 旧链临时兼容
         // ====================================================================
 
         /// <summary>
-        /// 构造只注册 Mob0 的敌人工厂。
+        /// 【临时兼容】构造只注册 Mob0 的旧链敌人工厂。
         /// </summary>
-        /// <param name="idAllocator">
-        /// 运行时 ID 分配器。每局新建，从 1 单调递增。不可为 null。
-        /// </param>
-        /// <param name="mob0Pool">
-        /// Mob0 对象池。由 <see cref="BattlePoolScope.GetPool{T}"/> 获取并注入。
-        /// 不可为 null。
-        /// </param>
-        /// <exception cref="ArgumentNullException">
-        /// <paramref name="idAllocator"/> 或 <paramref name="mob0Pool"/> 为 null。
-        /// </exception>
+        /// <param name="idAllocator">运行时 ID 分配器（不可为 null）。</param>
+        /// <param name="mob0Pool">Mob0 对象池（不可为 null）。</param>
+        /// <exception cref="ArgumentNullException">任一参数为 null。</exception>
         /// <remarks>
-        /// <para>对应还原工程 <c>EnemyFactory.configure({ objectPool })</c>
-        /// （EnemyFactory.js:20-24），但从全局 SingletonBase + 字符串 ObjectPool
-        /// 改为构造注入强类型依赖。</para>
-        ///
-        /// <para><b>只注册 Mob0：</b>构造即绑定 Mob0Enemy 类型，不提供运行时注册其他类型
-        /// 的能力。未知类型在 Acquire 时显式失败（本工厂只返回 Mob0Enemy）。</para>
+        /// <para>供 <see cref="BattleRuntimeFactory"/> 与既有测试使用；新链应使用
+        /// <see cref="EnemyFactory(RuntimeIdAllocator, EnemyCatalogSnapshot, BattlePoolScope)"/>。
+        /// 下一波迁移后本构造删除。</para>
         /// </remarks>
         internal EnemyFactory(RuntimeIdAllocator idAllocator, BattleObjectPool<Mob0Enemy> mob0Pool)
         {
             _idAllocator = idAllocator ?? throw new ArgumentNullException(nameof(idAllocator));
-            _mob0Pool = mob0Pool ?? throw new ArgumentNullException(nameof(mob0Pool));
+            _legacyMob0Pool = mob0Pool ?? throw new ArgumentNullException(nameof(mob0Pool));
+            _registry = new Dictionary<string, EnemyTypeRegistration>();
         }
 
         // ====================================================================
-        // Acquire —— 获取一个 Mob0Enemy（优先复用空闲，否则新建）并分配新运行时 ID
+        // 构造 —— 新链封闭注册表
         // ====================================================================
 
         /// <summary>
-        /// 获取一个 <see cref="Mob0Enemy"/>。优先复用空闲对象，否则新建。
-        /// 取得后立即分配新运行时 ID 并写入，保证池复用不复用旧 ID。
+        /// 以敌人目录建封闭注册表并构造敌人工厂：Mob0～Mob3 各自从
+        /// <see cref="BattlePoolScope.GetPool{T}"/> 获取独立池。
+        /// </summary>
+        /// <param name="idAllocator">运行时 ID 分配器（不可为 null）。</param>
+        /// <param name="catalog">不可变敌人目录（不可为 null）。</param>
+        /// <param name="poolScope">战斗对象池作用域（不可为 null，跨局复用池容量）。</param>
+        /// <exception cref="ArgumentNullException">任一参数为 null。</exception>
+        /// <exception cref="ArgumentException">目录含未支持普通敌人键、key/typeIndex 不一致或重复。</exception>
+        /// <remarks>
+        /// <para>每个目录定义键都绑定一个独立 <see cref="BattleObjectPool{T}"/>（惰性创建、
+        /// 不预热）。目录为空时注册表为空，<see cref="Acquire(EnemySpawnRequest)"/> 对任意
+        /// 键显式失败。</para>
+        /// </remarks>
+        internal EnemyFactory(
+            RuntimeIdAllocator idAllocator,
+            EnemyCatalogSnapshot catalog,
+            BattlePoolScope poolScope)
+        {
+            _idAllocator = idAllocator ?? throw new ArgumentNullException(nameof(idAllocator));
+            _legacyMob0Pool = null;
+            if (catalog == null)
+            {
+                throw new ArgumentNullException(nameof(catalog));
+            }
+
+            if (poolScope == null)
+            {
+                throw new ArgumentNullException(nameof(poolScope));
+            }
+
+            _registry = BuildRegistry(catalog, poolScope);
+        }
+
+        /// <summary>
+        /// 由目录定义构建封闭注册表：按固定键绑定独立类型池，校验 key/typeIndex 一致。
+        /// </summary>
+        private static IReadOnlyDictionary<string, EnemyTypeRegistration> BuildRegistry(
+            EnemyCatalogSnapshot catalog,
+            BattlePoolScope poolScope)
+        {
+            var registry = new Dictionary<string, EnemyTypeRegistration>();
+            foreach (EnemyDefinitionSnapshot definition in catalog.Definitions)
+            {
+                if (!FixedTypeIndexByKey.TryGetValue(definition.Key, out int expectedTypeIndex))
+                {
+                    throw new ArgumentException(
+                        $"{LogTag} 敌人目录包含未支持普通敌人键 '{definition.Key}'（只支持 Mob0～Mob3）");
+                }
+
+                if (definition.TypeIndex != expectedTypeIndex)
+                {
+                    throw new ArgumentException(
+                        $"{LogTag} 目录 key='{definition.Key}' 的 typeIndex={definition.TypeIndex} " +
+                        $"与固定类型索引 {expectedTypeIndex} 不一致");
+                }
+
+                if (registry.ContainsKey(definition.Key))
+                {
+                    throw new ArgumentException(
+                        $"{LogTag} 敌人目录存在重复普通敌人键 '{definition.Key}'");
+                }
+
+                registry.Add(definition.Key, CreateRegistration(definition.Key, definition, poolScope));
+            }
+
+            return registry;
+        }
+
+        /// <summary>
+        /// 按固定键创建租借/回收委托并绑定独立类型池。
+        /// </summary>
+        private static EnemyTypeRegistration CreateRegistration(
+            string key,
+            EnemyDefinitionSnapshot definition,
+            BattlePoolScope poolScope)
+        {
+            switch (key)
+            {
+                case "Mob0":
+                {
+                    BattleObjectPool<Mob0Enemy> pool = poolScope.GetPool(() => new Mob0Enemy());
+                    return new EnemyTypeRegistration(
+                        definition,
+                        acquire: () => pool.Acquire(),
+                        release: enemy => pool.Release((Mob0Enemy)enemy));
+                }
+
+                case "Mob1":
+                {
+                    BattleObjectPool<Mob1Enemy> pool = poolScope.GetPool(() => new Mob1Enemy());
+                    return new EnemyTypeRegistration(
+                        definition,
+                        acquire: () => pool.Acquire(),
+                        release: enemy => pool.Release((Mob1Enemy)enemy));
+                }
+
+                case "Mob2":
+                {
+                    BattleObjectPool<Mob2Enemy> pool = poolScope.GetPool(() => new Mob2Enemy());
+                    return new EnemyTypeRegistration(
+                        definition,
+                        acquire: () => pool.Acquire(),
+                        release: enemy => pool.Release((Mob2Enemy)enemy));
+                }
+
+                case "Mob3":
+                {
+                    BattleObjectPool<Mob3Enemy> pool = poolScope.GetPool(() => new Mob3Enemy());
+                    return new EnemyTypeRegistration(
+                        definition,
+                        acquire: () => pool.Acquire(),
+                        release: enemy => pool.Release((Mob3Enemy)enemy));
+                }
+
+                default:
+                    throw new ArgumentException(
+                        $"{LogTag} 未知普通敌人键 '{key}'（只支持 Mob0～Mob3）");
+            }
+        }
+
+        // ====================================================================
+        // 新链 Acquire —— 按 EnemySpawnRequest 完成租借与初始化
+        // ====================================================================
+
+        /// <summary>
+        /// 按出生请求租借并初始化一个普通敌人：租借 → 分配 runtimeId → 解析数值 →
+        /// 注入地图/终点/回调 → 初始化车道与 waveOrder → 开始移动。
+        /// </summary>
+        /// <param name="request">出生请求（携带已解析敌人键、车道、waveOrder、难度、
+        /// 策略 profile 与初始化依赖；不可为 null）。</param>
+        /// <returns>已初始化并开始移动的普通敌人（供调用方登记到 EnemyManager）。</returns>
+        /// <exception cref="ArgumentNullException">request 为 null。</exception>
+        /// <exception cref="ArgumentException">请求敌人键未注册（unknown key）。</exception>
+        /// <exception cref="EnemyStatsResolutionException">difficultyIndex 越界（不夹取）。</exception>
+        /// <exception cref="ArgumentNullException">请求携带的地图/目标/回调为 null（初始化失败）。</exception>
+        /// <remarks>
+        /// <para><b>失败回滚（design.md 决策 6）：</b>任一步失败都先把本次租借归还到
+        /// 正确池（Reset + 入池），再重新抛出异常，保证池租借对称。</para>
+        /// <para><b>generation（task 3.6）：</b>由 <see cref="ConfiguredEnemyBase.ConfiguredInit"/>
+        /// 在每次租借递增 generation 并携带 waveOrder；返回后可通过
+        /// <c>enemy.CurrentLease</c> 读取 <see cref="EnemyLeaseIdentity"/>。</para>
+        /// </remarks>
+        internal ConfiguredEnemyBase Acquire(EnemySpawnRequest request)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            if (!_registry.TryGetValue(request.EnemyKey, out EnemyTypeRegistration registration))
+            {
+                // 封闭注册表：未知键显式失败，不创建占位敌人（spec "Reject an unsupported normal enemy"）。
+                throw new ArgumentException(
+                    $"{LogTag} 未知敌人键 '{request.EnemyKey}'（未注册，禁止创建占位敌人）");
+            }
+
+            ConfiguredEnemyBase enemy = registration.Acquire();
+            if (enemy == null)
+            {
+                throw new InvalidOperationException(
+                    $"{LogTag} 池返回 null 对象 key={request.EnemyKey}");
+            }
+
+            try
+            {
+                // 分配新运行时 ID（池复用不复用旧 ID）。
+                int runtimeId = _idAllocator.Allocate();
+                enemy.AssignRuntimeId(runtimeId);
+
+                // 唯一数值解析器：difficultyIndex 同时索引血量曲线/策略乘数/早期乘数。
+                ConfiguredEnemyResolvedStats stats = EnemyStatsResolver.Resolve(
+                    registration.Definition,
+                    request.DifficultyIndex,
+                    request.StrategyProfile);
+
+                // 注入数值与依赖、初始化车道与 waveOrder（generation 递增）。
+                // resourceAddress 与 stats 来自同一 EnemyDefinitionSnapshot（task 5.4），
+                // 薄类型不硬编码资源地址。
+                enemy.ConfiguredInit(
+                    request.Map,
+                    request.CellSize,
+                    request.EndPointTarget,
+                    request.OnEnemyKilled,
+                    request.OnDeathRequested,
+                    stats,
+                    registration.Definition.ResourceAddress,
+                    request.IsPlayerLane,
+                    request.WaveOrder,
+                    request.Width,
+                    request.Height);
+
+                // 开始移动（SPAWNING → MOVING）。
+                enemy.BeginMoving();
+
+                _createLog.Add(request.EnemyKey);
+                return enemy;
+            }
+            catch
+            {
+                // 失败回滚：把本次租借归还正确池（Reset + 入池），再重新抛出。
+                registration.Release(enemy);
+                throw;
+            }
+        }
+
+        // ====================================================================
+        // 新链 Release —— 按实际固定 key/type 分发，禁止 Mob0 强转
+        // ====================================================================
+
+        /// <summary>
+        /// 归还一个普通敌人到其正确类型的池（按 <see cref="ConfiguredEnemyBase.EnemyKey"/> 分发）。
+        /// </summary>
+        /// <param name="enemy">要归还的普通敌人。null 或已归还返回 false。</param>
+        /// <returns>成功归还返回 true；null、键未注册或重复 Release 返回 false。</returns>
+        /// <remarks>
+        /// <para>按敌人自身的固定键分发到注册表对应的独立池，不依赖 Mob0 强转；
+        /// 池内部先执行 ResetState（清除本次 callbacks/waveOrder/迟到表现状态），再入池。</para>
+        /// </remarks>
+        internal bool Release(ConfiguredEnemyBase enemy)
+        {
+            if (enemy == null)
+            {
+                return false;
+            }
+
+            if (!_registry.TryGetValue(enemy.EnemyKey, out EnemyTypeRegistration registration))
+            {
+                return false;
+            }
+
+            bool recovered = registration.Release(enemy);
+            if (recovered)
+            {
+                _recoverLog.Add(enemy.EnemyKey);
+            }
+
+            return recovered;
+        }
+
+        // ====================================================================
+        // 旧链 Acquire/Release —— 临时兼容
+        // ====================================================================
+
+        /// <summary>
+        /// 【临时兼容】旧链 Acquire：获取一个 <see cref="Mob0Enemy"/> 并分配新运行时 ID。
         /// </summary>
         /// <returns>已分配新运行时 ID 的 <see cref="Mob0Enemy"/>。</returns>
         /// <remarks>
-        /// <para><b>只注册 Mob0（task 4.5 / design 决策 5）：</b>
-        /// 本方法只返回 <see cref="Mob0Enemy"/>，不提供 typeName 参数。本期只覆盖 Mob0，
-        /// 未知类型显式失败由类型系统保证（无其他注册类型）。</para>
-        ///
-        /// <para><b>每次 Acquire 分配新 ID（task 4.5）：</b>
-        /// 取得对象后立即调用 <see cref="RuntimeIdAllocator.Allocate"/> 分配新 ID，
-        /// 并通过 <c>Mob0Enemy.AssignRuntimeId</c> 写入。从 1 单调递增，
-        /// 池复用不复用旧 ID（design.md 目录表 RuntimeIdAllocator）。</para>
-        ///
-        /// <para><b>对应还原工程：</b>
-        /// EnemyFactory.create(typeName)（EnemyFactory.js:42-49） +
-        /// EnemyBase.init 中的 <c>this.id = gameData.allocateRuntimeId()</c>
-        /// （EnemyBase.js:200）。本工厂将 ID 分配从 EnemyBase.init 提到 Factory.Acquire，
-        /// 使池复用时 ID 重新分配的契约更显式（不依赖 EnemyBase.init 调用时机）。</para>
-        ///
-        /// <para><b>对称契约：</b>每次 Acquire MUST 对应恰好一次 <see cref="Release"/>。
-        /// 调用方（EnemyManager）负责登记到 <see cref="BattleRuntimeScope.TrackPoolRental"/>
-        /// 以保证 Settling/Exit 时自动归还。</para>
+        /// <para>只供旧构造路径使用（<see cref="EnemyFactory(RuntimeIdAllocator, BattleObjectPool{Mob0Enemy})"/>）；
+        /// 新构造路径调用本方法抛 <see cref="InvalidOperationException"/>。下一波迁移删除。</para>
         /// </remarks>
         internal Mob0Enemy Acquire()
         {
-            // 从池获取对象（优先复用空闲，否则新建）。
-            // 对应还原工程 EnemyFactory.create -> creator -> objectPool.takeByClass。
-            Mob0Enemy enemy = _mob0Pool.Acquire();
+            if (_legacyMob0Pool == null)
+            {
+                throw new InvalidOperationException(
+                    $"{LogTag} 旧 Acquire() 仅在旧构造路径可用（新构造请使用 Acquire(EnemySpawnRequest)）");
+            }
 
+            Mob0Enemy enemy = _legacyMob0Pool.Acquire();
             if (enemy == null)
             {
-                // 对应还原工程 EnemyFactory.js:46 "creator returned empty value"。
                 throw new InvalidOperationException(
                     $"{LogTag} 池返回 null 对象 type={nameof(Mob0Enemy)}");
             }
 
-            // 分配新运行时 ID 并写入（task 4.5：每次 Acquire 后分配新 ID）。
-            // 对应还原工程 EnemyBase.js:200 this.id = gameData.allocateRuntimeId()。
-            // 池复用不复用旧 ID：Release 时 ResetState 清除旧 ID，Acquire 时分配新 ID。
             int newId = _idAllocator.Allocate();
             enemy.AssignRuntimeId(newId);
 
-            // 诊断日志（对应 EnemyFactory.js:47 createLog.push）。
             _createLog.Add(nameof(Mob0Enemy));
-
             return enemy;
         }
 
-        // ====================================================================
-        // Release —— 归还 Mob0Enemy 到池（先 Reset 再入池，旧 ID/目标引用失效）
-        // ====================================================================
-
         /// <summary>
-        /// 归还一个 <see cref="Mob0Enemy"/> 到池。先执行 <c>ResetState</c> 清除全部可变状态
-        /// （包括运行时 ID、目标引用），再入池。回收后旧 ID/目标引用不得继续有效。
+        /// 【临时兼容】旧链 Release：归还 <see cref="Mob0Enemy"/> 到池。
         /// </summary>
         /// <param name="enemy">要归还的 <see cref="Mob0Enemy"/>。null 或已归还返回 false。</param>
-        /// <returns>成功归还返回 true；null 或已归还（重复 Release）返回 false。</returns>
+        /// <returns>成功归还返回 true；null 或重复 Release 返回 false。</returns>
         /// <remarks>
-        /// <para><b>旧 ID/目标引用失效（task 4.5）：</b>
-        /// <see cref="BattleObjectPool{T}.Release"/> 在入池前调用
-        /// <c>Mob0Enemy.ResetState</c>，清除运行时 ID（置 0）、阵营、生命、路径、
-        /// 目标引用、攻击冷却、接触回调标记、位置、击退、贡献者等全部可变状态
-        /// （还原工程池复位契约 enemy-pool-reset-contract.md）。
-        /// 回收后对象等价于新构造，旧 ID/目标引用不得继续有效。</para>
-        ///
-        /// <para><b>对应还原工程：</b>
-        /// EnemyFactory.recover(enemy)（EnemyFactory.js:58-63） ->
-        /// objectPool.recoverByClass(enemy) + recoverLog.push(enemy)。
-        /// 本工厂从全局 ObjectPool.recoverByClass 改为强类型
-        /// <see cref="BattleObjectPool{Mob0Enemy}.Release"/>。</para>
-        ///
-        /// <para><b>重复 Release 安全：</b>已归还对象再次 Release 返回 false
-        /// （对应 ObjectPool.js <c>__InPool</c> 语义）。</para>
+        /// <para>旧构造路径归还到旧链 Mob0 池；新构造路径（旧链池为 null）按键分发到
+        /// 注册表 Mob0 池。下一波迁移删除旧重载。</para>
         /// </remarks>
         internal bool Release(Mob0Enemy enemy)
         {
             if (enemy == null)
             {
-                // 对应还原工程 EnemyFactory.js:58 recover(enemy) 由 ObjectPool.recoverByClass
-                // 内部 `if (!value) return false;` 处理；本工厂提前拦截便于诊断。
                 return false;
             }
 
-            // 委托池执行 Reset + 入池。
-            // 池内部先调用 enemy.ResetState()（清除旧 ID/目标引用等全部可变状态），
-            // 再放入空闲列表。重复 Release 由池内部 _inPool 查重拦截。
-            bool recovered = _mob0Pool.Release(enemy);
-
-            if (recovered)
+            if (_legacyMob0Pool != null)
             {
-                // 诊断日志（对应 EnemyFactory.js:61 recoverLog.push(enemy)）。
-                _recoverLog.Add(nameof(Mob0Enemy));
+                bool recovered = _legacyMob0Pool.Release(enemy);
+                if (recovered)
+                {
+                    _recoverLog.Add(nameof(Mob0Enemy));
+                }
+
+                return recovered;
             }
 
-            return recovered;
+            return Release((ConfiguredEnemyBase)enemy);
         }
 
         // ====================================================================
@@ -290,17 +443,43 @@ namespace GameBattle
         /// 重置工厂诊断日志（仅供测试使用）。
         /// </summary>
         /// <remarks>
-        /// <para>对应还原工程 <c>EnemyFactory.resetForTests()</c>（EnemyFactory.js:66-71）。
-        /// 清空 createLog/recoverLog。</para>
-        ///
-        /// <para><b>不重置池与 ID 分配器：</b>池和 ID 分配器的生命周期由
-        /// <see cref="BattleRuntimeFactory"/> / <see cref="BattlePoolScope"/> 管理，
-        /// 不由工厂自行重置。测试中通过新建工厂实例实现重置。</para>
+        /// <para>对应还原工程 <c>EnemyFactory.resetForTests()</c>。不重置池与 ID 分配器
+        /// （其生命周期由 BattleRuntimeFactory / BattlePoolScope 管理）。</para>
         /// </remarks>
         internal void ResetForTests()
         {
             _createLog.Clear();
             _recoverLog.Clear();
+        }
+
+        // ====================================================================
+        // 内部注册类型
+        // ====================================================================
+
+        /// <summary>
+        /// 单类型注册：定义快照 + acquire/release 委托（绑定独立类型池）。
+        /// </summary>
+        private sealed class EnemyTypeRegistration
+        {
+            /// <summary>该键的敌人定义快照（数值解析来源）。</summary>
+            public readonly EnemyDefinitionSnapshot Definition;
+
+            /// <summary>租借委托（从独立类型池 Acquire）。</summary>
+            public readonly Func<ConfiguredEnemyBase> Acquire;
+
+            /// <summary>回收委托（归还到独立类型池，先 Reset 再入池；返回是否成功归还）。</summary>
+            public readonly Func<ConfiguredEnemyBase, bool> Release;
+
+            /// <summary>构造单类型注册。</summary>
+            internal EnemyTypeRegistration(
+                EnemyDefinitionSnapshot definition,
+                Func<ConfiguredEnemyBase> acquire,
+                Func<ConfiguredEnemyBase, bool> release)
+            {
+                Definition = definition;
+                Acquire = acquire;
+                Release = release;
+            }
         }
     }
 }

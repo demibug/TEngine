@@ -149,6 +149,17 @@ namespace GameBattle
         /// <summary>伤害值（对应 <c>this.damage</c>）。</summary>
         private int _damage;
 
+        /// <summary>
+        /// 攻击范围（design 决策 4：命中点有限重选的稳定查询半径）。
+        /// 由 Launch 接收，供 Resolve 回退查询使用。
+        /// </summary>
+        private float _attackRange;
+
+        /// <summary>
+        /// 敌人格子尺寸（宽=高，design 决策 4：回退查询透传给 AttackResolver.QueryTargets）。
+        /// </summary>
+        private float _cellSize;
+
         // ====================================================================
         // 时序状态
         // ====================================================================
@@ -195,10 +206,12 @@ namespace GameBattle
         /// 启动刀兵延迟命中效果：配置参数并激活。
         /// </summary>
         /// <param name="owner">所有者（非 null），提供阵营/运行时 ID。</param>
-        /// <param name="resolver">攻击解析服务（非 null），Resolve 时提交伤害。</param>
+        /// <param name="resolver">攻击解析服务（非 null），Resolve 时提交伤害与首选/回退解析。</param>
         /// <param name="enemyManager">敌人管理器（非 null），Resolve 时按 ID 查找目标。</param>
         /// <param name="targetId">目标敌人运行时 ID（对应 <c>target.id</c>）。</param>
         /// <param name="damage">伤害值（正数）。</param>
+        /// <param name="attackRange">攻击范围（命中点有限重选的稳定查询半径，design 决策 4）。</param>
+        /// <param name="cellSize">敌人格子尺寸（回退查询透传给 AttackResolver.QueryTargets）。</param>
         /// <returns>this（便于链式调用）。</returns>
         /// <remarks>
         /// <para><b>合并 Timeline.start（task 5.5 预防性合入）：</b>
@@ -207,19 +220,26 @@ namespace GameBattle
         /// record 简化为 <c>_resolved</c> 标志，Manager 推进唯一计时。</para>
         /// <para><b>不注册 Timer（task 5.5）：</b>JS usesTimer 分支注册 Laya.timer.once。
         /// C# 删除该分支——唯一计时源为 <see cref="AttackEffectManager.Update"/>。</para>
+        /// <para><b>命中点有限重选（design 决策 4）：</b>攻击范围与格子尺寸供 Resolve 在
+        /// 首选目标失效时经 <see cref="AttackResolver.TryResolvePreferredOrFallback"/>
+        /// 执行一次稳定回退查询。</para>
         /// </remarks>
         internal KnifeAttackEffect Launch(
             IAttackEffectOwner owner,
             AttackResolver resolver,
             EnemyManager enemyManager,
             int targetId,
-            int damage)
+            int damage,
+            float attackRange,
+            float cellSize)
         {
             _owner = owner;
             _resolver = resolver;
             _enemyManager = enemyManager;
             _targetId = targetId;
             _damage = damage;
+            _attackRange = attackRange;
+            _cellSize = cellSize;
             _delayMs = KnifeHitDelayMs;
             _elapsed = 0;
             _resolved = false;
@@ -281,19 +301,19 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 命中结算：查找目标、守卫、经 <see cref="AttackResolver"/> 提交伤害
-        /// （合并 JS <c>KnifeAttackTimeline.resolve</c>）。
+        /// 命中结算：首选目标验证与稳定回退，经 <see cref="AttackResolver"/> 提交伤害
+        /// （合并 JS <c>KnifeAttackTimeline.resolve</c> + design 决策 3/4 有限重选）。
         /// </summary>
         /// <remarks>
-        /// <para><b>对应 JS <c>resolve</c>：</b>
-        /// 检查 owner 有效性 → GetById 查找目标 → IsTargetableBy 守卫 → 提交伤害。</para>
+        /// <para><b>对应 JS <c>resolve</c> + design 决策 4 刀兵命中点有限重选：</b>
+        /// 首选目标（初始目标 ID）仍可攻击 → 继续命中首选；
+        /// 首选失效 → 按当前攻击范围稳定回退一次，命中替代目标；
+        /// 无替代目标 → 无伤害完成（<c>_resolved=true</c>，不命中）。</para>
         /// <para><b>伤害经 resolver（task 5.4 约束）：</b>不直接 <see cref="IEnemyEntity.Hit"/>，
         /// 经 <see cref="AttackResolver.Hit"/> 统一死亡守卫。</para>
-        /// <para><b>幂等：</b><c>_resolved</c> 标志防止重复 Resolve（合并 JS record.settled 语义）。</para>
-        /// <para><b>目标失效处理：</b>owner 为 null（已 Cancel）或目标不存在/不可攻击时，
-        /// 标记 <c>_resolved=true</c> 不命中（对应 JS record.cancelled）。效果仍将由 Manager
-        /// 在下一 Update 检测到非活动后移除——本方法由 Update 在 elapsed&gt;=delayMs 时调用，
-        /// 调用后 Update 立即置 active=false。</para>
+        /// <para><b>幂等：</b><c>_resolved</c> 标志防止重复 Resolve。</para>
+        /// <para><b>不重复消耗冷却：</b>本方法不改写 <c>LastAttackTimeMs</c>；
+        /// 回退查询不提交伤害，只解析目标，命中仍只经一次 <see cref="AttackResolver.Hit"/>。</para>
         /// </remarks>
         private void Resolve()
         {
@@ -305,29 +325,36 @@ namespace GameBattle
             _resolved = true;
 
             // owner 失效守卫（对应 JS if owner 失效 → cancelled; return）。
-            // C# 简化：owner 为 null（已 Cancel/Reset）即失效。
-            // 完整 lifecycleGeneration/inPool 检查由单位 CancelOwner 在回池时取消效果保证。
-            if (_owner == null)
+            if (_owner == null || _enemyManager == null || _resolver == null)
             {
                 return;
             }
 
-            // 查找目标（对应 JS enemy = enemyManager.getById(target.id)）。
-            if (_enemyManager == null)
+            // 首选目标验证与稳定回退（design 决策 3/4）。
+            // 首选目标仍可攻击 → 命中首选；首选失效 → 稳定回退一次；无替代 → 无伤害完成。
+            if (!_resolver.TryResolvePreferredOrFallback(
+                    _enemyManager,
+                    _targetId,
+                    _owner.CenterX, _owner.CenterY,
+                    _attackRange,
+                    _owner.Side,
+                    _cellSize, _cellSize,
+                    out EnemyTargetDto resolved))
             {
+                // 无替代目标：本次攻击无伤害完成（spec "无替代目标时攻击无伤害完成"）。
+                // 不回滚冷却，不立即启动另一轮攻击——冷却已在调度器写回，动画自然结束。
                 return;
             }
-            IEnemyEntity enemy = _enemyManager.GetById(_targetId);
 
-            // 目标守卫：不存在或不可被本方攻击 → 不命中（对应 JS if (!enemy || !isTargetableBy) cancelled; return）。
+            // 按解析后的目标 ID 查找敌人实体并提交伤害。
+            // resolver.Hit 内部死亡守卫拒绝迟到伤害（双重保险）。
+            IEnemyEntity enemy = _enemyManager.GetById(resolved.Id);
             if (enemy == null || !enemy.IsTargetableBy(_owner.Side))
             {
                 return;
             }
 
-            // 经 resolver 提交伤害（对应 JS enemy.hit(damage, owner)）。
-            // C# attackerId = owner.RuntimeId。resolver.Hit 内部死亡守卫拒绝迟到伤害。
-            if (_resolver != null && _damage > 0)
+            if (_damage > 0)
             {
                 _resolver.Hit(enemy, _damage, _owner.RuntimeId);
             }
@@ -378,6 +405,8 @@ namespace GameBattle
             _enemyManager = null;
             _targetId = 0;
             _damage = 0;
+            _attackRange = 0f;
+            _cellSize = 0f;
             _elapsed = 0;
             _delayMs = 0;
             _resolved = false;

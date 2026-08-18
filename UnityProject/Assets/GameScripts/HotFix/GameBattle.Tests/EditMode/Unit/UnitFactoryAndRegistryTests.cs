@@ -128,6 +128,89 @@ namespace GameBattle.Tests.EditMode.Unit
         private static UnitConfigSnapshot CavalryConfig =>
             MakeConfig(3, "骑", "cavalry", 2f, 2, 0.8f);
 
+        [Test]
+        public void BuffAdapter_AppliesSupportedChannelsRefreshesLevelAndClearsBeforePoolReuse()
+        {
+            var definitions = new[]
+            {
+                new BuffDefinitionSnapshot(0, "攻击", "", BuffKind.Numeric,
+                    new[] { (int)BuffNumericChannel.AttackPower }, BuffStackPolicy.Add, 3, ""),
+                new BuffDefinitionSnapshot(1, "攻速", "", BuffKind.Numeric,
+                    new[] { (int)BuffNumericChannel.AttackSpeed }, BuffStackPolicy.Add, 3, ""),
+                new BuffDefinitionSnapshot(2, "范围", "", BuffKind.Numeric,
+                    new[] { (int)BuffNumericChannel.AttackRange }, BuffStackPolicy.Add, 3, ""),
+                new BuffDefinitionSnapshot(3, "移速", "", BuffKind.Numeric,
+                    new[] { (int)BuffNumericChannel.MoveSpeed }, BuffStackPolicy.Add, 3, ""),
+                new BuffDefinitionSnapshot(8, "禁攻", "", BuffKind.State,
+                    new[] { (int)BuffStateChannel.AttackDisabled }, BuffStackPolicy.Add, 3, ""),
+            };
+            var buffManager = new BuffManager(
+                new BuffCatalogSnapshot(definitions), new BattleActionScheduler());
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                2, new[] { 1f, 2f }, new[] { 1f, 1f }));
+            var factory = new UnitFactory(
+                _idAllocator,
+                _knifePool, _bowPool, _spearPool, _cavalryPool,
+                _enemyManager, _attackResolver, _attackEffectManager,
+                _projectileFactory, _projectileManager,
+                CellSize, OpponentAttackMultiplier,
+                levelService);
+            var registry = new UnitRegistry(factory, CellSize, buffManager);
+            var levelOne = new BattleUnit(
+                100, true, UnitKind.Soldier, SoldierType.Knife, "刀", 1);
+            SoldierBase soldier = registry.ActivateBattleUnit(
+                levelOne, KnifeConfig, levelService, 0, 0, UnitWidth, UnitHeight);
+            BuffTargetHandle handle = ((IBuffTarget)soldier).Handle;
+
+            BuffOperationResult attack = buffManager.Apply(new BuffApplyRequest(
+                0, handle, new BuffSourceHandle(1), 10,
+                BuffValueMode.Flat, BuffTimeMode.Permanent, 0));
+            buffManager.Apply(new BuffApplyRequest(
+                1, handle, new BuffSourceHandle(2), 0.5,
+                BuffValueMode.Flat, BuffTimeMode.Permanent, 0));
+            buffManager.Apply(new BuffApplyRequest(
+                2, handle, new BuffSourceHandle(3), 40,
+                BuffValueMode.Flat, BuffTimeMode.Permanent, 0));
+            long disabledId = buffManager.Apply(new BuffApplyRequest(
+                8, handle, new BuffSourceHandle(4), 0,
+                BuffValueMode.Flat, BuffTimeMode.Permanent, 0)).InstanceId;
+            BuffOperationResult unsupported = buffManager.Apply(new BuffApplyRequest(
+                3, handle, new BuffSourceHandle(5), 10,
+                BuffValueMode.Flat, BuffTimeMode.Permanent, 0));
+
+            Assert.AreEqual(BuffOperationStatus.Applied, attack.Status);
+            Assert.AreEqual(BuffOperationStatus.UnsupportedTarget, unsupported.Status);
+            Assert.AreEqual(13, soldier.AttackDamageForTest);
+            Assert.AreEqual(0.8f / 1.5f, soldier.AttackIntervalSeconds, 0.001f);
+            Assert.AreEqual(1.5f * CellSize + 40f, soldier.AttackRange, 0.01f);
+            Assert.IsTrue(soldier.Disabled);
+
+            var levelTwo = new BattleUnit(
+                100, true, UnitKind.Soldier, SoldierType.Knife, "刀", 2);
+            SoldierBase same = registry.ActivateBattleUnit(
+                levelTwo, KnifeConfig, levelService, 0, 0, UnitWidth, UnitHeight);
+            Assert.AreSame(soldier, same);
+            Assert.AreEqual(16, same.AttackDamageForTest, "等级基础值变化后仍保留 +10 Buff。");
+
+            buffManager.RemoveInstance(disabledId);
+            Assert.IsFalse(same.Disabled);
+            int oldId = same.Id;
+            Assert.IsTrue(registry.Remove(oldId));
+            Assert.AreEqual(0, buffManager.ActiveInstanceCount);
+            Assert.AreEqual(0, buffManager.RegisteredTargetCount);
+
+            SoldierBase reused = registry.ActivateBattleUnit(
+                new BattleUnit(101, true, UnitKind.Soldier, SoldierType.Knife, "刀", 1),
+                KnifeConfig, levelService, 0, 0, UnitWidth, UnitHeight);
+            Assert.AreEqual(3, reused.AttackDamageForTest);
+            Assert.AreEqual(0.8f, reused.AttackIntervalSeconds, 0.001f);
+            Assert.AreEqual(1.5f * CellSize, reused.AttackRange, 0.01f);
+            Assert.IsFalse(reused.Disabled);
+
+            registry.GameOver();
+            buffManager.Dispose();
+        }
+
         // ====================================================================
         // UnitFactory 测试
         // ====================================================================

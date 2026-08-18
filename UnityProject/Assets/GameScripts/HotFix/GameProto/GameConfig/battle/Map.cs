@@ -39,6 +39,8 @@ public sealed partial class Map : Luban.BeanBase
         OpponentEnd = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
         {int n0 = _buf.ReadSize(); RouteMarkers = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); RouteMarkers.Add(_e0);}}
         EnemyTypeIndex = _buf.ReadInt();
+        Name = _buf.ReadString();
+        ResourceAddress = _buf.ReadString();
     }
 
     public static Map DeserializeMap(ByteBuf _buf)
@@ -102,6 +104,14 @@ public sealed partial class Map : Luban.BeanBase
     /// 本图敌人类型索引
     /// </summary>
     public readonly int EnemyTypeIndex;
+    /// <summary>
+    /// 地图诊断名称，不参与战斗规则
+    /// </summary>
+    public readonly string Name;
+    /// <summary>
+    /// Unity/YooAsset 战斗地图资源地址
+    /// </summary>
+    public readonly string ResourceAddress;
    
     public const int __ID__ = 2052541190;
     public override int GetTypeId() => __ID__;
@@ -133,6 +143,8 @@ public sealed partial class Map : Luban.BeanBase
         + "opponentEnd:" + OpponentEnd + ","
         + "routeMarkers:" + Luban.StringUtil.CollectionToString(RouteMarkers) + ","
         + "enemyTypeIndex:" + EnemyTypeIndex + ","
+        + "name:" + Name + ","
+        + "resourceAddress:" + ResourceAddress + ","
         + "}";
     }
 }

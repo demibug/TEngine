@@ -34,7 +34,6 @@ namespace GameBattle
     //   每个事件名只有一个参数签名。本类型不提供同名重载：
     //   - OnHealthChanged 只接受 HealthChangedUiFact
     //   - OnGoldChanged 只接受 GoldChangedUiFact
-    //   - OnRoundSpawnPrepared 只接受 RoundSpawnPreparedUiFact
     //   - OnBattleFrozen 只接受 BattleFrozenUiFact
     //   - 跨程序集 OnBattleStarted 只接受 BattleLoadoutDto
     //   - 跨程序集 OnBattleFinished 只接受 BattleResultDto
@@ -46,7 +45,7 @@ namespace GameBattle
     //   不暴露 GameBattle 内部实体、Manager、集合或具体 UI 类型。
     //
     // 订阅生命周期（spec "Event subscriptions follow runtime lifetime"）：
-    //   本类型订阅 BattleInternalSignalHub 的四个信号，订阅句柄由本类型持有，
+    //   本类型订阅 BattleInternalSignalHub 的三个信号，订阅句柄由本类型持有，
     //   在 Dispose 时逐一退订。BattleRuntimeScope 通过 TrackDisposable 登记本类型，
     //   在 Settling 静默清理、失败回滚或 Dispose 时调用 Dispose 批量退订。
     //   保证旧运行时的 Bridge 不会在新一局或迟到信号中被回调
@@ -91,7 +90,7 @@ namespace GameBattle
     /// 不可变），不暴露 GameBattle 内部实体、Manager、集合或具体 UI 类型。</para>
     ///
     /// <para><b>订阅生命周期（spec "Event subscriptions follow runtime lifetime"）：</b>
-    /// 本类型订阅 <see cref="BattleInternalSignalHub"/> 的四个信号，订阅句柄由本类型持有，
+    /// 本类型订阅 <see cref="BattleInternalSignalHub"/> 的三个信号，订阅句柄由本类型持有，
     /// 在 <see cref="Dispose"/> 时逐一退订。<see cref="BattleRuntimeScope"/> 通过
     /// <see cref="BattleRuntimeScope.TrackDisposable"/> 登记本类型，在 Settling 静默清理、
     /// 失败回滚或 Dispose 时调用 <see cref="Dispose"/> 批量退订。</para>
@@ -120,7 +119,7 @@ namespace GameBattle
 
         /// <summary>
         /// 本局内部信号中枢（task 7.1 产物）。
-        /// <para>本类型订阅其四个信号，桥接到 <see cref="IBattleUiEvent"/> UI 事件。
+        /// <para>本类型订阅其三个信号，桥接到 <see cref="IBattleUiEvent"/> UI 事件。
         /// 信号发布由规则服务触发（如 <c>BattleTarget.ApplyDamage</c> 触发 HealthChanged），
         /// 本类型只负责转发，不负责发布信号。</para>
         /// </summary>
@@ -129,7 +128,7 @@ namespace GameBattle
         // ====================================================================
         // 订阅句柄
         // --------------------------------------------------------------------
-        // 持有 SignalHub 四个信号的退订句柄，Dispose 时逐一退订。
+        // 持有 SignalHub 三个信号的退订句柄，Dispose 时逐一退订。
         // 不使用 GameEventMgr 管理（SignalHub 订阅不是 GameEvent 监听），
         // 直接持有 IUnsubscribeHandle。
         // ====================================================================
@@ -139,9 +138,6 @@ namespace GameBattle
 
         /// <summary>GoldChanged 信号退订句柄。</summary>
         private IUnsubscribeHandle _goldChangedHandle;
-
-        /// <summary>RoundSpawnPrepared 信号退订句柄。</summary>
-        private IUnsubscribeHandle _roundSpawnPreparedHandle;
 
         /// <summary>BattleFrozen 信号退订句柄。</summary>
         private IUnsubscribeHandle _battleFrozenHandle;
@@ -162,17 +158,17 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 构造单局事件桥接器，订阅 SignalHub 的四个信号。
+        /// 构造单局事件桥接器，订阅 SignalHub 的三个信号。
         /// </summary>
         /// <param name="signalHub">
         /// 本局内部信号中枢（非 null）。由 <see cref="BattleRuntimeFactory"/> 构造并注入。
-        /// 本类型订阅其四个信号，桥接到 <see cref="IBattleUiEvent"/>。
+        /// 本类型订阅其三个信号，桥接到 <see cref="IBattleUiEvent"/>。
         /// </param>
         /// <exception cref="ArgumentNullException">
         /// <paramref name="signalHub"/> 为 null。
         /// </exception>
         /// <remarks>
-        /// <para>构造时立即订阅 SignalHub 的四个信号，桥接到对应 UI 事件。
+        /// <para>构造时立即订阅 SignalHub 的三个信号，桥接到对应 UI 事件。
         /// 订阅句柄由本类型持有，Dispose 时逐一退订。</para>
         /// <para>前提：<c>GameEventHelper.Init()</c> 已在 <c>GameApp.Entrance</c> 第一行
         /// 最先调用（1.6 spike §3.2 唯一初始化入口），保证全局 EventMgr 就绪。
@@ -182,17 +178,16 @@ namespace GameBattle
         {
             _signalHub = signalHub ?? throw new ArgumentNullException(nameof(signalHub));
 
-            // 订阅 SignalHub 的四个信号，桥接到 IBattleUiEvent。
+            // 订阅 SignalHub 的三个信号，桥接到 IBattleUiEvent。
             // 每个订阅的回调把内部信号载荷转换成 UI 事实载荷，经 GameEvent 发送。
             // 若 GameEvent.Get<IBattleUiEvent>() 返回 default（接口未注册），回调安全无操作
             // （IBattleUiEvent_Gen 的实现可能为 null，调用会 NRE——此处用 try-catch 防御，
             // 不阻断其他信号桥接）。
             _healthChangedHandle = _signalHub.HealthChanged.Subscribe(OnHealthChangedSignal);
             _goldChangedHandle = _signalHub.GoldChanged.Subscribe(OnGoldChangedSignal);
-            _roundSpawnPreparedHandle = _signalHub.RoundSpawnPrepared.Subscribe(OnRoundSpawnPreparedSignal);
             _battleFrozenHandle = _signalHub.BattleFrozen.Subscribe(OnBattleFrozenSignal);
 
-            Log.Info($"{LogTag} 构造完成，已订阅 SignalHub 四个信号");
+            Log.Info($"{LogTag} 构造完成，已订阅 SignalHub 三个信号");
         }
 
         // ====================================================================
@@ -253,38 +248,6 @@ namespace GameBattle
             catch (Exception ex)
             {
                 Log.Error($"{LogTag} 桥接 GoldChanged 异常: {ex}");
-            }
-        }
-
-        /// <summary>
-        /// RoundSpawnPrepared 信号桥接：把 <see cref="WaveSpawnPlan"/> 转换成
-        /// <see cref="RoundSpawnPreparedUiFact"/>，经 <c>GameEvent.Get&lt;IBattleUiEvent&gt;()</c> 发送。
-        /// </summary>
-        /// <remarks>
-        /// <para>从 WaveSpawnPlan 提取 UI 需要的稳定字段（当前波次、计划敌人数量），
-        /// 不暴露完整 WaveSpawnPlan 内部结构（spec "UI receives typed battle facts"：
-        /// UI 接收不可变快照，不需要回写内部状态）。</para>
-        /// </remarks>
-        private void OnRoundSpawnPreparedSignal(WaveSpawnPlan plan)
-        {
-            if (IsDisposed)
-            {
-                return;
-            }
-
-            try
-            {
-                // 从 WaveSpawnPlan 提取 UI 需要的稳定字段。
-                // WaveSpawnPlan 是 task 3.9 定义的 internal sealed class，此处只读取
-                // 波次号（Round）与 Mob0 生成数量（NormalCount）。
-                int round = plan.Round;
-                int enemyCount = plan.NormalCount;
-                var uiFact = new RoundSpawnPreparedUiFact(round, enemyCount);
-                GameEvent.Get<IBattleUiEvent>()?.OnRoundSpawnPrepared(uiFact);
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"{LogTag} 桥接 RoundSpawnPrepared 异常: {ex}");
             }
         }
 
@@ -411,7 +374,7 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 销毁本桥接器，逐一退订 <see cref="BattleInternalSignalHub"/> 的四个信号。
+        /// 销毁本桥接器，逐一退订 <see cref="BattleInternalSignalHub"/> 的三个信号。
         /// </summary>
         /// <remarks>
         /// <para><b>销毁时机（spec "Event subscriptions follow runtime lifetime"）：</b>
@@ -434,7 +397,6 @@ namespace GameBattle
 
             // 逐一退订 SignalHub 信号（逆序，与订阅顺序相反）。
             TryUnsubscribe(ref _battleFrozenHandle, nameof(_battleFrozenHandle));
-            TryUnsubscribe(ref _roundSpawnPreparedHandle, nameof(_roundSpawnPreparedHandle));
             TryUnsubscribe(ref _goldChangedHandle, nameof(_goldChangedHandle));
             TryUnsubscribe(ref _healthChangedHandle, nameof(_healthChangedHandle));
 

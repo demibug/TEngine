@@ -11,14 +11,15 @@ namespace GameBattle
     /// 血量。逻辑血量由 <see cref="EnemyBase"/> 维护，本组件只消费表现层传入的
     /// 当前/最大血量比例（design 决策 4 / design.md:9：逻辑层不依赖表现组件）。</para>
     /// <para><b>填充实现：</b>血条填充使用 <c>SpriteRenderer</c>（<c>drawMode=Sliced</c>），
-    /// 通过缩放 <c>size.x</c> 实现"左侧不动、右侧收缩"。默认期望层级
-    /// <c>VisualRoot/hpBgImg/hpImg1</c>（可选 hpImg2 作底）。</para>
+    /// 通过修改 <c>size.x</c> 与局部 X 坐标实现"左侧不动、右侧收缩"。当前血量
+    /// 使用 <c>VisualRoot/hpBgImg/hpImg2</c> 的红色填充；<c>hpImg1</c> 预留给后续
+    /// 延迟伤害条，本期始终隐藏。</para>
     /// <para><b>显示—延时隐藏：</b>首次受击显示血条，之后每次受击更新比例并重置
     /// 隐藏计时；倒计时（<see cref="HideDelaySeconds"/>）结束自动隐藏。死亡/回池/
     /// 重生由调用方调用 <see cref="ResetAndHide"/> 立即隐藏并复位，保证复用不残留
     /// 旧比例。</para>
-    /// <para><b>可见性：</b>类与 <see cref="Bind"/> 为 public，供 Editor 程序集
-    /// （LayaBattlePrefabImporter）在生成 Prefab 时绑定层级引用。</para>
+    /// <para><b>可见性：</b>类与 <see cref="Bind"/> 为 public，供运行时端口绑定 Prefab
+    /// 节点，并供 EditMode 测试直接验证表现状态。</para>
     /// </remarks>
     public sealed class EnemyHealthBarView : MonoBehaviour
     {
@@ -28,11 +29,17 @@ namespace GameBattle
         /// <summary>血条背景节点（hpBgImg）。</summary>
         private SpriteRenderer _background;
 
-        /// <summary>血条填充节点（hpImg1，血量比例作用于此）。</summary>
+        /// <summary>当前血量填充节点（hpImg2，血量比例作用于此）。</summary>
         private SpriteRenderer _fill;
+
+        /// <summary>预留填充节点（hpImg1），本期始终保持隐藏。</summary>
+        private SpriteRenderer _standbyFill;
 
         /// <summary>填充节点初始 Sliced 宽度（世界单位），用于按比例缩放。</summary>
         private float _fillBaseWidth;
+
+        /// <summary>填充节点满血时的局部位置，用于保持左边缘不动。</summary>
+        private Vector3 _fillBaseLocalPosition;
 
         /// <summary>当前填充比例（0~1）。</summary>
         private float _ratio;
@@ -48,8 +55,9 @@ namespace GameBattle
         /// 在敌人生成时调用。
         /// </summary>
         /// <param name="background">血条背景 SpriteRenderer（不可为 null）。</param>
-        /// <param name="fill">血条填充 SpriteRenderer（不可为 null，drawMode=Sliced）。</param>
-        /// <exception cref="System.ArgumentNullException">任一参数为 null。</exception>
+        /// <param name="fill">当前血量填充 SpriteRenderer（不可为 null，drawMode=Sliced）。</param>
+        /// <param name="standbyFill">预留填充 SpriteRenderer（可为 null，本期保持隐藏）。</param>
+        /// <exception cref="System.ArgumentNullException">background 或 fill 为 null。</exception>
         /// <remarks>
         /// <para>调用时机：敌人生成时由 UnityBattleViewPort 动态 AddComponent 后 Bind，
         /// Prefab 中不序列化绑定数据。</para>
@@ -57,7 +65,10 @@ namespace GameBattle
         /// 若填充使用 Simple drawMode（固定尺寸素材），缩放 <c>size.x</c> 不生效，
         /// 需改缩放 <c>transform.localScale.x</c> 或改用 Sliced 素材。</para>
         /// </remarks>
-        public void Bind(SpriteRenderer background, SpriteRenderer fill)
+        public void Bind(
+            SpriteRenderer background,
+            SpriteRenderer fill,
+            SpriteRenderer standbyFill = null)
         {
             if (background == null)
             {
@@ -71,7 +82,9 @@ namespace GameBattle
 
             _background = background;
             _fill = fill;
+            _standbyFill = standbyFill;
             _fillBaseWidth = fill.size.x;
+            _fillBaseLocalPosition = fill.transform.localPosition;
             ResetAndHide();
         }
 
@@ -92,6 +105,10 @@ namespace GameBattle
                 Vector2 size = _fill.size;
                 size.x = _fillBaseWidth * _ratio;
                 _fill.size = size;
+
+                Vector3 position = _fill.transform.localPosition;
+                position.x = _fillBaseLocalPosition.x - (_fillBaseWidth - size.x) * 0.5f;
+                _fill.transform.localPosition = position;
             }
         }
 
@@ -108,6 +125,11 @@ namespace GameBattle
         public void ShowWithRatio(float ratio)
         {
             SetRatio(ratio);
+            if (_ratio <= 0f)
+            {
+                ResetAndHide();
+                return;
+            }
 
             if (_background != null)
             {
@@ -118,6 +140,8 @@ namespace GameBattle
             {
                 _fill.enabled = true;
             }
+
+            SetStandbyFillVisible(false);
 
             _visible = true;
             _hideTimer = HideDelaySeconds;
@@ -169,8 +193,11 @@ namespace GameBattle
                 Vector2 size = _fill.size;
                 size.x = _fillBaseWidth;
                 _fill.size = size;
+                _fill.transform.localPosition = _fillBaseLocalPosition;
                 _fill.enabled = false;
             }
+
+            SetStandbyFillVisible(false);
         }
 
         /// <summary>当前填充比例（诊断用，0~1）。</summary>
@@ -204,6 +231,17 @@ namespace GameBattle
             if (_fill != null)
             {
                 _fill.enabled = false;
+            }
+
+            SetStandbyFillVisible(false);
+        }
+
+        /// <summary>设置预留填充条显隐。本期不实现延迟掉血条，因此始终关闭。</summary>
+        private void SetStandbyFillVisible(bool visible)
+        {
+            if (_standbyFill != null)
+            {
+                _standbyFill.enabled = visible;
             }
         }
     }

@@ -191,10 +191,12 @@ namespace GameBattle.Tests.EditMode.Combat
             AttackResolver resolver,
             EnemyManager enemyManager,
             int targetId = 1,
-            int damage = 30)
+            int damage = 30,
+            float attackRange = 50f,
+            float cellSize = 40f)
         {
             var effect = new KnifeAttackEffect();
-            effect.Launch(owner, resolver, enemyManager, targetId, damage);
+            effect.Launch(owner, resolver, enemyManager, targetId, damage, attackRange, cellSize);
             return effect;
         }
 
@@ -432,6 +434,177 @@ namespace GameBattle.Tests.EditMode.Combat
         }
 
         // ====================================================================
+        // 命中点有限重选测试（design 决策 3/4，task 3.4）
+        // --------------------------------------------------------------------
+        // 验证：首选目标死亡 → 稳定回退命中替代目标一次；
+        //       无替代目标 → 无伤害完成；
+        //       首选有效 → 不切换；
+        //       重复 Update 不重复伤害；Cancel 后不查询/不伤害；池复用无旧目标残留。
+        // ====================================================================
+
+        /// <summary>
+        /// 构造已登记两个敌人的 EnemyManager（均在攻击范围内），供重选测试使用。
+        /// </summary>
+        private static EnemyManager MakeManagerWithTwoEnemies(
+            out FakeEnemy first, out FakeEnemy second)
+        {
+            var mgr = new EnemyManager(GridSize);
+            first = MakeEnemy(1, isPlayerLane: true, x: 40, y: 40, health: 100);
+            second = MakeEnemy(2, isPlayerLane: true, x: 40, y: 40, health: 100);
+            mgr.Register(first);
+            mgr.Register(second);
+            return mgr;
+        }
+
+        [Test]
+        [Description("刀兵命中前原目标死亡且存在替代目标 → 命中稳定顺序中的下一个目标一次。")]
+        public void KnifeHit_PreferredDead_HasAlternative_HitsAlternativeOnce()
+        {
+            EnemyManager mgr = MakeManagerWithTwoEnemies(out FakeEnemy first, out FakeEnemy second);
+            var resolver = new AttackResolver();
+            var owner = new FakeOwner { RuntimeIdValue = 10, SideValue = true };
+
+            // 初始目标为 first(id=1)，命中前 first 死亡。
+            KnifeAttackEffect effect = CreateAndLaunch(owner, resolver, mgr, targetId: 1, damage: 30);
+            first.GameOver(); // first 死亡，IsTargetableBy 返回 false。
+
+            effect.Update(KnifeHitDelayMs);
+
+            Assert.AreEqual(0, first.HitCount, "已死亡的初始目标不应被命中");
+            Assert.AreEqual(1, second.HitCount, "应命中稳定顺序中的替代目标一次");
+            Assert.AreEqual(70, second.Health, "替代目标血量应扣减 30");
+            Assert.IsFalse(effect.Active, "命中后应完成");
+        }
+
+        [Test]
+        [Description("同一子步两个刀兵锁定同一目标：首个击杀，后一个稳定回退，各自只结算一次。")]
+        public void SameSubstep_TwoLockedAttacks_FirstKills_SecondFallsBackOnce()
+        {
+            EnemyManager mgr = MakeManagerWithTwoEnemies(out FakeEnemy first, out FakeEnemy second);
+            first.Health = 30;
+            var resolver = new AttackResolver();
+            var manager = new AttackEffectManager();
+            var firstOwner = new FakeOwner { RuntimeIdValue = 10, SideValue = true };
+            var secondOwner = new FakeOwner { RuntimeIdValue = 20, SideValue = true };
+
+            KnifeAttackEffect firstEffect = CreateAndLaunch(
+                firstOwner, resolver, mgr, targetId: first.Id, damage: 30);
+            KnifeAttackEffect secondEffect = CreateAndLaunch(
+                secondOwner, resolver, mgr, targetId: first.Id, damage: 30);
+            manager.Add(firstEffect);
+            manager.Add(secondEffect);
+
+            // Manager 按登记顺序推进：首个效果击杀 first，第二个效果看到首选已死亡，
+            // 在同一子步内稳定回退到 second。每个效果只有一次结算机会。
+            manager.Update(KnifeHitDelayMs);
+
+            Assert.AreEqual(1, first.HitCount, "首选目标只应收到一次致死伤害");
+            Assert.AreEqual(0, first.Health, "首选目标应被首个效果击杀");
+            Assert.AreEqual(firstOwner.RuntimeId, first.LastAttackerId,
+                "致死伤害应来自登记顺序中的首个攻击者");
+            Assert.AreEqual(1, second.HitCount, "后续攻击只应稳定回退并命中替代目标一次");
+            Assert.AreEqual(70, second.Health, "替代目标只应扣除一次伤害");
+            Assert.AreEqual(secondOwner.RuntimeId, second.LastAttackerId,
+                "替代目标伤害应来自第二个攻击者");
+            Assert.AreEqual(0, manager.ActiveCount, "两个效果结算后都应完成");
+        }
+
+        [Test]
+        [Description("刀兵命中时原目标已失效且范围内无替代目标 → 无伤害完成。")]
+        public void KnifeHit_PreferredDead_NoAlternative_NoDamageCompletes()
+        {
+            EnemyManager mgr = MakeManagerWithEnemy(out FakeEnemy enemy);
+            var resolver = new AttackResolver();
+            var owner = new FakeOwner { RuntimeIdValue = 10, SideValue = true };
+
+            KnifeAttackEffect effect = CreateAndLaunch(owner, resolver, mgr, targetId: 1, damage: 30);
+            enemy.GameOver(); // 唯一目标死亡，无替代。
+
+            effect.Update(KnifeHitDelayMs);
+
+            Assert.AreEqual(0, enemy.HitCount, "无替代目标时不应命中");
+            Assert.AreEqual(100, enemy.Health, "血量不应改变");
+            Assert.IsFalse(effect.Active, "无伤害完成仍应标记非活动");
+        }
+
+        [Test]
+        [Description("刀兵命中时首选目标仍有效 → 继续命中首选，不切换到其他目标。")]
+        public void KnifeHit_PreferredValid_DoesNotSwitch()
+        {
+            EnemyManager mgr = MakeManagerWithTwoEnemies(out FakeEnemy first, out FakeEnemy second);
+            var resolver = new AttackResolver();
+            var owner = new FakeOwner { RuntimeIdValue = 10, SideValue = true };
+
+            // 首选 first 仍存活，second 也在范围内但不切换。
+            KnifeAttackEffect effect = CreateAndLaunch(owner, resolver, mgr, targetId: 1, damage: 30);
+
+            effect.Update(KnifeHitDelayMs);
+
+            Assert.AreEqual(1, first.HitCount, "应命中首选目标");
+            Assert.AreEqual(0, second.HitCount, "首选有效时不应切换到其他目标");
+        }
+
+        [Test]
+        [Description("刀兵命中后重复 Update 不二次伤害（_resolved 幂等 + 重选只一次）。")]
+        public void KnifeHit_RepeatUpdate_NoSecondaryDamage()
+        {
+            EnemyManager mgr = MakeManagerWithTwoEnemies(out FakeEnemy first, out FakeEnemy second);
+            var resolver = new AttackResolver();
+            var owner = new FakeOwner { RuntimeIdValue = 10, SideValue = true };
+
+            KnifeAttackEffect effect = CreateAndLaunch(owner, resolver, mgr, targetId: 1, damage: 30);
+            first.GameOver();
+
+            effect.Update(KnifeHitDelayMs);
+            // 重复推进多次。
+            effect.Update(100);
+            effect.Update(100);
+
+            Assert.AreEqual(1, second.HitCount, "重选只命中替代目标一次，不因重复 Update 二次伤害");
+        }
+
+        [Test]
+        [Description("Cancel 后不查询目标、不伤害（取消路径不触发重选）。")]
+        public void KnifeHit_Cancelled_NoQueryNoDamage()
+        {
+            EnemyManager mgr = MakeManagerWithTwoEnemies(out FakeEnemy first, out FakeEnemy second);
+            var resolver = new AttackResolver();
+            var owner = new FakeOwner { RuntimeIdValue = 10, SideValue = true };
+
+            KnifeAttackEffect effect = CreateAndLaunch(owner, resolver, mgr, targetId: 1, damage: 30);
+            first.GameOver();
+
+            effect.Cancel("owner-removed");
+            effect.Update(KnifeHitDelayMs);
+
+            Assert.AreEqual(0, first.HitCount, "Cancel 后不应命中任何目标");
+            Assert.AreEqual(0, second.HitCount, "Cancel 后不应触发重选");
+        }
+
+        [Test]
+        [Description("池复用 ResetState 清空旧目标与重选字段，无残留。")]
+        public void KnifeHit_PoolReuse_NoStaleTargetResidue()
+        {
+            EnemyManager mgr = MakeManagerWithTwoEnemies(out FakeEnemy first, out FakeEnemy second);
+            var resolver = new AttackResolver();
+            var owner = new FakeOwner { RuntimeIdValue = 10, SideValue = true };
+
+            KnifeAttackEffect effect = CreateAndLaunch(owner, resolver, mgr, targetId: 1, damage: 30);
+            first.GameOver();
+            effect.Update(KnifeHitDelayMs);
+            Assert.AreEqual(1, second.HitCount, "首次使用应命中替代目标");
+
+            // 池回收 + 复用：新目标集合无 first，新初始目标 id=2。
+            effect.ResetState();
+            EnemyManager mgr2 = MakeManagerWithEnemy(out FakeEnemy newEnemy);
+            effect.Launch(owner, resolver, mgr2, targetId: 1, damage: 20, attackRange: 50f, cellSize: 40f);
+            effect.Update(KnifeHitDelayMs);
+
+            Assert.AreEqual(1, newEnemy.HitCount, "复用后应命中新目标，无旧目标残留");
+            Assert.AreEqual(1, second.HitCount, "旧目标命中次数不应改变（无污染）");
+        }
+
+        // ====================================================================
         // 池复用 ResetState 测试 —— 回收后 resolve-once 守卫重置
         // ====================================================================
 
@@ -457,7 +630,7 @@ namespace GameBattle.Tests.EditMode.Combat
 
             // 重新 Launch 并使用——_resolved 守卫应已重置，可再次命中。
             EnemyManager mgr2 = MakeManagerWithEnemy(out FakeEnemy enemy2);
-            effect.Launch(owner, resolver, mgr2, targetId: 1, damage: 25);
+            effect.Launch(owner, resolver, mgr2, targetId: 1, damage: 25, attackRange: 50f, cellSize: 40f);
             effect.Update(KnifeHitDelayMs);
 
             Assert.AreEqual(1, enemy2.HitCount, "复用后应命中新目标");

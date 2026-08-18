@@ -138,7 +138,7 @@ namespace GameBattle.Tests.EditMode.Enemy
             enemy.InitializeStats(stats);
 
             Assert.IsTrue(enemy.Stats.HasValue, "Stats 有值。");
-            Assert.AreEqual(50, enemy.Stats.Value.Speed, "Speed=50。");
+            Assert.AreEqual(50, enemy.Stats.Value.MoveSpeed, "MoveSpeed=50。");
             Assert.AreEqual(1, enemy.Stats.Value.ContactDamage, "ContactDamage=1。");
             Assert.AreEqual(1, enemy.Stats.Value.RewardGold, "RewardGold=1。");
         }

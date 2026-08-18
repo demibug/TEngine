@@ -63,7 +63,8 @@ namespace GameBattle
     //   - 删除 GeneralPart/GeneralUnit/Farmer：本期只覆盖四兵种士兵
     //     （design.md 决策 5 / Non-Goals "不移植 Boss、Skill、AI、General"）。
     //   - 删除 EventBus：design 决策 4，一致性操作使用直接调用。
-    //   - 删除 WeaponManager/SkillManager/BuffManager：本期延后（task 1.5）。
+    //   - 删除 WeaponManager/SkillManager；BuffManager 仅以可选构造依赖接入
+    //     IBuffTarget 注册与 pre-remove 清理，不恢复全局单例。
     //   - 删除 MapTileManager：可建造性校验由 BattleInputController（task 6.7）
     //     在调用 UnitRegistry 前完成，UnitRegistry 只管理注册/放置/移除。
     //   - 删除 parentResolver：表现层 parent 由 Presenter 通过端口同步，
@@ -99,7 +100,7 @@ namespace GameBattle
     /// （与 EnemyManager 模式一致，task 4.6）。</para>
     ///
     /// <para><b>本期裁剪：</b>
-    /// 删除 GeneralPart/GeneralUnit/Farmer/WeaponManager/SkillManager/BuffManager/
+    /// 删除 GeneralPart/GeneralUnit/Farmer/WeaponManager/SkillManager/
     /// MapTileManager/EventBus/parentResolver（design.md 决策 5 / Non-Goals / task 1.5）。
     /// 只管理四兵种 SoldierBase。</para>
     ///
@@ -163,6 +164,12 @@ namespace GameBattle
         /// <summary>格子尺寸（像素，对应 map.gridWidth=80）。放置时计算逻辑像素位置。</summary>
         private readonly float _cellSize;
 
+        /// <summary>本局 Buff 所有者；未装配时保持旧测试行为。</summary>
+        private readonly BuffManager _buffManager;
+
+        /// <summary>玩家默认基础武器 resolver；未装配时保持旧测试行为（不装配武器）。</summary>
+        private readonly BasicWeaponResolver _weaponResolver;
+
         /// <summary>单位完成放置后的低频表现事实（末位为等级，修复 P0）。</summary>
         internal event Action<int, bool, int, int, int, int> UnitPlaced;
 
@@ -213,6 +220,9 @@ namespace GameBattle
         /// </summary>
         /// <param name="unitFactory">单位工厂。不可为 null。</param>
         /// <param name="cellSize">格子尺寸（像素，对应 map.gridWidth=80）。</param>
+        /// <param name="buffManager">本局 Buff 所有者（可为 null，未装配时保持旧测试行为）。</param>
+        /// <param name="weaponResolver">玩家默认基础武器 resolver（可为 null；null 时保持
+        /// 旧测试行为，不装配玩家默认武器）。</param>
         /// <exception cref="ArgumentNullException"><paramref name="unitFactory"/> 为 null。</exception>
         /// <remarks>
         /// <para>对应还原工程 <c>UnitRegistry.configure({unitFactory, ...})</c>
@@ -221,11 +231,60 @@ namespace GameBattle
         /// parentResolver 等依赖（design.md 决策 5 / Non-Goals）。</para>
         /// <para><b>每局新建/销毁：</b>由 BattleRuntimeFactory 在每局构造时创建新实例，
         /// 不跨局复用（spec "Restart creates clean per-battle state"）。</para>
+        /// <para><b>玩家默认武器（本 change 起）：</b>生产路径由 BattleRuntimeFactory
+        /// 从配置快照构造 <see cref="BasicWeaponResolver"/> 注入；玩家 Soldier 在
+        /// Acquire 之后、Register 之前应用默认武器，对手跳过。解析失败沿创建事务
+        /// 回滚（<see cref="ReleasePrepared"/> 归还池并 ResetState），不 fallback。</para>
         /// </remarks>
-        internal UnitRegistry(UnitFactory unitFactory, float cellSize)
+        internal UnitRegistry(
+            UnitFactory unitFactory,
+            float cellSize,
+            BuffManager buffManager = null,
+            BasicWeaponResolver weaponResolver = null)
         {
             _unitFactory = unitFactory ?? throw new ArgumentNullException(nameof(unitFactory));
             _cellSize = cellSize > 0 ? cellSize : 80f;
+            _buffManager = buffManager;
+            _weaponResolver = weaponResolver;
+        }
+
+        // ====================================================================
+        // ApplyDefaultWeapon —— 玩家默认基础武器应用（Acquire 后、Register 前）
+        // --------------------------------------------------------------------
+        // design.md 决策 3/4 / spec "Player Soldiers receive one default weapon value"：
+        //   玩家 Soldier 完成配置和等级初始化后，由本方法调用 resolver 写入武器；
+        //   对手跳过；解析失败抛 InvalidOperationException（不隐式 fallback），
+        //   由调用方沿创建事务回滚（Release/ResetState 保证无残留）。
+        // ====================================================================
+
+        /// <summary>
+        /// 为玩家 Soldier 应用默认基础武器（对手跳过；解析失败抛错，不 fallback）。
+        /// </summary>
+        /// <param name="soldier">已 Acquire 并完成配置/等级初始化的士兵。</param>
+        /// <param name="type">兵种类型。</param>
+        /// <exception cref="InvalidOperationException">玩家兵种无法解析默认武器
+        /// （resolver 已装配但映射缺失）。</exception>
+        /// <remarks>
+        /// <para><b>旧兼容语义：</b>resolver 未装配（旧测试直接构造 UnitRegistry）时
+        /// 本方法为空操作，保持既有行为；生产路径恒注入 resolver。</para>
+        /// <para><b>对手跳过：</b><see cref="SoldierBase.Side"/> 为 false 时不装配，
+        /// 对手 Soldier 保持无武器（spec "Opponent Soldiers SHALL store no player
+        /// weapon contribution"）。</para>
+        /// </remarks>
+        private void ApplyDefaultWeapon(SoldierBase soldier, SoldierType type)
+        {
+            if (_weaponResolver == null || !soldier.Side)
+            {
+                return;
+            }
+
+            if (!_weaponResolver.TryResolve(type, out WeaponDefinitionSnapshot definition))
+            {
+                throw new InvalidOperationException(
+                    $"{LogTag} 玩家兵种 {type} 缺少默认基础武器配置，禁止隐式 fallback");
+            }
+
+            soldier.ApplyBasicWeapon(definition.Id, definition.AddAttackPower);
         }
 
         // ====================================================================
@@ -284,6 +343,19 @@ namespace GameBattle
 
             // 创建单位（对应 JS unitFactory.createByText，UnitRegistry.js:95）。
             SoldierBase unit = _unitFactory.Acquire(type, config, side, unitWidth, unitHeight);
+
+            // 玩家默认武器：Acquire 后、Register 前应用（对手跳过）。
+            // 解析失败时归还本次租借到池（ResetState 清除状态）再重新抛出，
+            // 沿现有创建事务回滚，不留下半初始化单位。
+            try
+            {
+                ApplyDefaultWeapon(unit, type);
+            }
+            catch
+            {
+                _unitFactory.Release(unit);
+                throw;
+            }
 
             // 设置网格坐标（对应 JS unit.setPlacement，UnitRegistry.js:96）。
             unit.SetPlacement(gridX, gridY);
@@ -353,6 +425,14 @@ namespace GameBattle
                 // 等级可能因合并提升，重新应用数值。
                 existing.ConfigureLevel(levelService);
                 existing.ApplyLevel(unit.Level);
+                _buffManager?.RefreshTarget(
+                    ((IBuffTarget)existing).Handle,
+                    new[]
+                    {
+                        BuffNumericChannel.AttackPower,
+                        BuffNumericChannel.AttackSpeed,
+                        BuffNumericChannel.AttackRange,
+                    });
                 // 战场换格不导入 Board 冷却（Board 冷却已由调用方同步为实时值）。
                 // 战场槽换位复用同一战斗实例，发布位置与等级变化表现事实。
                 UnitMoved?.Invoke(existing.Id, gridX, gridY);
@@ -362,6 +442,17 @@ namespace GameBattle
 
             // 首次上场：创建并应用等级，再放置。
             SoldierBase soldier = _unitFactory.Acquire(unit, config, unitWidth, unitHeight);
+            // 玩家默认武器：Acquire 后、Register 前应用（对手跳过）；失败归还池再抛出。
+            try
+            {
+                ApplyDefaultWeapon(soldier, unit.SoldierType);
+            }
+            catch
+            {
+                _unitFactory.Release(soldier);
+                throw;
+            }
+
             // 修复 P0：首次上场导入冷却（上下场不刷新攻击冷却）。
             soldier.ImportAttackCooldown(unit.LastAttackTimeMs);
             soldier.SetPlacement(gridX, gridY);
@@ -406,6 +497,19 @@ namespace GameBattle
             }
 
             SoldierBase soldier = _unitFactory.Acquire(unit, config, unitWidth, unitHeight);
+            // 玩家默认武器：Acquire 后、Register 前应用（对手跳过）。解析失败时归还
+            // 本次租借到池（ResetState 清除状态）再重新抛出，使调用方事务可经
+            // ReleasePrepared 回滚且不留武器残留。
+            try
+            {
+                ApplyDefaultWeapon(soldier, unit.SoldierType);
+            }
+            catch
+            {
+                _unitFactory.Release(soldier);
+                throw;
+            }
+
             soldier.ImportAttackCooldown(unit.LastAttackTimeMs);
             return soldier;
         }
@@ -540,6 +644,16 @@ namespace GameBattle
                     $"{LogTag} 注册失败：单位 ID {unit.Id} 已存在（重复注册）");
             }
 
+            if (_buffManager != null)
+            {
+                BuffOperationResult result = _buffManager.RegisterTarget(unit);
+                if (!result.IsSuccess)
+                {
+                    throw new InvalidOperationException(
+                        $"{LogTag} 注册 Buff 目标失败：{result.Status} {result.Message}");
+                }
+            }
+
             _idToIndex[unit.Id] = _soldiers.Count;
             _soldiers.Add(unit);
         }
@@ -573,6 +687,8 @@ namespace GameBattle
             }
 
             SoldierBase unit = _soldiers[index];
+
+            _buffManager?.UnregisterTarget(((IBuffTarget)unit).Handle);
 
             // 调 GameOver 取消活动攻击效果并标记回收（对应 JS unit.gameOver()）。
             unit.GameOver();

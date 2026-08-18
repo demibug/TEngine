@@ -222,9 +222,45 @@ namespace GameBattle
         /// <summary>
         /// 进入新波次：波次 +1（对应 BattleManager.js:112 currentRound += 1）。
         /// </summary>
+        /// <remarks>
+        /// <para><b>legacy（任务 4.8）：</b>旧生产链的波次推进入口，保留供既有测试与
+        /// 兼容路径使用。新生产链（有序波次状态机）不再经本方法推进——CurrentRound 由
+        /// <see cref="ApplyWaveStarted"/> 按真实 WaveManager.CurrentOrder 同步。</para>
+        /// </remarks>
         internal void ApplyBeginWave()
         {
             CurrentRound += 1;
+        }
+
+        /// <summary>
+        /// 以所选有序波次计划初始化显示/统计轮数（任务 4.8）。
+        /// </summary>
+        /// <param name="planRowCount">计划行数（<c>plan.Rows.Count</c>）。</param>
+        /// <remarks>
+        /// <para><b>派生显示/统计值：</b><see cref="MaxRounds"/> 从此只作为计划行数的只读
+        /// 显示/统计来源，绝不再参与波次推进或胜利判断（spec ordered-wave-plan
+        /// "计划长度是显示轮数上限的唯一派生来源"）。CurrentRound 重置为 0，
+        /// 之后由 <see cref="ApplyWaveStarted"/> 按真实 order 同步。</para>
+        /// </remarks>
+        internal void ApplyConfigurePlan(int planRowCount)
+        {
+            MaxRounds = Math.Max(0, planRowCount);
+            CurrentRound = 0;
+        }
+
+        /// <summary>
+        /// 同步当前波次到真实 <see cref="WaveManager.CurrentOrder"/>（任务 4.8）。
+        /// </summary>
+        /// <param name="order">波次状态机当前行 order（1-based）。</param>
+        /// <remarks>
+        /// <para>由 <see cref="BattleManager"/> 在收到 WaveManager.<c>WaveStarted(order)</c>
+        /// 单次事实时调用，使 <see cref="CurrentRound"/> 与真实逐波计划保持一致；结果冻结前
+        /// 再次以最后真实 order 调用，确保 ResultBuilder 读取的 round 为最后真实 order。
+        /// 本方法不参与推进/成功判断。</para>
+        /// </remarks>
+        internal void ApplyWaveStarted(int order)
+        {
+            CurrentRound = Math.Max(1, order);
         }
 
         /// <summary>
@@ -311,6 +347,19 @@ namespace GameBattle
         internal void ApplyEnemyKill()
         {
             KillCount += 1;
+        }
+
+        /// <summary>
+        /// 记录一次 Boss 击杀（spec "Boss reward and counters commit once"）。
+        /// </summary>
+        /// <remarks>
+        /// <para>由 Boss 击杀回调在 Enemy 首次死亡边界恰好一次调用，与
+        /// <see cref="ApplyEnemyKill"/> 并列：Boss 死亡同时 +1 KillCount 与 +1 BossKillCount。
+        /// endpoint/forced/Settling 移除不触发。</para>
+        /// </remarks>
+        internal void ApplyBossKill()
+        {
+            BossKillCount += 1;
         }
 
         /// <summary>

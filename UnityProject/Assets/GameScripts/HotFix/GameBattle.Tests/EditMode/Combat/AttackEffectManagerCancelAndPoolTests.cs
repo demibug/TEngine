@@ -153,7 +153,7 @@ namespace GameBattle.Tests.EditMode.Combat
         }
 
         [Test]
-        [Description("CancelOwner 在 Update 遍历中调用时只入队列，遍历结束后统一处理。")]
+        [Description("CancelOwner 在 Update 遍历中调用时立即阻止待取消效果推进，遍历结束后统一移除。")]
         public void CancelOwner_DuringUpdate_QueuedUntilAfterTraversal()
         {
             var manager = new AttackEffectManager();
@@ -173,6 +173,8 @@ namespace GameBattle.Tests.EditMode.Combat
             // triggerEffect 自身因 Cancel 被移除，targetEffect 也被取消。
             Assert.AreEqual(0, manager.ActiveCount, "两个效果都应被移除");
             Assert.IsTrue(targetEffect.CancelCount > 0, "targetEffect 应被 Cancel");
+            Assert.AreEqual(0, targetEffect.UpdateCount,
+                "已进入取消队列的后续效果不得在同一次遍历中继续推进");
         }
 
         /// <summary>

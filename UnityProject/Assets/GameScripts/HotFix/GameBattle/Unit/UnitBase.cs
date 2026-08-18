@@ -82,7 +82,8 @@ namespace GameBattle
     //   3. gameLoop/eventBus/objectPool/presentation/audio 删除：JS 经 configure 注入。
     //      C# 移植删除全部 Laya/全局依赖，单位不需要 gameLoop 注册（AttackScheduler
     //      在阶段回调中驱动），不需要 eventBus（design 决策 4 直接调用）。
-    //   4. buff* 字段删除：本期不移植 BuffManager（task 1.5 延后）。
+    //   4. 删除还原工程散落的 buff* 字段；确定性 Buff 聚合由 SoldierBase 的
+    //      IBuffTarget 窄接口与每局 BuffManager 统一拥有。
     //   5. placementTween/placementPhase 删除：放置缓动属表现层，规则层只记录
     //      网格坐标与容器类型。
     //   6. currentState 枚举：JS 用字符串 'none'/'skip'/'UnitIdle'/'UnitAttack'。
@@ -389,6 +390,12 @@ namespace GameBattle
         {
             get => _attackIntervalSeconds;
             set => _attackIntervalSeconds = value;
+        }
+
+        /// <summary>提交 Buff 聚合后的禁用状态。</summary>
+        protected void SetBuffDisabled(bool disabled)
+        {
+            _disabled = disabled;
         }
 
         /// <summary>当前网格 X（供 UnitRegistry 放置访问）。</summary>
@@ -703,23 +710,25 @@ namespace GameBattle
 
         /// <inheritdoc/>
         /// <summary>
-        /// 触发攻击（对应 unit.attack()）。由具体兵种（task 6.2）覆写，内部创建攻击效果/投射物。
+        /// 触发一次攻击（对应 unit.attack()），接收调度器为本次攻击选定的唯一初始目标。
+        /// 由具体兵种（task 6.2）覆写，内部创建攻击效果/投射物。
         /// </summary>
+        /// <param name="initialTarget">调度器为本次攻击选定的初始目标快照。</param>
         /// <remarks>
         /// <para><b>调用前保证（AttackScheduler）：</b>冷却完毕且存在目标。
         /// AttackScheduler 在 <c>ScheduleUnitAttack</c> 中守卫 <c>IsActive/Disabled/InPool</c>，
-        /// 检查冷却，查询目标，确认有目标后才调用本方法。</para>
+        /// 检查冷却，查询目标，确认有目标后把第一个目标作为本次攻击初始目标传入。</para>
         /// <para><b>子类实现职责：</b>具体兵种（KnifeSoldier/BowSoldier/SpearSoldier/CavalrySoldier，
         /// task 6.2）覆写本方法，内部：</para>
         /// <list type="number">
-        /// <item>查询目标（经 AttackResolver.QueryTargets，二次查询是各兵种既定行为）。</item>
+        /// <item>使用传入的初始目标创建攻击效果或计算朝向（不再独立二次查询目标）。</item>
         /// <item>创建攻击效果（MeleeAttackEffect/KnifeAttackEffect/PikeAttackEffect/
         ///   CavalrySweepEffect/ProjectileAttackEffect）。</item>
         /// <item>经 AttackEffectManager.Add 登记效果。</item>
         /// </list>
         /// <para>本基类不提供默认实现（abstract），强制子类覆写。</para>
         /// </remarks>
-        public abstract void Attack();
+        public abstract void Attack(EnemyTargetDto initialTarget);
 
         // ====================================================================
         // GameOver —— 回收（对应 UnitBase.js:189-222 gameOver）
