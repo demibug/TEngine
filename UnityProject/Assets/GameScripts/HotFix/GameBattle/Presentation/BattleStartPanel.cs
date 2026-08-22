@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameFUI;
 using GameCommon.Battle;
@@ -59,7 +58,7 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 接收 FairyGUI 开始按钮点击；异步任务自行处理全部预期失败和取消。
+        /// 接收 FairyGUI 开始按钮点击；异步任务自行处理全部预期失败。
         /// </summary>
         private void OnStartClicked()
         {
@@ -91,11 +90,8 @@ namespace GameBattle
 
             try
             {
-                BattleOperationResult result = await entryArgs.StartAsync(
-                    entryArgs.Loadout,
-                    OpenCancellationToken);
-
-                if (OpenCancellationToken.IsCancellationRequested)
+                BattleOperationResult result = await entryArgs.StartAsync(entryArgs.Loadout);
+                if (!ReferenceEquals(_entryArgs, entryArgs))
                 {
                     return;
                 }
@@ -105,29 +101,26 @@ namespace GameBattle
                     return;
                 }
 
-                ShowStartFailed(result.DiagnosticMessage);
-            }
-            catch (OperationCanceledException) when (OpenCancellationToken.IsCancellationRequested)
-            {
-                // 窗口关闭会取消本轮开始请求；BattleModule 会完成既有回滚。
-            }
-            catch (OperationCanceledException)
-            {
-                ShowStartFailed("请求取消");
+                ShowStartFailed(entryArgs, result.DiagnosticMessage);
             }
             catch (Exception ex)
             {
+                if (!ReferenceEquals(_entryArgs, entryArgs))
+                {
+                    return;
+                }
+
                 Log.Error($"[BattleStartPanel] 请求开始战斗发生异常: {ex}");
-                ShowStartFailed("请求异常");
+                ShowStartFailed(entryArgs, "请求异常");
             }
         }
 
         /// <summary>
         /// 恢复可重试状态并记录失败原因。
         /// </summary>
-        private void ShowStartFailed(string reason)
+        private void ShowStartFailed(BattleStartEntryArgs entryArgs, string reason)
         {
-            if (OpenCancellationToken.IsCancellationRequested)
+            if (!ReferenceEquals(_entryArgs, entryArgs))
             {
                 return;
             }
@@ -163,7 +156,7 @@ namespace GameBattle
     /// 战斗入口窗口的单次打开参数。
     /// </summary>
     /// <remarks>
-    /// 开始操作是带取消和结果的命令，不使用 GameEvent 表达。
+    /// 开始操作是带结果的命令，不使用 GameEvent 表达。
     /// 委托仅由当前窗口实例持有，窗口关闭后随打开周期清理，避免全局静态订阅。
     /// </remarks>
     internal sealed class BattleStartEntryArgs
@@ -176,11 +169,11 @@ namespace GameBattle
         /// <summary>
         /// 请求开始战斗的异步命令。
         /// </summary>
-        internal Func<BattleLoadoutDto, CancellationToken, UniTask<BattleOperationResult>> StartAsync { get; }
+        internal Func<BattleLoadoutDto, UniTask<BattleOperationResult>> StartAsync { get; }
 
         internal BattleStartEntryArgs(
             BattleLoadoutDto loadout,
-            Func<BattleLoadoutDto, CancellationToken, UniTask<BattleOperationResult>> startAsync)
+            Func<BattleLoadoutDto, UniTask<BattleOperationResult>> startAsync)
         {
             Loadout = loadout;
             StartAsync = startAsync ?? throw new ArgumentNullException(nameof(startAsync));

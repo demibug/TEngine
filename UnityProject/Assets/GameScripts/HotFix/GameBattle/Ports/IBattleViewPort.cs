@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 
 namespace GameBattle
@@ -24,13 +23,13 @@ namespace GameBattle
     //   - spec battle-event-boundary "UI receives typed battle facts"：
     //     系统以强类型事实通知战斗 UI，提供当前值或不可变快照
     //   - spec battle-runtime-lifecycle "Exit releases battle-owned state"：
-    //     退出时取消异步操作和表现回调
+    //     退出时清理表现对象和回调
     //
-    // 异步与取消语义（任务 7.3 要求）：
-    //   所有异步操作接收 Runtime 或 Module CancellationToken。Runtime Token 由
-    //   BattleRuntime.RuntimeTokenSource 提供（task 2.10），在 Settling 静默清理
-    //   与 Exit 时 Cancel，使迟到的表现回调因 Token 失效（spec "Exit releases
-    //   battle-owned state"）。Null 实现的异步方法立即返回，不执行任何 IO。
+    // 异步语义（任务 7.3）：
+    //   所有异步操作通过 UniTask + 资源租约完成，不依赖取消令牌。Runtime 清理
+    //   由 PresentationCallbacks 代次/Scope 释放承担：预加载经 lease 轮询，Settling/Exit 的
+    //   迟到回调经 ResetPreload/Clear 幂等释放失效（spec "Exit releases battle-owned state"）。
+    //   Null 实现的异步方法立即返回，不执行任何 IO。
     //
     // 与事件边界的关系（design.md 第 4 节 / spec battle-event-boundary）：
     //   本端口属于"表现端口"层，不是事件总线。它只承载逻辑→表现的单向事实
@@ -43,8 +42,8 @@ namespace GameBattle
     //   1. 逻辑层单向调用：逻辑层只调本端口通知事实，不从端口读规则状态。
     //   2. 不持有表现对象引用：接口参数只包含逻辑标量与值类型（RuntimeId / 坐标 /
     //      阵营 / 血量等），不传 GameObject / FairyGUI 组件 / Entity 引用。
-    //   3. 异步操作可取消：所有 async 方法接收 CancellationToken，取消时抛出
-    //      OperationCanceledException，保留取消异常语义（与 IBattleModule 一致）。
+    //   3. 异步操作不依赖取消令牌：异步预加载用 lease.IsDone 轮询，Settling/Exit 的迟到
+    //      回调由 Scope 幂等释放与战斗代次检查失效。
     //   4. 线程安全不要求：所有调用在 Unity 主线程的 Runtime 串行队列中执行
     //      （design.md:206 / task 6.6）。
     // ============================================================================
@@ -61,9 +60,9 @@ namespace GameBattle
     /// 不直接持有 Unity GameObject、FairyGUI 组件或任何表现对象。端口参数只包含
     /// 逻辑标量与值类型。</para>
     ///
-    /// <para><b>异步与取消（任务 7.3）：</b>所有异步操作接收 Runtime 或 Module
-    /// CancellationToken。Runtime Token 在 Settling / Exit 时 Cancel，使迟到回调失效
-    /// （spec "Exit releases battle-owned state"）。</para>
+    /// <para><b>异步（任务 7.3）：</b>异步预加载通过资源租约与 lease.IsDone 轮询完成，
+    /// 不依赖取消令牌。Settling/Exit 的迟到回调经 Scope 幂等释放与战斗代次
+    /// 检查失效（spec "Exit releases battle-owned state"）。</para>
     ///
     /// <para><b>与事件边界的关系（design.md 第 4 节）：</b>本端口是表现端口，不是事件总线。
     /// 高频逐实体推进不应通过本端口驱动，而由 BattleViewSynchronizer 在 Unity 帧中读取
@@ -96,9 +95,8 @@ namespace GameBattle
         /// 由 <see cref="BattlePresentationResourcePlan"/> 从所选配置快照收集；
         /// 表现层只为这些地址加载 Prefab 并建立表现池，不再固定预加载 Mob0。
         /// </param>
-        /// <param name="cancellationToken">
-        /// Runtime 或 Module 取消令牌。取消时抛出 <see cref="System.OperationCanceledException"/>。
-        /// Runtime Token 由 <c>BattleRuntime.RuntimeTokenSource</c> 提供，在 Settling / Exit 时 Cancel。
+        /// <param name="generalResourceAddresses">
+        /// 已启用 General 配置中的去重 Prefab 地址；与固定四兵种地址重复时由真实端口去重。
         /// </param>
         /// <remarks>
         /// <para>由 BattleRuntimeFactory 在组装阶段调用（或由 BattleModule 在 Entering 阶段调用），
@@ -111,7 +109,8 @@ namespace GameBattle
         /// </remarks>
         UniTask PreloadAsync(
             IReadOnlyList<string> enemyResourceAddresses,
-            CancellationToken cancellationToken);
+            IReadOnlyList<string> generalResourceAddresses,
+            IReadOnlyList<string> generalPartWords);
 
         /// <summary>
         /// 通知表现层：战斗已开始，可初始化场景视图与 UI。
@@ -177,6 +176,26 @@ namespace GameBattle
         /// <param name="gridY">放置格子行索引。</param>
         /// <param name="level">单位当前等级（首次上场显示真实等级，修复 P0）。</param>
         void OnUnitPlaced(int runtimeId, bool isPlayerSide, int soldierType, int gridX, int gridY, int level);
+
+        /// <summary>按配置地址和武将身份创建单位表现。</summary>
+        void OnConfiguredUnitPlaced(UnitSpawnViewData dto);
+
+        /// <summary>
+        /// 通知表现层：某个战场槽位的未合成武将字部件字形应显示或移除。
+        /// </summary>
+        /// <param name="slotId">固定槽位标识（Battle 槽）。</param>
+        /// <param name="isPlayerSide">是否玩家方。</param>
+        /// <param name="gridX">战场格子列。</param>
+        /// <param name="gridY">战场格子行。</param>
+        /// <param name="partWord">武将字（"张"/"飞"/"黄"/"忠"等）；null 或空表示该槽不再占用
+        /// 武将字部件，表现层应移除该槽的字形对象。</param>
+        /// <remarks>
+        /// <para>由 <see cref="BattlePresenter"/> 从权威槽位事实（SlotChangedFact）翻译：
+        /// 仅当战场槽占用为 <see cref="UnitKind.GeneralPart"/> 时传入对应拆字；空槽、
+        /// 士兵或已合成武将传入空 partWord 以移除旧字形。字形只占一格、可再次起拖，
+        /// 但不创建任何战斗运行时。</para>
+        /// </remarks>
+        void OnBattleGeneralPartGlyphChanged(int slotId, bool isPlayerSide, int gridX, int gridY, string partWord);
 
         /// <summary>
         /// 通知表现层：一个单位已移除（卖出或战斗结束回收），需销毁/隐藏对应表现对象。

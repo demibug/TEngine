@@ -43,6 +43,57 @@ namespace GameBattle.Tests.EditMode.Presentation
         }
 
         [Test]
+        public void CollectGeneralResourceAddresses_UsesConfiguredAddressesAndStableDeduplication()
+        {
+            var generals = new GeneralCatalogSnapshot(new[]
+            {
+                General(10, "张飞", "SpearSoldier"),
+                General(11, "黄忠", "BowSoldier", GeneralCombatArchetype.Bow),
+                General(12, "占位复用", "SpearSoldier"),
+            });
+            BattleConfigSnapshot snapshot = CreateSnapshot(
+                new[] { NormalRow(1, "Mob1") }, generalCatalog: generals);
+
+            IReadOnlyList<string> addresses =
+                BattlePresentationResourcePlan.CollectGeneralResourceAddresses(snapshot);
+
+            CollectionAssert.AreEqual(new[] { "SpearSoldier", "BowSoldier" }, addresses);
+        }
+
+        [Test]
+        public void CollectGeneralResourceAddresses_MissingAddress_FailsExplicitly()
+        {
+            var generals = new GeneralCatalogSnapshot(new[] { General(10, "张飞", string.Empty) });
+            BattleConfigSnapshot snapshot = CreateSnapshot(
+                new[] { NormalRow(1, "Mob1") }, generalCatalog: generals);
+
+            BattleConfigDataException exception = Assert.Throws<BattleConfigDataException>(() =>
+                BattlePresentationResourcePlan.CollectGeneralResourceAddresses(snapshot));
+
+            Assert.AreEqual(BattleConfigErrorCategory.GeneralConfigInvalid, exception.Category);
+            StringAssert.Contains("PrefabAddress", exception.Path);
+        }
+
+        [Test]
+        public void CollectGeneralPartWords_CollectsPartWordsAndDeduplicates()
+        {
+            var generals = new GeneralCatalogSnapshot(new[]
+            {
+                GeneralWithParts(10, "张飞", "张", "飞"),
+                GeneralWithParts(11, "黄忠", "黄", "忠", GeneralCombatArchetype.Bow),
+                GeneralWithParts(12, "张苞", "张", "苞"),
+            });
+            BattleConfigSnapshot snapshot = CreateSnapshot(
+                new[] { NormalRow(1, "Mob1") }, generalCatalog: generals);
+
+            IReadOnlyList<string> words =
+                BattlePresentationResourcePlan.CollectGeneralPartWords(snapshot);
+
+            CollectionAssert.AreEqual(new[] { "张", "飞", "黄", "忠", "苞" }, words,
+                "武将拆字应按首次出现顺序收集并去重。");
+        }
+
+        [Test]
         public void EnemySpawnViewData_IsImmutableValuePayload()
         {
             var dto = new EnemySpawnViewData(41, "Mob3", "Mob3", true, 12.5f, -3f);
@@ -101,7 +152,8 @@ namespace GameBattle.Tests.EditMode.Presentation
 
         private static BattleConfigSnapshot CreateSnapshot(
             IReadOnlyList<WavePlanEntry> rows,
-            string bossResourcePath = "ZhangLiangPrefab")
+            string bossResourcePath = "ZhangLiangPrefab",
+            GeneralCatalogSnapshot generalCatalog = null)
         {
             MapData map = MapData.FromColumnMajorGrid(
                 new IReadOnlyList<string>[]
@@ -153,7 +205,39 @@ namespace GameBattle.Tests.EditMode.Presentation
                         "ZhangLiang", "张梁", "SoulCapture", "boss0", bossResourcePath,
                         "attackliang", "goliang", new BossTimelineSnapshot(500, 1400),
                         true, 7f, 10f, 1, 10, 84.33f, 101.25f),
-                }));
+                }),
+                generalCatalog: generalCatalog);
+        }
+
+        private static GeneralConfigSnapshot General(
+            int index,
+            string name,
+            string address,
+            GeneralCombatArchetype archetype = GeneralCombatArchetype.Pike)
+        {
+            return new GeneralConfigSnapshot(
+                index, name, name, new[] { name + "甲", name + "乙" }, archetype,
+                archetype == GeneralCombatArchetype.Bow ? 7f : 1f,
+                10, 1f, "Physical", "Nearest", address, "default",
+                archetype == GeneralCombatArchetype.Bow ? "SimpleDynamicArrow" : string.Empty,
+                archetype == GeneralCombatArchetype.Bow ? 200 : 0,
+                1);
+        }
+
+        private static GeneralConfigSnapshot GeneralWithParts(
+            int index,
+            string name,
+            string partWord0,
+            string partWord1,
+            GeneralCombatArchetype archetype = GeneralCombatArchetype.Pike)
+        {
+            return new GeneralConfigSnapshot(
+                index, name, name, new[] { partWord0, partWord1 }, archetype,
+                archetype == GeneralCombatArchetype.Bow ? 7f : 1f,
+                10, 1f, "Physical", "Nearest", "TestPrefab", "default",
+                archetype == GeneralCombatArchetype.Bow ? "SimpleDynamicArrow" : string.Empty,
+                archetype == GeneralCombatArchetype.Bow ? 200 : 0,
+                1);
         }
 
         private static EnemyDefinitionSnapshot Definition(int typeIndex, string key)

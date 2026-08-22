@@ -23,7 +23,7 @@
 
 | 文件 | 用途 | SHA-256 |
 |---|---|---|
-| `golden-battle-bundle.json` | canonical 黄金数据清单（5 类数据 + 来源 hash），可读且可由 task 8.2 对照工具独立解析 | `9c7063dbfd0a803553d3c38296d9d62ffa4ae925c57fb1c3d6cd583630994f11` |
+| `golden-battle-bundle.json` | canonical 黄金数据清单（5 类数据 + 来源 hash），可读且可由 task 8.2 对照工具独立解析 | `45bdbecaebee3f900fe705b18308f3ff94244c213335f649c72f4b34b05c1492` |
 | `GoldenBattleFixtures.cs` | 强类型 C# fixture（不依赖 JSON 解析器），固化与 bundle 逐字段一致的常量/只读集合，供 EditMode 测试直接消费 | 见下方 note |
 
 > **hash note**：`GoldenBattleFixtures.cs` 内 `BundleSha256` 常量填入后文件内容再次变化，故 C# 文件自身 hash 在此不固化（自引用无意义）；其内容正确性以 `golden-battle-bundle.json` 为 canonical 凭证，由 task 8.2 对照工具校验 C# 常量与 JSON 字段一致。`golden-battle-bundle.json` 的 hash 为最终写入值，可稳定复算。

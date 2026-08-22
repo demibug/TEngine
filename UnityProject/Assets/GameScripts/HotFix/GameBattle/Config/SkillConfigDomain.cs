@@ -82,6 +82,12 @@ namespace GameBattle
         /// <summary>范围（格，只读透传；SoulCapture 专用 handler 读取，不为通用 DSL）。</summary>
         public float? RangeTiles { get; }
 
+        /// <summary>触发攻击计数（主动技能：累计多少次普通攻击后在下个可攻击槽触发；只读透传）。</summary>
+        public int? TriggerAttackCount { get; }
+
+        /// <summary>单箭伤害倍率（主动技能：每箭伤害 = 当前有效攻击力 × 倍率；只读透传）。</summary>
+        public float? EffectDamageMultiplier { get; }
+
         /// <summary>构造单个 Skill 定义快照。</summary>
         /// <param name="key">技能主键。</param>
         /// <param name="category">技能类别。</param>
@@ -90,6 +96,8 @@ namespace GameBattle
         /// <param name="effectBuffType">效果 Buff 类型（只读透传）。</param>
         /// <param name="effectDurationMs">效果持续毫秒（只读透传）。</param>
         /// <param name="rangeTiles">范围（格，只读透传；可为空）。</param>
+        /// <param name="triggerAttackCount">触发攻击计数（只读透传；可为空）。</param>
+        /// <param name="effectDamageMultiplier">单箭伤害倍率（只读透传；可为空）。</param>
         public SkillDefinitionSnapshot(
             string key,
             SkillCategory category,
@@ -97,7 +105,9 @@ namespace GameBattle
             string handlerKey,
             int? effectBuffType,
             int? effectDurationMs,
-            float? rangeTiles = null)
+            float? rangeTiles = null,
+            int? triggerAttackCount = null,
+            float? effectDamageMultiplier = null)
         {
             Key = key ?? string.Empty;
             Category = category;
@@ -106,6 +116,8 @@ namespace GameBattle
             EffectBuffType = effectBuffType;
             EffectDurationMs = effectDurationMs;
             RangeTiles = rangeTiles;
+            TriggerAttackCount = triggerAttackCount;
+            EffectDamageMultiplier = effectDamageMultiplier;
         }
 
         /// <inheritdoc/>
@@ -113,7 +125,8 @@ namespace GameBattle
         {
             return $"SkillDefinition(key={Key}, category={Category}, cooldownMs={CooldownMs}, " +
                    $"handlerKey='{HandlerKey}', " +
-                   $"effectBuffType={EffectBuffType}, effectDurationMs={EffectDurationMs}, rangeTiles={RangeTiles})";
+                   $"effectBuffType={EffectBuffType}, effectDurationMs={EffectDurationMs}, rangeTiles={RangeTiles}, " +
+                   $"triggerAttackCount={TriggerAttackCount}, effectDamageMultiplier={EffectDamageMultiplier})";
         }
     }
 

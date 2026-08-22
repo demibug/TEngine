@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using NUnit.Framework;
 
 namespace GameBattle.Tests.EditMode.Recruit
@@ -129,6 +130,63 @@ namespace GameBattle.Tests.EditMode.Recruit
             Assert.AreEqual(SoldierType.Bow, RecruitManager.TextToSoldierType("弓"));
             Assert.AreEqual(SoldierType.Spear, RecruitManager.TextToSoldierType("枪"));
             Assert.AreEqual(SoldierType.Cavalry, RecruitManager.TextToSoldierType("骑"));
+        }
+
+        [Test]
+        public void GenerateBatch_PlayerUsesWeightedParts_OpponentRemainsSoldierOnly()
+        {
+            var entries = new[]
+            {
+                new GeneralPartRecruitEntry("张", 1),
+                new GeneralPartRecruitEntry("飞", 1),
+                new GeneralPartRecruitEntry("黄", 1),
+                new GeneralPartRecruitEntry("忠", 1),
+            };
+            var playerRecruit = new RecruitManager(new FixedRandomSource(0.5f), _slotBoard, 1, entries);
+            BattleUnit player = playerRecruit.GenerateBatch(true)[0];
+            var opponentRecruit = new RecruitManager(new FixedRandomSource(0.5f), _slotBoard, 1, entries);
+            BattleUnit opponent = opponentRecruit.GenerateBatch(false)[0];
+
+            Assert.AreEqual(UnitKind.GeneralPart, player.Kind);
+            Assert.AreEqual("张", player.GeneralPartText, "总权重 8 的边界 4 应命中首个武将字");
+            Assert.AreEqual(UnitKind.Soldier, opponent.Kind, "对手池必须始终只有四兵");
+            Assert.IsFalse(opponent.Side);
+        }
+
+        [Test]
+        [Description("征兵批次只能生成士兵或武将字，绝不直接生成已合成武将。")]
+        public void GenerateBatch_NeverReturnsCompletedGeneral()
+        {
+            var entries = new[]
+            {
+                new GeneralPartRecruitEntry("张", 1),
+                new GeneralPartRecruitEntry("飞", 1),
+                new GeneralPartRecruitEntry("黄", 1),
+                new GeneralPartRecruitEntry("忠", 1),
+            };
+            var recruit = new RecruitManager(new SeededRandomSource(20260821), _slotBoard, 5, entries);
+
+            for (int batchIndex = 0; batchIndex < 16; batchIndex++)
+            {
+                IReadOnlyList<BattleUnit> batch = recruit.GenerateBatch(isPlayerSide: true);
+                foreach (BattleUnit unit in batch)
+                {
+                    Assert.AreNotEqual(UnitKind.General, unit.Kind,
+                        $"第 {batchIndex} 批征兵不应直接产出已合成武将");
+                    Assert.IsTrue(unit.Kind == UnitKind.Soldier || unit.Kind == UnitKind.GeneralPart,
+                        "玩家征兵结果只允许士兵或武将字");
+                }
+            }
+        }
+
+        private sealed class FixedRandomSource : IRandomSource
+        {
+            private readonly float _value;
+            public FixedRandomSource(float value) => _value = value;
+            public float NextUnit() => _value;
+            public int Next(int max) => (int)Math.Floor(_value * max);
+            public int Next(int min, int max) => min + Next(max - min);
+            public void Shuffle<T>(IList<T> list) { }
         }
 
         private static bool IsBaseSoldierText(string text)

@@ -12,9 +12,18 @@ namespace GameBattle
     /// <para>数字 Sprite 数组由 <see cref="UnityBattleViewPort"/> 预加载
     /// <c>Sprites/LevelBadge/level_number_1</c>..<c>level_number_8</c> 后经
     /// <see cref="Configure"/> 注入（index = level - 1）。未注入时退化为隐藏。</para>
+    /// <para>标签仍是士兵子节点，但每帧在 <see cref="LateUpdate"/>（角色旋转经
+    /// <c>SetBodyRotation</c> 结算之后）以世界坐标固定到角色左上方并保持世界旋转
+    /// <c>Quaternion.identity</c>，因此根节点 Z 旋转时数字自身始终正向、不绕行。</para>
     /// </remarks>
     internal sealed class SoldierLevelBadge : MonoBehaviour
     {
+        /// <summary>标签相对角色中心的世界空间左偏移（左上角）。</summary>
+        private const float WorldOffsetX = -0.4f;
+
+        /// <summary>标签相对角色中心的世界空间上偏移（头顶上方）。</summary>
+        private const float WorldOffsetY = 0.55f;
+
         private SpriteRenderer _renderer;
         private Sprite[] _numberSprites;
         private int _level = 1;
@@ -52,14 +61,41 @@ namespace GameBattle
                 return;
             }
 
-            // 在士兵根节点下创建等级数字标签，偏移到头顶上方。
+            // 在士兵根节点下创建等级数字标签（初始位置仅作兜底，随后由
+            // SyncWorldPlacement 以世界坐标立即覆盖）。
             var labelObject = new GameObject("LevelBadge");
             labelObject.transform.SetParent(transform, false);
-            labelObject.transform.localPosition = new Vector3(0f, 0.55f, 0f);
+            labelObject.transform.localPosition = new Vector3(WorldOffsetX, WorldOffsetY, 0f);
 
             _renderer = labelObject.AddComponent<SpriteRenderer>();
             _renderer.sortingOrder = 10;
             _renderer.enabled = false;
+
+            // 创建即同步世界位置/旋转，避免首帧跟随根节点旋转闪动。
+            SyncWorldPlacement();
+        }
+
+        /// <summary>
+        /// 每帧在角色旋转结算后（LateUpdate 晚于驱动 SetBodyRotation 的 OnUpdate）执行，
+        /// 以世界坐标固定标签到角色左上方并保持世界旋转为正，使其不随根节点 Z 旋转绕行。
+        /// </summary>
+        private void LateUpdate()
+        {
+            SyncWorldPlacement();
+        }
+
+        /// <summary>同步标签世界位置与旋转（根节点未旋转时为恒等，无额外开销）。</summary>
+        private void SyncWorldPlacement()
+        {
+            if (_renderer == null)
+            {
+                return;
+            }
+
+            Transform labelTransform = _renderer.transform;
+            // 世界空间偏移：角色中心 + 固定左上偏移，不依赖根节点朝向。
+            labelTransform.position = transform.position + new Vector3(WorldOffsetX, WorldOffsetY, 0f);
+            labelTransform.rotation = Quaternion.identity;
         }
 
         /// <summary>按当前等级刷新数字 Sprite。</summary>

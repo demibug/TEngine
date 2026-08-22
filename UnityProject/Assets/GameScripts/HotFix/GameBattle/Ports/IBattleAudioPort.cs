@@ -1,4 +1,3 @@
-using System.Threading;
 using Cysharp.Threading.Tasks;
 
 namespace GameBattle
@@ -17,12 +16,12 @@ namespace GameBattle
     //     Time.deltaTime；表现通过端口和 Presenter 同步"
     //   - design.md:215 "战斗音频意图端口；逻辑测试可使用空实现"
     //   - spec battle-runtime-lifecycle "Exit releases battle-owned state"：
-    //     退出时取消异步操作和表现回调
+    //     退出时停止音频并清理表现回调
     //
-    // 异步与取消语义（任务 7.3 要求）：
-    //   所有异步操作接收 Runtime 或 Module CancellationToken。Runtime Token 在
-    //   Settling / Exit 时 Cancel，使迟到的音频加载回调失效。Null 实现的异步方法
-    //   立即返回，不执行任何 IO。
+    // 异步语义（任务 7.3）：
+    //   异步预加载通过 UniTask + Yield 完成，不依赖取消令牌。Settling/Exit 的
+    //   迟到音频回调经 Clear 幂等停止失效（spec "Exit releases battle-owned state"）。
+    //   Null 实现的异步方法立即返回，不执行任何 IO。
     //
     // 设计考量：
     //   - 本端口只表达"意图"（Play/Stop），不表达具体 AudioClip 路径。具体资源
@@ -35,7 +34,8 @@ namespace GameBattle
     //   1. 逻辑层单向调用：逻辑层只调本端口发送音频意图，不从端口读规则状态。
     //   2. 不持有音频对象引用：接口参数只包含逻辑标量（audioId / 循环标志），
     //      不传 AudioClip / AudioSource / GameObject。
-    //   3. 异步操作可取消：所有 async 方法接收 CancellationToken。
+    //   3. 异步操作不依赖取消令牌：异步预加载通过 Yield 完成，Settling/Exit 的迟到
+    //      回调由 Clear 幂等停止失效。
     //   4. 线程安全不要求：所有调用在 Unity 主线程的 Runtime 串行队列中执行。
     // ============================================================================
 
@@ -49,8 +49,8 @@ namespace GameBattle
     /// <para><b>意图式设计：</b>本端口只表达 Play/Stop 意图，不表达具体资源路径。
     /// 真实实现根据 <c>audioId</c> 查表映射到 AudioClip，使逻辑层与资源命名解耦。</para>
     ///
-    /// <para><b>异步与取消（任务 7.3）：</b>异步预加载接收 Runtime/Module CancellationToken。
-    /// Runtime Token 在 Settling / Exit 时 Cancel（spec "Exit releases battle-owned state"）。</para>
+    /// <para><b>异步（任务 7.3）：</b>异步预加载通过 Yield 完成，不依赖取消令牌。
+    /// Settling/Exit 的迟到音频回调经 Clear 幂等停止失效（spec "Exit releases battle-owned state"）。</para>
     ///
     /// <para><b>线程安全：</b>不要求。所有调用在 Unity 主线程的 Runtime 串行队列中执行。</para>
     ///
@@ -74,16 +74,13 @@ namespace GameBattle
         /// <summary>
         /// 异步预加载本端口所需的音频资源（BGM / SFX AudioClip）。
         /// </summary>
-        /// <param name="cancellationToken">
-        /// Runtime 或 Module 取消令牌。取消时抛出 <see cref="System.OperationCanceledException"/>。
-        /// </param>
         /// <remarks>
         /// <para>由 BattleRuntimeFactory / BattleModule 在 Entering 阶段调用。
         /// 加载失败向上传播为结构化 <c>BattleOperationResult</c>，使部分初始化回滚
         /// （spec "Partial initialization is recoverable"）。</para>
         /// <para>Null 实现立即返回 <see cref="UniTask.CompletedTask"/>。</para>
         /// </remarks>
-        UniTask PreloadAsync(CancellationToken cancellationToken);
+        UniTask PreloadAsync();
 
         /// <summary>
         /// 播放战斗 BGM（背景音乐）。

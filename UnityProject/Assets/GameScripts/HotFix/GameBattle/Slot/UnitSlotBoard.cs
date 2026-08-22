@@ -26,16 +26,24 @@ namespace GameBattle
     //   之间迁移，槽位本身不移动。Battle 槽由地图可建造格生成；Reserve 槽数量
     //   由配置决定。
     //
-    // 拖放规则（最终方案"冻结后的玩法规则" + 修复）：
-    //   1. 空目标槽：把单位从源槽换到目标槽，源槽变空。
+    // 拖放规则（统一拖放规则：Move / Merge / Swap）：
+    //   1. 空目标槽：Move —— 把单位从源槽换到目标槽，源槽变空。
     //      先检查 sourceSlot.Side == sourceUnit.Side == targetSlot.Side（跨阵营空槽拦截）。
-    //   2. 有目标单位且满足合并条件：目标单位升一级，源单位消失，源槽变空。
-    //   3. 有目标单位但不满足条件：不修改任何逻辑状态，表现弹回源槽。
-    //   4. 合并条件：不同单位、同阵营、同兵种、同等级、低于配置最大等级。
+    //   2. 有目标单位且满足合并条件：Merge —— 目标单位升一级，源单位消失，源槽变空。
+    //   3. 有目标单位但不满足合并条件：Swap —— 两单位互换位置，不消耗任何单位。
+    //   4. 合并条件：不同单位、同阵营、同兵种（Kind/SoldierType 权威）、同等级、低于配置最大等级。
     //   5. 合并免费且单次执行，不自动连锁。
     //   6. 合并结果保留目标 UnitId 和目标 SlotId；升级保留目标攻击冷却。
     //   7. 所有拖动行为都不自动补充待上场单位。
     //   8. 征兵只处理待上场槽，绝不影响战场槽；批次数量必须等于槽位数。
+    //   9. 武将字（GeneralPart）：单字拖到占用的单字格基础动作永远是 Swap，拖到空格是 Move。
+    //      基础动作后按最终槽位布局检测同区域横向有序配方（张|飞/黄|忠 左字+右字）：
+    //      只有最终成序且包含本次移动字牌时才在同一事务内合成；最终反序不合成。
+    //      合成武将身份复用配方中未拖动字牌的 UnitId，拖动字牌被消耗。
+    //   10. General 只是一对相邻字牌的合成态；拖动命中其中任一格时，先把该 General
+    //       解散为两个 GeneralPart，再只对命中的源格和目标格执行单格 Move / Swap。
+    //   11. 目标 General 同样先解散；一空一占、两个士兵或两个 General 均只处理实际
+    //       命中的目标格。换位后仅检查本次移动影响的两个最终落点是否重新满足有序配方。
     //
     // 事实发布：
     //   换槽/合并/征兵替换的事实由 <see cref="BattleInputController"/> 在完整事务成功
@@ -73,15 +81,24 @@ namespace GameBattle
         /// <summary>源单位与目标单位阵营不同，或空目标槽跨阵营。</summary>
         CrossSide = 5,
 
-        /// <summary>目标单位不满足合并条件（不同兵种/不同等级等）。</summary>
+        /// <summary>目标单位不满足合并条件（不同兵种/不同等级等；统一规则下已走 Swap）。</summary>
         TargetMismatch = 6,
 
-        /// <summary>目标单位已满级，不可继续合并。</summary>
+        /// <summary>目标单位已满级，不可继续合并（统一规则下已走 Swap）。</summary>
         MaxLevelReached = 7,
+
+        /// <summary>武将字区域限制（历史保留：已允许字牌进出战场，不再产生）。</summary>
+        UnitZoneRestricted = 8,
+
+        /// <summary>历史双格整体拖动拒绝原因（保留枚举值兼容，不再产生）。</summary>
+        HorizontalPairUnavailable = 9,
+
+        /// <summary>历史双格整体拖动拒绝原因（保留枚举值兼容，不再产生）。</summary>
+        GeneralPairWouldSplit = 10,
     }
 
     /// <summary>
-    /// 换槽/合并操作结果（TryPlanDrop 的返回）。
+    /// 换槽/合并/互换操作结果（TryPlanDrop 的返回）。
     /// </summary>
     internal readonly struct SlotDropResult
     {
@@ -99,6 +116,9 @@ namespace GameBattle
 
         /// <summary>是否发生了合并（成功且目标有单位时；便捷属性委托 Plan）。</summary>
         public bool IsMerge => Success && Plan.IsMerge;
+
+        /// <summary>是否发生了互换（成功且目标占用不满足合并条件时；便捷属性委托 Plan）。</summary>
+        public bool IsSwap => Success && Plan.IsSwap;
 
         /// <summary>合并或换槽后的目标槽占用单位（便捷属性委托 Plan）。</summary>
         public BattleUnit? ResultUnit => Success ? Plan.ResultUnit : null;
@@ -159,6 +179,9 @@ namespace GameBattle
         /// <summary>最大等级（合并上限，来自 UnitLevelConfigSnapshot.MaxLevel）。</summary>
         private readonly int _maxLevel;
 
+        /// <summary>启用武将的有序配方索引（左字+右字，反序不命中）。</summary>
+        private readonly GeneralCatalogSnapshot _generalCatalog;
+
         /// <summary>是否已初始化（Initialize 后置位）。</summary>
         private bool _initialized;
 
@@ -173,9 +196,10 @@ namespace GameBattle
         /// 构造槽位面板。
         /// </summary>
         /// <param name="maxLevel">最大等级（合并上限，来自 UnitLevelConfigSnapshot.MaxLevel）。</param>
-        internal UnitSlotBoard(int maxLevel)
+        internal UnitSlotBoard(int maxLevel, GeneralCatalogSnapshot generalCatalog = null)
         {
             _maxLevel = maxLevel > 0 ? maxLevel : RecruitDefinitions.MaxLevel;
+            _generalCatalog = generalCatalog ?? new GeneralCatalogSnapshot(Array.Empty<GeneralConfigSnapshot>());
         }
 
         // ====================================================================
@@ -347,6 +371,12 @@ namespace GameBattle
                 return false;
             }
 
+            if (slot.Occupant.Value.Kind == UnitKind.General)
+            {
+                return UpdateOccupantCooldownByUnitId(
+                    slot.Occupant.Value.UnitId, lastAttackTimeMs);
+            }
+
             BattleUnit updated = slot.Occupant.Value.WithAttackCooldown(lastAttackTimeMs);
             _slotsById[slotId] = new UnitSlot(slot.SlotId, updated);
             _revision++;
@@ -361,16 +391,31 @@ namespace GameBattle
         /// <returns>true=找到并更新；false=该单位不在任何槽位。</returns>
         internal bool UpdateOccupantCooldownByUnitId(int unitId, long lastAttackTimeMs)
         {
+            var matchingSlotIds = new List<int>(2);
             foreach (KeyValuePair<int, UnitSlot> pair in _slotsById)
             {
                 BattleUnit? occupant = pair.Value.Occupant;
                 if (occupant.HasValue && occupant.Value.UnitId == unitId)
                 {
-                    return UpdateOccupantCooldown(pair.Key, lastAttackTimeMs);
+                    matchingSlotIds.Add(pair.Key);
                 }
             }
 
-            return false;
+            for (int index = 0; index < matchingSlotIds.Count; index++)
+            {
+                int slotId = matchingSlotIds[index];
+                UnitSlot slot = _slotsById[slotId];
+                BattleUnit unit = slot.Occupant.Value.WithAttackCooldown(lastAttackTimeMs);
+                _slotsById[slotId] = new UnitSlot(slot.SlotId, unit);
+            }
+
+            if (matchingSlotIds.Count == 0)
+            {
+                return false;
+            }
+
+            _revision++;
+            return true;
         }
 
         // ====================================================================
@@ -422,14 +467,21 @@ namespace GameBattle
         /// <see cref="CommitDrop"/> 提交；失败时携带拒绝原因，不修改任何状态。
         /// </returns>
         /// <remarks>
-        /// <para><b>校验顺序（最终方案 + 修复）：</b></para>
+        /// <para><b>校验顺序（统一拖放规则）：</b></para>
         /// <list type="number">
         /// <item>已初始化、源/目标槽合法、源非空、源目标不同。</item>
         /// <item><b>跨阵营检查（修复）：</b>无论目标是否为空，先检查
         ///   <c>sourceSlot.Side == sourceUnit.Side == targetSlot.Side</c>。
         ///   空目标槽跨阵营也返回 <see cref="SlotDropRejectReason.CrossSide"/>。</item>
-        /// <item>目标为空 → 换槽计划（源移动到目标，源槽变空）。</item>
-        /// <item>目标有单位 → 合并条件检查（同兵种/同等级/未满级）。</item>
+        /// <item>目标为空 → 基础动作 Move（源移动到目标，源槽变空）。</item>
+        /// <item>目标有单位且满足合并条件（士兵同兵种/同等级/未满级）→ 基础动作 Merge。</item>
+        /// <item>目标有单位但不满足合并条件 → 基础动作 Swap（两单位互换位置）。
+        ///   武将字对占用单字格永远先 Swap。</item>
+        /// <item>源为武将字且最终落点在 Battle 时，基础动作后再按最终槽位布局检测
+        ///   包含本次移动字牌的横向有序配方；命中则在同一事务内改写为双格 General。
+        ///   Reserve 中武将字只执行 Move/Swap，不合成。</item>
+        /// <item>源或目标为 General 时，先在虚拟布局中解散为两个 GeneralPart，再按点击格
+        ///   执行普通单格 Move / Swap。历史残缺 General 也降级为已有字牌后继续。</item>
         /// </list>
         /// </remarks>
         internal SlotDropResult TryPlanDrop(UnitSlotId sourceSlotId, UnitSlotId targetSlotId)
@@ -475,58 +527,292 @@ namespace GameBattle
                     $"sourceSlot.Side={sourceSlot.SlotId.Side} targetSlot.Side={targetSlot.SlotId.Side}");
             }
 
-            // 空目标槽：换槽计划。
-            if (!targetUnit.HasValue)
+            return TryPlanOriginalSingleCellDrop(sourceSlotId, targetSlotId);
+        }
+
+        /// <summary>
+        /// 原版单格拖放：General 先还原为独立字牌，再只处理点击的源格和目标格。
+        /// 所有拆将、移动、交换和重新合成均写入同一个事务计划。
+        /// </summary>
+        private SlotDropResult TryPlanOriginalSingleCellDrop(
+            UnitSlotId sourceSlotId,
+            UnitSlotId targetSlotId)
+        {
+            var virtualOccupants = new Dictionary<int, BattleUnit?>();
+            var changedSlotIds = new HashSet<int>();
+            var disassembledGeneralIds = new HashSet<int>();
+
+            BattleUnit sourceBefore = _slotsById[sourceSlotId.Id].Occupant.Value;
+            BattleUnit? targetBefore = _slotsById[targetSlotId.Id].Occupant;
+            DisassembleGeneral(sourceBefore, virtualOccupants, changedSlotIds, disassembledGeneralIds);
+            if (targetBefore.HasValue)
             {
-                var movePlan = new SlotDropPlan(
-                    sourceSlotId: sourceSlotId,
-                    targetSlotId: targetSlotId,
-                    isMerge: false,
-                    resultUnit: sourceUnit,
-                    consumedSourceUnit: null,
-                    sourceBefore: sourceUnit,
-                    targetBefore: null,
-                    boardRevision: _revision);
-                return SlotDropResult.Ok(movePlan);
+                DisassembleGeneral(
+                    targetBefore.Value, virtualOccupants, changedSlotIds, disassembledGeneralIds);
             }
 
-            // 有目标单位：检查合并条件。
-            BattleUnit source = sourceUnit.Value;
-            BattleUnit target = targetUnit.Value;
-
-            if (source.Kind != target.Kind || source.SoldierType != target.SoldierType)
-            {
-                return SlotDropResult.Fail(
-                    SlotDropRejectReason.TargetMismatch,
-                    $"合并要求同兵种（source={source.SoldierText} target={target.SoldierText}）");
-            }
-
-            if (source.Level != target.Level)
-            {
-                return SlotDropResult.Fail(
-                    SlotDropRejectReason.TargetMismatch,
-                    $"合并要求同等级（source Lv={source.Level} target Lv={target.Level}）");
-            }
-
-            if (target.Level >= _maxLevel)
+            BattleUnit? virtualSource = GetVirtualOccupant(virtualOccupants, sourceSlotId);
+            BattleUnit? virtualTarget = GetVirtualOccupant(virtualOccupants, targetSlotId);
+            if (!virtualSource.HasValue)
             {
                 return SlotDropResult.Fail(
-                    SlotDropRejectReason.MaxLevelReached,
-                    $"目标单位已满级（Lv={target.Level}，最大 {_maxLevel}）");
+                    SlotDropRejectReason.SourceEmpty,
+                    $"源槽 {sourceSlotId} 在拆将后为空");
             }
 
-            // 满足合并条件：目标升一级（保留目标冷却），源消失。
-            BattleUnit merged = target.WithLevel(target.Level + 1);
-            var mergePlan = new SlotDropPlan(
-                sourceSlotId: sourceSlotId,
-                targetSlotId: targetSlotId,
-                isMerge: true,
-                resultUnit: merged,
-                consumedSourceUnit: source,
-                sourceBefore: source,
-                targetBefore: target,
-                boardRevision: _revision);
-            return SlotDropResult.Ok(mergePlan);
+            BattleUnit source = virtualSource.Value;
+            BattleUnit? target = virtualTarget;
+            SlotDropOperationType operationType;
+            if (!target.HasValue)
+            {
+                operationType = SlotDropOperationType.Move;
+                SetVirtualOccupant(virtualOccupants, changedSlotIds, sourceSlotId, null);
+                SetVirtualOccupant(virtualOccupants, changedSlotIds, targetSlotId, source);
+            }
+            else
+            {
+                BattleUnit targetUnit = target.Value;
+                bool canMerge = source.Kind == UnitKind.Soldier
+                    && targetUnit.Kind == UnitKind.Soldier
+                    && source.SoldierType == targetUnit.SoldierType
+                    && source.Level == targetUnit.Level
+                    && targetUnit.Level < _maxLevel;
+                if (canMerge)
+                {
+                    operationType = SlotDropOperationType.Merge;
+                    SetVirtualOccupant(virtualOccupants, changedSlotIds, sourceSlotId, null);
+                    SetVirtualOccupant(
+                        virtualOccupants,
+                        changedSlotIds,
+                        targetSlotId,
+                        targetUnit.WithLevel(targetUnit.Level + 1));
+                }
+                else
+                {
+                    operationType = SlotDropOperationType.Swap;
+                    SetVirtualOccupant(
+                        virtualOccupants, changedSlotIds, sourceSlotId, targetUnit);
+                    SetVirtualOccupant(
+                        virtualOccupants, changedSlotIds, targetSlotId, source);
+                }
+            }
+
+            // 原版先回调拖动源，再回调被换出的目标：按 target → source 顺序检查。
+            bool synthesized = TrySynthesizeAround(
+                targetSlotId, source.UnitId, virtualOccupants, changedSlotIds);
+            if (target.HasValue)
+            {
+                synthesized |= TrySynthesizeAround(
+                    sourceSlotId, target.Value.UnitId, virtualOccupants, changedSlotIds);
+            }
+
+            if (synthesized)
+            {
+                operationType = SlotDropOperationType.Synthesize;
+            }
+
+            var orderedSlotIds = new List<int>(changedSlotIds);
+            orderedSlotIds.Sort();
+            var mutations = new SlotDropMutation[orderedSlotIds.Count];
+            for (int index = 0; index < orderedSlotIds.Count; index++)
+            {
+                int slotId = orderedSlotIds[index];
+                UnitSlot current = _slotsById[slotId];
+                mutations[index] = new SlotDropMutation(
+                    current.SlotId,
+                    current.Occupant,
+                    GetVirtualOccupant(virtualOccupants, current.SlotId));
+            }
+
+            return SlotDropResult.Ok(new SlotDropPlan(
+                sourceSlotId,
+                targetSlotId,
+                operationType,
+                mutations,
+                _revision));
+        }
+
+        /// <summary>把完整或历史残缺 General 的所有已找到半格还原为独立字牌。</summary>
+        private void DisassembleGeneral(
+            BattleUnit unit,
+            Dictionary<int, BattleUnit?> virtualOccupants,
+            HashSet<int> changedSlotIds,
+            HashSet<int> disassembledGeneralIds)
+        {
+            if (unit.Kind != UnitKind.General || !disassembledGeneralIds.Add(unit.UnitId))
+            {
+                return;
+            }
+
+            foreach (UnitSlot slot in _slotsById.Values)
+            {
+                BattleUnit? occupant = slot.Occupant;
+                if (!occupant.HasValue
+                    || occupant.Value.Kind != UnitKind.General
+                    || occupant.Value.UnitId != unit.UnitId)
+                {
+                    continue;
+                }
+
+                SetVirtualOccupant(
+                    virtualOccupants,
+                    changedSlotIds,
+                    slot.SlotId,
+                    occupant.Value.ToGeneralPart());
+            }
+        }
+
+        private BattleUnit? GetVirtualOccupant(
+            Dictionary<int, BattleUnit?> virtualOccupants,
+            UnitSlotId slotId)
+        {
+            return virtualOccupants.TryGetValue(slotId.Id, out BattleUnit? occupant)
+                ? occupant
+                : _slotsById[slotId.Id].Occupant;
+        }
+
+        private static void SetVirtualOccupant(
+            Dictionary<int, BattleUnit?> virtualOccupants,
+            HashSet<int> changedSlotIds,
+            UnitSlotId slotId,
+            BattleUnit? occupant)
+        {
+            virtualOccupants[slotId.Id] = occupant;
+            changedSlotIds.Add(slotId.Id);
+        }
+
+        /// <summary>只检查一个实际移动落点附近的有序配方，不扫描无关旧布局。</summary>
+        private bool TrySynthesizeAround(
+            UnitSlotId movedSlotId,
+            int movedPartUnitId,
+            Dictionary<int, BattleUnit?> virtualOccupants,
+            HashSet<int> changedSlotIds)
+        {
+            if (movedSlotId.Zone != SlotZone.Battle)
+            {
+                return false;
+            }
+
+            BattleUnit? moved = GetVirtualOccupant(virtualOccupants, movedSlotId);
+            if (!moved.HasValue || moved.Value.Kind != UnitKind.GeneralPart)
+            {
+                return false;
+            }
+
+            if (TryGetHorizontalNeighbor(movedSlotId, -1, out UnitSlotId leftId)
+                && TrySynthesizePair(
+                    leftId,
+                    movedSlotId,
+                    movedPartUnitId,
+                    virtualOccupants,
+                    changedSlotIds))
+            {
+                return true;
+            }
+
+            return TryGetHorizontalNeighbor(movedSlotId, 1, out UnitSlotId rightId)
+                && TrySynthesizePair(
+                    movedSlotId,
+                    rightId,
+                    movedPartUnitId,
+                    virtualOccupants,
+                    changedSlotIds);
+        }
+
+        private bool TrySynthesizePair(
+            UnitSlotId leftSlotId,
+            UnitSlotId rightSlotId,
+            int movedPartUnitId,
+            Dictionary<int, BattleUnit?> virtualOccupants,
+            HashSet<int> changedSlotIds)
+        {
+            BattleUnit? leftCandidate = GetVirtualOccupant(virtualOccupants, leftSlotId);
+            BattleUnit? rightCandidate = GetVirtualOccupant(virtualOccupants, rightSlotId);
+            if (!leftCandidate.HasValue
+                || !rightCandidate.HasValue
+                || leftCandidate.Value.Kind != UnitKind.GeneralPart
+                || rightCandidate.Value.Kind != UnitKind.GeneralPart
+                || leftCandidate.Value.Side != rightCandidate.Value.Side)
+            {
+                return false;
+            }
+
+            BattleUnit leftPart = leftCandidate.Value;
+            BattleUnit rightPart = rightCandidate.Value;
+            GeneralConfigSnapshot definition = _generalCatalog.GetByRecipeOrDefault(
+                leftPart.GeneralPartText, rightPart.GeneralPartText);
+            if (definition == null)
+            {
+                return false;
+            }
+
+            BattleUnit identityPart = leftPart.UnitId == movedPartUnitId
+                ? rightPart
+                : leftPart;
+            int generalUnitId = identityPart.UnitId;
+            int level = Math.Max(leftPart.Level, rightPart.Level);
+            long cooldown = identityPart.LastAttackTimeMs;
+            BattleUnit leftCell = BattleUnit.CreateGeneralCell(
+                generalUnitId,
+                leftPart.Side,
+                definition,
+                0,
+                leftPart.UnitId,
+                level,
+                cooldown);
+            BattleUnit rightCell = BattleUnit.CreateGeneralCell(
+                generalUnitId,
+                rightPart.Side,
+                definition,
+                1,
+                rightPart.UnitId,
+                level,
+                cooldown);
+            SetVirtualOccupant(
+                virtualOccupants, changedSlotIds, leftSlotId, leftCell);
+            SetVirtualOccupant(
+                virtualOccupants, changedSlotIds, rightSlotId, rightCell);
+            return true;
+        }
+
+        private bool TryGetHorizontalNeighbor(
+            UnitSlotId slotId,
+            int offset,
+            out UnitSlotId neighbor)
+        {
+            if (offset != -1 && offset != 1)
+            {
+                neighbor = UnitSlotId.Invalid;
+                return false;
+            }
+
+            if (slotId.Zone == SlotZone.Battle)
+            {
+                GridPosition target = new GridPosition(
+                    slotId.GridPosition.X + offset,
+                    slotId.GridPosition.Y);
+                return TryFindBattleSlot(slotId.Side, target, out neighbor);
+            }
+
+            IReadOnlyList<UnitSlot> slots = GetSlots(slotId.Side, slotId.Zone);
+            for (int index = 0; index < slots.Count; index++)
+            {
+                if (slots[index].SlotId.Id != slotId.Id)
+                {
+                    continue;
+                }
+
+                int neighborIndex = index + offset;
+                if (neighborIndex >= 0 && neighborIndex < slots.Count)
+                {
+                    neighbor = slots[neighborIndex].SlotId;
+                    return true;
+                }
+                break;
+            }
+
+            neighbor = UnitSlotId.Invalid;
+            return false;
         }
 
         // ====================================================================
@@ -542,8 +828,10 @@ namespace GameBattle
         /// <para><b>版本冲突校验：</b>提交时校验 <see cref="SlotDropPlan.BoardRevision"/>
         /// 等于当前 <see cref="Revision"/>。若期间发生其他槽位修改，提交失败，
         /// 由调用方返回失败（事务版本冲突拒绝原因）。</para>
-        /// <para><b>提交语义：</b>IsMerge 时目标槽写结果单位、源槽清空；否则源槽清空、
-        /// 目标槽写源单位。本方法不触发任何 C# 事件（事实由控制器发布）。</para>
+        /// <para><b>提交语义：</b>一次性把源槽写为 <see cref="SlotDropPlan.SourceAfter"/>、
+        /// 目标槽写为 <see cref="SlotDropPlan.TargetAfter"/>（Move 源变空目标写入；
+        /// Merge 源变空目标升级；Swap 两槽互换）。本方法不触发任何 C# 事件
+        /// （事实由控制器发布）。</para>
         /// </remarks>
         internal bool CommitDrop(SlotDropPlan plan)
         {
@@ -558,15 +846,11 @@ namespace GameBattle
                 return false;
             }
 
-            if (plan.IsMerge)
+            IReadOnlyList<SlotDropMutation> mutations = plan.Mutations;
+            for (int index = 0; index < mutations.Count; index++)
             {
-                _slotsById[plan.TargetSlotId.Id] = new UnitSlot(plan.TargetSlotId, plan.ResultUnit);
-                _slotsById[plan.SourceSlotId.Id] = new UnitSlot(plan.SourceSlotId, occupant: null);
-            }
-            else
-            {
-                _slotsById[plan.TargetSlotId.Id] = new UnitSlot(plan.TargetSlotId, plan.ResultUnit);
-                _slotsById[plan.SourceSlotId.Id] = new UnitSlot(plan.SourceSlotId, occupant: null);
+                SlotDropMutation mutation = mutations[index];
+                _slotsById[mutation.SlotId.Id] = new UnitSlot(mutation.SlotId, mutation.After);
             }
 
             _revision++;
@@ -590,8 +874,12 @@ namespace GameBattle
                 return false;
             }
 
-            _slotsById[plan.SourceSlotId.Id] = new UnitSlot(plan.SourceSlotId, plan.SourceBefore);
-            _slotsById[plan.TargetSlotId.Id] = new UnitSlot(plan.TargetSlotId, plan.TargetBefore);
+            IReadOnlyList<SlotDropMutation> mutations = plan.Mutations;
+            for (int index = 0; index < mutations.Count; index++)
+            {
+                SlotDropMutation mutation = mutations[index];
+                _slotsById[mutation.SlotId.Id] = new UnitSlot(mutation.SlotId, mutation.Before);
+            }
             _revision++;
             return true;
         }

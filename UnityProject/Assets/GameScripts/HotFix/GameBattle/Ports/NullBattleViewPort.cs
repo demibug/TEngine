@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 
 namespace GameBattle
@@ -60,10 +59,9 @@ namespace GameBattle
         /// <remarks>Null 实现：立即返回 <see cref="UniTask.CompletedTask"/>，不执行任何 IO。</remarks>
         public UniTask PreloadAsync(
             IReadOnlyList<string> enemyResourceAddresses,
-            CancellationToken cancellationToken)
+            IReadOnlyList<string> generalResourceAddresses,
+            IReadOnlyList<string> generalPartWords)
         {
-            // 取消令牌已取消时保留取消异常语义（与 IBattleModule 一致）。
-            cancellationToken.ThrowIfCancellationRequested();
             return UniTask.CompletedTask;
         }
 
@@ -109,6 +107,16 @@ namespace GameBattle
         public void OnUnitPlaced(int runtimeId, bool isPlayerSide, int soldierType, int gridX, int gridY, int level)
         {
             // 空操作：不创建单位表现对象。
+        }
+
+        public void OnConfiguredUnitPlaced(UnitSpawnViewData dto)
+        {
+            // 空操作：纯逻辑运行不创建配置化单位表现。
+        }
+
+        public void OnBattleGeneralPartGlyphChanged(int slotId, bool isPlayerSide, int gridX, int gridY, string partWord)
+        {
+            // 空操作：纯逻辑运行不创建武将字字形表现。
         }
 
         /// <inheritdoc/>

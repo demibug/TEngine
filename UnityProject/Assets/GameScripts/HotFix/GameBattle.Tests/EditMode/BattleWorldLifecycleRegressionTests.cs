@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
@@ -17,9 +16,9 @@ namespace GameBattle.Tests.EditMode
         {
             int exitCalls = 0;
             var module = new BattleModule(
-                (loadout, scope, token) => UniTask.FromResult(
+                (loadout, scope) => UniTask.FromResult(
                     BattleOperationResult.Ok(BattleModuleState.Running)),
-                (scope, token) =>
+                scope =>
                 {
                     exitCalls++;
                     return exitCalls == 1
@@ -44,36 +43,45 @@ namespace GameBattle.Tests.EditMode
         }
 
         [Test]
-        public async Task EnsureWorld_CanceledAfterInstanceCreated_DestroysOrphanAndCanRetry()
+        public async Task EnsureWorld_ReleaseInvalidatesLateLoad_DestroysOrphanAndCanRetry()
         {
-            using var cancellationSource = new CancellationTokenSource();
+            var firstLoadAllowed = new UniTaskCompletionSource();
             int loadCount = 0;
-            var host = new BattleWorldHost((parent, token) =>
+            GameObject lateInstance = null;
+            var host = new BattleWorldHost(async parent =>
             {
-                GameObject map = CreateValidMap();
-                map.transform.SetParent(parent, false);
                 if (loadCount++ == 0)
                 {
-                    cancellationSource.Cancel();
+                    await firstLoadAllowed.Task;
+                    lateInstance = CreateValidMap();
+                    return lateInstance;
                 }
 
-                return UniTask.FromResult(map);
+                GameObject map = CreateValidMap();
+                map.transform.SetParent(parent, false);
+                return map;
             });
 
             try
             {
-                bool canceled = false;
+                UniTask<GameObject> firstLoad = host.EnsureWorldAsync();
+                host.Release(destroyImmediate: true);
+                firstLoadAllowed.TrySetResult();
+
+                bool invalidated = false;
                 try
                 {
-                    await host.EnsureWorldAsync(cancellationSource.Token);
+                    await firstLoad;
                 }
-                catch (OperationCanceledException)
+                catch (BattleMapLoadException)
                 {
-                    canceled = true;
+                    invalidated = true;
                 }
 
-                Assert.IsTrue(canceled);
-                Assert.AreEqual(0, host.WorldRoot.childCount, "取消后的地图实例不得遗留在世界根节点下。");
+                Assert.IsTrue(invalidated, "Release 后旧加载必须被判定为失效。");
+                Assert.IsNull(host.MapInstance, "迟到实例不得提交到 WorldHost。");
+                await UniTask.Yield();
+                Assert.IsTrue(lateInstance == null, "迟到实例必须被销毁。");
 
                 GameObject map = await host.EnsureWorldAsync();
                 Assert.IsNotNull(map);
@@ -81,7 +89,77 @@ namespace GameBattle.Tests.EditMode
             }
             finally
             {
-                host.Release();
+                if (lateInstance != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(lateInstance);
+                }
+
+                host.Release(destroyImmediate: true);
+            }
+        }
+
+        [Test]
+        public async Task EnsureWorld_StaleCompletionDoesNotClearNewerLoad()
+        {
+            var firstLoadAllowed = new UniTaskCompletionSource();
+            var secondLoadAllowed = new UniTaskCompletionSource();
+            int loadCount = 0;
+            GameObject firstLateInstance = null;
+            GameObject secondInstance = null;
+            var host = new BattleWorldHost(async parent =>
+            {
+                int loadIndex = loadCount++;
+                if (loadIndex == 0)
+                {
+                    await firstLoadAllowed.Task;
+                    firstLateInstance = CreateValidMap();
+                    return firstLateInstance;
+                }
+
+                if (loadIndex == 1)
+                {
+                    await secondLoadAllowed.Task;
+                    secondInstance = CreateValidMap();
+                    secondInstance.transform.SetParent(parent, false);
+                    return secondInstance;
+                }
+
+                throw new InvalidOperationException("新一代在途加载被旧加载覆盖，触发了第三次加载。");
+            });
+
+            try
+            {
+                UniTask<GameObject> firstLoad = host.EnsureWorldAsync();
+                host.Release(destroyImmediate: true);
+
+                UniTask<GameObject> secondLoad = host.EnsureWorldAsync();
+                firstLoadAllowed.TrySetResult();
+                Assert.ThrowsAsync<BattleMapLoadException>(async () => await firstLoad);
+
+                // 旧加载收尾后再次请求必须继续复用第二个任务，不能创建第三个加载。
+                UniTask<GameObject> sharedSecondLoad = host.EnsureWorldAsync();
+                Assert.AreEqual(2, loadCount);
+
+                secondLoadAllowed.TrySetResult();
+                GameObject loaded = await secondLoad;
+                GameObject sharedLoaded = await sharedSecondLoad;
+
+                Assert.AreSame(loaded, sharedLoaded);
+                Assert.AreSame(secondInstance, host.MapInstance);
+                Assert.AreEqual(1, host.WorldRoot.childCount);
+                await UniTask.Yield();
+                Assert.IsTrue(firstLateInstance == null, "旧代迟到实例必须被销毁。");
+            }
+            finally
+            {
+                firstLoadAllowed.TrySetResult();
+                secondLoadAllowed.TrySetResult();
+                if (firstLateInstance != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(firstLateInstance);
+                }
+
+                host.Release(destroyImmediate: true);
             }
         }
 

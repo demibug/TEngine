@@ -70,6 +70,71 @@ namespace GameBattle.Tests.EditMode.Config
                 "两次快照的金币值应相等");
         }
 
+        [Test]
+        public void GeneralCatalog_RecipeLookup_IsOrdered_AndCopiesSourceList()
+        {
+            var source = new List<GeneralConfigSnapshot>
+            {
+                new GeneralConfigSnapshot(
+                    1, "张飞", "张", new[] { "张", "飞" }, GeneralCombatArchetype.Pike,
+                    2.5f, 15, 1f, "近战枪击", "nearest", "SpearSoldier", "default", "", 0, 1),
+            };
+            var catalog = new GeneralCatalogSnapshot(source);
+            source.Clear();
+
+            Assert.AreEqual(1, catalog.Definitions.Count, "目录必须复制源列表");
+            Assert.AreSame(catalog.Definitions[0], catalog.GetByRecipeOrDefault("张", "飞"),
+                "有序左+右应命中配方");
+            Assert.IsNull(catalog.GetByRecipeOrDefault("飞", "张"), "反序配方必须返回 null");
+            Assert.AreEqual(2, catalog.PartRecruitEntries.Count);
+            Assert.AreEqual("张", catalog.PartRecruitEntries[0].PartText);
+        }
+
+        [Test]
+        public void GeneralDefinition_MapsConfiguredStatsToExistingCombatArchetype()
+        {
+            var zhangFei = new GeneralConfigSnapshot(
+                1, "张飞", "张", new[] { "张", "飞" }, GeneralCombatArchetype.Pike,
+                2.5f, 15, 1f, "近战枪击", "nearest", "SpearSoldier", "default", "", 0, 1,
+                "BattleShout");
+            var huangZhong = new GeneralConfigSnapshot(
+                4, "黄忠", "黄", new[] { "黄", "忠" }, GeneralCombatArchetype.Bow,
+                3.5f, 13, 0.8f, "单体", "nearest", "BowSoldier", "default",
+                "SimpleDynamicArrow", 200, 1, "FireArrowBarrage");
+
+            BattleUnit zfUnit = BattleUnit.CreateGeneral(10, true, zhangFei);
+            UnitConfigSnapshot zfCombat = zhangFei.ToUnitConfigSnapshot();
+            BattleUnit hzUnit = BattleUnit.CreateGeneral(11, true, huangZhong);
+            UnitConfigSnapshot hzCombat = huangZhong.ToUnitConfigSnapshot();
+
+            Assert.AreEqual(SoldierType.Spear, zfUnit.SoldierType);
+            Assert.AreEqual(15, zfCombat.AttackDamage);
+            Assert.AreEqual(2.5f, zfCombat.RangeCells);
+            Assert.AreEqual("BattleShout", zhangFei.SkillKey, "张飞 SkillKey 应透传");
+            Assert.AreEqual("BattleShout", zfCombat.SkillKey, "ToUnitConfigSnapshot 应透传 SkillKey");
+            Assert.AreEqual(SoldierType.Bow, hzUnit.SoldierType);
+            Assert.AreEqual(13, hzCombat.AttackDamage);
+            Assert.AreEqual(0.8f, hzCombat.AttackIntervalSeconds);
+            Assert.AreEqual("SimpleDynamicArrow", huangZhong.ProjectileType);
+            Assert.AreEqual(200, huangZhong.ProjectileSpeed);
+            Assert.AreEqual(200, hzCombat.ProjectileSpeed);
+            Assert.AreEqual("FireArrowBarrage", huangZhong.SkillKey, "黄忠 SkillKey 应透传");
+            Assert.AreEqual("FireArrowBarrage", hzCombat.SkillKey, "ToUnitConfigSnapshot 应透传 SkillKey");
+        }
+
+        [Test]
+        public void GeneralDefinition_NullSkillKey_NormalizedToEmptyAndPassesThrough()
+        {
+            var general = new GeneralConfigSnapshot(
+                1, "张飞", "张", new[] { "张", "飞" }, GeneralCombatArchetype.Pike,
+                2.5f, 15, 1f, "近战枪击", "nearest", "SpearSoldier", "default", "", 0, 1);
+
+            UnitConfigSnapshot unit = general.ToUnitConfigSnapshot();
+
+            Assert.AreEqual(string.Empty, general.SkillKey, "null SkillKey 应规范化为空串");
+            Assert.AreEqual(string.Empty, unit.SkillKey, "空 SkillKey 应透传到 UnitConfigSnapshot");
+        }
+
         // ====================================================================
         // 地图配置测试
         // ====================================================================
@@ -107,9 +172,9 @@ namespace GameBattle.Tests.EditMode.Config
             BattleConfigSnapshot snapshot = provider.GetSnapshot();
 
             // 验证玩家可建造格
-            Assert.IsTrue(snapshot.Map.IsBuildableForSide(true, 3, 1), "(3,1) 应为玩家可建造格");
-            Assert.IsTrue(snapshot.Map.IsBuildableForSide(true, 4, 2), "(4,2) 应为玩家可建造格");
-            Assert.IsFalse(snapshot.Map.IsBuildableForSide(true, 2, 7), "(2,7) 不应为玩家可建造格");
+            Assert.IsTrue(snapshot.Map.IsBuildableForSide(true, 2, 7), "(2,7) 应为玩家可建造格");
+            Assert.IsTrue(snapshot.Map.IsBuildableForSide(true, 3, 8), "(3,8) 应为玩家可建造格");
+            Assert.IsFalse(snapshot.Map.IsBuildableForSide(true, 3, 1), "(3,1) 不应为玩家可建造格");
         }
 
         [Test]
@@ -119,9 +184,9 @@ namespace GameBattle.Tests.EditMode.Config
             BattleConfigSnapshot snapshot = provider.GetSnapshot();
 
             // 验证对手可建造格
-            Assert.IsTrue(snapshot.Map.IsBuildableForSide(false, 2, 7), "(2,7) 应为对手可建造格");
-            Assert.IsTrue(snapshot.Map.IsBuildableForSide(false, 3, 8), "(3,8) 应为对手可建造格");
-            Assert.IsFalse(snapshot.Map.IsBuildableForSide(false, 3, 1), "(3,1) 不应为对手可建造格");
+            Assert.IsTrue(snapshot.Map.IsBuildableForSide(false, 3, 1), "(3,1) 应为对手可建造格");
+            Assert.IsTrue(snapshot.Map.IsBuildableForSide(false, 4, 2), "(4,2) 应为对手可建造格");
+            Assert.IsFalse(snapshot.Map.IsBuildableForSide(false, 2, 7), "(2,7) 不应为对手可建造格");
         }
 
         [Test]

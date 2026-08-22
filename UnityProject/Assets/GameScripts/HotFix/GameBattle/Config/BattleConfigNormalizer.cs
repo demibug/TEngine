@@ -74,7 +74,7 @@ namespace GameBattle
             };
 
             BuildableSide side = cellKind == GridCellKind.Buildable
-                ? (lane == 1 ? BuildableSide.Player : BuildableSide.Opponent)
+                ? (lane == 0 ? BuildableSide.Player : BuildableSide.Opponent)
                 : BuildableSide.None;
 
             return new GridCell(cellKind, side);

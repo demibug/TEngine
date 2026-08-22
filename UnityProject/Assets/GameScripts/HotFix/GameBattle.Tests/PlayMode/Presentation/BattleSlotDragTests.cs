@@ -224,29 +224,25 @@ namespace GameBattle.Tests.PlayMode.Presentation
         }
 
         [Test]
-        [Description("拖放失败弹回：目标不匹配时不修改逻辑状态。")]
-        public void DragDrop_TargetMismatch_NoStateChange()
+        [Description("拖放目标不匹配：走互换而非拒绝，两槽原子交换。")]
+        public void DragDrop_TargetMismatch_Swaps()
         {
             IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
             UnitSlot source = reserves[0];
             UnitSlot target = reserves[1];
 
-            // 源 1 级刀兵，目标 1 级弓兵（不同兵种不可合并）。
+            // 源 1 级刀兵，目标 1 级弓兵（不同兵种不可合并 → 互换）。
             var knife = new BattleUnit(
                 7000, true, UnitKind.Soldier, SoldierType.Knife, "刀", 1);
             var bow = new BattleUnit(
                 7001, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1);
             FillReserveAll(knife, bow);
 
-            int sourceUnitId = _slotBoard.GetSlot(source.SlotId).OccupantUnitId;
-            int targetUnitId = _slotBoard.GetSlot(target.SlotId).OccupantUnitId;
-
             BattleInputResult result = _adapter.HandleDropUnit(source.SlotId.Id, target.SlotId.Id);
 
-            Assert.IsFalse(result.IsSuccess, "不同兵种应失败");
-            Assert.AreEqual(BattleInputRejectReason.TargetMismatch, result.RejectReason);
-            Assert.AreEqual(sourceUnitId, _slotBoard.GetSlot(source.SlotId).OccupantUnitId, "源槽未变");
-            Assert.AreEqual(targetUnitId, _slotBoard.GetSlot(target.SlotId).OccupantUnitId, "目标槽未变");
+            Assert.IsTrue(result.IsSuccess, "不同兵种应互换而非拒绝");
+            Assert.AreEqual(bow.UnitId, _slotBoard.GetSlot(source.SlotId).OccupantUnitId, "源槽换入目标单位");
+            Assert.AreEqual(knife.UnitId, _slotBoard.GetSlot(target.SlotId).OccupantUnitId, "目标槽换入源单位");
         }
 
         /// <summary>用指定单位列表填满玩家方全部待上场槽（ReplaceReserve 严格要求批次数量等于槽位数）。</summary>
@@ -515,6 +511,59 @@ namespace GameBattle.Tests.PlayMode.Presentation
             Assert.IsFalse(_slotBoard.GetSlotById(r0).IsEmpty, "r0 有单位");
         }
 
+        [Test]
+        [Description("拖拽控制器：四向占用目标互换（R→R / R→B / B→R / B→B 的 Swap 方向）。")]
+        public void DragController_FourWaySwapTargets()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
+            int r0 = reserves[0].SlotId.Id;
+            int r1 = reserves[1].SlotId.Id;
+            int b0 = battles[0].SlotId.Id;
+            int b1 = battles[1].SlotId.Id;
+
+            // 前置：r0=刀兵，r1=弓兵（不同兵种，任何占用目标互换都走 Swap 而非 Merge）。
+            FillReserveAll(
+                new BattleUnit(100, true, UnitKind.Soldier, SoldierType.Knife, "刀", 1),
+                new BattleUnit(200, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1));
+
+            // R→R 互换：r0（刀）→ r1（弓）。
+            var dragRR = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r1);
+            dragRR.BeginDrag(r0, touchId: 1);
+            Assert.IsTrue(dragRR.EndDrag(0f, 0f, 1).Value.IsSuccess, "R→R 互换应成功");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(r0).OccupantUnitId, "r0 换入弓兵");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(r1).OccupantUnitId, "r1 换入刀兵");
+
+            // 前置：r1（刀）上场到 b0（空目标 Move），使 b0 占用刀兵。
+            _adapter.HandleDropUnit(r1, b0);
+            Assert.IsTrue(_slotBoard.GetSlotById(b0).IsEmpty == false, "前置：b0 占用刀兵");
+
+            // R→B 互换：r0（弓）→ b0（刀）。
+            var dragRB = new BattleDragController(_adapter.HandleDropUnit, (x, y) => b0);
+            dragRB.BeginDrag(r0, touchId: 1);
+            Assert.IsTrue(dragRB.EndDrag(0f, 0f, 1).Value.IsSuccess, "R→B 互换应成功");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(r0).OccupantUnitId, "r0 换入刀兵");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(b0).OccupantUnitId, "b0 换入弓兵");
+
+            // B→R 互换：b0（弓）→ r0（刀）。
+            var dragBR = new BattleDragController(_adapter.HandleDropUnit, (x, y) => r0);
+            dragBR.BeginDrag(b0, touchId: 1);
+            Assert.IsTrue(dragBR.EndDrag(0f, 0f, 1).Value.IsSuccess, "B→R 互换应成功");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(r0).OccupantUnitId, "r0 换入弓兵");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(b0).OccupantUnitId, "b0 换入刀兵");
+
+            // 前置：r0（弓）上场到 b1（空目标 Move），使 b1 占用弓兵。
+            _adapter.HandleDropUnit(r0, b1);
+            Assert.IsTrue(_slotBoard.GetSlotById(b1).IsEmpty == false, "前置：b1 占用弓兵");
+
+            // B→B 互换：b0（刀）→ b1（弓）。
+            var dragBB = new BattleDragController(_adapter.HandleDropUnit, (x, y) => b1);
+            dragBB.BeginDrag(b0, touchId: 1);
+            Assert.IsTrue(dragBB.EndDrag(0f, 0f, 1).Value.IsSuccess, "B→B 互换应成功");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(b0).OccupantUnitId, "b0 换入弓兵");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(b1).OccupantUnitId, "b1 换入刀兵");
+        }
+
         // ====================================================================
         // 真实事件顺序回归：Reserve 卡拖动 → Stage TouchEnd（应被守卫忽略）
         // → Card DragEnd（独占结算，只提交一次 DropUnit）
@@ -567,6 +616,43 @@ namespace GameBattle.Tests.PlayMode.Presentation
             Assert.IsFalse(drag.IsDragging, "结算后不再拖拽");
             Assert.IsTrue(_slotBoard.GetSlotById(sourceSlotId).IsEmpty, "Reserve 源槽为空");
             Assert.IsFalse(_slotBoard.GetSlotById(targetSlotId).IsEmpty, "Battle 目标槽有单位");
+        }
+
+        [Test]
+        [Description("回归：完整武将单字拖动（张→飞）经拖拽控制器只移动点击格，整将解散为反序独立字牌。")]
+        public void DragController_CompleteGeneral_SingleCellDrag_DisassemblesToReversedParts()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            var zhangFei = new GeneralConfigSnapshot(
+                1, "张飞", "张", new[] { "张", "飞" }, GeneralCombatArchetype.Pike,
+                2.5f, 15, 1f, "近战枪击", "nearest", "SpearSoldier", "default", "", 0, 1);
+            FillReserveAll(
+                BattleUnit.CreateGeneralCell(100, true, zhangFei, 0),
+                BattleUnit.CreateGeneralCell(100, true, zhangFei, 1));
+
+            var drag = new BattleDragController(
+                _adapter.HandleDropUnit,
+                resolveTargetSlot: (x, y) => reserves[1].SlotId.Id);
+            drag.BeginDrag(reserves[0].SlotId.Id, touchId: 1);
+            Assert.IsTrue(drag.IsDragging, "拖动中");
+
+            BattleInputResult? result = drag.EndDrag(0f, 0f, touchId: 1);
+
+            Assert.IsTrue(result.HasValue, "应提交命令");
+            Assert.IsTrue(result.Value.IsSuccess, "同将内部单字互换应成功");
+            Assert.AreEqual(UnitKind.GeneralPart,
+                _slotBoard.GetSlotById(reserves[0].SlotId.Id).Occupant.Value.Kind,
+                "源格最终为独立字牌");
+            Assert.AreEqual("飞",
+                _slotBoard.GetSlotById(reserves[0].SlotId.Id).Occupant.Value.GeneralPartText,
+                "源格最终为飞字");
+            Assert.AreEqual(UnitKind.GeneralPart,
+                _slotBoard.GetSlotById(reserves[1].SlotId.Id).Occupant.Value.Kind,
+                "目标格最终为独立字牌");
+            Assert.AreEqual("张",
+                _slotBoard.GetSlotById(reserves[1].SlotId.Id).Occupant.Value.GeneralPartText,
+                "目标格最终为张字");
+            Assert.IsFalse(drag.IsDragging, "松手后不再拖拽");
         }
     }
 }

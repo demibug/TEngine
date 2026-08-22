@@ -41,7 +41,7 @@ namespace GameBattle.Tests.EditMode.Enemy
                 configHash: string.Empty, deckPreset: BattleDeckPreset.Normal);
 
             BattleRuntimeAssembly assembly = BattleRuntimeFactory.Create(
-                loadout, default, poolScope, bindings: null, configSnapshot: snapshot);
+                loadout, poolScope, bindings: null, configSnapshot: snapshot);
 
             Assert.IsTrue(assembly.IsSuccess, $"组装应成功：{assembly.DiagnosticMessage}");
             Assert.AreEqual(4, snapshot.OrderedWavePlan.Rows.Count, "golden 计划 4 行。");
@@ -378,7 +378,7 @@ namespace GameBattle.Tests.EditMode.Enemy
                 configHash: string.Empty, deckPreset: BattleDeckPreset.Normal);
             var poolScope = new BattlePoolScope();
             BattleRuntimeAssembly assembly = BattleRuntimeFactory.Create(
-                loadout, default, poolScope, bindings: null, configSnapshot: bossSnapshot);
+                loadout, poolScope, bindings: null, configSnapshot: bossSnapshot);
 
             Assert.IsTrue(assembly.IsSuccess, assembly.DiagnosticMessage);
             Assert.IsNotNull(assembly.SkillRunner);
@@ -543,7 +543,7 @@ namespace GameBattle.Tests.EditMode.Enemy
                 configHash: string.Empty, deckPreset: BattleDeckPreset.Normal);
             var poolScope = new BattlePoolScope();
             BattleRuntimeAssembly assembly = BattleRuntimeFactory.Create(
-                loadout, default, poolScope, bindings: null, configSnapshot: bossSnapshot);
+                loadout, poolScope, bindings: null, configSnapshot: bossSnapshot);
 
             Assert.IsTrue(assembly.IsSuccess, assembly.DiagnosticMessage);
             assembly.BattleManager.StartGame(startNowMs: 0, spawnStrategyIndex: 0);
@@ -619,7 +619,7 @@ namespace GameBattle.Tests.EditMode.Enemy
                 configHash: string.Empty, deckPreset: BattleDeckPreset.Normal);
             var poolScope = new BattlePoolScope();
             BattleRuntimeAssembly assembly = BattleRuntimeFactory.Create(
-                loadout, default, poolScope, bindings: null, configSnapshot: bossSnapshot);
+                loadout, poolScope, bindings: null, configSnapshot: bossSnapshot);
             Assert.IsTrue(assembly.IsSuccess, assembly.DiagnosticMessage);
             var runtime = new BattleRuntime(assembly);
 

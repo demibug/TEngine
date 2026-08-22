@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
 using GameFUI;
@@ -9,25 +8,23 @@ using TEngine;
 namespace GameBattle
 {
     // ============================================================================
-    // 任务 2.6：BattleModule —— Start/Restart/Exit 串行门与生命周期实现
+    // 任务 2.6：BattleModule —— Start/Restart/Exit 生命周期实现
     // ----------------------------------------------------------------------------
     // 职责（design.md 第 1/3 节 / specs/battle-runtime-lifecycle/spec.md）：
     //   BattleModule 是 TEngine 长期存在的模块和唯一外部入口（design 决策 1）。
     //   本文件实现 IBattleModule 定义的三条公共异步命令（Start/Restart/Exit），
     //   并保证以下不变量：
     //
-    //   1. 串行门：同一时刻只有一个生命周期操作在执行（SemaphoreSlim(1,1)）。
+    //   1. 状态防重：生命周期状态在第一次 await 前同步更新。
     //   2. 重复语义（决策 0.7）：
     //      - Start 只允许 Idle；重复 Start 返回 AlreadyActive，不创建第二个运行时。
     //      - Restart 只允许 Settling；其他状态返回 NotSettling，不销毁当前运行时。
-    //      - Exit 在任意状态幂等；并发调用共享进行中的退出操作而不重复执行清理。
+    //      - Exit 在任意状态幂等；Exiting 中重复调用直接返回 Exiting。
     //   3. 加载失败执行反向回滚（spec "Partial initialization is recoverable"）：
     //      使用 BattleRuntimeScope 跟踪进入步骤，失败时逆序释放。
-    //   4. 调用方取消不能绕过内部清理（task 2.6）：
-    //      取消异常从内部清理 finally 块抛出，清理逻辑先于异常传播执行。
-    //   5. Faulted 必须先清理才能回到 Idle（决策 0.7）：
+    //   4. Faulted 必须先清理才能回到 Idle（决策 0.7）：
     //      Faulted → Idle 由 Exit 或显式清理完成，不允许直接 Start/Restart。
-    //   6. 使用 BattleModuleStateTransitions.CanTransition 校验所有状态迁移。
+    //   5. 使用 BattleModuleStateTransitions.CanTransition 校验所有状态迁移。
     //
     //   BattleRuntime / BattleRuntimeFactory 尚未实现（task 2.9/2.10），
     //   当前通过可注入的加载/清理委托抽象出进入与退出步骤，使生命周期门控逻辑
@@ -45,9 +42,9 @@ namespace GameBattle
     /// 由 GameLogic 组合根通过 <c>ModuleSystem.RegisterModule&lt;IBattleModule&gt;</c>
     /// 注册（task 2.7），不修改 TEngine <c>ModuleSystem</c> 公共实现。</para>
     ///
-    /// <para><b>串行门（task 2.6 核心）：</b></para>
-    /// <para>使用 <see cref="SemaphoreSlim"/>(1,1) 保证同一时刻只有一个生命周期操作在执行。
-    /// Start/Restart/Exit 在执行实际逻辑前必须先获取串行门，防止并发命令绕过状态校验。</para>
+    /// <para><b>状态防重（task 2.6 核心）：</b></para>
+    /// <para>Start/Restart/Exit 在第一次 await 前同步更新生命周期状态；重复按钮调用读取现有状态后
+    /// 直接返回结构化结果，不需要锁或命令队列。</para>
     ///
     /// <para><b>重复语义（决策 0.7）：</b></para>
     /// <list type="bullet">
@@ -55,16 +52,13 @@ namespace GameBattle
     /// 重复 Start 返回 <see cref="BattleErrorCode.AlreadyActive"/>。</item>
     /// <item><see cref="RestartAsync"/> 只允许 <see cref="BattleModuleState.Settling"/>；
     /// 其他状态返回 <see cref="BattleErrorCode.NotSettling"/>。</item>
-    /// <item><see cref="ExitAsync"/> 在任意状态幂等；并发调用共享进行中的退出操作。</item>
+    /// <item><see cref="ExitAsync"/> 在任意状态幂等；Exiting 中重复调用返回
+    /// <see cref="BattleErrorCode.Exiting"/>。</item>
     /// </list>
     ///
     /// <para><b>加载失败回滚（spec "Partial initialization is recoverable"）：</b></para>
     /// <para>进入战斗的每个步骤都登记到 <see cref="BattleRuntimeScope"/>，
     /// 任一步骤失败时逆序释放已完成部分，不留下半初始化运行时。</para>
-    ///
-    /// <para><b>调用方取消语义（决策 0.7）：</b></para>
-    /// <para>调用方取消抛出 <see cref="OperationCanceledException"/>，保留取消异常语义。
-    /// 但取消不能绕过内部清理：清理逻辑在 finally 块中先于异常传播执行。</para>
     /// </remarks>
     public sealed class BattleModule : Module, IBattleModule, IUpdateModule
     {
@@ -81,38 +75,25 @@ namespace GameBattle
         /// </summary>
         /// <param name="loadout">不可变战斗装载信息。</param>
         /// <param name="scope">本局运行时所有权作用域，用于登记部分初始化步骤。</param>
-        /// <param name="cancellationToken">运行时取消令牌（已链接调用方令牌）。</param>
         /// <returns>结构化操作结果。成功时状态应为 Running。</returns>
         internal delegate UniTask<BattleOperationResult> BattleEntryHandler(
             BattleLoadoutDto loadout,
-            BattleRuntimeScope scope,
-            CancellationToken cancellationToken);
+            BattleRuntimeScope scope);
 
         /// <summary>
         /// 退出战斗的清理步骤委托。
         /// </summary>
         /// <param name="scope">本局运行时所有权作用域（可能为 null，表示无活动运行时）。</param>
-        /// <param name="cancellationToken">运行时取消令牌。</param>
         /// <returns>结构化操作结果。成功时状态应为 Idle。</returns>
-        internal delegate UniTask<BattleOperationResult> BattleExitHandler(
-            BattleRuntimeScope scope,
-            CancellationToken cancellationToken);
+        internal delegate UniTask<BattleOperationResult> BattleExitHandler(BattleRuntimeScope scope);
 
         // ====================================================================
         // 内部状态
         // ====================================================================
 
         /// <summary>
-        /// 串行门：保证同一时刻只有一个生命周期操作在执行。
-        /// <para>初始计数为 1，Start/Restart/Exit 在执行实际逻辑前必须先 Wait，
-        /// 完成后 Release。使用 SemaphoreSlim 而非 lock，因为异步方法不能在 lock 内 await。</para>
-        /// </summary>
-        private readonly SemaphoreSlim _lifecycleGate = new SemaphoreSlim(1, 1);
-
-        /// <summary>
         /// 当前模块生命周期状态。
-        /// <para>所有读写都在串行门保护下进行（构造和 Shutdown 除外），
-        /// 因此不需要额外同步原语。</para>
+        /// <para>所有读写都发生在 Unity 主线程，操作入口在第一次 await 前同步更新状态。</para>
         /// </summary>
         private BattleModuleState _state = BattleModuleState.Idle;
 
@@ -147,8 +128,11 @@ namespace GameBattle
         /// </summary>
         private BattleStartupContext _activeContext;
 
-        /// <summary>模块关闭时取消地图准备和仍在等待的模块级异步操作。</summary>
-        private CancellationTokenSource _moduleCts;
+        /// <summary>模块已关闭；迟到的异步结果不得再提交。</summary>
+        private bool _isShutdown;
+
+        /// <summary>入口窗口正在准备/打开；重复点击直接忽略。</summary>
+        private bool _isOpeningEntry;
 
         /// <summary>入口世界准备的幂等任务；失败后清空以允许重试。</summary>
         private AsyncLazy<UnityEngine.GameObject> _entryPreparationTask;
@@ -158,13 +142,6 @@ namespace GameBattle
 
         /// <summary>最近一次入口装载，用于退出后重新显示入口。</summary>
         private BattleLoadoutDto _lastLoadout;
-
-        /// <summary>
-        /// 进行中的 Exit 操作的完成源。
-        /// <para>非 null 表示有退出操作正在进行；并发 Exit 调用共享此完成源，
-        /// 避免重复执行清理。退出完成后置 null。</para>
-        /// </summary>
-        private UniTaskCompletionSource<BattleOperationResult> _pendingExitTcs;
 
         /// <summary>
         /// 进入战斗的加载步骤委托。
@@ -190,15 +167,15 @@ namespace GameBattle
         /// <inheritdoc />
         public async UniTask ShowEntryAsync(BattleLoadoutDto loadout)
         {
-            await _lifecycleGate.WaitAsync();
+            if (_isShutdown || _isOpeningEntry || _state != BattleModuleState.Idle)
+            {
+                Log.Warning($"[BattleModule] 当前状态为 {_state}，跳过重复打开战斗入口。");
+                return;
+            }
+
+            _isOpeningEntry = true;
             try
             {
-                if (_state != BattleModuleState.Idle)
-                {
-                    Log.Warning($"[BattleModule] 当前状态为 {_state}，跳过重复打开战斗入口。");
-                    return;
-                }
-
                 _lastLoadout = loadout;
 
                 // 新入口（本分支已在 Idle 下执行，无活动 Runtime）：清除上一局残留的
@@ -232,15 +209,31 @@ namespace GameBattle
                 {
                     // 世界准备失败：清空 Context，避免残留不匹配的缓存。
                     _activeContext = null;
+                    if (_isShutdown)
+                    {
+                        return;
+                    }
+
                     throw;
+                }
+
+                if (_isShutdown || _state != BattleModuleState.Idle)
+                {
+                    _activeContext = null;
+                    return;
                 }
 
                 await FUI.ShowAsync<BattleStartPanel>(
                     new BattleStartEntryArgs(loadout, StartAsync));
+
+                if (_isShutdown || _state != BattleModuleState.Idle)
+                {
+                    FUI.Close<BattleStartPanel>();
+                }
             }
             finally
             {
-                _lifecycleGate.Release();
+                _isOpeningEntry = false;
             }
         }
 
@@ -254,16 +247,11 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(config));
             }
 
-            if (_moduleCts == null)
-            {
-                throw new InvalidOperationException("BattleModule 尚未初始化。");
-            }
-
             if (_entryPreparationTask == null || !ReferenceEquals(_preparationSnapshot, config))
             {
                 _preparationSnapshot = config;
                 _entryPreparationTask = UniTask.Lazy(
-                    () => _worldHost.EnsureWorldForMapAsync(config.Map, _moduleCts.Token));
+                    () => _worldHost.EnsureWorldForMapAsync(config.Map));
             }
 
             try
@@ -327,10 +315,8 @@ namespace GameBattle
         /// </summary>
         private async UniTask<BattleOperationResult> DefaultEntryHandler(
             BattleLoadoutDto loadout,
-            BattleRuntimeScope scope,
-            CancellationToken cancellationToken)
+            BattleRuntimeScope scope)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             _lastLoadout = loadout;
 
             // 世界加载前解析并校验配置：复用匹配的已准备 Context，否则即时准备
@@ -358,10 +344,6 @@ namespace GameBattle
             try
             {
                 await EnsureEntryWorldAsync(context.Config);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
             }
             catch (BattleMapResourceAddressException ex)
             {
@@ -411,6 +393,11 @@ namespace GameBattle
                     exception: ex);
             }
 
+            if (!CanCommitEntry())
+            {
+                return CreateStaleEntryResult("地图准备完成时战斗入口已失效。");
+            }
+
             BattleMapBindings bindings = _worldHost.Bindings;
             if (bindings == null)
             {
@@ -442,7 +429,6 @@ namespace GameBattle
 
             BattleRuntimeAssembly assembly = BattleRuntimeFactory.Create(
                 loadout,
-                cancellationToken,
                 _poolScope,
                 bindings,
                 context.Config);
@@ -473,15 +459,17 @@ namespace GameBattle
                     BattlePresentationResourcePlan.CollectEnemyResourceAddresses(
                         context.Config,
                         requireBossPresentation: !(viewPort is NullBattleViewPort));
+                IReadOnlyList<string> generalResourceAddresses =
+                    BattlePresentationResourcePlan.CollectGeneralResourceAddresses(context.Config);
+                IReadOnlyList<string> generalPartWords =
+                    BattlePresentationResourcePlan.CollectGeneralPartWords(context.Config);
                 await UniTask.WhenAll(
-                    viewPort.PreloadAsync(enemyResourceAddresses, cancellationToken),
-                    audioPort.PreloadAsync(cancellationToken),
-                    vfxPort.PreloadAsync(cancellationToken));
-            }
-            catch (OperationCanceledException)
-            {
-                assembly.Scope.Rollback();
-                throw;
+                    viewPort.PreloadAsync(
+                        enemyResourceAddresses,
+                        generalResourceAddresses,
+                        generalPartWords),
+                    audioPort.PreloadAsync(),
+                    vfxPort.PreloadAsync());
             }
             catch (BattlePresentationLoadException ex)
             {
@@ -504,6 +492,12 @@ namespace GameBattle
                     $"表现端口资源预加载失败: {ex.Message}",
                     BattleFailureStage.PresentationPreload,
                     exception: ex);
+            }
+
+            if (!CanCommitEntry())
+            {
+                assembly.Scope.Rollback();
+                return CreateStaleEntryResult("表现资源预加载完成时战斗入口已失效。");
             }
 
             BattleRuntime runtime = new BattleRuntime(assembly);
@@ -532,7 +526,6 @@ namespace GameBattle
             try
             {
                 await FUI.ShowAsync<BattleHudPanel>(
-                    cancellationToken,
                     new BattleHudEntryArgs(
                         ExitAsync,
                         () => runtime.Presenter?.HandleRecruitClick(playerSide: true)
@@ -543,14 +536,13 @@ namespace GameBattle
                         () => runtime.Presenter?.GetSlotSnapshot().GetSlots(isPlayerSide: true, SlotZone.Reserve)
                               ?? (IReadOnlyList<UnitSlot>)Array.Empty<UnitSlot>(),
                         ResolvePlayerBattleSlotForStage,
+                        (float stageX, float stageY, out int sourceSlotId) =>
+                            ResolvePlayerBattleSourceForStage(viewPort, stageX, stageY, out sourceSlotId),
                         slotId => runtime.Presenter != null
                             ? runtime.Presenter.GetSlotSnapshot().GetSlotById(slotId)
                             : default,
-                        soldierType => (viewPort as UnityBattleViewPort)?.GetUnitIcon(soldierType)));
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
+                        soldierType => (viewPort as UnityBattleViewPort)?.GetUnitIcon(soldierType),
+                        partWord => (viewPort as UnityBattleViewPort)?.GetGeneralPartIcon(partWord)));
             }
             catch (Exception ex)
             {
@@ -560,6 +552,12 @@ namespace GameBattle
                     $"打开 BattleHudPanel 失败: {ex.Message}",
                     BattleFailureStage.HudOpen,
                     exception: ex);
+            }
+
+            if (!CanCommitEntry())
+            {
+                FUI.Close<BattleHudPanel>();
+                return CreateStaleEntryResult("HUD 打开完成时战斗入口已失效。");
             }
 
             BattleOperationResult closeEntryResult = CloseEntryAfterHudForTransaction(
@@ -572,6 +570,21 @@ namespace GameBattle
 
             Log.Info("[BattleModule] 战斗世界、必需资源、运行时服务与 HUD 已全部就绪。");
             return BattleOperationResult.Ok(BattleModuleState.Running);
+        }
+
+        /// <summary>入口异步步骤完成后，只有当前模块仍处于本轮 Entering 才允许提交。</summary>
+        private bool CanCommitEntry()
+        {
+            return !_isShutdown && _state == BattleModuleState.Entering;
+        }
+
+        private BattleOperationResult CreateStaleEntryResult(string message)
+        {
+            return BattleOperationResult.Fail(
+                BattleErrorCode.Exiting,
+                _state,
+                message,
+                BattleFailureStage.Rollback);
         }
 
         /// <summary>
@@ -617,11 +630,8 @@ namespace GameBattle
         /// 所有权释放只在本方法成功后由 ExitInternalAsync 执行。</para>
         /// </summary>
         private async UniTask<BattleOperationResult> DefaultExitHandler(
-            BattleRuntimeScope scope,
-            CancellationToken cancellationToken)
+            BattleRuntimeScope scope)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             // 入口界面必须在战场不可见、主相机已恢复的状态下打开，
             // 否则 ShowAsync 期间会把上一局画面暴露在入口 UI 后面。
             _worldHost.HideWorld();
@@ -631,9 +641,8 @@ namespace GameBattle
             {
                 // 退出通常由按钮点击触发。让当前 FairyGUI 指针事件完整结束后
                 // 再创建入口按钮，避免同一次点击穿透后立即重新开战。
-                await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
+                await UniTask.Yield(PlayerLoopTiming.Update);
                 await FUI.ShowAsync<BattleStartPanel>(
-                    cancellationToken,
                     new BattleStartEntryArgs(_lastLoadout, StartAsync));
             }
             catch (Exception ex)
@@ -661,6 +670,7 @@ namespace GameBattle
 
             try
             {
+                FUI.Close<BattleResultPanel>();
                 FUI.Close<BattleHudPanel>();
             }
             catch (Exception ex)
@@ -706,7 +716,8 @@ namespace GameBattle
         public override void OnInit()
         {
             _state = BattleModuleState.Idle;
-            _moduleCts = new CancellationTokenSource();
+            _isShutdown = false;
+            _isOpeningEntry = false;
             _worldHost.EnsureRoot();
 
             // 由唯一 BattleModule 拥有 UIBattle 注册；GameLogic 组合根只负责
@@ -786,17 +797,45 @@ namespace GameBattle
             {
                 TransitionTo(BattleModuleState.Settling);
                 runtime.EnterSettling();
+
+                // EnterSettling 完成静默清理并冻结最终结果后，由 FUI owner 直接打开结算窗口。
+                // 不依赖跨程序集生成的事件 ID，且该分支每局只会进入一次。
+                ShowBattleResultPanelAsync(runtime.ResultBuilder.GetFrozenResult()).Forget();
+            }
+        }
+
+        private async UniTaskVoid ShowBattleResultPanelAsync(BattleResultDto result)
+        {
+            try
+            {
+                await FUI.ShowAsync<BattleResultPanel>(
+                    new BattleResultEntryArgs(result, ExitAsync));
+
+                // 异步加载期间可能已从其他入口退出；旧局结算窗不得带到开始界面。
+                if (_isShutdown || _state != BattleModuleState.Settling)
+                {
+                    FUI.Close<BattleResultPanel>();
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!_isShutdown)
+                {
+                    Log.Error($"[BattleModule] 打开 BattleResultPanel 失败: {ex}");
+                }
             }
         }
 
         /// <inheritdoc />
         public override void Shutdown()
         {
-            _moduleCts?.Cancel();
+            _isShutdown = true;
+            _isOpeningEntry = false;
             ForceCleanupInternal();
 
             try
             {
+                FUI.Close<BattleResultPanel>();
                 FUI.Close<BattleHudPanel>();
                 FUI.Close<BattleStartPanel>();
             }
@@ -814,9 +853,7 @@ namespace GameBattle
             _entryPreparationTask = null;
             _preparationSnapshot = null;
             _activeContext = null;
-            _moduleCts?.Dispose();
-            _moduleCts = null;
-            Log.Info("[BattleModule] Shutdown: 已取消异步操作、释放运行时、地图、根节点并恢复主相机。");
+            Log.Info("[BattleModule] Shutdown: 已释放运行时、地图、根节点并恢复主相机。");
         }
 
         // ====================================================================
@@ -824,118 +861,21 @@ namespace GameBattle
         // ====================================================================
 
         /// <inheritdoc />
-        public async UniTask<BattleOperationResult> StartAsync(
-            BattleLoadoutDto loadout,
-            CancellationToken cancellationToken = default)
+        public UniTask<BattleOperationResult> StartAsync(BattleLoadoutDto loadout)
         {
-            // 串行门：等待当前操作完成后再执行。
-            await _lifecycleGate.WaitAsync(cancellationToken);
-            try
-            {
-                return await StartInternalAsync(loadout, cancellationToken);
-            }
-            finally
-            {
-                _lifecycleGate.Release();
-            }
+            return StartInternalAsync(loadout);
         }
 
         /// <inheritdoc />
-        public async UniTask<BattleOperationResult> RestartAsync(
-            BattleLoadoutDto loadout,
-            CancellationToken cancellationToken = default)
+        public UniTask<BattleOperationResult> RestartAsync(BattleLoadoutDto loadout)
         {
-            await _lifecycleGate.WaitAsync(cancellationToken);
-            try
-            {
-                return await RestartInternalAsync(loadout, cancellationToken);
-            }
-            finally
-            {
-                _lifecycleGate.Release();
-            }
+            return RestartInternalAsync(loadout);
         }
 
         /// <inheritdoc />
-        public async UniTask<BattleOperationResult> ExitAsync(
-            CancellationToken cancellationToken = default)
+        public UniTask<BattleOperationResult> ExitAsync()
         {
-            // ==================================================================
-            // Exit 并发合并：多个调用方并发请求退出时共享进行中的退出操作。
-            // ==================================================================
-            // 先获取串行门外层检查是否有进行中的 Exit。
-            // 但为了支持并发合并，Exit 的门控逻辑分为两步：
-            //   1. 快速检查：如果已有进行中的 Exit（_pendingExitTcs != null），
-            //      直接附加到该完成源，不等待串行门。
-            //   2. 否则获取串行门执行退出操作。
-            //
-            // 这里的设计权衡：
-            //   - 并发 Exit 不需要全部排队等待串行门，只需第一个获取门的执行退出，
-            //     后续调用附加到同一个完成源。
-            //   - 使用 UniTaskCompletionSource 实现合并，保证所有并发调用方获得相同结果。
-            // ==================================================================
-
-            UniTaskCompletionSource<BattleOperationResult> pendingTcs;
-
-            // 快速检查是否有进行中的退出操作（无锁读取，稍后在串行门内二次确认）。
-            pendingTcs = _pendingExitTcs;
-            if (pendingTcs != null)
-            {
-                // 已有进行中的退出操作，直接附加到该完成源，不重复执行清理。
-                return await pendingTcs.Task.AttachExternalCancellation(cancellationToken);
-            }
-
-            // 没有进行中的退出操作，获取串行门。
-            await _lifecycleGate.WaitAsync(cancellationToken);
-            try
-            {
-                // 二次确认：在等待串行门期间可能已有其他调用方启动了退出操作。
-                if (_pendingExitTcs != null)
-                {
-                    return await _pendingExitTcs.Task
-                        .AttachExternalCancellation(cancellationToken);
-                }
-
-                // 当前调用方是第一个请求退出的，创建完成源并执行退出。
-                _pendingExitTcs = new UniTaskCompletionSource<BattleOperationResult>();
-
-                try
-                {
-                    BattleOperationResult result = await ExitInternalAsync(cancellationToken);
-                    _pendingExitTcs.TrySetResult(result);
-                    return result;
-                }
-                catch (OperationCanceledException)
-                {
-                    // 调用方取消：取消异常传播前确保完成源有结果。
-                    // 退出操作即使被取消也会在 ExitInternalAsync 的 finally 中完成清理。
-                    // 这里设置一个取消时的结果，让附加的并发调用方获得确定性结果。
-                    _pendingExitTcs.TrySetResult(
-                        BattleOperationResult.Fail(
-                            BattleErrorCode.Unknown,
-                            _state,
-                            "退出操作被调用方取消，内部清理已执行。"));
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _pendingExitTcs.TrySetResult(
-                        BattleOperationResult.Fail(
-                            BattleErrorCode.Unknown,
-                            _state,
-                            $"退出操作发生异常: {ex.Message}"));
-                    throw;
-                }
-                finally
-                {
-                    // 退出操作完成（无论成功/失败/取消），清除进行中标记。
-                    _pendingExitTcs = null;
-                }
-            }
-            finally
-            {
-                _lifecycleGate.Release();
-            }
+            return ExitInternalAsync();
         }
 
         // ====================================================================
@@ -943,12 +883,18 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// Start 内部实现（在串行门保护下执行）。
+        /// Start 内部实现。状态在第一次 await 前同步迁移到 Entering。
         /// </summary>
-        private async UniTask<BattleOperationResult> StartInternalAsync(
-            BattleLoadoutDto loadout,
-            CancellationToken cancellationToken)
+        private async UniTask<BattleOperationResult> StartInternalAsync(BattleLoadoutDto loadout)
         {
+            if (_isShutdown)
+            {
+                return BattleOperationResult.Fail(
+                    BattleErrorCode.Faulted,
+                    _state,
+                    "BattleModule 已关闭，不能开始新战斗。");
+            }
+
             // ----------------------------------------------------------
             // 状态校验：Start 只允许 Idle。
             // ----------------------------------------------------------
@@ -991,21 +937,18 @@ namespace GameBattle
             BattleRuntimeScope scope = new BattleRuntimeScope();
             _activeScope = scope;
 
-            // 创建运行时取消令牌，链接调用方令牌。
-            // 调用方取消会传播到运行时令牌，但内部清理不受影响（finally 块使用独立令牌）。
-            CancellationTokenSource runtimeCts = new CancellationTokenSource();
-            scope.TrackCancellationTokenSource(runtimeCts, "runtime-cts");
-
-            // 链接调用方取消令牌：调用方取消传播到运行时加载步骤。
-            CancellationToken moduleToken = _moduleCts?.Token ?? default;
-            using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
-                new[] { runtimeCts.Token, cancellationToken, moduleToken });
-
             try
             {
                 // 执行加载步骤委托。
                 BattleOperationResult entryResult =
-                    await _entryHandler(loadout, scope, linkedCts.Token);
+                    await _entryHandler(loadout, scope);
+
+                // Exit/Shutdown 已在等待期间接管本局所有权时，迟到的入口结果只能丢弃。
+                // 清理由当前 Exit/Shutdown 负责；这里不能再次回滚或记录非法迁移错误。
+                if (!CanCommitEntry())
+                {
+                    return CreateStaleEntryResult("入口加载完成时本轮 Entering 已失效。");
+                }
 
                 if (!entryResult.IsSuccess)
                 {
@@ -1037,19 +980,6 @@ namespace GameBattle
                 TransitionTo(BattleModuleState.Running);
                 return BattleOperationResult.Ok(_state);
             }
-            catch (OperationCanceledException)
-            {
-                // 调用方取消：不能绕过内部清理。
-                // 对应 task 2.6："调用方取消不能绕过内部清理"。
-                // 先执行反向回滚，再重新抛出取消异常。
-                Log.Info("[BattleModule] Start 被调用方取消，执行内部清理。");
-                await RollbackAndReturnAsync(
-                    BattleOperationResult.Fail(
-                        BattleErrorCode.Unknown,
-                        _state,
-                        "Start 被调用方取消，内部清理已执行。"));
-                throw;
-            }
             catch (Exception ex)
             {
                 Log.Error($"[BattleModule] Start 发生非预期异常: {ex}");
@@ -1064,7 +994,7 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 加载失败/取消时的反向回滚辅助方法。
+        /// 加载失败时的反向回滚辅助方法。
         /// <para>状态迁移路径：Entering → Exiting → Idle。
         /// 逆序释放 scope 中已登记的所有权，然后回到 Idle。</para>
         /// </summary>
@@ -1140,16 +1070,19 @@ namespace GameBattle
             }
 
             // 返回更新了状态快照的失败结果。
-            try
+            if (!_isShutdown)
             {
-                // HasWindow 会把 Closing 也视为存活；失败回滚必须显式 Show，
-                // 由 FUI 自身将关闭中的旧请求收敛为新的 Open，不能据 HasWindow 跳过恢复。
-                await FUI.ShowAsync<BattleStartPanel>(
-                    new BattleStartEntryArgs(_lastLoadout, StartAsync));
-            }
-            catch (Exception ex)
-            {
-                Log.Error($"[BattleModule] 回滚后恢复 BattleStartPanel 失败: {ex}");
+                try
+                {
+                    // HasWindow 会把 Closing 也视为存活；失败回滚必须显式 Show，
+                    // 由 FUI 自身将关闭中的旧请求收敛为新的 Open，不能据 HasWindow 跳过恢复。
+                    await FUI.ShowAsync<BattleStartPanel>(
+                        new BattleStartEntryArgs(_lastLoadout, StartAsync));
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"[BattleModule] 回滚后恢复 BattleStartPanel 失败: {ex}");
+                }
             }
 
             return failResult.WithState(_state);
@@ -1160,12 +1093,18 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// Restart 内部实现（在串行门保护下执行）。
+        /// Restart 内部实现。状态在第一次 await 前同步迁移到 Restarting/Entering。
         /// </summary>
-        private async UniTask<BattleOperationResult> RestartInternalAsync(
-            BattleLoadoutDto loadout,
-            CancellationToken cancellationToken)
+        private async UniTask<BattleOperationResult> RestartInternalAsync(BattleLoadoutDto loadout)
         {
+            if (_isShutdown)
+            {
+                return BattleOperationResult.Fail(
+                    BattleErrorCode.Faulted,
+                    _state,
+                    "BattleModule 已关闭，不能重开战斗。");
+            }
+
             // ----------------------------------------------------------
             // 状态校验：Restart 只允许 Settling。
             // ----------------------------------------------------------
@@ -1254,17 +1193,17 @@ namespace GameBattle
             BattleRuntimeScope newScope = new BattleRuntimeScope();
             _activeScope = newScope;
 
-            CancellationTokenSource runtimeCts = new CancellationTokenSource();
-            newScope.TrackCancellationTokenSource(runtimeCts, "runtime-cts");
-
-            CancellationToken moduleToken = _moduleCts?.Token ?? default;
-            using CancellationTokenSource linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
-                new[] { runtimeCts.Token, cancellationToken, moduleToken });
-
             try
             {
                 BattleOperationResult entryResult =
-                    await _entryHandler(loadout, newScope, linkedCts.Token);
+                    await _entryHandler(loadout, newScope);
+
+                // 重开等待期间若已退出或关闭，迟到结果不得重新提交 Running，
+                // 也不得与 Exit/Shutdown 重复争用清理所有权。
+                if (!CanCommitEntry())
+                {
+                    return CreateStaleEntryResult("重开加载完成时本轮 Entering 已失效。");
+                }
 
                 if (!entryResult.IsSuccess)
                 {
@@ -1290,17 +1229,6 @@ namespace GameBattle
                 TransitionTo(BattleModuleState.Running);
                 return BattleOperationResult.Ok(_state);
             }
-            catch (OperationCanceledException)
-            {
-                // 调用方取消：先执行内部清理，再抛出取消异常。
-                Log.Info("[BattleModule] Restart 被调用方取消，执行内部清理。");
-                await RollbackAndReturnAsync(
-                    BattleOperationResult.Fail(
-                        BattleErrorCode.Unknown,
-                        _state,
-                        "Restart 被调用方取消，内部清理已执行。"));
-                throw;
-            }
             catch (Exception ex)
             {
                 Log.Error($"[BattleModule] Restart 发生非预期异常: {ex}");
@@ -1319,16 +1247,15 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// Exit 内部实现（在串行门保护下执行）。
+        /// Exit 内部实现。活动状态在第一次 await 前同步迁移到 Exiting。
         /// </summary>
         /// <remarks>
         /// Exit 在任意状态幂等：
         /// - Idle 状态调用 Exit 直接返回成功（幂等，无活动运行时需清理）。
         /// - 其他状态执行退出清理后回到 Idle。
-        /// - 对应 spec "Exit is idempotent and concurrent-safe"。
+        /// - Exiting 状态重复调用返回 Exiting，不重复清理。
         /// </remarks>
-        private async UniTask<BattleOperationResult> ExitInternalAsync(
-            CancellationToken cancellationToken)
+        private async UniTask<BattleOperationResult> ExitInternalAsync()
         {
             // ----------------------------------------------------------
             // 幂等检查：Idle 状态直接返回成功。
@@ -1339,6 +1266,14 @@ namespace GameBattle
                 return BattleOperationResult.Ok(BattleModuleState.Idle);
             }
 
+            if (_state == BattleModuleState.Exiting)
+            {
+                return BattleOperationResult.Fail(
+                    BattleErrorCode.Exiting,
+                    _state,
+                    "退出操作正在进行，不重复执行清理。");
+            }
+
             // ----------------------------------------------------------
             // Faulted 状态：Exit 作为清理路径，Faulted → Idle（清理后）。
             // 但迁移表中 Faulted → Exiting 不合法，Faulted 只能直接 → Idle。
@@ -1346,7 +1281,7 @@ namespace GameBattle
             // ----------------------------------------------------------
             if (_state == BattleModuleState.Faulted)
             {
-                return await ExitFromFaultedAsync(cancellationToken);
+                return await ExitFromFaultedAsync();
             }
 
             // ----------------------------------------------------------
@@ -1364,15 +1299,10 @@ namespace GameBattle
 
             TransitionTo(BattleModuleState.Exiting);
 
-            // 使用独立取消令牌执行清理，调用方取消不能绕过内部清理。
-            // 对应 task 2.6："调用方取消不能绕过内部清理"。
-            using CancellationTokenSource cleanupCts = new CancellationTokenSource();
-
             try
             {
-                // 即使调用方取消，清理仍使用独立令牌执行。
                 BattleOperationResult exitResult =
-                    await _exitHandler(_activeScope, cleanupCts.Token);
+                    await _exitHandler(_activeScope);
 
                 if (!exitResult.IsSuccess)
                 {
@@ -1410,15 +1340,12 @@ namespace GameBattle
         /// <para>Faulted → Idle 是合法迁移（清理后恢复），
         /// 不经过 Exiting 状态（迁移表中 Faulted 只能直接 → Idle）。</para>
         /// </summary>
-        private async UniTask<BattleOperationResult> ExitFromFaultedAsync(
-            CancellationToken cancellationToken)
+        private async UniTask<BattleOperationResult> ExitFromFaultedAsync()
         {
-            using CancellationTokenSource cleanupCts = new CancellationTokenSource();
-
             try
             {
                 // 即使 scope 为 null，也调用清理委托执行其他退出步骤（如关闭 UI）。
-                BattleOperationResult exitResult = await _exitHandler(_activeScope, cleanupCts.Token);
+                BattleOperationResult exitResult = await _exitHandler(_activeScope);
                 if (!exitResult.IsSuccess)
                 {
                     Log.Warning($"[BattleModule] Faulted Exit 清理步骤返回失败: {exitResult.ErrorCode}");
@@ -1517,7 +1444,7 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 强制清理内部状态（TEngine Shutdown 时调用，不经过串行门）。
+        /// 强制清理内部状态（TEngine Shutdown 时调用）。
         /// <para>对应 spec "Exit releases battle-owned state" 的框架级关闭路径。
         /// 不抛异常，尽可能释放所有资源。</para>
         /// </summary>
@@ -1529,7 +1456,6 @@ namespace GameBattle
 
             BattleRuntimeScope scope = _activeScope;
             _activeScope = null;
-            _pendingExitTcs = null;
             _activeContext = null;
             _entryPreparationTask = null;
             _preparationSnapshot = null;
@@ -1610,7 +1536,71 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 执行状态迁移（在串行门保护下调用）。
+        /// 解析玩家战场可起拖的源槽（统一拖放规则：源只从单位主体起拖）。
+        /// </summary>
+        /// <param name="viewPort">当前战斗表现端口（非 Null 端口时带活动单位表现）。</param>
+        /// <param name="screenX">Stage X 坐标。</param>
+        /// <param name="screenY">Stage Y 坐标。</param>
+        /// <param name="battleSlotId">解析出的玩家战场源槽位固定标识；未命中为 -1。</param>
+        /// <returns>
+        /// 解析成功、命中战场槽且该槽活动单位 Body 命中屏幕点返回 true。
+        /// 战场格子底框不能起拖；投放目标仍使用 <see cref="ResolvePlayerBattleSlotForStage"/> 完整槽位命中。
+        /// </returns>
+        /// <remarks>
+        /// 先经 Presenter 锁定玩家战场槽，再检查 <see cref="UnityBattleViewPort"/> 中
+        /// 对应活动单位（按 BattleUnit.UnitId → 活动 SoldierBase → 运行时表现）Body
+        /// SpriteRenderer 的屏幕/世界 bounds。无活动单位或非 Unity 端口时返回 false。
+        /// </remarks>
+        private bool ResolvePlayerBattleSourceForStage(
+            IBattleViewPort viewPort,
+            float screenX,
+            float screenY,
+            out int battleSlotId)
+        {
+            battleSlotId = -1;
+            BattleRuntime runtime = _activeRuntime;
+            if (runtime?.Presenter == null)
+            {
+                return false;
+            }
+
+            // 1. 先锁定玩家战场槽（完整槽位命中）。
+            if (!runtime.Presenter.TryResolvePlayerBattleSlot(screenX, screenY, out battleSlotId))
+            {
+                return false;
+            }
+
+            // 2. 槽必须有单位。
+            UnitSlot slot = runtime.Presenter.GetSlotSnapshot().GetSlotById(battleSlotId);
+            if (slot.IsEmpty || slot.SlotId.Zone != SlotZone.Battle)
+            {
+                return false;
+            }
+
+            if (!(viewPort is UnityBattleViewPort unityViewPort))
+            {
+                return false;
+            }
+
+            BattleUnit occupant = slot.Occupant.Value;
+            if (occupant.Kind == UnitKind.GeneralPart)
+            {
+                // 未合成武将字：不注册战斗运行时，经字形对象命中（可再次起拖）。
+                return unityViewPort.TryHitGeneralPartGlyph(battleSlotId, screenX, screenY);
+            }
+
+            // 战斗单位（士兵/已合成武将）：按共享 UnitId 查找活动实例 Body 命中。
+            SoldierBase active = runtime.UnitRegistry.GetActiveByUnitId(occupant.UnitId);
+            if (active == null)
+            {
+                return false;
+            }
+
+            return unityViewPort.TryHitActiveUnitBody(active.Id, screenX, screenY);
+        }
+
+        /// <summary>
+        /// 执行状态迁移（Unity 主线程同步调用）。
         /// <para>调用前必须已通过 <see cref="BattleModuleStateTransitions.CanTransition"/>
         /// 校验。Debug 模式下断言迁移合法性。</para>
         /// </summary>

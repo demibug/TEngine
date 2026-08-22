@@ -54,7 +54,7 @@ FUIWindow : GComponent
 
 ### 2.2 参考工程 SAUnity
 
-- `D:/Work/SAUnity/Project/.codex/skills/slg-dev/SKILL.md`
+- `D:/Work/SAUnity/Project/.agents/skills/slg-dev/SKILL.md`
 - `slg-dev/references/architecture.md`
 - `slg-dev/references/ui-lifecycle.md`
 - `slg-dev/references/ui-patterns.md`

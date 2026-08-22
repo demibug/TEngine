@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using Spine.Unity;
 using TEngine;
@@ -71,10 +70,12 @@ namespace GameBattle
         private SpriteRenderer[] _playerHealthPoints;
         private SpriteRenderer[] _opponentHealthPoints;
         private Sprite[] _levelNumberSprites;
+        private readonly Dictionary<string, Sprite> _generalPartSprites = new Dictionary<string, Sprite>();
+        private readonly Dictionary<int, GameObject> _generalPartGlyphs = new Dictionary<int, GameObject>();
 
         /// <summary>
         /// 资源加载接缝。生产默认由 <see cref="GetOrCreateLoader"/> 惰性创建
-        /// <see cref="UnityResourceAssetLoader"/>；测试注入替身以驱动成功/失败/取消与句柄释放。
+        /// <see cref="UnityResourceAssetLoader"/>；测试注入替身以驱动成功、失败与句柄释放。
         /// </summary>
         private IBattleViewAssetLoader _loader;
 
@@ -116,18 +117,234 @@ namespace GameBattle
         }
 
         /// <summary>
+        /// 获取已预加载的武将拆字字形贴图；未预加载或未知拆字返回 null。
+        /// </summary>
+        /// <remarks>已预加载时同步查表，无 IO。供 BattleHudPanel 卡牌复用，与 GetUnitIcon 同一模式。</remarks>
+        internal Sprite GetGeneralPartIcon(string partWord)
+        {
+            if (string.IsNullOrEmpty(partWord))
+            {
+                return null;
+            }
+
+            _generalPartSprites.TryGetValue(partWord, out Sprite sprite);
+            return sprite;
+        }
+
+        /// <summary>
+        /// 判断 Stage 屏幕点是否命中活动单位可见主体 Renderer 的世界 AABB 屏幕投影。
+        /// </summary>
+        /// <param name="runtimeId">活动单位运行时 ID（对应 <see cref="SoldierBase.Id"/>）。</param>
+        /// <param name="stageX">FairyGUI Stage X 坐标（左上角原点）。</param>
+        /// <param name="stageY">FairyGUI Stage Y 坐标（左上角原点）。</param>
+        /// <returns>命中返回 true；单位无活动表现、无可见主体 Renderer 或无相机时返回 false。</returns>
+        /// <remarks>
+        /// <para>供战场起拖源命中使用（统一拖放规则：战场只能从单位 Body 起拖，格子底框不能起拖）。</para>
+        /// <para>把 Body SpriteRenderer 世界包围盒的 8 个角投影到屏幕矩形（左下角原点），
+        /// 再把 Stage 点（左上角原点，Y 翻转）与之比较。投放目标仍使用完整槽位命中。</para>
+        /// <para>普通士兵优先使用名为 Body 的 Renderer；Spine 武将 Prefab 没有 Body，
+        /// 回退到 SkeletonAnimation 所在的 MeshRenderer，再回退到首个可见网格 Renderer。</para>
+        /// </remarks>
+        internal bool TryHitActiveUnitBody(int runtimeId, float stageX, float stageY)
+        {
+            if (!_activeInstances.TryGetValue(runtimeId, out ActiveInstance active)
+                || active.GameObject == null)
+            {
+                return false;
+            }
+
+            Renderer body = ResolveUnitDragRenderer(active.GameObject);
+            return HitBodyInStage(body, stageX, stageY);
+        }
+
+        /// <summary>
+        /// 解析单位用于起拖命中的可见主体 Renderer。
+        /// </summary>
+        /// <remarks>
+        /// 普通士兵沿用 Body 节点；Spine 武将使用 SkeletonAnimation 同节点的 MeshRenderer。
+        /// 最后的网格 Renderer 回退兼容不使用 Spine、但同样没有 Body 节点的配置化武将 Prefab。
+        /// </remarks>
+        internal static Renderer ResolveUnitDragRenderer(GameObject instance)
+        {
+            if (instance == null)
+            {
+                return null;
+            }
+
+            Renderer body = instance.transform.Find("Body")?.GetComponent<Renderer>();
+            if (body != null)
+            {
+                return body;
+            }
+
+            SkeletonAnimation spine = instance.GetComponentInChildren<SkeletonAnimation>(true);
+            Renderer spineRenderer = spine?.GetComponent<Renderer>();
+            if (spineRenderer != null)
+            {
+                return spineRenderer;
+            }
+
+            SkinnedMeshRenderer skinnedMesh = instance.GetComponentInChildren<SkinnedMeshRenderer>(true);
+            if (skinnedMesh != null)
+            {
+                return skinnedMesh;
+            }
+
+            return instance.GetComponentInChildren<MeshRenderer>(true);
+        }
+
+        /// <summary>
+        /// 判断 Stage 屏幕点是否命中武将字部件字形对象的 SpriteRenderer 世界 AABB 屏幕投影。
+        /// </summary>
+        /// <param name="slotId">战场槽位固定标识（对应 <see cref="OnBattleGeneralPartGlyphChanged"/> 的 slotId）。</param>
+        /// <param name="stageX">FairyGUI Stage X 坐标（左上角原点）。</param>
+        /// <param name="stageY">FairyGUI Stage Y 坐标（左上角原点）。</param>
+        /// <returns>命中返回 true；该槽无字形、无 SpriteRenderer 或无相机时返回 false。</returns>
+        /// <remarks>
+        /// 供战场起拖源命中使用：未合成武将字在战场以单格字形显示并可再次起拖。
+        /// 复用 <see cref="HitBodyInStage"/> 的 SpriteRenderer bounds 屏幕投影，与活动单位 Body 命中一致。
+        /// </remarks>
+        internal bool TryHitGeneralPartGlyph(int slotId, float stageX, float stageY)
+        {
+            if (!_generalPartGlyphs.TryGetValue(slotId, out GameObject glyph) || glyph == null)
+            {
+                return false;
+            }
+
+            SpriteRenderer body = glyph.GetComponent<SpriteRenderer>();
+            return HitBodyInStage(body, stageX, stageY);
+        }
+
+        /// <summary>
+        /// 把 SpriteRenderer 世界包围盒的 8 个角投影到屏幕矩形（左下角原点），
+        /// 再把 Stage 点（左上角原点，Y 翻转）与之比较。
+        /// </summary>
+        private static bool HitBodyInStage(Renderer body, float stageX, float stageY)
+        {
+            if (body == null || !body.enabled
+                || body is SpriteRenderer spriteRenderer && spriteRenderer.sprite == null)
+            {
+                return false;
+            }
+
+            Camera camera = Camera.main;
+            if (camera == null)
+            {
+                return false;
+            }
+
+            Bounds bounds = body.bounds;
+            Vector3 center = bounds.center;
+            Vector3 extents = bounds.extents;
+            Vector3[] corners =
+            {
+                center + new Vector3(-extents.x, -extents.y, -extents.z),
+                center + new Vector3(extents.x, -extents.y, -extents.z),
+                center + new Vector3(extents.x, extents.y, -extents.z),
+                center + new Vector3(-extents.x, extents.y, -extents.z),
+                center + new Vector3(-extents.x, -extents.y, extents.z),
+                center + new Vector3(extents.x, -extents.y, extents.z),
+                center + new Vector3(extents.x, extents.y, extents.z),
+                center + new Vector3(-extents.x, extents.y, extents.z),
+            };
+
+            float minX = float.MaxValue;
+            float maxX = float.MinValue;
+            float minY = float.MaxValue;
+            float maxY = float.MinValue;
+            for (int i = 0; i < corners.Length; i++)
+            {
+                Vector3 screen = camera.WorldToScreenPoint(corners[i]);
+                minX = Mathf.Min(minX, screen.x);
+                maxX = Mathf.Max(maxX, screen.x);
+                minY = Mathf.Min(minY, screen.y);
+                maxY = Mathf.Max(maxY, screen.y);
+            }
+
+            // Stage 坐标为左上角原点；转换到 Unity 左下角原点后比较（与 UnityCoordinateConverter 一致）。
+            float unityScreenY = Screen.height - stageY;
+            return stageX >= minX && stageX <= maxX
+                && unityScreenY >= minY && unityScreenY <= maxY;
+        }
+
+        /// <summary>
+        /// 显示或移除某个战场槽位的武将字部件字形。
+        /// </summary>
+        /// <param name="slotId">固定槽位标识（Battle 槽）。</param>
+        /// <param name="isPlayerSide">是否玩家方（当前仅玩家侧会有武将字，保留供通用）。</param>
+        /// <param name="gridX">战场格子列。</param>
+        /// <param name="gridY">战场格子行。</param>
+        /// <param name="partWord">武将字；null 或空时移除该槽字形。</param>
+        /// <remarks>
+        /// <para>由 <see cref="BattlePresenter"/> 从权威槽位事实驱动。字形使用已预加载的
+        /// <see cref="_generalPartSprites"/>（<see cref="LoadGeneralPartSpritesAsync"/> 填充），
+        /// 以 SpriteRenderer 呈现，并跟踪 GameObject 供 <see cref="TryHitGeneralPartGlyph"/>
+        /// 与 <see cref="Clear"/> 清理。字形不进入 UnitRegistry/攻击调度，仅作可起拖表现。</para>
+        /// </remarks>
+        public void OnBattleGeneralPartGlyphChanged(int slotId, bool isPlayerSide, int gridX, int gridY, string partWord)
+        {
+            if (string.IsNullOrEmpty(partWord))
+            {
+                RemoveGeneralPartGlyph(slotId);
+                return;
+            }
+
+            if (!_generalPartSprites.TryGetValue(partWord, out Sprite sprite) || sprite == null)
+            {
+                // 未预加载该字形：保持无字形状态（移除旧字形，避免残留错误字形）。
+                RemoveGeneralPartGlyph(slotId);
+                return;
+            }
+
+            Vector3 world = _bindings.CellToWorld(gridX, gridY);
+            if (_generalPartGlyphs.TryGetValue(slotId, out GameObject existing) && existing != null)
+            {
+                existing.transform.position = world;
+                SpriteRenderer existingRenderer = existing.GetComponent<SpriteRenderer>();
+                if (existingRenderer != null)
+                {
+                    existingRenderer.sprite = sprite;
+                    existingRenderer.sortingOrder = 12;
+                }
+
+                return;
+            }
+
+            var glyph = new GameObject($"GeneralPartGlyph_{slotId}");
+            glyph.transform.SetParent(_bindings.SoldierRoot, false);
+            glyph.transform.position = world;
+            SpriteRenderer renderer = glyph.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            // 玩家战场槽底框使用 sortingOrder=8；字形必须位于其上方才能稳定显示和命中。
+            renderer.sortingOrder = 12;
+            _generalPartGlyphs[slotId] = glyph;
+        }
+
+        private void RemoveGeneralPartGlyph(int slotId)
+        {
+            if (!_generalPartGlyphs.TryGetValue(slotId, out GameObject glyph) || glyph == null)
+            {
+                return;
+            }
+
+            _generalPartGlyphs.Remove(slotId);
+            Destroy(glyph);
+        }
+
+        /// <summary>
         /// 加载本端口的全部必需 Prefab。失败时释放本端口已取得的所有句柄。
         /// </summary>
         /// <param name="enemyResourceAddresses">
         /// 本局所选计划解析后会使用的去重普通敌人资源地址；只为本局实际引用的敌人
         /// 加载 Prefab 并建立表现池，不再固定预加载 Mob0。
         /// </param>
-        /// <param name="cancellationToken">取消令牌。</param>
+        /// <param name="generalResourceAddresses">配置驱动的 General Prefab 地址。</param>
+        /// <param name="generalPartWords">需预加载的武将拆字列表，用于字形贴图加载。</param>
         public async UniTask PreloadAsync(
             IReadOnlyList<string> enemyResourceAddresses,
-            CancellationToken cancellationToken)
+            IReadOnlyList<string> generalResourceAddresses,
+            IReadOnlyList<string> generalPartWords)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             if (_preloaded)
             {
                 return;
@@ -154,6 +371,24 @@ namespace GameBattle
                 "unit_SpearSoldier", "SpearSoldier", ViewObjectCategory.Unit));
             requiredPrefabs.Add(new PrefabLoadEntry(
                 "unit_CavalrySoldier", "CavalrySoldier", ViewObjectCategory.Unit));
+            if (generalResourceAddresses != null)
+            {
+                var seenGeneralAddresses = new HashSet<string>(StringComparer.Ordinal)
+                {
+                    "KnifeSoldier",
+                    "BowSoldier",
+                    "SpearSoldier",
+                    "CavalrySoldier",
+                };
+                foreach (string address in generalResourceAddresses)
+                {
+                    if (seenGeneralAddresses.Add(address))
+                    {
+                        requiredPrefabs.Add(new PrefabLoadEntry(
+                            $"unit_{address}", address, ViewObjectCategory.Unit));
+                    }
+                }
+            }
             requiredPrefabs.Add(new PrefabLoadEntry(
                 "projectile_arrow", ArrowAddress, ViewObjectCategory.Projectile));
 
@@ -161,21 +396,16 @@ namespace GameBattle
             {
                 for (int index = 0; index < requiredPrefabs.Count; index++)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
                     PrefabLoadEntry entry = requiredPrefabs[index];
                     await LoadRequiredPrefabAsync(
-                        loader, entry.AssetKey, entry.Address, entry.Category, cancellationToken);
+                        loader, entry.AssetKey, entry.Address, entry.Category);
                 }
 
-                await LoadUnitAnimationsAsync(loader, cancellationToken);
-                await LoadLevelNumberSpritesAsync(loader, cancellationToken);
+                await LoadUnitAnimationsAsync(loader);
+                await LoadLevelNumberSpritesAsync(loader);
+                await LoadGeneralPartSpritesAsync(loader, generalPartWords);
 
                 _preloaded = true;
-            }
-            catch (OperationCanceledException)
-            {
-                ResetPreload();
-                throw;
             }
             catch (BattlePresentationLoadException)
             {
@@ -289,23 +519,32 @@ namespace GameBattle
 
         public void OnUnitPlaced(int runtimeId, bool isPlayerSide, int soldierType, int gridX, int gridY, int level)
         {
-            if (!_unitAddresses.TryGetValue(soldierType, out string address))
+            OnConfiguredUnitPlaced(new UnitSpawnViewData(
+                runtimeId, isPlayerSide, 0, -1, string.Empty, soldierType,
+                string.Empty, string.Empty, gridX, gridY, level));
+        }
+
+        public void OnConfiguredUnitPlaced(UnitSpawnViewData dto)
+        {
+            string address = dto.PrefabAddress;
+            if (string.IsNullOrEmpty(address)
+                && !_unitAddresses.TryGetValue(dto.SoldierType, out address))
             {
                 throw new BattlePresentationLoadException(
                     "instantiate",
-                    $"soldierType:{soldierType}",
-                    new ArgumentOutOfRangeException(nameof(soldierType)));
+                    $"soldierType:{dto.SoldierType}",
+                    new ArgumentOutOfRangeException(nameof(dto.SoldierType)));
             }
 
             SpawnInstance(
-                runtimeId,
+                dto.RuntimeId,
                 ViewObjectCategory.Unit,
                 $"unit_{address}",
-                _bindings.UnitCellToWorld(gridX, gridY),
+                _bindings.UnitCellToWorld(dto.GridX, dto.GridY),
                 _bindings.SoldierRoot);
 
             // 战场单位附加等级数字表现（修复 P0：首次上场显示真实等级，不再固定 1）。
-            if (_activeInstances.TryGetValue(runtimeId, out ActiveInstance placed))
+            if (_activeInstances.TryGetValue(dto.RuntimeId, out ActiveInstance placed))
             {
                 SoldierLevelBadge badge = placed.GameObject.GetComponent<SoldierLevelBadge>();
                 if (badge == null)
@@ -314,7 +553,8 @@ namespace GameBattle
                 }
 
                 badge.Configure(_levelNumberSprites);
-                badge.SetLevel(level > 0 ? level : 1);
+                badge.SetLevel(dto.Level > 0 ? dto.Level : 1);
+                ConfigureGeneralSpine(placed.GameObject, dto.AnimationKey);
             }
         }
 
@@ -379,6 +619,13 @@ namespace GameBattle
                 Destroy(active.GameObject);
             }
             _activeInstances.Clear();
+
+            // 清理战场武将字字形对象（在 ResetPreload 清空字形贴图字典之前）。
+            foreach (GameObject glyph in _generalPartGlyphs.Values)
+            {
+                Destroy(glyph);
+            }
+            _generalPartGlyphs.Clear();
 
             foreach (Stack<GameObject> pool in _pools.Values)
             {
@@ -507,8 +754,7 @@ namespace GameBattle
             IBattleViewAssetLoader loader,
             string assetKey,
             string address,
-            ViewObjectCategory category,
-            CancellationToken cancellationToken)
+            ViewObjectCategory category)
         {
             IBattleAssetLease lease;
             try
@@ -520,11 +766,7 @@ namespace GameBattle
                 }
 
                 _assetLeases.Add(lease);
-                await UniTask.WaitUntil(() => lease.IsDone, cancellationToken: cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
+                await UniTask.WaitUntil(() => lease.IsDone);
             }
             catch (BattlePresentationLoadException)
             {
@@ -670,6 +912,7 @@ namespace GameBattle
             instance.SetActive(true);
             instance.GetComponent<SoldierSpriteAnimator>()?.ResetToIdle();
             instance.GetComponent<SpearWeaponView>()?.ResetView();
+            instance.GetComponent<GeneralSpineAnimator>()?.ResetToIdle();
 
             return instance;
         }
@@ -690,22 +933,21 @@ namespace GameBattle
             instance.transform.SetParent(parent, false);
             instance.GetComponent<SoldierSpriteAnimator>()?.ResetToIdle();
             instance.GetComponent<SpearWeaponView>()?.ResetView();
+            instance.GetComponent<GeneralSpineAnimator>()?.ResetToIdle();
             instance.SetActive(false);
             pool.Push(instance);
         }
 
-        private async UniTask LoadUnitAnimationsAsync(
-            IBattleViewAssetLoader loader,
-            CancellationToken cancellationToken)
+        private async UniTask LoadUnitAnimationsAsync(IBattleViewAssetLoader loader)
         {
             int[] idleCounts = { 7, 7, 8, 6 };
             int[] attackCounts = { 19, 30, 21, 19 };
             for (int soldierType = 0; soldierType < idleCounts.Length; soldierType++)
             {
                 Sprite[] idleFrames = await LoadSpriteFramesAsync(
-                    loader, soldierType, "skeleton-zhan", idleCounts[soldierType], cancellationToken);
+                    loader, soldierType, "skeleton-zhan", idleCounts[soldierType]);
                 Sprite[] attackFrames = await LoadSpriteFramesAsync(
-                    loader, soldierType, "skeleton-attack", attackCounts[soldierType], cancellationToken);
+                    loader, soldierType, "skeleton-attack", attackCounts[soldierType]);
                 _unitAnimations[soldierType] = new SoldierAnimationFrames(idleFrames, attackFrames);
             }
         }
@@ -714,13 +956,11 @@ namespace GameBattle
             IBattleViewAssetLoader loader,
             int soldierType,
             string animationName,
-            int frameCount,
-            CancellationToken cancellationToken)
+            int frameCount)
         {
             var frames = new Sprite[frameCount];
             for (int frameIndex = 0; frameIndex < frameCount; frameIndex++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 string frameName = animationName == "skeleton-attack"
                     ? $"{animationName}_{frameIndex:D2}"
                     : $"{animationName}_{frameIndex}";
@@ -738,11 +978,7 @@ namespace GameBattle
                     }
 
                     _assetLeases.Add(lease);
-                    await UniTask.WaitUntil(() => lease.IsDone, cancellationToken: cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
+                    await UniTask.WaitUntil(() => lease.IsDone);
                 }
                 catch (BattlePresentationLoadException)
                 {
@@ -768,14 +1004,11 @@ namespace GameBattle
         /// <summary>
         /// 预加载 1 至 8 的等级数字 Sprite（index = level - 1），每个数字独立单图。
         /// </summary>
-        private async UniTask LoadLevelNumberSpritesAsync(
-            IBattleViewAssetLoader loader,
-            CancellationToken cancellationToken)
+        private async UniTask LoadLevelNumberSpritesAsync(IBattleViewAssetLoader loader)
         {
             var sprites = new Sprite[MaxLevelNumber];
             for (int index = 0; index < MaxLevelNumber; index++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 string address = LevelNumberAddressPrefix + (index + 1);
 
                 IBattleAssetLease lease;
@@ -788,11 +1021,7 @@ namespace GameBattle
                     }
 
                     _assetLeases.Add(lease);
-                    await UniTask.WaitUntil(() => lease.IsDone, cancellationToken: cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
+                    await UniTask.WaitUntil(() => lease.IsDone);
                 }
                 catch (BattlePresentationLoadException)
                 {
@@ -814,6 +1043,61 @@ namespace GameBattle
             }
 
             _levelNumberSprites = sprites;
+        }
+
+        /// <summary>
+        /// 预加载武将拆字字形贴图，按 partWord 建立查表字典。
+        /// </summary>
+        /// <remarks>复用 LoadLevelNumberSpritesAsync 的 lease 模式：LoadAsync 登记 _assetLeases，
+        /// 对称释放由 ResetPreload 统一 Dispose。未知拆字（GetSpriteAddress 返回 null）跳过。</remarks>
+        private async UniTask LoadGeneralPartSpritesAsync(
+            IBattleViewAssetLoader loader,
+            IReadOnlyList<string> partWords)
+        {
+            if (partWords == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < partWords.Count; index++)
+            {
+                string word = partWords[index];
+                string address = GeneralPartGlyphMap.GetSpriteAddress(word);
+                if (address == null)
+                {
+                    continue;
+                }
+
+                IBattleAssetLease lease;
+                try
+                {
+                    lease = loader.LoadAsync<Sprite>(address);
+                    if (lease == null)
+                    {
+                        throw new InvalidOperationException("资源加载接缝返回空租约");
+                    }
+
+                    _assetLeases.Add(lease);
+                    await UniTask.WaitUntil(() => lease.IsDone);
+                }
+                catch (BattlePresentationLoadException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    throw new BattlePresentationLoadException("load-general-part", address, ex);
+                }
+
+                if (!lease.IsValid || !(lease.AssetObject is Sprite sprite) || sprite == null)
+                {
+                    throw new BattlePresentationLoadException(
+                        "validate-general-part", address,
+                        new InvalidOperationException("武将字形 Sprite 无效"));
+                }
+
+                _generalPartSprites[word] = sprite;
+            }
         }
 
         private void ConfigureUnitAnimation(GameObject instance, string assetKey)
@@ -845,9 +1129,28 @@ namespace GameBattle
             animator.Configure(renderer, frames.IdleFrames, frames.AttackFrames);
         }
 
+        // 武将单位挂 SkeletonAnimation 时绑定 Spine 待机/攻击动画；士兵 Prefab 无此组件则空操作。
+        private void ConfigureGeneralSpine(GameObject instance, string idleKey)
+        {
+            SkeletonAnimation spine = instance.GetComponentInChildren<SkeletonAnimation>(true);
+            if (spine == null)
+            {
+                return;
+            }
+
+            GeneralSpineAnimator animator = instance.GetComponent<GeneralSpineAnimator>();
+            if (animator == null)
+            {
+                animator = instance.AddComponent<GeneralSpineAnimator>();
+            }
+
+            animator.Configure(spine, idleKey);
+        }
+
         private void ResetPreload()
         {
             _levelNumberSprites = null;
+            _generalPartSprites.Clear();
 
             // 对称释放至今取得的所有资源租约（生产租约内部 Release 对应 AssetHandle）。
             for (int index = 0; index < _assetLeases.Count; index++)
@@ -1047,7 +1350,7 @@ namespace GameBattle
     // ----------------------------------------------------------------------------
     // 生产实现（UnityResourceAssetLoader + YooAssetBattleAssetLease）沿用现有
     // IResourceModule.LoadAssetAsyncHandle<T> / AssetHandle.Release 语义；
-    // EditMode 测试注入替身驱动预加载成功/失败/取消并验证句柄对称释放与可重试。
+    // EditMode 测试注入替身驱动预加载成功/失败并验证句柄对称释放与可重试。
     // 不修改 GameModule.Resource 实现（contract 7）。
     // ============================================================================
 

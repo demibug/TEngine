@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using TEngine;
 using YooAsset;
 
@@ -17,21 +16,20 @@ namespace GameBattle
     //
     // 跟踪的所有权类别（对应 spec "Runtime quiescence and cleanup have one
     //   ordered owner" 与 "Partial initialization is recoverable"）：
-    //   1. CancellationTokenSource —— 运行时 Token，取消异步操作与表现回调。
-    //   2. GameEvent 局部监听 —— 通过 GameEventMgr 批量注册的 int 事件监听，
+    //   1. GameEvent 局部监听 —— 通过 GameEventMgr 批量注册的 int 事件监听，
     //      Release 时 Clear 一次性解除（event-system.md 推荐：非 UI 类用
     //      GameEventMgr 避免泄漏）。
-    //   3. 到期动作 —— BattleActionScheduler 注册的接触伤害 / 刀兵命中 / 攻击
+    //   2. 到期动作 —— BattleActionScheduler 注册的接触伤害 / 刀兵命中 / 攻击
     //      释放等帧级到期回调（battle-simulation/spec.md）。
-    //   4. 表现回调 —— Presenter / View 注册的异步完成或动画回调。
-    //   5. 资源租约 —— YooAsset AssetHandle（实现 IDisposable，Release 幂等）
+    //   3. 表现回调 —— Presenter / View 注册的异步完成或动画回调。
+    //   4. 资源租约 —— YooAsset AssetHandle（实现 IDisposable，Release 幂等）
     //      与通过 GameModule.Resource.UnloadAsset 释放的裸资源对象
     //      （resource-api.md：LoadAssetAsync 与 UnloadAsset 必须配对）。
-    //   6. 池租借 —— BattleObjectPool 的 Acquire/Release 对称租借
+    //   5. 池租借 —— BattleObjectPool 的 Acquire/Release 对称租借
     //      （task 4.1 IPoolableBattleObject，本期由 Scope 统一登记释放动作）。
-    //   7. 内部信号中枢 —— BattleInternalSignalHub 的单局信号订阅，Clear 批量解除。
-    //   8. Scene 租约 —— task 7.6 战斗 Scene，经 GameModule.Scene.UnloadAsync 释放。
-    //   9. FUI Package 租约 —— task 7.6 GameFUI PackageLease，Release 递减引用计数。
+    //   6. 内部信号中枢 —— BattleInternalSignalHub 的单局信号订阅，Clear 批量解除。
+    //   7. Scene 租约 —— task 7.6 战斗 Scene，经 GameModule.Scene.UnloadAsync 释放。
+    //   8. FUI Package 租约 —— task 7.6 GameFUI PackageLease，Release 递减引用计数。
     //
     // 释放语义：
     //   - 幂等：重复 Dispose / Rollback 安全，每条登记只释放一次。
@@ -41,7 +39,7 @@ namespace GameBattle
 
     /// <summary>
     /// 单局运行时所有权作用域。
-    /// <para>跟踪一局战斗中取得的全部可释放所有权（CTS、GameEvent 局部监听、到期动作、
+    /// <para>跟踪一局战斗中取得的全部可释放所有权（GameEvent 局部监听、到期动作、
     /// 表现回调、资源租约、池租借、内部信号订阅、Scene 租约、FUI Package 租约），
     /// 并提供幂等逆序释放与失败初始化回滚。</para>
     /// <para>本类型替代还原工程的字符串服务容器 <c>CombatServices</c> 与隐式全局单例：
@@ -88,9 +86,6 @@ namespace GameBattle
         /// </summary>
         internal enum OwnershipKind
         {
-            /// <summary> CancellationTokenSource —— 运行时取消令牌。 </summary>
-            CancellationToken,
-
             /// <summary> GameEvent 局部监听（GameEventMgr 批量解除）。 </summary>
             GameEventListener,
 
@@ -161,44 +156,6 @@ namespace GameBattle
         // ------------------------------------------------------------------------
 
         /// <summary>
-        /// 登记一个 <see cref="CancellationTokenSource"/> 的所有权。
-        /// <para>释放时先 Cancel 再 Dispose，保证挂起异步操作被取消（naming-rules.md
-        /// 推荐模式：<c>_cts.Cancel(); _cts.Dispose();</c>）。幂等：重复释放安全。</para>
-        /// </summary>
-        /// <param name="cts">本局运行时取消令牌源；不可为 null。</param>
-        /// <param name="tag">可选诊断标签。</param>
-        internal void TrackCancellationTokenSource(CancellationTokenSource cts, string tag = null)
-        {
-            if (cts == null)
-            {
-                throw new ArgumentNullException(nameof(cts));
-            }
-            Track(OwnershipKind.CancellationToken, tag, () =>
-            {
-                // 先取消挂起操作，再释放句柄；Cancel/Dispose 本身幂等。
-                try
-                {
-                    if (!cts.IsCancellationRequested)
-                    {
-                        cts.Cancel();
-                    }
-                }
-                catch (ObjectDisposedException)
-                {
-                    // 已被外部提前释放，忽略。
-                }
-                try
-                {
-                    cts.Dispose();
-                }
-                catch (ObjectDisposedException)
-                {
-                    // 已释放，忽略。
-                }
-            });
-        }
-
-        /// <summary>
         /// 登记一个 <see cref="GameEventMgr"/> 局部事件管理器的所有权。
         /// <para>释放时调用 <see cref="GameEventMgr.Clear"/> 一次性解除全部已注册监听
         /// （event-system.md：非 UI 类用 GameEventMgr 批量管理，Clear 一次性移除）。
@@ -236,7 +193,7 @@ namespace GameBattle
         /// 登记一个表现回调的所有权。
         /// <para>用于 Presenter / View 注册的异步完成或动画回调。释放时执行
         /// <paramref name="releaseAction"/> 取消该回调，避免迟到回调在 Runtime 销毁后
-        /// 触发（spec：退出完成后任何迟到回调均因 Token/generation 失效）。</para>
+        /// 触发（spec：退出完成后任何迟到回调均因战斗代次或当前打开身份失效）。</para>
         /// </summary>
         /// <param name="releaseAction">取消该表现回调的释放动作；不可为 null。</param>
         /// <param name="tag">可选诊断标签。</param>

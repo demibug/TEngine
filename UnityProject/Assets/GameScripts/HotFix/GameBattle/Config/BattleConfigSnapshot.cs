@@ -130,6 +130,9 @@ namespace GameBattle
         /// </remarks>
         public WeaponCatalogSnapshot WeaponCatalog { get; }
 
+        /// <summary>本局启用武将、有序配方索引与玩家武将字招募项。</summary>
+        public GeneralCatalogSnapshot GeneralCatalog { get; }
+
         // ====================================================================
         // 波次配置（legacy）
         // ====================================================================
@@ -253,7 +256,8 @@ namespace GameBattle
             BuffCatalogSnapshot buffCatalog = null,
             SkillCatalogSnapshot skillCatalog = null,
             BossCatalogSnapshot bossCatalog = null,
-            WeaponCatalogSnapshot weaponCatalog = null)
+            WeaponCatalogSnapshot weaponCatalog = null,
+            GeneralCatalogSnapshot generalCatalog = null)
         {
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Enemy = enemy ?? throw new ArgumentNullException(nameof(enemy));
@@ -271,6 +275,7 @@ namespace GameBattle
             SkillCatalog = skillCatalog;
             BossCatalog = bossCatalog;
             WeaponCatalog = weaponCatalog;
+            GeneralCatalog = generalCatalog ?? new GeneralCatalogSnapshot(Array.Empty<GeneralConfigSnapshot>());
         }
     }
 
@@ -411,6 +416,18 @@ namespace GameBattle
         /// <summary>目标策略。</summary>
         public string TargetPolicy { get; }
 
+        /// <summary>投射物类型；近战或旧四兵配置为空。</summary>
+        public string ProjectileType { get; }
+
+        /// <summary>配置投射物速度；0 表示沿用既有兵种默认值。</summary>
+        public int ProjectileSpeed { get; }
+
+        /// <summary>单位表现 Prefab 地址；空时按既有 SoldierType 映射。</summary>
+        public string PrefabAddress { get; }
+
+        /// <summary>主动技能键（武将单位才有；普通四兵为空串）。</summary>
+        public string SkillKey { get; }
+
         /// <summary>构造单位配置快照。</summary>
         public UnitConfigSnapshot(
             int index,
@@ -420,7 +437,11 @@ namespace GameBattle
             int attackDamage,
             float attackIntervalSeconds,
             string damageMode,
-            string targetPolicy)
+            string targetPolicy,
+            string projectileType = "",
+            int projectileSpeed = 0,
+            string prefabAddress = "",
+            string skillKey = "")
         {
             Index = index;
             Text = text ?? throw new ArgumentNullException(nameof(text));
@@ -430,6 +451,10 @@ namespace GameBattle
             AttackIntervalSeconds = attackIntervalSeconds;
             DamageMode = damageMode ?? throw new ArgumentNullException(nameof(damageMode));
             TargetPolicy = targetPolicy ?? throw new ArgumentNullException(nameof(targetPolicy));
+            ProjectileType = projectileType ?? string.Empty;
+            ProjectileSpeed = projectileSpeed;
+            PrefabAddress = prefabAddress ?? string.Empty;
+            SkillKey = skillKey ?? string.Empty;
         }
     }
 

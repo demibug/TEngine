@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using GameCommon.Battle;
 using GameConfig;
 using TEngine;
@@ -81,12 +80,6 @@ namespace GameBattle
         /// 本次组装产生的装载信息（只读副本，供 Runtime 读取种子/地图/牌组预设）。
         /// </summary>
         public readonly BattleLoadoutDto Loadout;
-
-        /// <summary>
-        /// 本次组装产生的运行时取消令牌源。由 Factory 构造并登记到 Scope，
-        /// 用于取消本局所有异步操作与表现回调。
-        /// </summary>
-        public readonly CancellationTokenSource RuntimeTokenSource;
 
         /// <summary>
         /// 本次组装从应用级 ConfigSystem.Tables 复制的不可变战斗配置快照
@@ -340,7 +333,6 @@ namespace GameBattle
             BattleRuntimeScope scope,
             BattleSimulation simulation,
             BattleLoadoutDto loadout,
-            CancellationTokenSource runtimeTokenSource,
             BattleConfigSnapshot configSnapshot,
             BuffManager buffManager,
             SkillRunner skillRunner,
@@ -373,7 +365,6 @@ namespace GameBattle
             Scope = scope;
             Simulation = simulation;
             Loadout = loadout;
-            RuntimeTokenSource = runtimeTokenSource;
             ConfigSnapshot = configSnapshot;
             BuffManager = buffManager;
             SkillRunner = skillRunner;
@@ -409,7 +400,6 @@ namespace GameBattle
             BattleRuntimeScope scope,
             BattleSimulation simulation,
             BattleLoadoutDto loadout,
-            CancellationTokenSource runtimeTokenSource,
             BattleConfigSnapshot configSnapshot,
             BuffManager buffManager,
             SkillRunner skillRunner,
@@ -442,7 +432,6 @@ namespace GameBattle
                 scope,
                 simulation,
                 loadout,
-                runtimeTokenSource,
                 configSnapshot,
                 buffManager,
                 skillRunner,
@@ -483,7 +472,6 @@ namespace GameBattle
                 rolledBackScope,
                 simulation: null,
                 loadout: default,
-                runtimeTokenSource: null,
                 configSnapshot: null,
                 buffManager: null,
                 skillRunner: null,
@@ -526,7 +514,7 @@ namespace GameBattle
     ///
     /// <para><b>职责边界（与 task 2.10 BattleRuntime 的分工）：</b></para>
     /// <list type="bullet">
-    /// <item>Factory 只负责校验输入、构造模拟器/令牌等强类型依赖、登记所有权、记录初始化步骤日志。</item>
+    /// <item>Factory 只负责校验输入、构造模拟器等强类型依赖、登记所有权、记录初始化步骤日志。</item>
     /// <item>Factory 不创建 <c>BattleRuntime</c>；<c>BattleRuntime</c> 由 task 2.10 实现，
     /// 在构造时接管本工厂产生的 <see cref="BattleRuntimeAssembly"/> 所有权。</item>
     /// <item>当 task 2.10 尚未实现时，Factory 返回的 Assembly 携带已组装的依赖与 Scope，
@@ -553,11 +541,6 @@ namespace GameBattle
         /// 不可变战斗装载信息（地图、种子、配置版本/hash 占位、牌组预设）。
         /// 由调用方（<c>BattleModule</c>）在 Start/Restart 时传入。
         /// </param>
-        /// <param name="cancellationToken">
-        /// 组装过程取消令牌。组装本身为同步操作，但取消会中止后续步骤并回滚已取得的所有权。
-        /// 取消时抛出 <see cref="OperationCanceledException"/>（决策 0.7：取消保留取消异常语义），
-        /// 但已登记的所有权在抛出前已被回滚释放。
-        /// </param>
         /// <returns>
         /// 组装产物 <see cref="BattleRuntimeAssembly"/>。成功时 <see cref="BattleRuntimeAssembly.IsSuccess"/>
         /// 为 true；失败时携带稳定错误码与诊断信息，且 Scope 已被回滚释放。
@@ -566,7 +549,6 @@ namespace GameBattle
         /// <para><b>组装步骤顺序（每步登记所有权到新建的 Scope）：</b></para>
         /// <list type="number">
         /// <item>创建 <see cref="BattleRuntimeScope"/>（本次组装的所有权根）。</item>
-        /// <item>创建运行时 <see cref="CancellationTokenSource"/> 并登记到 Scope。</item>
         /// <item>构造 <see cref="BattleActionScheduler"/>（到期动作/冷却调度器）。</item>
         /// <item>构造 <see cref="BattleSimulation"/>（逻辑时钟入口），注入阶段回调占位与调度器。</item>
         /// <item>校验装载信息（牌组预设、配置版本占位），失败返回
@@ -606,15 +588,12 @@ namespace GameBattle
         /// </list>
         /// <para>任一步骤失败：记录日志，调用 <see cref="BattleRuntimeScope.Rollback"/>
         /// 只释放本次已取得的所有权，返回失败产物。不抛出预期失败异常（决策 0.7）。</para>
-        /// <para>调用方取消：先回滚已取得的所有权，再抛出
-        /// <see cref="OperationCanceledException"/>，保留取消异常语义。</para>
         /// </remarks>
         internal static BattleRuntimeAssembly Create(
             BattleLoadoutDto loadout,
-            CancellationToken cancellationToken = default,
             BattlePoolScope poolScope = null)
         {
-            return Create(loadout, cancellationToken, poolScope, bindings: null, configSnapshot: null);
+            return Create(loadout, poolScope, bindings: null, configSnapshot: null);
         }
 
         /// <summary>
@@ -626,11 +605,10 @@ namespace GameBattle
         /// </remarks>
         internal static BattleRuntimeAssembly Create(
             BattleLoadoutDto loadout,
-            CancellationToken cancellationToken,
             BattlePoolScope poolScope,
             BattleMapBindings bindings)
         {
-            return Create(loadout, cancellationToken, poolScope, bindings, configSnapshot: null);
+            return Create(loadout, poolScope, bindings, configSnapshot: null);
         }
 
         /// <summary>
@@ -644,7 +622,6 @@ namespace GameBattle
         /// </remarks>
         internal static BattleRuntimeAssembly Create(
             BattleLoadoutDto loadout,
-            CancellationToken cancellationToken,
             BattlePoolScope poolScope,
             BattleMapBindings bindings,
             BattleConfigSnapshot configSnapshot)
@@ -658,7 +635,6 @@ namespace GameBattle
             BattlePoolScope effectivePoolScope = poolScope ?? new BattlePoolScope();
 
             BattleSimulation simulation = null;
-            CancellationTokenSource runtimeTokenSource = null;
             BattleActionScheduler actionScheduler = null;
             BuffManager buffManager = null;
             SkillRunner skillRunner = null;
@@ -703,13 +679,6 @@ namespace GameBattle
 
             try
             {
-                // 步骤 2：创建运行时取消令牌源并登记所有权。
-                // 该令牌用于取消本局所有异步操作与表现回调（spec "Exit releases battle-owned state"）。
-                Log.Info($"{LogTag} 步骤 1/12：创建运行时取消令牌源");
-                cancellationToken.ThrowIfCancellationRequested();
-                runtimeTokenSource = new CancellationTokenSource();
-                scope.TrackCancellationTokenSource(runtimeTokenSource, "RuntimeToken");
-
                 // task 7.1 闭环：构造单局内部信号中枢并登记到 Scope。
                 // SignalHub 仅承载需要一对多的单局低频内部事实；订阅由 Scope 经
                 // TrackSignalHub 批量登记，在失败回滚/Settling/Dispose 时一次性 Clear
@@ -732,7 +701,6 @@ namespace GameBattle
 
                 // 步骤 3：构造到期动作/冷却调度器（task 2.11 产物，强类型注入，非字符串查找）。
                 Log.Info($"{LogTag} 步骤 2/12：构造 BattleActionScheduler");
-                cancellationToken.ThrowIfCancellationRequested();
                 actionScheduler = new BattleActionScheduler();
 
                 // 步骤 4：构造逻辑模拟器（task 2.11 产物）。
@@ -746,11 +714,9 @@ namespace GameBattle
                 // 实际实现：此处先不创建 Simulation，推迟到步骤 10。步骤 3 只构造
                 // BattleActionScheduler（Simulation 的依赖），Simulation 在步骤 11 构造。
                 Log.Info($"{LogTag} 步骤 3/12：BattleActionScheduler 已构造，Simulation 推迟到步骤 10");
-                cancellationToken.ThrowIfCancellationRequested();
 
                 // 步骤 5：校验装载信息。预期校验失败返回结构化错误码，不抛异常（决策 0.7）。
                 Log.Info($"{LogTag} 步骤 4/12：校验装载信息");
-                cancellationToken.ThrowIfCancellationRequested();
                 if (!TryValidateLoadout(loadout, out BattleErrorCode validateError, out string validateMsg))
                 {
                     // 校验失败：回滚本次已取得的所有权，返回失败产物。
@@ -764,7 +730,6 @@ namespace GameBattle
                 // 解析并校验配置快照并传入本参数，此处直接复用避免二次读取；
                 // 为 null 时（测试/兼容调用）保持旧路径内部读取。
                 Log.Info($"{LogTag} 步骤 5/12：获取战斗配置快照（已准备则复用）");
-                cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
                     if (configSnapshot == null)
@@ -797,7 +762,6 @@ namespace GameBattle
 
                 // 步骤 7：校验配置快照（task 3.5 BattleConfigValidator）。
                 Log.Info($"{LogTag} 步骤 6/12：校验配置快照（BattleConfigValidator）");
-                cancellationToken.ThrowIfCancellationRequested();
                 BattleConfigValidationResult validationResult =
                     BattleConfigValidator.Validate(
                         configSnapshot, BattleRuntimeCapabilities.Production);
@@ -832,7 +796,6 @@ namespace GameBattle
                 // task 7.4 闭环：BattleReadModel 经 Assembly 暴露给 BattlePresenter，使 Presenter
                 // 只读访问 BattleState 快照，不直接访问 BattleState 或 Manager。
                 Log.Info($"{LogTag} 步骤 7/12：构造 BattleState / BattleReadModel / BattleResultBuilder");
-                cancellationToken.ThrowIfCancellationRequested();
                 const int gridSize = EnemyManager.DefaultGridSize;
                 const float cellSize = 80f;
                 var idAllocator = new RuntimeIdAllocator();
@@ -845,7 +808,7 @@ namespace GameBattle
                     ? configSnapshot.Deck.HandSize
                     : RecruitDefinitions.ReserveSlotCount;
                 levelService = new UnitLevelService(configSnapshot.UnitLevel);
-                slotBoard = new UnitSlotBoard(levelService.MaxLevel);
+                slotBoard = new UnitSlotBoard(levelService.MaxLevel, configSnapshot.GeneralCatalog);
                 slotBoard.Initialize(configSnapshot.Map, reserveSlotCount);
 
                 // 注意：readModel 同时被 ResultBuilder 与 Presenter 共享只读访问。
@@ -856,7 +819,6 @@ namespace GameBattle
                 // 步骤 9：构造 EnemyManager / AttackResolver / AttackEffectManager / ProjectileManager
                 // 及其依赖链（Phase 3/4 产物）。
                 Log.Info($"{LogTag} 步骤 8/12：构造 EnemyManager / AttackEffectManager / ProjectileManager");
-                cancellationToken.ThrowIfCancellationRequested();
                 enemyManager = new EnemyManager(gridSize, buffManager: buffManager);
                 attackEffectManager = new AttackEffectManager();
                 var attackResolver = new AttackResolver();
@@ -907,7 +869,6 @@ namespace GameBattle
                 // PlacementReservationRegistry / BattleInputController / WaveManager / BattleManager /
                 // AttackScheduler（Phase 2/3/5 产物）。
                 Log.Info($"{LogTag} 步骤 9/12：构造 UnitFactory / UnitRegistry / Economy / Deck / Input / Wave / BattleManager");
-                cancellationToken.ThrowIfCancellationRequested();
                 const int opponentAttackMultiplier = 1;
                 BattleObjectPool<KnifeSoldier> knifePool =
                     effectivePoolScope.GetPool(() => new KnifeSoldier());
@@ -922,7 +883,11 @@ namespace GameBattle
 
                 // 最终方案：征兵服务，随机生成 1 级四兵批次。
                 // levelService / slotBoard / reserveSlotCount 已在步骤 7 构造，此处复用。
-                recruitManager = new RecruitManager(randomSource, slotBoard, reserveSlotCount);
+                recruitManager = new RecruitManager(
+                    randomSource,
+                    slotBoard,
+                    reserveSlotCount,
+                    configSnapshot.GeneralCatalog.PartRecruitEntries);
 
                 // 最终方案：开局免费生成第一批待上场单位，填满待上场槽。
                 // 此后只有点击征兵扣馒头（扣费由 BattleInputController.ExecuteRecruit 完成）。
@@ -965,22 +930,139 @@ namespace GameBattle
 
                 reservationRegistry = new PlacementReservationRegistry();
 
-                if (hasSelectedBoss)
+                // ==================================================================
+                // 武将主动技能 + 张梁 SoulCapture 共享 SkillRunner 装配
+                // ------------------------------------------------------------------
+                // 只创建一个 SkillHandlerRegistry 和一个 SkillRunner，供武将主动技能
+                // 与张梁 Boss SoulCapture 共享。无武将技能且无张梁 Boss 时保持
+                // skillRunner=null 的旧路径（AttackScheduler 也不注入 runtime）。
+                //
+                // 装配顺序：所有依赖（unitRegistry/enemyManager/attackResolver/buffManager/
+                // projectileFactory/projectileManager/attackEffectManager/randomSource/cellSize）
+                // 均已构造完成，此处在 AttackScheduler 之前一次性装配。
+                //
+                // SkillRunner 只 TrackDisposable 一次；GeneralSkillRuntime 由
+                // UnitRegistry.ClearForSettling 清理，不额外重复处置。
+                // ==================================================================
+                bool hasGeneralSkill = false;
+                if (configSnapshot.GeneralCatalog != null)
                 {
-                    if (!configSnapshot.SkillCatalog.TryGetByKey(
-                            "SoulCapture", out SkillDefinitionSnapshot soulCaptureDefinition))
+                    IReadOnlyList<GeneralConfigSnapshot> generalDefinitions =
+                        configSnapshot.GeneralCatalog.Definitions;
+                    for (int i = 0; i < generalDefinitions.Count; i++)
                     {
-                        throw new InvalidOperationException($"{LogTag} 缺少 SoulCapture 技能定义");
+                        if (!string.IsNullOrEmpty(generalDefinitions[i].SkillKey))
+                        {
+                            hasGeneralSkill = true;
+                            break;
+                        }
+                    }
+                }
+
+                bool needSkillRunner = hasGeneralSkill || hasSelectedBoss;
+                GeneralSkillRuntime generalSkillRuntime = null;
+                if (needSkillRunner)
+                {
+                    var skillHandlers = new SkillHandlerRegistry();
+
+                    // 张梁 SoulCapture 注册（Boss 选中时），保持原有行为，避免重复注册。
+                    if (hasSelectedBoss)
+                    {
+                        if (!configSnapshot.SkillCatalog.TryGetByKey(
+                                "SoulCapture", out SkillDefinitionSnapshot soulCaptureDefinition))
+                        {
+                            throw new InvalidOperationException($"{LogTag} 缺少 SoulCapture 技能定义");
+                        }
+
+                        skillHandlers.Register(
+                            "SoulCapture",
+                            new SoulCaptureHandler(
+                                soulCaptureDefinition, enemyManager, unitRegistry, buffManager, cellSize));
                     }
 
-                    var skillHandlers = new SkillHandlerRegistry();
-                    skillHandlers.Register(
-                        "SoulCapture",
-                        new SoulCaptureHandler(
-                            soulCaptureDefinition, enemyManager, unitRegistry, buffManager, cellSize));
+                    // 武将主动技能 handler 注册：被武将 SkillKey 引用时注册对应 handler。
+                    // 缺少被引用的技能定义时抛清晰 InvalidOperationException，不引入 fallback。
+                    if (hasGeneralSkill && configSnapshot.GeneralCatalog != null)
+                    {
+                        IReadOnlyList<GeneralConfigSnapshot> generalDefinitions =
+                            configSnapshot.GeneralCatalog.Definitions;
+                        bool battleShoutRegistered = false;
+                        bool fireArrowBarrageRegistered = false;
+                        for (int i = 0; i < generalDefinitions.Count; i++)
+                        {
+                            string skillKey = generalDefinitions[i].SkillKey;
+                            if (string.IsNullOrEmpty(skillKey))
+                            {
+                                continue;
+                            }
+
+                            if (!configSnapshot.SkillCatalog.TryGetByKey(
+                                    skillKey, out SkillDefinitionSnapshot generalSkillDefinition))
+                            {
+                                throw new InvalidOperationException(
+                                    $"{LogTag} 武将技能定义缺失：SkillKey='{skillKey}' 在 SkillCatalog 中不存在");
+                            }
+
+                            // 决策：switch/注册键统一使用 generalSkillDefinition.HandlerKey
+                            // （与 SkillRunner 查询键一致），不使用武将引用的 SkillKey。
+                            // 未实现的 HandlerKey 立即抛清晰异常，同时包含 SkillKey 与
+                            // HandlerKey，不静默跳过到 ActivateBattleUnit 才失败。
+                            string generalHandlerKey = generalSkillDefinition.HandlerKey;
+                            switch (generalHandlerKey)
+                            {
+                                case "BattleShout":
+                                    if (!battleShoutRegistered)
+                                    {
+                                        skillHandlers.Register(
+                                            generalHandlerKey,
+                                            new BattleShoutHandler(
+                                                generalSkillDefinition,
+                                                unitRegistry,
+                                                enemyManager,
+                                                attackResolver,
+                                                buffManager,
+                                                cellSize));
+                                        battleShoutRegistered = true;
+                                    }
+                                    break;
+                                case "FireArrowBarrage":
+                                    if (!fireArrowBarrageRegistered)
+                                    {
+                                        skillHandlers.Register(
+                                            generalHandlerKey,
+                                            new FireArrowBarrageHandler(
+                                                generalSkillDefinition,
+                                                unitRegistry,
+                                                enemyManager,
+                                                attackResolver,
+                                                projectileFactory,
+                                                projectileManager,
+                                                attackEffectManager,
+                                                randomSource,
+                                                cellSize));
+                                        fireArrowBarrageRegistered = true;
+                                    }
+                                    break;
+                                default:
+                                    throw new InvalidOperationException(
+                                        $"{LogTag} 未实现的武将技能 HandlerKey：" +
+                                        $"SkillKey='{skillKey}', HandlerKey='{generalHandlerKey}'");
+                            }
+                        }
+                    }
+
                     skillRunner = new SkillRunner(
                         configSnapshot.SkillCatalog, skillHandlers, actionScheduler);
                     scope.TrackDisposable(skillRunner, "SkillRunner");
+
+                    // 有武将 SkillKey 时创建 GeneralSkillRuntime 并装配到 UnitRegistry，
+                    // AttackScheduler 构造时注入使其能在攻击槽替换为技能激活。
+                    if (hasGeneralSkill)
+                    {
+                        generalSkillRuntime = new GeneralSkillRuntime(
+                            skillRunner, configSnapshot.SkillCatalog);
+                        unitRegistry.AssembleGeneralSkillRuntime(generalSkillRuntime);
+                    }
                 }
 
                 inputController = new BattleInputController(
@@ -1109,7 +1191,10 @@ namespace GameBattle
                     signalHub: signalHub);
 
                 // AttackScheduler 依赖 actionScheduler / attackResolver / cellWidth / cellHeight。
-                attackScheduler = new AttackScheduler(actionScheduler, attackResolver, cellSize, cellSize);
+                // 有武将主动技能时注入 GeneralSkillRuntime，使技能成功时替换攻击槽；
+                // 无武将技能时 generalSkillRuntime 为 null，保持旧测试行为。
+                attackScheduler = new AttackScheduler(
+                    actionScheduler, attackResolver, cellSize, cellSize, generalSkillRuntime);
 
                 // 步骤 11：构造 BattleSimulation，phaseHandlers 连接到实际 Manager 的 update 方法，
                 // tryFreeze 回调连接到 BattleResultBuilder.TryFreeze（task 6.10 闭环核心接入）。
@@ -1123,7 +1208,6 @@ namespace GameBattle
                 //   UnitAttack → AttackScheduler.Update（遍历 UnitRegistry 活动单位）
                 //   AttackEffect → AttackEffectManager.Update
                 Log.Info($"{LogTag} 步骤 10/12：构造 BattleSimulation（phaseHandlers 接入实际 Manager）");
-                cancellationToken.ThrowIfCancellationRequested();
                 int phaseCount = Enum.GetValues(typeof(BattleUpdatePhase)).Length;
                 Action<long, long, BattleUpdatePhase>[] phaseHandlers =
                     new Action<long, long, BattleUpdatePhase>[phaseCount];
@@ -1212,7 +1296,6 @@ namespace GameBattle
                 // Presenter 经 Scope.TrackDisposable 登记释放，在失败回滚/Settling/Dispose 时
                 // 调用 Presenter.Dispose 清理表现对象与监听。
                 Log.Info($"{LogTag} 步骤 11/12：构造 BattlePresenter（task 7.4/7.6 产物）");
-                cancellationToken.ThrowIfCancellationRequested();
                 presenter = new BattlePresenter(
                     readModel,
                     viewPort,
@@ -1232,7 +1315,6 @@ namespace GameBattle
                     scope,
                     simulation,
                     loadout,
-                    runtimeTokenSource,
                     configSnapshot,
                     buffManager,
                     skillRunner,
@@ -1259,14 +1341,6 @@ namespace GameBattle
                     slotBoard,
                     recruitManager,
                     levelService);
-            }
-            catch (OperationCanceledException)
-            {
-                // 调用方取消：先回滚本次已取得的所有权，再重新抛出取消异常。
-                // 取消不绕过内部清理（task 2.6 约束同理）：已登记的 CTS 等所有权在此释放。
-                Log.Warning($"{LogTag} 组装被调用方取消，回滚已取得的所有权");
-                scope.Rollback();
-                throw;
             }
             catch (Exception ex)
             {

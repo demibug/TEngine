@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using TEngine;
 using AudioType = TEngine.AudioType;
@@ -28,9 +27,9 @@ namespace GameBattle
     //   - 本类型不依赖 FairyGUI 程序集，符合校验报告中"IBattleAudioPort 的 Unity
     //     真实实现不受 asmdef 限制"的结论。
     //
-    // 异步与取消语义（任务 7.3 要求）：
-    //   - PreloadAsync 接收 Runtime 或 Module CancellationToken。取消时抛出
-    //     OperationCanceledException，已加载的 AssetHandle 留在 AudioModule 的
+    // 异步语义（任务 7.3）：
+    //   - PreloadAsync 通过 UniTask.Yield 完成（音频由 AudioModule 共享池异步加载），
+    //     不依赖取消令牌。已加载的 AssetHandle 留在 AudioModule 的
     //     AudioClipPool 中由 AudioModule 自身管理（TEngine AudioModule 的池是
     //     跨局共享的应用级资源，不由本端口单局释放）。
     //   - PlayBgm / PlaySfx / StopBgm / Clear 为同步意图调用，对应 AudioModule
@@ -52,7 +51,7 @@ namespace GameBattle
     // 不变量：
     //   1. 逻辑层单向调用：本类型只接收音频意图，不回写规则状态。
     //   2. 不持有逻辑层引用：本类型不引用 BattleState / Manager / 实体。
-    //   3. 异步操作可取消：PreloadAsync 接收 CancellationToken。
+    //   3. 异步操作不依赖取消令牌：PreloadAsync 通过 Yield 完成。
     //   4. 线程安全不要求：所有调用在 Unity 主线程的 Runtime 串行队列中执行。
     //   5. 幂等清理：StopBgm / Clear 可重复调用。
     //
@@ -74,8 +73,8 @@ namespace GameBattle
     /// <para><b>意图式设计：</b>本类型持有 <c>audioId → YooAsset 资源路径</c> 映射表，
     /// 逻辑层只传稳定字符串 ID。具体资源路径在 task 7.6 接入真实 YooAsset 地址后替换占位。</para>
     ///
-    /// <para><b>异步与取消（任务 7.3）：</b>PreloadAsync 接收 Runtime/Module CancellationToken。
-    /// 取消时抛出 OperationCanceledException。</para>
+    /// <para><b>异步（任务 7.3）：</b>PreloadAsync 通过 Yield 完成，不依赖取消令牌。
+    /// 迟到音频回调经 Clear 幂等停止失效。</para>
     ///
     /// <para><b>资源所有权（决策 0.11）：</b>AudioClip 由 AudioModule 共享池持有，属应用级
     /// 资源，不由本端口随单局释放。本端口不在 BattleRuntimeScope 登记 AssetHandle。</para>
@@ -171,13 +170,10 @@ namespace GameBattle
         /// 到 AudioModule 的共享 AudioClipPool。预加载是异步的（AudioModule 内部
         /// LoadAssetAsyncHandle），但 PutInAudioPool 本身不返回 awaitable，本方法
         /// 等待一帧 Yield 后返回，使调用方能在下一帧安全使用音频资源。
-        /// <para>取消语义：cancellationToken 已取消时抛出 OperationCanceledException。</para>
         /// <para>幂等：重复调用安全，已预加载则直接返回。</para>
         /// </remarks>
-        public async UniTask PreloadAsync(CancellationToken cancellationToken)
+        public async UniTask PreloadAsync()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
             if (_preloaded)
             {
                 return;
@@ -208,8 +204,7 @@ namespace GameBattle
             audio.PutInAudioPool(paths);
 
             // 等待一帧使异步加载启动；完整加载在 AudioModule 内部异步完成。
-            // 取消语义：Yield 接收 cancellationToken，取消时抛出 OperationCanceledException。
-            await UniTask.Yield(cancellationToken);
+            await UniTask.Yield();
 
             _preloaded = true;
             Log.Info($"{LogTag} 预加载完成，BGM={_bgmPathMap.Count} SFX={_sfxPathMap.Count}");

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using GameCommon.Battle;
 using TEngine;
 using UnityEngine;
@@ -35,10 +34,9 @@ namespace GameBattle
     //   高频逐实体位置同步由 BattleViewSynchronizer 在 Unity 帧中直接读取只读位置查询
     //   完成，不通过事件（design.md 第 4 节 / task 7.9 性能 profile）。
     //
-    // 异步与取消（task 7.3 端口语义）：
-    //   三个端口的异步操作接收 Runtime 或 Module CancellationToken。Presenter 在 Dispose
-    //   时调用三个端口的 Clear，使迟到回调因 Token 失效（spec "Exit releases battle-owned
-    //   state"）。Presenter 自身经 Scope.TrackDisposable 登记释放。
+    // 异步生命周期（task 7.3 端口语义）：
+    //   三个端口的异步操作在 Unity PlayerLoop 上等待。Presenter 在 Dispose 时调用三个端口
+    //   的 Clear，使迟到表现不再提交。Presenter 自身经 Scope.TrackDisposable 登记释放。
     //
     // 框架解耦（design.md:9）：
     //   Presenter 不直接引用 UnityEngine 或 FairyGUI 类型。三个端口为抽象接口，
@@ -350,9 +348,23 @@ namespace GameBattle
 
             try
             {
-                // 表现层根据槽位事实刷新战场/待上场表现。
-                // 战场单位在 UnitRegistry 的 UnitMoved/UnitLevelChanged 中同步，此处只记录日志。
-                Log.Debug($"{LogTag} 槽位变化 {fact.SlotId} -> {(fact.Occupant.HasValue ? fact.Occupant.Value.ToString() : "Empty")}");
+                // 只处理战场槽：未合成武将字部件以单格字形显示并可再次起拖；
+                // 空槽/士兵/已合成武将传入空 partWord 以移除旧字形。战场单位
+                // （士兵/武将）仍由 UnitRegistry 的 UnitMoved/UnitLevelChanged 同步。
+                if (fact.SlotId.Zone != SlotZone.Battle)
+                {
+                    return;
+                }
+
+                string partWord = fact.Occupant.HasValue && fact.Occupant.Value.Kind == UnitKind.GeneralPart
+                    ? fact.Occupant.Value.GeneralPartText
+                    : null;
+                _viewPort.OnBattleGeneralPartGlyphChanged(
+                    fact.SlotId.Id,
+                    fact.SlotId.Side,
+                    fact.SlotId.GridPosition.X,
+                    fact.SlotId.GridPosition.Y,
+                    partWord);
             }
             catch (Exception ex)
             {
@@ -493,7 +505,7 @@ namespace GameBattle
 
             if (_unitRegistry != null)
             {
-                _unitRegistry.UnitPlaced += OnUnitPlaced;
+                _unitRegistry.ConfiguredUnitPlaced += OnConfiguredUnitPlaced;
                 _unitRegistry.UnitRemoved += OnUnitRemoved;
                 _unitRegistry.UnitMoved += OnUnitMoved;
                 _unitRegistry.UnitLevelChanged += OnUnitLevelChanged;
@@ -518,7 +530,7 @@ namespace GameBattle
 
             if (_unitRegistry != null)
             {
-                _unitRegistry.UnitPlaced -= OnUnitPlaced;
+                _unitRegistry.ConfiguredUnitPlaced -= OnConfiguredUnitPlaced;
                 _unitRegistry.UnitRemoved -= OnUnitRemoved;
                 _unitRegistry.UnitMoved -= OnUnitMoved;
                 _unitRegistry.UnitLevelChanged -= OnUnitLevelChanged;
@@ -584,6 +596,12 @@ namespace GameBattle
         {
             try { _viewPort.OnUnitPlaced(runtimeId, isPlayerSide, soldierType, gridX, gridY, level); }
             catch (Exception ex) { Log.Error($"{LogTag} 创建士兵表现异常: {ex}"); }
+        }
+
+        private void OnConfiguredUnitPlaced(UnitSpawnViewData dto)
+        {
+            try { _viewPort.OnConfiguredUnitPlaced(dto); }
+            catch (Exception ex) { Log.Error($"{LogTag} 创建配置化单位表现异常: {ex}"); }
         }
 
         private void OnUnitRemoved(int runtimeId)
@@ -939,9 +957,16 @@ namespace GameBattle
         /// 基于 Unity Transform 的真实 <see cref="IViewObjectSync"/> 实现（task 7.6）。
         /// <para>把表现对象（GameObject）的 Transform 位置设置为逻辑坐标映射的世界坐标，
         /// 把血量比例设置到 HealthBar 子组件（若存在）。不回写规则状态。</para>
+        /// <para>弓兵本体旋转：攻击时经 <see cref="SetBodyRotation"/> 立即转向目标；
+        /// Attack→Idle 时经 <see cref="ResetUnitPose"/> 启动平滑回正，由
+        /// <see cref="SoldierBodyRotationReturn"/> 以恒定角速度逐帧 RotateTowards
+        /// 回到初始朝向，不再一帧 snap。新目标出现时 SetBodyRotation 立即取消回正并转向。</para>
         /// </summary>
         private sealed class UnityViewObjectSync : IViewObjectSync
         {
+            /// <summary>回正角速度（度/秒）：Idle 时弓兵本体从攻击角平滑回到初始朝向。</summary>
+            private const float BodyRotationReturnDegreesPerSecond = 60f;
+
             private readonly BattleMapBindings _bindings;
             private readonly Dictionary<GameObject, long> _attackTimes =
                 new Dictionary<GameObject, long>();
@@ -990,7 +1015,17 @@ namespace GameBattle
                 if (viewObject is GameObject go && go != null)
                 {
                     Quaternion initialRotation = GetInitialRotation(go);
-                    go.transform.localRotation = initialRotation * _bindings.LogicAngleToWorld(angleDegrees);
+                    Quaternion target = initialRotation * _bindings.LogicAngleToWorld(angleDegrees);
+                    SoldierBodyRotationReturn returner = go.GetComponent<SoldierBodyRotationReturn>();
+                    if (returner != null)
+                    {
+                        // 立即取消进行中的回正并转向新目标：新目标必须立即可见，不能被旧回正覆盖。
+                        returner.SetImmediate(target);
+                    }
+                    else
+                    {
+                        go.transform.localRotation = target;
+                    }
                 }
             }
 
@@ -1053,6 +1088,7 @@ namespace GameBattle
                 }
 
                 go.GetComponent<SoldierSpriteAnimator>()?.PlayAttack();
+                go.GetComponent<GeneralSpineAnimator>()?.PlayAttack();
                 go.GetComponent<SpearWeaponView>()?.PlayAttack();
             }
 
@@ -1063,15 +1099,98 @@ namespace GameBattle
                     return;
                 }
 
-                // design 决策 5：普通 Attack→Idle 只恢复根节点初始旋转（弓兵攻击会按目标方向
+                // design 决策 5：普通 Attack→Idle 只恢复根节点朝向到默认（弓兵攻击会按目标方向
                 // 旋转角色本体）。不调用 SoldierSpriteAnimator.ResetToIdle() 或
                 // SpearWeaponView.ResetView()——时间驱动的攻击动画与武器表现由各自 Update
                 // 自然完成，普通 Idle 不等于正在播放的表现必须被取消。
                 // 回池/Settling 的强制完整复位由 UnityBattleViewPort 的 Acquire/ReturnToPool 承担。
                 if (_initialRotations.TryGetValue(go, out Quaternion initialRotation))
                 {
-                    go.transform.localRotation = initialRotation;
+                    SoldierBodyRotationReturn returner = go.GetComponent<SoldierBodyRotationReturn>();
+                    if (returner == null)
+                    {
+                        returner = go.AddComponent<SoldierBodyRotationReturn>();
+                    }
+
+                    // 不在此处 snap 回初始旋转，改为启动平滑回正：由 SoldierBodyRotationReturn
+                    // 以恒定角速度逐帧 RotateTowards 回初始朝向。
+                    returner.BeginReturn(initialRotation, BodyRotationReturnDegreesPerSecond);
                 }
+            }
+        }
+
+        /// <summary>
+        /// 弓兵本体旋转平滑回正组件（纯表现层，无独立资产）。
+        /// <para>由 <see cref="UnityViewObjectSync.ResetUnitPose"/> 在 Attack→Idle 时
+        /// <see cref="BeginReturn"/> 启动：不从当前角度 snap，而是由 Update 以恒定角速度
+        /// <see cref="Quaternion.RotateTowards"/> 逐帧回到目标（初始）旋转，避免帧率依赖的
+        /// 渐近式 Lerp。到达目标后停用，保证池化对象复用/新目标不会覆盖新朝向。</para>
+        /// </summary>
+        internal sealed class SoldierBodyRotationReturn : MonoBehaviour
+        {
+            private const float CompletionAngleDegrees = 0.01f;
+
+            private Quaternion _targetRotation;
+            private float _degreesPerSecond;
+            private bool _isReturning;
+
+            /// <summary>是否正在回正（测试断言用）。</summary>
+            internal bool IsReturning => _isReturning;
+
+            /// <summary>
+            /// 开始平滑回正到 <paramref name="targetRotation"/>：不从当前角度 snap，
+            /// 后续由 Update/测试驱动的 <see cref="Tick"/> 逐帧逼近。
+            /// </summary>
+            internal void BeginReturn(Quaternion targetRotation, float degreesPerSecond)
+            {
+                _targetRotation = targetRotation;
+                _degreesPerSecond = degreesPerSecond > 0f ? degreesPerSecond : 0f;
+                _isReturning = true;
+            }
+
+            /// <summary>
+            /// 取消回正并立即把 localRotation 置为 <paramref name="targetRotation"/>。
+            /// 总是取消恢复（即使未在回正），避免池化复用后旧回正覆盖新朝向。
+            /// </summary>
+            internal void SetImmediate(Quaternion targetRotation)
+            {
+                _isReturning = false;
+                transform.localRotation = targetRotation;
+            }
+
+            /// <summary>
+            /// 确定性推进一帧回正。供 Update 与测试注入固定 deltaSeconds，保证可测。
+            /// </summary>
+            internal void Tick(float deltaSeconds)
+            {
+                if (!_isReturning || deltaSeconds <= 0f)
+                {
+                    return;
+                }
+
+                transform.localRotation = Quaternion.RotateTowards(
+                    transform.localRotation,
+                    _targetRotation,
+                    _degreesPerSecond * deltaSeconds);
+
+                if (Quaternion.Angle(transform.localRotation, _targetRotation) <= CompletionAngleDegrees)
+                {
+                    // 到达目标后停用恢复：后续即使组件仍在对象上，也不会再覆盖新朝向。
+                    transform.localRotation = _targetRotation;
+                    _isReturning = false;
+                }
+            }
+
+            private void Update()
+            {
+                Tick(Time.deltaTime);
+            }
+
+            private void OnDisable()
+            {
+                // 对象回池/停用时停止回正：即使对象复用，旧的恢复状态也不能残留到下一次
+                // 战斗（新朝向由 SetBodyRotation/SetImmediate 重新建立）。
+                _isReturning = false;
             }
         }
 

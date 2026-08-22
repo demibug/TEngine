@@ -30,7 +30,7 @@ namespace GameBattle.Tests.EditMode.Golden
         public const string BundleFileName = "golden-battle-bundle.json";
 
         /// <summary>黄金 bundle JSON 内容 SHA-256（由 README manifest 记录的最终值）。</summary>
-        public const string BundleSha256 = "9c7063dbfd0a803553d3c38296d9d62ffa4ae925c57fb1c3d6cd583630994f11";
+        public const string BundleSha256 = "45bdbecaebee3f900fe705b18308f3ff94244c213335f649c72f4b34b05c1492";
 
         // 关键来源源文件 SHA-256（只读导出基线，供 hash 校验）
         public static class SourceHashes
@@ -77,15 +77,15 @@ namespace GameBattle.Tests.EditMode.Golden
             public const int OpponentStartX = 7, OpponentStartY = 1;
             public const int OpponentEndX = 0, OpponentEndY = 0;
 
-            // 玩家可建造格（map0 '1_1'）
+            // 玩家可建造格（map0 '1_0'）
             public static readonly int[][] PlayerBuildableCells =
             {
-                new[] { 3, 1 }, new[] { 3, 2 }, new[] { 4, 1 }, new[] { 4, 2 }, new[] { 5, 1 }, new[] { 5, 2 },
+                new[] { 2, 7 }, new[] { 2, 8 }, new[] { 3, 7 }, new[] { 3, 8 }, new[] { 4, 7 }, new[] { 4, 8 },
             };
-            // 对手可建造格（map0 '1_0'）
+            // 对手可建造格（map0 '1_1'）
             public static readonly int[][] OpponentBuildableCells =
             {
-                new[] { 2, 7 }, new[] { 2, 8 }, new[] { 3, 7 }, new[] { 3, 8 }, new[] { 4, 7 }, new[] { 4, 8 },
+                new[] { 3, 1 }, new[] { 3, 2 }, new[] { 4, 1 }, new[] { 4, 2 }, new[] { 5, 1 }, new[] { 5, 2 },
             };
 
             public const int PlayerPathLength = 17;

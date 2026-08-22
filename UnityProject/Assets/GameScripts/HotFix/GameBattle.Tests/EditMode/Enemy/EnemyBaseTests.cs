@@ -937,5 +937,190 @@ namespace GameBattle.Tests.EditMode.Enemy
                     $"EnemyBase 字段 {field.Name} 类型 {fieldTypeName} 不应引用 UnityEngine 表现组件。");
             }
         }
+
+        // ====================================================================
+        // Buff8（AttackDisabled + MovementDisabled）测试
+        // --------------------------------------------------------------------
+        // 验证 EnemyBase BuffCapabilities 包含 AttackDisabled，Buff8 可成功 Apply，
+        // 两状态生效（移动停止/攻击禁用）、2000ms 到期清除、Reset/GameOver 无残留。
+        // ====================================================================
+
+        /// <summary>
+        /// BuffEnabled 测试子类：重写 BuffGeneration 为正值，使 BuffTargetHandle.IsValid。
+        /// </summary>
+        private sealed class BuffEnabledEnemy : EnemyBase
+        {
+            private long _generation;
+
+            internal void ConfigureForBuffTest(MapData map, float cellSize)
+            {
+                Configure(
+                    map,
+                    cellSize,
+                    new NopEndPointTarget(),
+                    onEnemyKilled: (_, __, ___, ____) => { },
+                    onDeathRequested: (_, _) => { });
+                AssignRuntimeId(1);
+                _generation += 1;
+                Init(true, 100, EnemyWidth, EnemyHeight);
+                BeginMoving();
+            }
+
+            protected override long BuffGeneration => _generation;
+
+            internal bool TestBuffMovementDisabled => BuffMovementDisabledForTest;
+            internal bool TestBuffAttackDisabled => BuffAttackDisabledForTest;
+            internal bool TestMovementStopped => MovementStoppedForTest;
+            internal bool TestInPool => InPool;
+        }
+
+        private sealed class NopEndPointTarget : IEnemyEndPointAttackTarget
+        {
+            public bool ReceiveEndPointAttack(EndPointAttackRequest request) => true;
+        }
+
+        /// <summary>Buff8 定义：State, MovementDisabled(0) + AttackDisabled(1), Refresh, 1 stack。</summary>
+        private static BuffDefinitionSnapshot Buff8Definition => new BuffDefinitionSnapshot(
+            8, "stun", "晕眩", BuffKind.State,
+            new[] { (int)BuffStateChannel.MovementDisabled, (int)BuffStateChannel.AttackDisabled },
+            BuffStackPolicy.Refresh, 1, string.Empty);
+
+        private static BuffManager CreateBuffManager(BuffDefinitionSnapshot def, BattleActionScheduler scheduler)
+        {
+            return new BuffManager(new BuffCatalogSnapshot(new[] { def }), scheduler);
+        }
+
+        [Test]
+        [Description("Buff8(AttackDisabled+MovementDisabled) 可成功 Apply，两状态生效、移动停止。")]
+        public void Buff8_Apply_BothStatesActive_MovementStopped()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = new BuffEnabledEnemy();
+            enemy.ConfigureForBuffTest(map, CellSize);
+
+            var scheduler = new BattleActionScheduler();
+            scheduler.BeginFrame(0);
+            BuffManager manager = CreateBuffManager(Buff8Definition, scheduler);
+            manager.RegisterTarget(enemy);
+
+            BuffOperationResult result = manager.Apply(new BuffApplyRequest(
+                8,
+                ((IBuffTarget)enemy).Handle,
+                new BuffSourceHandle(1, 1),
+                0d,
+                BuffValueMode.Flat,
+                BuffTimeMode.DurationMs,
+                2000));
+
+            Assert.AreEqual(BuffOperationStatus.Applied, result.Status, "Buff8 Apply 成功。");
+            Assert.IsTrue(enemy.TestBuffMovementDisabled, "MovementDisabled 生效。");
+            Assert.IsTrue(enemy.TestBuffAttackDisabled, "AttackDisabled 生效。");
+            Assert.IsTrue(enemy.TestMovementStopped, "移动停止（_stopMovement=true）。");
+        }
+
+        [Test]
+        [Description("1999ms 时 Buff8 仍在，2000ms 到期清除。")]
+        public void Buff8_1999msStillActive_2000msExpired()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = new BuffEnabledEnemy();
+            enemy.ConfigureForBuffTest(map, CellSize);
+
+            var scheduler = new BattleActionScheduler();
+            scheduler.BeginFrame(0);
+            BuffManager manager = CreateBuffManager(Buff8Definition, scheduler);
+            manager.RegisterTarget(enemy);
+
+            manager.Apply(new BuffApplyRequest(
+                8,
+                ((IBuffTarget)enemy).Handle,
+                new BuffSourceHandle(1, 1),
+                0d,
+                BuffValueMode.Flat,
+                BuffTimeMode.DurationMs,
+                2000));
+
+            // 1999ms 仍在。
+            scheduler.BeginFrame(1999);
+            scheduler.FlushDueActions(1);
+            Assert.AreEqual(1, manager.GetTargetSnapshots(((IBuffTarget)enemy).Handle).Count,
+                "1999ms 时 Buff8 仍存在。");
+            Assert.IsTrue(enemy.TestBuffMovementDisabled, "1999ms 时移动禁用仍生效。");
+            Assert.IsTrue(enemy.TestBuffAttackDisabled, "1999ms 时攻击禁用仍生效。");
+
+            // 2000ms 到期清除。
+            scheduler.BeginFrame(2000);
+            scheduler.FlushDueActions(1);
+            Assert.AreEqual(0, manager.GetTargetSnapshots(((IBuffTarget)enemy).Handle).Count,
+                "2000ms 时 Buff8 已到期清除。");
+            Assert.IsFalse(enemy.TestBuffMovementDisabled, "2000ms 后移动禁用解除。");
+            Assert.IsFalse(enemy.TestBuffAttackDisabled, "2000ms 后攻击禁用解除。");
+            Assert.IsFalse(enemy.TestMovementStopped, "2000ms 后移动停止解除。");
+        }
+
+        [Test]
+        [Description("GameOver 无残留：Buff8 生效中 GameOver 后状态清除。")]
+        public void Buff8_GameOver_NoResidual()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = new BuffEnabledEnemy();
+            enemy.ConfigureForBuffTest(map, CellSize);
+
+            var scheduler = new BattleActionScheduler();
+            scheduler.BeginFrame(0);
+            BuffManager manager = CreateBuffManager(Buff8Definition, scheduler);
+            manager.RegisterTarget(enemy);
+
+            manager.Apply(new BuffApplyRequest(
+                8,
+                ((IBuffTarget)enemy).Handle,
+                new BuffSourceHandle(1, 1),
+                0d,
+                BuffValueMode.Flat,
+                BuffTimeMode.DurationMs,
+                2000));
+
+            Assert.IsTrue(enemy.TestBuffMovementDisabled, "GameOver 前 Buff8 生效。");
+
+            // GameOver 清局。
+            manager.GameOver();
+
+            Assert.IsFalse(enemy.TestBuffMovementDisabled, "GameOver 后移动禁用无残留。");
+            Assert.IsFalse(enemy.TestBuffAttackDisabled, "GameOver 后攻击禁用无残留。");
+            Assert.IsFalse(enemy.TestMovementStopped, "GameOver 后移动停止无残留。");
+            Assert.AreEqual(0, manager.ActiveInstanceCount, "GameOver 后无活动 Buff 实例。");
+        }
+
+        [Test]
+        [Description("ResetState 后 Buff 聚合状态无残留（等价于新构造）。")]
+        public void Buff8_ResetState_NoResidual()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = new BuffEnabledEnemy();
+            enemy.ConfigureForBuffTest(map, CellSize);
+
+            var scheduler = new BattleActionScheduler();
+            scheduler.BeginFrame(0);
+            BuffManager manager = CreateBuffManager(Buff8Definition, scheduler);
+            manager.RegisterTarget(enemy);
+
+            manager.Apply(new BuffApplyRequest(
+                8,
+                ((IBuffTarget)enemy).Handle,
+                new BuffSourceHandle(1, 1),
+                0d,
+                BuffValueMode.Flat,
+                BuffTimeMode.DurationMs,
+                2000));
+
+            Assert.IsTrue(enemy.TestBuffMovementDisabled, "Reset 前 Buff8 生效。");
+
+            // ResetState 清除全部可变状态。
+            (enemy as IPoolableBattleObject).ResetState();
+
+            Assert.IsFalse(enemy.TestBuffMovementDisabled, "ResetState 后移动禁用无残留。");
+            Assert.IsFalse(enemy.TestBuffAttackDisabled, "ResetState 后攻击禁用无残留。");
+            Assert.IsFalse(enemy.TestMovementStopped, "ResetState 后移动停止无残留。");
+        }
     }
 }

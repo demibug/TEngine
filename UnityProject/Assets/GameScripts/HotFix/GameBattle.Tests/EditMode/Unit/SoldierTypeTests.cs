@@ -220,13 +220,14 @@ namespace GameBattle.Tests.EditMode.Unit
             ProjectileFactory factory,
             ProjectileManager projManager,
             float pixelX = 400f, float pixelY = 300f,
-            float attackIntervalSeconds = 1.5f)
+            float attackIntervalSeconds = 1.5f,
+            UnitConfigSnapshot config = null)
         {
             var soldier = new BowSoldier();
             soldier.Configure(enemyManager, resolver, effectManager, factory, projManager, CellSize, 1);
             soldier.AssignRuntimeIdForTest(RuntimeId);
             soldier.InitForTest("弓", true, UnitWidth, UnitHeight);
-            soldier.InitStats(CreateSoldierConfig(1, "弓", "bow", attackIntervalSeconds));
+            soldier.InitStats(config ?? CreateSoldierConfig(1, "弓", "bow", attackIntervalSeconds));
             soldier.ActivateAt(pixelX, pixelY);
             return soldier;
         }
@@ -238,13 +239,14 @@ namespace GameBattle.Tests.EditMode.Unit
             EnemyManager enemyManager,
             AttackResolver resolver,
             AttackEffectManager effectManager,
-            float pixelX = 400f, float pixelY = 300f)
+            float pixelX = 400f, float pixelY = 300f,
+            UnitConfigSnapshot config = null)
         {
             var soldier = new SpearSoldier();
             soldier.Configure(enemyManager, resolver, effectManager, CellSize, 1);
             soldier.AssignRuntimeIdForTest(RuntimeId);
             soldier.InitForTest("枪", true, UnitWidth, UnitHeight);
-            soldier.InitStats(CreateSoldierConfig(2, "枪", "pike"));
+            soldier.InitStats(config ?? CreateSoldierConfig(2, "枪", "pike"));
             soldier.ActivateAt(pixelX, pixelY);
             return soldier;
         }
@@ -378,6 +380,47 @@ namespace GameBattle.Tests.EditMode.Unit
             Assert.AreEqual(0, projManager.ActiveCount, "第 17 帧前不应创建投射物");
             effectManager.Update(1);
             Assert.AreEqual(1, projManager.ActiveCount, "第 17 帧开始时应创建 1 个活动投射物");
+        }
+
+        [Test]
+        public void ConfiguredGenerals_ReusePikeAndBowAttackChains_WithConfiguredDamageAndSpeed()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projectileManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var zhangEffects = new AttackEffectManager();
+            TestEnemy enemy = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+            var zhangFei = new GeneralConfigSnapshot(
+                1, "张飞", "张", new[] { "张", "飞" }, GeneralCombatArchetype.Pike,
+                2.5f, 15, 1f, "近战枪击", "nearest", "SpearSoldier", "default", "", 0, 1);
+            SpearSoldier spear = SetupSpearSoldier(
+                enemyManager, resolver, zhangEffects, config: zhangFei.ToUnitConfigSnapshot());
+
+            spear.Attack(InitialTarget(enemy));
+
+            Assert.AreEqual(15, spear.AttackDamageForTest);
+            Assert.AreEqual(1, zhangEffects.ActiveCount);
+            Assert.IsInstanceOf<PikeAttackEffect>(zhangEffects.GetEffectsSnapshot()[0]);
+            Assert.AreEqual(0, projectileManager.ActiveCount, "张飞枪击不得创建投射物");
+
+            var huangEffects = new AttackEffectManager();
+            var huangZhong = new GeneralConfigSnapshot(
+                4, "黄忠", "黄", new[] { "黄", "忠" }, GeneralCombatArchetype.Bow,
+                3.5f, 13, 0.8f, "单体", "nearest", "BowSoldier", "default",
+                "SimpleDynamicArrow", 200, 1);
+            BowSoldier bow = SetupBowSoldier(
+                enemyManager, resolver, huangEffects, factory, projectileManager,
+                attackIntervalSeconds: 0.8f, config: huangZhong.ToUnitConfigSnapshot());
+
+            bow.Attack(InitialTarget(enemy));
+            huangEffects.Update(454);
+
+            Assert.AreEqual(13, bow.AttackDamageForTest);
+            Assert.AreEqual(1, projectileManager.ActiveCount, "黄忠一次释放只创建一支箭");
+            ProjectileBase arrow = projectileManager.GetProjectilesSnapshot()[0];
+            Assert.IsInstanceOf<SimpleDynamicArrow>(arrow);
+            Assert.AreEqual(2f, arrow.SpeedScale, 0.001f,
+                "配置 projectileSpeed=200 应适配为现有移动 scale=2.0");
         }
 
         [Test]

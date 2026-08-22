@@ -39,8 +39,6 @@ namespace GameBattle
     /// <para><b>与异常的关系（决策 0.7）：</b></para>
     /// <list type="bullet">
     /// <item>预期失败（状态、配置、资源）返回 <c>Failed</c> 结果 + 错误码，不抛异常。</item>
-    /// <item>调用方取消抛出 <see cref="OperationCanceledException"/>，不走本结构路径——
-    /// 调用方取消保留取消异常语义，不被吞成错误码。</item>
     /// <item>非预期异常由实现层捕获并包装为 <see cref="BattleErrorCode.Unknown"/> 错误码。</item>
     /// </list>
     ///

@@ -32,6 +32,8 @@ public sealed partial class Skill : Luban.BeanBase
         HandlerKey = _buf.ReadString();
         if(_buf.ReadBool()){ EffectBuffType = _buf.ReadInt(); } else { EffectBuffType = null; }
         if(_buf.ReadBool()){ EffectDurationMs = _buf.ReadInt(); } else { EffectDurationMs = null; }
+        if(_buf.ReadBool()){ TriggerAttackCount = _buf.ReadInt(); } else { TriggerAttackCount = null; }
+        if(_buf.ReadBool()){ EffectDamageMultiplier = _buf.ReadFloat(); } else { EffectDamageMultiplier = null; }
     }
 
     public static Skill DeserializeSkill(ByteBuf _buf)
@@ -91,6 +93,14 @@ public sealed partial class Skill : Luban.BeanBase
     /// 效果持续毫秒(可空)
     /// </summary>
     public readonly int? EffectDurationMs;
+    /// <summary>
+    /// 触发攻击计数
+    /// </summary>
+    public readonly int? TriggerAttackCount;
+    /// <summary>
+    /// 单箭伤害倍率
+    /// </summary>
+    public readonly float? EffectDamageMultiplier;
    
     public const int __ID__ = 1107930491;
     public override int GetTypeId() => __ID__;
@@ -115,6 +125,8 @@ public sealed partial class Skill : Luban.BeanBase
         + "handlerKey:" + HandlerKey + ","
         + "effectBuffType:" + EffectBuffType + ","
         + "effectDurationMs:" + EffectDurationMs + ","
+        + "triggerAttackCount:" + TriggerAttackCount + ","
+        + "effectDamageMultiplier:" + EffectDamageMultiplier + ","
         + "}";
     }
 }

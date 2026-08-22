@@ -58,6 +58,9 @@ namespace GameBattle
         /// <summary>待上场槽数量（每侧）。</summary>
         private readonly int _reserveSlotCount;
 
+        /// <summary>仅玩家侧参与加权抽取的武将字条目。</summary>
+        private readonly IReadOnlyList<GeneralPartRecruitEntry> _partRecruitEntries;
+
         // ====================================================================
         // 构造
         // ====================================================================
@@ -68,11 +71,16 @@ namespace GameBattle
         /// <param name="randomSource">确定性随机源（非 null）。</param>
         /// <param name="slotBoard">槽位面板（非 null），供分配单位 ID。</param>
         /// <param name="reserveSlotCount">每侧待上场槽数量（<=0 时回退 RecruitDefinitions.ReserveSlotCount）。</param>
-        internal RecruitManager(IRandomSource randomSource, UnitSlotBoard slotBoard, int reserveSlotCount)
+        internal RecruitManager(
+            IRandomSource randomSource,
+            UnitSlotBoard slotBoard,
+            int reserveSlotCount,
+            IReadOnlyList<GeneralPartRecruitEntry> partRecruitEntries = null)
         {
             _randomSource = randomSource ?? throw new ArgumentNullException(nameof(randomSource));
             _slotBoard = slotBoard ?? throw new ArgumentNullException(nameof(slotBoard));
             _reserveSlotCount = reserveSlotCount > 0 ? reserveSlotCount : RecruitDefinitions.ReserveSlotCount;
+            _partRecruitEntries = partRecruitEntries ?? Array.Empty<GeneralPartRecruitEntry>();
         }
 
         // ====================================================================
@@ -107,18 +115,42 @@ namespace GameBattle
         private BattleUnit GenerateSingle(bool isPlayerSide)
         {
             string[] pool = RecruitDefinitions.BaseSoldierTexts;
-            float r = _randomSource.NextUnit();
-            int index = (int)Math.Floor(r * pool.Length);
-            if (index < 0)
+            int totalWeight = pool.Length;
+            if (isPlayerSide)
             {
-                index = 0;
-            }
-            else if (index >= pool.Length)
-            {
-                index = pool.Length - 1;
+                for (int i = 0; i < _partRecruitEntries.Count; i++)
+                {
+                    totalWeight += Math.Max(0, _partRecruitEntries[i].Weight);
+                }
             }
 
-            string text = pool[index] ?? "刀";
+            float r = _randomSource.NextUnit();
+            int selected = (int)Math.Floor(r * totalWeight);
+            if (selected < 0)
+            {
+                selected = 0;
+            }
+            else if (selected >= totalWeight)
+            {
+                selected = totalWeight - 1;
+            }
+
+            if (selected >= pool.Length && isPlayerSide)
+            {
+                int cursor = pool.Length;
+                for (int i = 0; i < _partRecruitEntries.Count; i++)
+                {
+                    GeneralPartRecruitEntry entry = _partRecruitEntries[i];
+                    cursor += Math.Max(0, entry.Weight);
+                    if (selected < cursor)
+                    {
+                        return BattleUnit.CreateGeneralPart(
+                            _slotBoard.AllocateUnitId(), true, entry.PartText);
+                    }
+                }
+            }
+
+            string text = pool[selected] ?? "刀";
             SoldierType type = TextToSoldierType(text);
 
             return new BattleUnit(

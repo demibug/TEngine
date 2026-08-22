@@ -16,8 +16,10 @@ namespace GameBattle
     //   生成完整批次 → 验证馒头 → 扣费 → 清空待上场单位 → 填满槽位 → 提交。
     //   失败时不清槽、不扣费（spec "Input commands are atomic"）。
     //
-    // 换槽/合并流程（ExecuteDropUnit）：
+    // 换槽/合并/互换流程（ExecuteDropUnit）：
     //   完全通过 UnitSlotBoard 修改槽位与单位状态，全程不访问经济模块。
+    //   Runtime 从两槽 before/after 推导迁移（R-R 仅 Board；B-B 移动活动实例；
+    //   R-B/B-R 一方下场保留冷却、一方上场；Merge 保持现有语义与特效）。
     //   目标在战场时经 UnitRegistry 激活/复用战斗实例；离开战场时解除战斗实例但保留
     //   BattleUnit（最终方案"战场槽换位时复用同一战斗实例；下场时解除战斗实例"）。
     //
@@ -338,7 +340,7 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 执行换槽/合并命令：Sync Cooldown → Plan → Prepare(真 Acquire) → Commit Board → Commit Runtime → Publish。
+        /// 执行换槽/合并/互换命令：Sync Cooldown → Plan → Prepare(真 Acquire) → Commit Board → Commit Runtime → Publish。
         /// 全程不访问经济模块。
         /// </summary>
         /// <param name="command">换槽/合并命令（载荷为 <see cref="DropUnitPayload"/>）。</param>
@@ -350,15 +352,19 @@ namespace GameBattle
         ///   避免换格/战场合并用过期冷却覆盖真实冷却。</item>
         /// <item><b>Plan：</b>经 <see cref="UnitSlotBoard.TryPlanDrop"/> 只读校验并生成
         ///   <see cref="SlotDropPlan"/>。失败返回拒绝原因，不修改任何状态。</item>
-        /// <item><b>Prepare Runtime：</b>首次上场时真 Acquire（对象池/配置/等级/冷却都可能抛错），
-        ///   失败返回失败，槽位不变化，不留下半初始化实例。</item>
+        /// <item><b>Prepare Runtime：</b>按计划推导全部战场落点：首次上场时真 Acquire
+        ///   （对象池/配置/等级/冷却都可能抛错），失败返回失败，槽位不变化，不留下半初始化实例。</item>
         /// <item><b>Commit Board：</b>经 <see cref="UnitSlotBoard.CommitDrop"/> 一次性提交
-        ///   槽位状态（版本冲突校验；冲突时释放已准备实例）。</item>
+        ///   源/目标两槽的 After 状态（版本冲突校验；冲突时释放已准备实例）。</item>
         /// <item><b>Commit Runtime：</b>激活/复用/解除战斗实例。抛错时经
         ///   <see cref="UnitSlotBoard.RollbackDrop"/> 回滚 Board 并释放已准备实例，
         ///   保证"槽位已移动但战斗实例未创建"的半提交不可能发生。</item>
-        /// <item><b>Publish：</b>完整事务成功后发布 <see cref="SlotChangedFact"/> / <see cref="UnitMergedFact"/>。</item>
+        /// <item><b>Publish：</b>完整事务成功后发布两槽最终状态的
+        ///   <see cref="SlotChangedFact"/> / <see cref="UnitMergedFact"/>。</item>
         /// </list>
+        /// <para><b>统一拖放规则：</b>空目标 Move；同兵种（Kind/SoldierType 权威）同等级
+        /// 未满级 Merge；其余占用目标 Swap。Runtime 从两槽 before/after 推导：R-R 仅 Board；
+        /// B-B 移动活动实例；R-B/B-R 一方下场保留冷却、一方上场；Merge 保持现有语义与特效。</para>
         /// <para><b>合并条件：</b>不同单位、同阵营、同兵种、同等级、低于配置最大等级。
         /// 合并免费且单次执行，不自动连锁。合并结果保留目标 UnitId 和目标 SlotId。</para>
         /// </remarks>
@@ -477,146 +483,234 @@ namespace GameBattle
 
             if (_unitRegistry.TryGetLiveCooldown(occupant.Value.UnitId, out long liveCooldown))
             {
-                _slotBoard.UpdateOccupantCooldown(slotId.Id, liveCooldown);
+                _slotBoard.UpdateOccupantCooldownByUnitId(
+                    occupant.Value.UnitId, liveCooldown);
             }
         }
 
-        /// <summary>换槽/合并战斗实例准备结果。</summary>
+        /// <summary>换槽/合并/互换战斗实例准备结果。</summary>
         private struct PreparedRuntime
         {
-            /// <summary>目标在战场且首次上场时，已 Acquire 待激活的实例（null=复用已有或非首次）。</summary>
+            /// <summary>全部需在战场放置的单位（首次上场已 Acquire，已在战场则复用）。</summary>
+            internal List<PreparedActivation> Activations;
+
+            /// <summary>需解除战斗实例的单位 ID 列表（合并源或下场单位）。</summary>
+            internal List<int> DeactivateUnitIds;
+        }
+
+        /// <summary>单个战场落点的准备结果。</summary>
+        private struct PreparedActivation
+        {
+            /// <summary>落点单位（事务后位于战场槽的单位）。</summary>
+            internal BattleUnit Unit;
+
+            /// <summary>落点单位的配置快照（首次上场与复用路径都需要）。</summary>
+            internal UnitConfigSnapshot Config;
+
+            /// <summary>落点战场格。</summary>
+            internal GridPosition Grid;
+
+            /// <summary>首次上场时已 Acquire 待激活的实例（null=复用已有实例）。</summary>
             internal SoldierBase NewInstance;
-
-            /// <summary>目标在战场时，需激活/复用/放置的单位（首次上场或换格）。</summary>
-            internal BattleUnit? ActivateUnit;
-
-            /// <summary>目标在战场时的目标战场格。</summary>
-            internal GridPosition TargetGrid;
-
-            /// <summary>需解除战斗实例的单位 ID（合并源或下场单位）；-1 表示无。</summary>
-            internal int DeactivateUnitId;
         }
 
         /// <summary>
         /// 据事务计划准备战斗实例（真 Acquire + 配置校验；可抛错，失败槽位不变化）。
         /// </summary>
+        /// <remarks>
+        /// <para>从两槽 before/after 推导 Runtime 迁移：所有"事务后位于战场"的单位
+        /// 逐一准备配置与首次上场实例（已在战场则复用，无需 Acquire）；所有"原在战场
+        /// 但事务后离开战场"的单位列入解除列表（下场保留冷却）。</para>
+        /// <para>全部可能抛错的首次上场 Acquire 都在本阶段完成，保证 Commit Board 后
+        /// 的 Commit Runtime 只做不会因配置缺失而失败的操作（避免运行时半提交）。</para>
+        /// </remarks>
         /// <exception cref="InvalidOperationException">配置缺失或 Acquire 失败。</exception>
         private PreparedRuntime PrepareRuntime(SlotDropPlan plan)
         {
             var prepared = new PreparedRuntime
             {
-                NewInstance = null,
-                ActivateUnit = null,
-                TargetGrid = plan.TargetSlotId.GridPosition,
-                DeactivateUnitId = -1,
+                Activations = new List<PreparedActivation>(),
+                DeactivateUnitIds = new List<int>(),
             };
 
-            bool targetIsBattle = plan.TargetSlotId.Zone == SlotZone.Battle;
-            bool sourceIsBattle = plan.SourceSlotId.Zone == SlotZone.Battle;
+            var activationIds = new HashSet<int>();
+            IReadOnlyList<SlotDropMutation> mutations = plan.Mutations;
 
-            if (targetIsBattle && plan.ResultUnit.HasValue)
+            try
             {
-                BattleUnit result = plan.ResultUnit.Value;
-
-                // 目标单位已有活动战斗实例 → 战场换格复用（非首次，无需 Acquire）。
-                bool alreadyActive = _unitRegistry.GetActiveByUnitId(result.UnitId) != null;
-
-                if (!alreadyActive)
+                // 双格 General 的两格共享 UnitId，只在左半格准备一个战斗实例。
+                for (int index = 0; index < mutations.Count; index++)
                 {
-                    // 首次上场：真 Acquire（对象池/配置/等级/冷却都可能抛错）。
-                    UnitConfigSnapshot config = FindUnitConfig(result.SoldierText);
-                    if (config == null)
+                    SlotDropMutation mutation = mutations[index];
+                    if (!mutation.After.HasValue || mutation.SlotId.Zone != SlotZone.Battle)
                     {
-                        throw new InvalidOperationException(
-                            $"配置中无兵种 {result.SoldierText}");
+                        continue;
                     }
 
-                    prepared.NewInstance = _unitRegistry.PrepareBattleInstance(
-                        result, config, DefaultUnitWidth, DefaultUnitHeight);
+                    BattleUnit unit = mutation.After.Value;
+                    if (unit.Kind == UnitKind.GeneralPart)
+                    {
+                        continue;
+                    }
+
+                    if (unit.Kind == UnitKind.General && !unit.IsGeneralPrimaryCell)
+                    {
+                        continue;
+                    }
+
+                    if (activationIds.Add(unit.UnitId))
+                    {
+                        prepared.Activations.Add(PrepareActivation(unit, mutation.SlotId));
+                    }
                 }
 
-                prepared.ActivateUnit = result;
-                prepared.TargetGrid = plan.TargetSlotId.GridPosition;
-            }
-
-            // 源在战场：合并（源消失）或下场（移到非战场槽）时解除战斗实例。
-            if (sourceIsBattle && plan.SourceBefore.HasValue)
-            {
-                bool staysInBattle = plan.ResultUnit.HasValue
-                    && plan.ResultUnit.Value.UnitId == plan.SourceBefore.Value.UnitId
-                    && targetIsBattle;
-                if (!staysInBattle)
+                // 解除：事务前在战场、事务后已完全离开战场的单位。双格 General 只解除一次。
+                var deactivateIds = new HashSet<int>();
+                for (int index = 0; index < mutations.Count; index++)
                 {
-                    prepared.DeactivateUnitId = plan.SourceBefore.Value.UnitId;
+                    SlotDropMutation mutation = mutations[index];
+                    if (!mutation.Before.HasValue || mutation.SlotId.Zone != SlotZone.Battle)
+                    {
+                        continue;
+                    }
+
+                    BattleUnit beforeUnit = mutation.Before.Value;
+                    if (beforeUnit.Kind == UnitKind.GeneralPart)
+                    {
+                        continue;
+                    }
+
+                    int unitId = beforeUnit.UnitId;
+                    if (!EndsInBattle(plan, unitId) && deactivateIds.Add(unitId))
+                    {
+                        prepared.DeactivateUnitIds.Add(unitId);
+                    }
                 }
+            }
+            catch
+            {
+                ReleasePrepared(prepared);
+                throw;
             }
 
             return prepared;
         }
 
+        /// <summary>准备单个战场落点：解析配置，首次上场时真 Acquire（可抛错）。</summary>
+        private PreparedActivation PrepareActivation(BattleUnit unit, UnitSlotId slotId)
+        {
+            UnitConfigSnapshot config = FindUnitConfig(unit);
+            if (config == null)
+            {
+                throw new InvalidOperationException(
+                    $"配置中无兵种 {unit.SoldierText}");
+            }
+
+            SoldierBase newInstance = _unitRegistry.GetActiveByUnitId(unit.UnitId) == null
+                ? _unitRegistry.PrepareBattleInstance(
+                    unit, config, DefaultUnitWidth, DefaultUnitHeight)
+                : null;
+
+            return new PreparedActivation
+            {
+                Unit = unit,
+                Config = config,
+                Grid = slotId.GridPosition,
+                NewInstance = newInstance,
+            };
+        }
+
+        /// <summary>按单位 ID 判断其事务后是否仍位于战场（用于解除判定）。</summary>
+        /// <remarks>
+        /// <para>双格 General 的两格共享 UnitId：任一格（主/副格）仍在战场都视为仍在场，
+        /// 复用同一战斗实例。</para>
+        /// <para>解散后的 GeneralPart 不是战斗参与者：即使 GeneralPart 保留了原 General 的
+        /// UnitId，也不能让旧战斗运行时继续存活（分离字牌不参战、不占 Spine），因此
+        /// GeneralPart 落点不参与本判定。普通士兵与仍完整的 General 半格判定不变。</para>
+        /// </remarks>
+        private static bool EndsInBattle(SlotDropPlan plan, int unitId)
+        {
+            IReadOnlyList<SlotDropMutation> mutations = plan.Mutations;
+            for (int index = 0; index < mutations.Count; index++)
+            {
+                SlotDropMutation mutation = mutations[index];
+                if (mutation.SlotId.Zone == SlotZone.Battle
+                    && mutation.After.HasValue
+                    && mutation.After.Value.Kind != UnitKind.GeneralPart
+                    && mutation.After.Value.UnitId == unitId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         /// <summary>释放已准备但未激活的实例（事务失败回滚用）。</summary>
         private void ReleasePrepared(PreparedRuntime prepared)
         {
-            if (prepared.NewInstance != null)
+            if (prepared.Activations == null)
             {
-                try
-                {
-                    _unitRegistry.ReleasePrepared(prepared.NewInstance);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error($"{LogTag} 释放已准备战斗实例异常: {ex}");
-                }
+                return;
+            }
 
-                prepared.NewInstance = null;
+            for (int i = 0; i < prepared.Activations.Count; i++)
+            {
+                SoldierBase newInstance = prepared.Activations[i].NewInstance;
+                if (newInstance != null)
+                {
+                    try
+                    {
+                        _unitRegistry.ReleasePrepared(newInstance);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error($"{LogTag} 释放已准备战斗实例异常: {ex}");
+                    }
+                }
             }
         }
 
         /// <summary>提交战斗实例变化（激活/复用/解除；抛错时由调用方回滚 Board）。</summary>
         private void CommitRuntime(PreparedRuntime prepared, SlotDropPlan plan)
         {
-            if (prepared.ActivateUnit.HasValue)
+            // 激活/复用：全部战场落点先激活，再解除下场单位（避免同格瞬时冲突）。
+            for (int i = 0; i < prepared.Activations.Count; i++)
             {
-                BattleUnit unit = prepared.ActivateUnit.Value;
-
-                if (prepared.NewInstance != null)
+                PreparedActivation activation = prepared.Activations[i];
+                if (activation.NewInstance != null)
                 {
                     // 首次上场：激活已准备实例。
                     _unitRegistry.ActivatePrepared(
-                        unit,
-                        prepared.NewInstance,
+                        activation.Unit,
+                        activation.NewInstance,
                         _levelService,
-                        prepared.TargetGrid.X,
-                        prepared.TargetGrid.Y);
+                        activation.Grid.X,
+                        activation.Grid.Y,
+                        activation.Config);
                 }
                 else
                 {
-                    // 战场换格复用同一实例（非首次）。
-                    UnitConfigSnapshot config = FindUnitConfig(unit.SoldierText);
-                    if (config == null)
-                    {
-                        throw new InvalidOperationException(
-                            $"配置中无兵种 {unit.SoldierText}");
-                    }
-
+                    // 已在战场：复用同一实例并重新放置（战场换格/互换/合并）。
                     _unitRegistry.ActivateBattleUnit(
-                        unit,
-                        config,
+                        activation.Unit,
+                        activation.Config,
                         _levelService,
-                        prepared.TargetGrid.X,
-                        prepared.TargetGrid.Y,
+                        activation.Grid.X,
+                        activation.Grid.Y,
                         DefaultUnitWidth,
                         DefaultUnitHeight);
                 }
             }
 
-            if (prepared.DeactivateUnitId >= 0)
+            for (int i = 0; i < prepared.DeactivateUnitIds.Count; i++)
             {
+                int unitId = prepared.DeactivateUnitIds[i];
                 // 下场/合并源：导出冷却（写回 BattleUnit），取消未释放攻击并回池。
-                long cooldown = _unitRegistry.DeactivateBattleUnit(prepared.DeactivateUnitId);
+                long cooldown = _unitRegistry.DeactivateBattleUnit(unitId);
                 if (cooldown >= 0L)
                 {
-                    WriteBackCooldown(prepared.DeactivateUnitId, cooldown);
+                    WriteBackCooldown(unitId, cooldown);
                 }
             }
         }
@@ -626,19 +720,10 @@ namespace GameBattle
         {
             // 源单位在合并中被消耗（不存在于任何槽位），无需写回。
             // 下场场景：源单位移动到非战场槽，需更新其冷却。
-            IReadOnlyList<UnitSlot> allSlots = _slotBoard.Snapshot().GetAllSlots();
-            for (int i = 0; i < allSlots.Count; i++)
-            {
-                BattleUnit? occupant = allSlots[i].Occupant;
-                if (occupant.HasValue && occupant.Value.UnitId == unitId)
-                {
-                    _slotBoard.UpdateOccupantCooldown(allSlots[i].SlotId.Id, lastAttackTimeMs);
-                    return;
-                }
-            }
+            _slotBoard.UpdateOccupantCooldownByUnitId(unitId, lastAttackTimeMs);
         }
 
-        /// <summary>发布换槽/合并事实（完整事务成功后）。</summary>
+        /// <summary>发布换槽/合并/互换事实（完整事务成功后）。</summary>
         private void PublishDropFacts(SlotDropPlan plan)
         {
             if (_signalHub == null)
@@ -646,17 +731,34 @@ namespace GameBattle
                 return;
             }
 
-            // 槽位变化：源槽清空；目标槽写结果（换槽为源单位，合并为升级后的目标单位）。
-            _signalHub.SlotChanged.Publish(new SlotChangedFact(plan.SourceSlotId, null));
-            if (plan.ResultUnit.HasValue)
+            // 槽位变化：普通单位发布两槽；双格 General 原子发布全部四槽。
+            IReadOnlyList<SlotDropMutation> mutations = plan.Mutations;
+            for (int index = 0; index < mutations.Count; index++)
             {
-                _signalHub.SlotChanged.Publish(new SlotChangedFact(plan.TargetSlotId, plan.ResultUnit));
+                SlotDropMutation mutation = mutations[index];
+                _signalHub.SlotChanged.Publish(new SlotChangedFact(
+                    mutation.SlotId, mutation.After));
             }
 
-            if (plan.IsMerge && plan.ResultUnit.HasValue)
+            if (plan.IsMerge && plan.TargetAfter.HasValue)
             {
                 _signalHub.UnitMerged.Publish(new UnitMergedFact(
-                    plan.TargetSlotId, plan.ResultUnit.Value, plan.ResultUnit.Value.Level));
+                    plan.TargetSlotId, plan.TargetAfter.Value, plan.TargetAfter.Value.Level));
+            }
+
+            if (plan.IsSynthesize)
+            {
+                for (int index = 0; index < mutations.Count; index++)
+                {
+                    SlotDropMutation mutation = mutations[index];
+                    if (mutation.After.HasValue
+                        && mutation.After.Value.IsGeneralPrimaryCell)
+                    {
+                        _signalHub.GeneralSynthesized.Publish(new GeneralSynthesizedFact(
+                            mutation.SlotId, mutation.After.Value));
+                        break;
+                    }
+                }
             }
         }
 
@@ -686,6 +788,13 @@ namespace GameBattle
                 case SlotDropRejectReason.TargetMismatch:
                     return BattleInputResult.Fail(commandId, BattleInputRejectReason.TargetMismatch,
                         dropResult.DiagnosticMessage);
+                case SlotDropRejectReason.UnitZoneRestricted:
+                    return BattleInputResult.Fail(commandId, BattleInputRejectReason.UnitZoneRestricted,
+                        dropResult.DiagnosticMessage);
+                case SlotDropRejectReason.HorizontalPairUnavailable:
+                case SlotDropRejectReason.GeneralPairWouldSplit:
+                    return BattleInputResult.Fail(commandId, BattleInputRejectReason.InvalidTargetSlot,
+                        dropResult.DiagnosticMessage);
                 default:
                     return BattleInputResult.Fail(commandId, BattleInputRejectReason.Unknown,
                         dropResult.DiagnosticMessage);
@@ -693,12 +802,23 @@ namespace GameBattle
         }
 
         /// <summary>按兵种文字查找 UnitConfigSnapshot。</summary>
-        private UnitConfigSnapshot FindUnitConfig(string soldierText)
+        private UnitConfigSnapshot FindUnitConfig(BattleUnit unit)
         {
+            if (unit.Kind == UnitKind.General)
+            {
+                GeneralConfigSnapshot general = _configSnapshot.GeneralCatalog.GetByIndexOrDefault(unit.GeneralIndex);
+                if (general == null)
+                {
+                    return null;
+                }
+
+                return general.ToUnitConfigSnapshot();
+            }
+
             IReadOnlyList<UnitConfigSnapshot> units = _configSnapshot.Units;
             for (int i = 0; i < units.Count; i++)
             {
-                if (units[i].Text == soldierText)
+                if (units[i].Text == unit.SoldierText)
                 {
                     return units[i];
                 }

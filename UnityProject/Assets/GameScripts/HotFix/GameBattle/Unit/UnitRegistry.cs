@@ -170,8 +170,18 @@ namespace GameBattle
         /// <summary>玩家默认基础武器 resolver；未装配时保持旧测试行为（不装配武器）。</summary>
         private readonly BasicWeaponResolver _weaponResolver;
 
+        /// <summary>
+        /// 武将主动技能运行时（可为 null；未装配时保持旧测试行为，不绑定技能租期）。
+        /// <para>装配后，General 首次上场绑定技能租期，下场解除，GameOver 清局。
+        /// 普通兵与未装配 runtime 的旧路径行为不变。</para>
+        /// </summary>
+        private GeneralSkillRuntime _skillRuntime;
+
         /// <summary>单位完成放置后的低频表现事实（末位为等级，修复 P0）。</summary>
         internal event Action<int, bool, int, int, int, int> UnitPlaced;
+
+        /// <summary>携带武将身份、配置 Prefab 地址和动画键的上场事实。</summary>
+        internal event Action<UnitSpawnViewData> ConfiguredUnitPlaced;
 
         /// <summary>单位从活动集合移除后的低频表现事实。</summary>
         internal event Action<int> UnitRemoved;
@@ -246,6 +256,41 @@ namespace GameBattle
             _cellSize = cellSize > 0 ? cellSize : 80f;
             _buffManager = buffManager;
             _weaponResolver = weaponResolver;
+        }
+
+        // ====================================================================
+        // 装配武将技能运行时（窄方法，一次性）
+        // --------------------------------------------------------------------
+        // Wave 3：武将主动技能普通攻击计数与生命周期绑定。本方法由
+        // BattleRuntimeFactory 在构造后一次性装配，不影响旧测试行为（不装配时
+        // _skillRuntime 为 null，所有技能路径跳过）。
+        // ====================================================================
+
+        /// <summary>
+        /// 一次性装配武将主动技能运行时（窄方法）。
+        /// </summary>
+        /// <param name="skillRuntime">武将技能运行时（非 null）。</param>
+        /// <exception cref="ArgumentNullException"><paramref name="skillRuntime"/> 为 null。</exception>
+        /// <exception cref="InvalidOperationException">重复装配。</exception>
+        /// <remarks>
+        /// <para>装配后，General 首次上场时按 config.SkillKey 绑定技能租期；
+        /// 场内换位复用不重复绑定；Deactivate/Remove 前解除租期；GameOver 清局。</para>
+        /// <para><b>未装配时旧行为不变：</b>普通兵与未装配 runtime 的旧测试不受影响。</para>
+        /// </remarks>
+        internal void AssembleGeneralSkillRuntime(GeneralSkillRuntime skillRuntime)
+        {
+            if (skillRuntime == null)
+            {
+                throw new ArgumentNullException(nameof(skillRuntime));
+            }
+
+            if (_skillRuntime != null)
+            {
+                throw new InvalidOperationException(
+                    $"{LogTag} GeneralSkillRuntime 已装配，禁止重复装配。");
+            }
+
+            _skillRuntime = skillRuntime;
         }
 
         // ====================================================================
@@ -445,7 +490,10 @@ namespace GameBattle
             // 玩家默认武器：Acquire 后、Register 前应用（对手跳过）；失败归还池再抛出。
             try
             {
-                ApplyDefaultWeapon(soldier, unit.SoldierType);
+                if (unit.Kind == UnitKind.Soldier)
+                {
+                    ApplyDefaultWeapon(soldier, unit.SoldierType);
+                }
             }
             catch
             {
@@ -461,7 +509,29 @@ namespace GameBattle
             float py = gridY * _cellSize;
             soldier.ActivatePlacement(px, py);
             _unitIdToSoldier[unit.UnitId] = soldier;
+
+            // Wave 3：武将首次上场绑定技能租期（普通兵或无 SkillKey 跳过）。
+            // 绑定失败沿创建事务完整回滚（移除注册集合/Buff/映射并归还池），
+            // 不发布 UnitPlaced/ConfiguredUnitPlaced，不留下半绑定单位。
+            if (_skillRuntime != null && unit.Kind == UnitKind.General
+                && !string.IsNullOrEmpty(config.SkillKey))
+            {
+                try
+                {
+                    _skillRuntime.Bind(unit.UnitId, soldier, config.SkillKey);
+                }
+                catch
+                {
+                    // 完整注册回滚：移除 _soldiers/_idToIndex/Buff target/_unitIdToSoldier，
+                    // 只 Release 一次；Unbind 幂等（Bind 失败时租期已原子回滚）。
+                    RemoveFromRegistry(soldier);
+                    _unitFactory.Release(soldier);
+                    throw;
+                }
+            }
+
             UnitPlaced?.Invoke(soldier.Id, unit.Side, (int)unit.SoldierType, gridX, gridY, unit.Level);
+            PublishConfiguredUnitPlaced(soldier.Id, unit, config, gridX, gridY);
             return soldier;
         }
 
@@ -502,7 +572,10 @@ namespace GameBattle
             // ReleasePrepared 回滚且不留武器残留。
             try
             {
-                ApplyDefaultWeapon(soldier, unit.SoldierType);
+                if (unit.Kind == UnitKind.Soldier)
+                {
+                    ApplyDefaultWeapon(soldier, unit.SoldierType);
+                }
             }
             catch
             {
@@ -543,7 +616,8 @@ namespace GameBattle
             SoldierBase soldier,
             UnitLevelService levelService,
             int gridX,
-            int gridY)
+            int gridY,
+            UnitConfigSnapshot config = null)
         {
             if (soldier == null)
             {
@@ -556,8 +630,70 @@ namespace GameBattle
             float py = gridY * _cellSize;
             soldier.ActivatePlacement(px, py);
             _unitIdToSoldier[unit.UnitId] = soldier;
+
+            // Wave 3：武将首次上场绑定技能租期（普通兵或无 SkillKey 跳过）。
+            // 绑定失败沿创建事务完整回滚（移除注册集合/Buff/映射并归还池），
+            // 不发布 UnitPlaced/ConfiguredUnitPlaced；外层 ReleasePrepared 因池级
+            // 重复 Release 守卫幂等，不会双重入池。
+            if (_skillRuntime != null && unit.Kind == UnitKind.General
+                && config != null && !string.IsNullOrEmpty(config.SkillKey))
+            {
+                try
+                {
+                    _skillRuntime.Bind(unit.UnitId, soldier, config.SkillKey);
+                }
+                catch
+                {
+                    // 完整注册回滚：移除 _soldiers/_idToIndex/Buff target/_unitIdToSoldier，
+                    // 只 Release 一次；Unbind 幂等（Bind 失败时租期已原子回滚）。
+                    RemoveFromRegistry(soldier);
+                    _unitFactory.Release(soldier);
+                    throw;
+                }
+            }
+
             UnitPlaced?.Invoke(soldier.Id, unit.Side, (int)unit.SoldierType, gridX, gridY, unit.Level);
+            PublishConfiguredUnitPlaced(soldier.Id, unit, config, gridX, gridY);
             return soldier;
+        }
+
+        private void PublishConfiguredUnitPlaced(
+            int runtimeId,
+            BattleUnit unit,
+            UnitConfigSnapshot config,
+            int gridX,
+            int gridY)
+        {
+            ConfiguredUnitPlaced?.Invoke(new UnitSpawnViewData(
+                runtimeId,
+                unit.Side,
+                (int)unit.Kind,
+                unit.GeneralIndex,
+                unit.Kind == UnitKind.General ? unit.GeneralName : unit.SoldierText,
+                (int)unit.SoldierType,
+                config?.PrefabAddress,
+                config?.AnimationKey,
+                gridX,
+                gridY,
+                unit.Level));
+        }
+
+        /// <summary>
+        /// 按 SoldierBase 实例反向查找 UnitId（供 Remove 中的技能 Unbind 使用）。
+        /// </summary>
+        /// <param name="soldier">要查找的战斗实例。</param>
+        /// <returns>匹配的 UnitId；未找到返回 0。</returns>
+        private int FindUnitIdBySoldier(SoldierBase soldier)
+        {
+            foreach (var pair in _unitIdToSoldier)
+            {
+                if (ReferenceEquals(pair.Value, soldier))
+                {
+                    return pair.Key;
+                }
+            }
+
+            return 0;
         }
 
         /// <summary>
@@ -581,6 +717,10 @@ namespace GameBattle
             }
 
             _unitIdToSoldier.Remove(unitId);
+
+            // Wave 3：池回收前解除武将技能租期（保留 AttackCount）。
+            _skillRuntime?.Unbind(unitId, soldier);
+
             long cooldown = soldier.LastAttackTimeMs;
             soldier.CancelUnreleasedAttacks();
             Remove(soldier.Id);
@@ -678,6 +818,10 @@ namespace GameBattle
         ///
         /// <para><b>末尾交换法：</b>用末尾元素填补被移除位置，O(1) 移除。
         /// 保持剩余元素顺序不变。同步更新被交换元素的索引映射。</para>
+        ///
+        /// <para><b>Wave 3：同步清除 UnitId 映射。</b>反查到 UnitId 后解除技能租期，
+        /// 并同步删除 <see cref="_unitIdToSoldier"/> 中的匹配项，避免直接 Remove
+        /// 留下陈旧映射。</para>
         /// </remarks>
         internal bool Remove(int id)
         {
@@ -687,6 +831,43 @@ namespace GameBattle
             }
 
             SoldierBase unit = _soldiers[index];
+            RemoveFromRegistry(unit);
+
+            // 先发布移除事实，再归还对象池；回收后运行时 ID 会被重置。
+            UnitRemoved?.Invoke(id);
+
+            // 归还池（对应 JS objectPool.recoverByClass，经 UnitFactory.Release）。
+            _unitFactory.Release(unit);
+
+            return true;
+        }
+
+        /// <summary>
+        /// 把单位从注册集合移除并解除 Buff 目标与武将技能租期；不发布事件、不归还池。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>共享回滚路径：</b><see cref="Remove"/> 与两个激活路径的 Bind 失败
+        /// 回滚（<see cref="ActivateBattleUnit"/> / <see cref="ActivatePrepared"/>）共用本方法：
+        /// 解除 Buff 目标、解除技能租期、同步删除 <see cref="_unitIdToSoldier"/> 映射、
+        /// GameOver 标记回收、末尾交换法从 <see cref="_soldiers"/> 移除。</para>
+        /// <para>事件发布与池归还由调用方决定：Remove 发布 UnitRemoved 并 Release；
+        /// 回滚路径不发布任何事件且只 Release 一次。</para>
+        /// </remarks>
+        private void RemoveFromRegistry(SoldierBase unit)
+        {
+            // Wave 3：池回收前解除武将技能租期（保留 AttackCount）。
+            // 通过反向查找 UnitId；Deactivate 已解除时 Unbind 幂等跳过。
+            int unitId = FindUnitIdBySoldier(unit);
+            if (_skillRuntime != null && unitId > 0)
+            {
+                _skillRuntime.Unbind(unitId, unit);
+            }
+
+            // Wave 3：同步删除 UnitId → 战斗实例映射，避免陈旧映射残留。
+            if (unitId > 0)
+            {
+                _unitIdToSoldier.Remove(unitId);
+            }
 
             _buffManager?.UnregisterTarget(((IBuffTarget)unit).Handle);
 
@@ -694,6 +875,7 @@ namespace GameBattle
             unit.GameOver();
 
             // 末尾交换法移除（保持剩余元素顺序稳定）。
+            int index = _idToIndex[unit.Id];
             int lastIndex = _soldiers.Count - 1;
             if (index != lastIndex)
             {
@@ -703,15 +885,7 @@ namespace GameBattle
             }
 
             _soldiers.RemoveAt(lastIndex);
-            _idToIndex.Remove(id);
-
-            // 先发布移除事实，再归还对象池；回收后运行时 ID 会被重置。
-            UnitRemoved?.Invoke(id);
-
-            // 归还池（对应 JS objectPool.recoverByClass，经 UnitFactory.Release）。
-            _unitFactory.Release(unit);
-
-            return true;
+            _idToIndex.Remove(unit.Id);
         }
 
         // ====================================================================
@@ -897,6 +1071,9 @@ namespace GameBattle
             _soldiers.Clear();
             _idToIndex.Clear();
             _unitIdToSoldier.Clear();
+
+            // Wave 3：最终清局——清理全部武将技能租期与累计计数（幂等）。
+            _skillRuntime?.Clear();
         }
 
         // ====================================================================

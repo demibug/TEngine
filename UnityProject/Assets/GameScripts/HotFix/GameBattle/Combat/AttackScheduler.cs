@@ -269,6 +269,13 @@ namespace GameBattle
         /// </summary>
         private readonly float _cellHeight;
 
+        /// <summary>
+        /// 武将主动技能运行时（可为 null；null 时保持旧测试行为，不替换攻击槽）。
+        /// <para>非 null 时，冷却完毕且有合法目标的武将攻击槽会先尝试技能激活：
+        /// 成功则消费槽并跳过普通攻击，失败则普通攻击后累计 AttackCount。</para>
+        /// </summary>
+        private readonly GeneralSkillRuntime _skillRuntime;
+
         // ====================================================================
         // 构造
         // ====================================================================
@@ -288,27 +295,26 @@ namespace GameBattle
         /// 敌人格子宽（对应 <c>map.gridWidth</c>）。由调用方从配置或 MapData 注入。
         /// </param>
         /// <param name="cellHeight">敌人格子高（对应 <c>map.gridHeight</c>）。</param>
+        /// <param name="skillRuntime">
+        /// 武将主动技能运行时（可选；null 时保持旧测试行为，不替换攻击槽）。
+        /// 非空时，武将攻击槽在冷却完毕且有合法目标时先尝试技能激活；
+        /// 激活成功消费槽并跳过普通攻击，失败则普通攻击后累计计数。
+        /// </param>
         /// <exception cref="ArgumentNullException">
         /// <paramref name="actionScheduler"/> 或 <paramref name="resolver"/> 为 null。
         /// </exception>
-        /// <remarks>
-        /// <para>与 JS 原版 <c>AttackScheduler.js:8-11</c> 一致，本类型在构造时注入
-        /// <c>enemyManager</c>（C# 移植改为注入 <see cref="AttackResolver"/>，隔离对
-        /// EnemyManager 的直接知识）与 resolver。由 <see cref="BattleRuntimeFactory"/>
-        /// 在每次 Create 时构造新实例。</para>
-        /// <para><b>不跨局复用：</b>虽然本类型无状态可安全复用，但遵循"每局新建/销毁"统一约定
-        /// （spec "Restart creates clean per-battle state"），避免隐式跨局引用。</para>
-        /// </remarks>
         internal AttackScheduler(
             BattleActionScheduler actionScheduler,
             AttackResolver resolver,
             float cellWidth,
-            float cellHeight)
+            float cellHeight,
+            GeneralSkillRuntime skillRuntime = null)
         {
             _actionScheduler = actionScheduler ?? throw new ArgumentNullException(nameof(actionScheduler));
             _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
             _cellWidth = cellWidth;
             _cellHeight = cellHeight;
+            _skillRuntime = skillRuntime;
         }
 
         // ====================================================================
@@ -537,6 +543,25 @@ namespace GameBattle
             {
                 unit.SetState(AttackUnitState.Idle);
                 return false;
+            }
+
+            // ----------------------------------------------------------------
+            // 武将技能替换攻击槽（Wave 3）：
+            // 有合法目标时，先尝试用武将主动技能替换本攻击槽；成功消费槽并跳过普通攻击，
+            // 失败则普通攻击后累计 AttackCount。普通兵或未装配 runtime 时保持旧行为。
+            // ----------------------------------------------------------------
+            if (_skillRuntime != null && unit is SoldierBase soldier)
+            {
+                if (_skillRuntime.TryActivateInsteadOfAttack(soldier))
+                {
+                    // 技能激活成功：消费本攻击槽，跳过普通攻击（不累计 AttackCount）。
+                    return true;
+                }
+
+                // 技能未激活（未绑定/未达阈值/Busy/OnCooldown 等）：普通攻击后累计。
+                unit.Attack(attackTargets[0]);
+                _skillRuntime.OnBasicAttack(soldier);
+                return true;
             }
 
             // 有目标 → 触发攻击。

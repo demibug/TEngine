@@ -156,6 +156,11 @@ namespace GameBattle
             WeaponCatalogSnapshot weaponCatalog = BuildWeaponCatalogFromLuban(_tables.TbWeapon);
 
             // ----------------------------------------------------------------
+            // 启用武将目录：禁用行不进入运行时、配方索引或玩家招募池。
+            // ----------------------------------------------------------------
+            GeneralCatalogSnapshot generalCatalog = BuildGeneralCatalogFromLuban(_tables.TbGeneral);
+
+            // ----------------------------------------------------------------
             // 【legacy】单敌人快照：由目录按地图 EnemyTypeIndex 派生（兼容 WaveManager）。
             // ----------------------------------------------------------------
             EnemyConfigSnapshot enemy = BuildLegacyEnemyFromCatalog(catalog, mapRow.EnemyTypeIndex);
@@ -206,7 +211,56 @@ namespace GameBattle
                 buffCatalog: buffCatalog,
                 skillCatalog: skillCatalog,
                 bossCatalog: bossCatalog,
-                weaponCatalog: weaponCatalog);
+                weaponCatalog: weaponCatalog,
+                generalCatalog: generalCatalog);
+        }
+
+        internal static GeneralCatalogSnapshot BuildGeneralCatalogFromLuban(TbGeneral table)
+        {
+            var definitions = new List<GeneralConfigSnapshot>();
+            foreach (GameConfig.battle.General row in table.DataList)
+            {
+                if (!row.Enabled)
+                {
+                    continue;
+                }
+
+                GeneralCombatArchetype archetype;
+                switch (row.CombatArchetype)
+                {
+                    case "pike":
+                        archetype = GeneralCombatArchetype.Pike;
+                        break;
+                    case "bow":
+                        archetype = GeneralCombatArchetype.Bow;
+                        break;
+                    default:
+                        throw new BattleConfigDataException(
+                            BattleConfigErrorCategory.GeneralConfigInvalid,
+                            $"武将 index={row.Index} 的 combatArchetype='{row.CombatArchetype}' 非法",
+                            $"General.{row.Index}.CombatArchetype");
+                }
+
+                definitions.Add(new GeneralConfigSnapshot(
+                    row.Index,
+                    row.Name,
+                    row.Family,
+                    row.PartWords,
+                    archetype,
+                    row.RangeCells,
+                    row.AttackDamage,
+                    row.AttackIntervalSeconds,
+                    row.DamageMode,
+                    row.TargetPolicy,
+                    row.PrefabAddress,
+                    row.AnimationKey,
+                    row.ProjectileType,
+                    row.ProjectileSpeed,
+                    row.PartRecruitWeight,
+                    row.SkillKey));
+            }
+
+            return new GeneralCatalogSnapshot(definitions);
         }
 
         // ====================================================================
@@ -733,7 +787,9 @@ namespace GameBattle
                     handlerKey: row.HandlerKey,
                     effectBuffType: row.EffectBuffType,
                     effectDurationMs: row.EffectDurationMs,
-                    rangeTiles: row.RangeTiles));
+                    rangeTiles: row.RangeTiles,
+                    triggerAttackCount: row.TriggerAttackCount,
+                    effectDamageMultiplier: row.EffectDamageMultiplier));
             }
 
             try

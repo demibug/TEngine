@@ -1,4 +1,3 @@
-using System.Threading;
 using Cysharp.Threading.Tasks;
 
 namespace GameBattle
@@ -53,10 +52,8 @@ namespace GameBattle
 
         /// <inheritdoc/>
         /// <remarks>Null 实现：立即返回 <see cref="UniTask.CompletedTask"/>，不执行任何 IO。</remarks>
-        public UniTask PreloadAsync(CancellationToken cancellationToken)
+        public UniTask PreloadAsync()
         {
-            // 取消令牌已取消时保留取消异常语义。
-            cancellationToken.ThrowIfCancellationRequested();
             return UniTask.CompletedTask;
         }
 

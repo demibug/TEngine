@@ -22,7 +22,6 @@ namespace GameBattle
     /// <para><b>与异常的关系：</b></para>
     /// <list type="bullet">
     /// <item>预期失败使用本错误码 + <see cref="BattleOperationResult"/> 返回，不抛异常。</item>
-    /// <item>调用方取消抛出 <see cref="System.OperationCanceledException"/>，不走错误码路径（决策 0.7）。</item>
     /// <item>非预期异常（如 NullReferenceException）由实现层捕获并包装为 <see cref="Unknown"/> 错误码，
     /// 但不得用异常文本作为调用方判断依据。</item>
     /// </list>

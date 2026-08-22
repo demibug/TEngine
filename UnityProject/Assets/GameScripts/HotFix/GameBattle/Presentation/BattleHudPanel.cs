@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using FairyGUI;
-using GameFUI;
+using GameLogic;
 using TEngine;
 using UIBattle;
 using UnityEngine;
@@ -22,7 +21,13 @@ namespace GameBattle
         private const float CardWidth = 100f;
         private const float CardSpacing = 12f;
         private const float CardBottom = 132f;
+        private const float CardHandleInset = 6f;
+        private const float CardHandleSize = CardWidth - 12f;
         private const string FallbackBackgroundName = "fallbackBackground";
+        private const string DragHandleName = "dragHandle";
+
+        private static readonly Vector2 DragHandleHomePosition =
+            new Vector2(CardHandleInset, CardHandleInset);
 
         private BattleHudEntryArgs _entryArgs;
         private readonly List<UI_BattleCardItem> _cards = new List<UI_BattleCardItem>();
@@ -31,6 +36,7 @@ namespace GameBattle
         private BattleDragController _dragController;
         private GObject _dragShadow;
         private Vector2 _dragOriginPosition;
+        private float _dragShadowPointerOffsetX;
 
         protected override void RegisterOpenEvents()
         {
@@ -132,14 +138,21 @@ namespace GameBattle
                 card.SetSize(CardWidth, CardWidth);
                 card.SetXY(startX + index * (CardWidth + CardSpacing), height - CardBottom - CardWidth);
                 card.onClick.Add(context => OnCardClicked(context, slotIndex));
-                card.draggable = true;
-                card.onDragStart.Add(context => OnCardDragStart(context, slotIndex));
-                card.onDragEnd.Add(context => OnCardDragEnd(context, slotIndex));
                 SetCardVisual(
                     card,
-                    occupant.HasValue ? occupant.Value.SoldierText : null,
-                    occupant.HasValue ? occupant.Value.Level : 0,
-                    _entryArgs.GetUnitIcon);
+                    occupant,
+                    _entryArgs.GetUnitIcon,
+                    _entryArgs.GetGeneralPartIcon);
+
+                // 统一拖放规则：根卡不 draggable，起拖只允许发生在非空单位主体的拖拽柄上
+                // （底框/空槽/等级数字不能起拖）。空槽无拖拽柄，无拖拽。
+                if (card.GetChild(DragHandleName) is GObject dragHandle)
+                {
+                    dragHandle.onDragStart.Add(context => OnCardDragStart(context, slotIndex));
+                    dragHandle.onDragMove.Add(context => OnCardDragMove(context, slotIndex));
+                    dragHandle.onDragEnd.Add(context => OnCardDragEnd(context, slotIndex));
+                }
+
                 AddChild(card);
                 _cards.Add(card);
             }
@@ -167,13 +180,23 @@ namespace GameBattle
         /// <summary>
         /// 使用士兵 Prefab 的默认立绘设置卡牌图标；资源不可用或空槽时才回退为兵种文字。
         /// 有单位时在卡面叠加等级数字（最终方案"待上场槽显示等级"）。
+        /// 非空卡直接以单位主体作为不覆盖底框的拖拽柄，使起拖与可见对象保持一致。
         /// </summary>
         private static void SetCardVisual(
             UI_BattleCardItem card,
-            string soldierText,
-            int level,
-            Func<int, Sprite> getUnitIcon)
+            BattleUnit? unit,
+            Func<int, Sprite> getUnitIcon,
+            Func<string, Sprite> getGeneralPartIcon)
         {
+            bool hasUnit = unit.HasValue;
+            string displayText = !unit.HasValue ? null
+                : unit.Value.Kind == UnitKind.GeneralPart ? unit.Value.GeneralPartText
+                : unit.Value.Kind == UnitKind.General ? unit.Value.GeneralPartText
+                : unit.Value.SoldierText;
+            string soldierText = unit.HasValue && unit.Value.Kind == UnitKind.Soldier
+                ? unit.Value.SoldierText
+                : string.Empty;
+            int level = unit.HasValue ? unit.Value.Level : 0;
             var background = new GGraph
             {
                 name = FallbackBackgroundName,
@@ -193,12 +216,19 @@ namespace GameBattle
                 : soldierText == "骑" ? 3
                 : -1;
             Sprite sprite = soldierType >= 0 ? getUnitIcon?.Invoke(soldierType) : null;
+            if (sprite == null && unit.HasValue
+                && (unit.Value.Kind == UnitKind.GeneralPart || unit.Value.Kind == UnitKind.General))
+            {
+                sprite = getGeneralPartIcon?.Invoke(unit.Value.GeneralPartText);
+            }
+
             if (sprite != null)
             {
                 var icon = new GLoader
                 {
-                    name = "unitIcon",
-                    touchable = false,
+                    name = DragHandleName,
+                    touchable = true,
+                    draggable = true,
                     fill = FillType.Scale,
                     align = AlignType.Center,
                     verticalAlign = VertAlignType.Middle,
@@ -207,26 +237,36 @@ namespace GameBattle
                 icon.SetSize(CardWidth - 12f, CardWidth - 12f);
                 icon.SetXY(6f, 6f);
                 card.AddChild(icon);
+                if (unit.HasValue && unit.Value.Kind == UnitKind.General)
+                {
+                    AddIdentityBadge(card, unit.Value.GeneralName);
+                }
                 AddLevelBadge(card, level);
                 return;
             }
 
             var label = new GTextField
             {
-                name = "fallbackLabel",
+                name = hasUnit ? DragHandleName : "fallbackLabel",
                 autoSize = AutoSizeType.None,
                 align = AlignType.Center,
                 verticalAlign = VertAlignType.Middle,
-                touchable = false,
+                touchable = hasUnit,
+                draggable = hasUnit,
             };
             TextFormat format = label.textFormat;
             format.size = 38;
             format.bold = true;
             format.color = new Color(0.25f, 0.08f, 0.03f, 1f);
             label.textFormat = format;
-            label.SetSize(CardWidth, CardWidth);
-            label.text = string.IsNullOrEmpty(soldierText) ? "空" : soldierText ?? "?";
+            label.SetSize(CardHandleSize, CardHandleSize);
+            label.SetXY(CardHandleInset, CardHandleInset);
+            label.text = string.IsNullOrEmpty(displayText) ? "空" : displayText;
             card.AddChild(label);
+            if (unit.HasValue && unit.Value.Kind == UnitKind.General)
+            {
+                AddIdentityBadge(card, unit.Value.GeneralName);
+            }
             AddLevelBadge(card, level);
         }
 
@@ -244,7 +284,7 @@ namespace GameBattle
                 autoSize = AutoSizeType.None,
                 align = AlignType.Center,
                 verticalAlign = VertAlignType.Middle,
-                touchable = false,
+                touchable = true,
             };
             TextFormat format = badge.textFormat;
             format.size = 26;
@@ -254,6 +294,27 @@ namespace GameBattle
             badge.SetSize(40f, 32f);
             badge.SetXY(CardWidth - 48f, CardWidth - 40f);
             badge.text = "Lv" + level;
+            card.AddChild(badge);
+        }
+
+        private static void AddIdentityBadge(UI_BattleCardItem card, string text)
+        {
+            var badge = new GTextField
+            {
+                name = "identityBadge",
+                autoSize = AutoSizeType.None,
+                align = AlignType.Center,
+                verticalAlign = VertAlignType.Middle,
+                touchable = false,
+                text = string.IsNullOrEmpty(text) ? "武将" : text,
+            };
+            TextFormat format = badge.textFormat;
+            format.size = 18;
+            format.bold = true;
+            format.color = Color.white;
+            badge.textFormat = format;
+            badge.SetSize(CardWidth - 8f, 24f);
+            badge.SetXY(4f, 4f);
             card.AddChild(badge);
         }
 
@@ -274,7 +335,39 @@ namespace GameBattle
             IReadOnlyList<UnitSlot> slots = _entryArgs?.GetPlayerReserveSlots?.Invoke();
             if (slots != null && reserveSlotIndex >= 0 && reserveSlotIndex < slots.Count)
             {
-                _dragController?.BeginDrag(slots[reserveSlotIndex].SlotId.Id, context.inputEvent?.touchId ?? -1);
+                BattleUnit? occupant = slots[reserveSlotIndex].Occupant;
+                int touchId = context.inputEvent?.touchId ?? -1;
+                _dragController?.BeginDrag(slots[reserveSlotIndex].SlotId.Id, touchId);
+                if (occupant.HasValue && occupant.Value.Kind == UnitKind.General && Stage.inst != null)
+                {
+                    Vector2 stagePosition = context.inputEvent != null
+                        ? context.inputEvent.position
+                        : Stage.inst.GetTouchPosition(touchId);
+                    CreateDragShadow(occupant.Value, stagePosition);
+                }
+            }
+        }
+
+        /// <summary>Reserve General 使用单格影子拖动，原卡柄固定在槽位原点。</summary>
+        private void OnCardDragMove(EventContext context, int reserveSlotIndex)
+        {
+            IReadOnlyList<UnitSlot> slots = _entryArgs?.GetPlayerReserveSlots?.Invoke();
+            if (slots == null || reserveSlotIndex < 0 || reserveSlotIndex >= slots.Count
+                || !slots[reserveSlotIndex].Occupant.HasValue
+                || slots[reserveSlotIndex].Occupant.Value.Kind != UnitKind.General)
+            {
+                return;
+            }
+
+            if (reserveSlotIndex < _cards.Count
+                && _cards[reserveSlotIndex]?.GetChild(DragHandleName) is GObject handle)
+            {
+                handle.xy = DragHandleHomePosition;
+            }
+
+            if (_dragShadow != null && context.inputEvent != null)
+            {
+                MoveDragShadow(context.inputEvent.position);
             }
         }
 
@@ -282,21 +375,46 @@ namespace GameBattle
         {
             context.StopPropagation();
 
-            // 复位卡回到原位（未命中目标时表现弹回源槽）。
+            IReadOnlyList<UnitSlot> slots = _entryArgs?.GetPlayerReserveSlots?.Invoke();
+            bool isGeneral = slots != null
+                && reserveSlotIndex >= 0
+                && reserveSlotIndex < slots.Count
+                && slots[reserveSlotIndex].Occupant.HasValue
+                && slots[reserveSlotIndex].Occupant.Value.Kind == UnitKind.General;
+
+            // 复位拖拽柄回到单位主体原位（未命中目标时表现弹回源槽；命中提交由刷新重建卡面）。
             if (reserveSlotIndex >= 0 && reserveSlotIndex < _cards.Count && _cards[reserveSlotIndex] != null)
             {
-                _cards[reserveSlotIndex].xy = ReserveCardHomePosition(reserveSlotIndex);
+                if (_cards[reserveSlotIndex].GetChild(DragHandleName) is GObject handle)
+                {
+                    handle.xy = DragHandleHomePosition;
+                }
             }
 
             if (_entryArgs == null || Stage.inst == null)
             {
                 _dragController?.Cancel();
+                if (isGeneral)
+                {
+                    AnimateDragShadowBack();
+                }
                 return;
             }
 
             int touchId = context.inputEvent?.touchId ?? -1;
             Vector2 stagePosition = Stage.inst.GetTouchPosition(touchId);
             BattleInputResult? result = _dragController?.EndDrag(stagePosition.x, stagePosition.y, touchId);
+            if (isGeneral)
+            {
+                if (result.HasValue && result.Value.IsSuccess)
+                {
+                    DestroyDragShadow();
+                }
+                else
+                {
+                    AnimateDragShadowBack();
+                }
+            }
             if (result.HasValue)
             {
                 TryDropUnit(result.Value);
@@ -328,8 +446,8 @@ namespace GameBattle
                 return;
             }
 
-            // 识别场上源槽：Stage 坐标 → 战场槽。
-            if (_entryArgs.ResolveBattleSlotForStage?.Invoke(
+            // 识别场上源槽：源只从单位主体起拖（先锁定玩家战场槽，再检查活动单位 Body 命中）。
+            if (_entryArgs.ResolveBattleSourceForStage?.Invoke(
                     stagePosition.x, stagePosition.y, out int battleSlotId) != true
                 || battleSlotId < 0)
             {
@@ -364,10 +482,7 @@ namespace GameBattle
             }
 
             // 只移动影子，不修改规则状态。影子存 HUD 本地坐标（P2 修复）。
-            Vector2 localPosition = GlobalToLocal(context.inputEvent.position);
-            _dragShadow.xy = new Vector2(
-                localPosition.x - _dragShadow.width * 0.5f,
-                localPosition.y - _dragShadow.height * 0.5f);
+            MoveDragShadow(context.inputEvent.position);
         }
 
         private void OnStageTouchEnd(EventContext context)
@@ -439,7 +554,7 @@ namespace GameBattle
             return false;
         }
 
-        /// <summary>创建纯 UI 拖动影子（复用卡片图标生成方式）。</summary>
+        /// <summary>创建纯 UI 拖动影子（复用卡片图标生成方式；武将也按点击格显示单字）。</summary>
         private void CreateDragShadow(BattleUnit unit, Vector2 stagePosition)
         {
             if (_dragShadow != null)
@@ -447,12 +562,18 @@ namespace GameBattle
                 DestroyDragShadow();
             }
 
-            int soldierType = unit.SoldierText == "刀" ? 0
+            int soldierType = unit.Kind != UnitKind.Soldier ? -1
+                : unit.SoldierText == "刀" ? 0
                 : unit.SoldierText == "弓" ? 1
                 : unit.SoldierText == "枪" ? 2
                 : unit.SoldierText == "骑" ? 3
                 : -1;
             Sprite sprite = soldierType >= 0 ? _entryArgs?.GetUnitIcon?.Invoke(soldierType) : null;
+            if (sprite == null
+                && (unit.Kind == UnitKind.GeneralPart || unit.Kind == UnitKind.General))
+            {
+                sprite = _entryArgs?.GetGeneralPartIcon?.Invoke(unit.GeneralPartText);
+            }
 
             GObject shadow;
             if (sprite != null)
@@ -470,28 +591,53 @@ namespace GameBattle
             }
             else
             {
-                var graph = new GGraph
+                var label = new GTextField
                 {
                     touchable = false,
+                    autoSize = AutoSizeType.None,
+                    align = AlignType.Center,
+                    verticalAlign = VertAlignType.Middle,
                 };
-                graph.DrawRect(
-                    CardWidth - 12f,
-                    CardWidth - 12f,
-                    2,
-                    new Color(0.10f, 0.70f, 0.95f, 0.85f),
-                    new Color(1f, 0.88f, 0.48f, 0.9f));
-                shadow = graph;
+                TextFormat format = label.textFormat;
+                format.size = 38;
+                format.bold = true;
+                format.color = Color.white;
+                label.textFormat = format;
+                label.text = unit.Kind == UnitKind.GeneralPart || unit.Kind == UnitKind.General
+                    ? unit.GeneralPartText
+                    : unit.SoldierText;
+                shadow = label;
             }
 
             shadow.SetSize(CardWidth - 12f, CardWidth - 12f);
-            // P2 修复：影子存 HUD 本地坐标（GlobalToLocal 转换 Stage 坐标）。
+            PositionDragShadow(shadow, stagePosition);
+        }
+
+        private void PositionDragShadow(
+            GObject shadow,
+            Vector2 stagePosition)
+        {
+            _dragShadowPointerOffsetX = shadow.width * 0.5f;
             Vector2 localPosition = GlobalToLocal(stagePosition);
             shadow.xy = new Vector2(
-                localPosition.x - shadow.width * 0.5f,
+                localPosition.x - _dragShadowPointerOffsetX,
                 localPosition.y - shadow.height * 0.5f);
             _dragOriginPosition = shadow.xy;
             AddChild(shadow);
             _dragShadow = shadow;
+        }
+
+        private void MoveDragShadow(Vector2 stagePosition)
+        {
+            if (_dragShadow == null)
+            {
+                return;
+            }
+
+            Vector2 localPosition = GlobalToLocal(stagePosition);
+            _dragShadow.xy = new Vector2(
+                localPosition.x - _dragShadowPointerOffsetX,
+                localPosition.y - _dragShadow.height * 0.5f);
         }
 
         /// <summary>影子弹回原点后销毁（GTween，无 Coroutine）。</summary>
@@ -528,16 +674,6 @@ namespace GameBattle
             {
                 RemoveChild(shadow, dispose: true);
             }
-        }
-
-        /// <summary>Reserve 卡在主面板的初始位置。</summary>
-        private Vector2 ReserveCardHomePosition(int index)
-        {
-            IReadOnlyList<UnitSlot> slots = _entryArgs?.GetPlayerReserveSlots?.Invoke();
-            int count = slots?.Count ?? 0;
-            float totalWidth = count * CardWidth + (count - 1) * CardSpacing;
-            float startX = (width - totalWidth) * 0.5f;
-            return new Vector2(startX + index * (CardWidth + CardSpacing), height - CardBottom - CardWidth);
         }
 
         /// <summary>
@@ -579,14 +715,14 @@ namespace GameBattle
             for (int index = 0; index < _cards.Count; index++)
             {
                 UI_BattleCardItem card = _cards[index];
+                bool selected = index == _selectedHandSlot;
                 if (card?.m_cState != null)
                 {
-                    card.m_cState.selectedPage = index == _selectedHandSlot ? "Selected" : "Normal";
+                    card.m_cState.selectedPage = selected ? "Selected" : "Normal";
                 }
 
                 if (card?.GetChild(FallbackBackgroundName) is GGraph background)
                 {
-                    bool selected = index == _selectedHandSlot;
                     background.DrawRect(
                         CardWidth,
                         CardWidth,
@@ -678,27 +814,33 @@ namespace GameBattle
 
             try
             {
-                BattleOperationResult result = await entryArgs.ExitAsync(OpenCancellationToken);
-                if (!result.IsSuccess && !OpenCancellationToken.IsCancellationRequested)
+                BattleOperationResult result = await entryArgs.ExitAsync();
+                if (!ReferenceEquals(_entryArgs, entryArgs))
+                {
+                    return;
+                }
+
+                if (!result.IsSuccess)
                 {
                     Log.Warning($"[BattleHudPanel] 退出战斗失败: {result}");
-                    RestoreExitButton();
+                    RestoreExitButton(entryArgs);
                 }
-            }
-            catch (OperationCanceledException) when (OpenCancellationToken.IsCancellationRequested)
-            {
-                // 窗口关闭会取消当前等待，模块退出清理由独立令牌保证完成。
             }
             catch (Exception ex)
             {
+                if (!ReferenceEquals(_entryArgs, entryArgs))
+                {
+                    return;
+                }
+
                 Log.Error($"[BattleHudPanel] 退出战斗发生异常: {ex}");
-                RestoreExitButton();
+                RestoreExitButton(entryArgs);
             }
         }
 
-        private void RestoreExitButton()
+        private void RestoreExitButton(BattleHudEntryArgs entryArgs)
         {
-            if (OpenCancellationToken.IsCancellationRequested)
+            if (!ReferenceEquals(_entryArgs, entryArgs))
             {
                 return;
             }
@@ -717,22 +859,26 @@ namespace GameBattle
     /// </summary>
     internal sealed class BattleHudEntryArgs
     {
-        internal Func<CancellationToken, UniTask<BattleOperationResult>> ExitAsync { get; }
+        internal Func<UniTask<BattleOperationResult>> ExitAsync { get; }
         internal Func<BattleInputResult> Recruit { get; }
         internal Func<int, int, BattleInputResult> DropUnit { get; }
         internal Func<IReadOnlyList<UnitSlot>> GetPlayerReserveSlots { get; }
         internal ResolveBattleSlotDelegate ResolveBattleSlotForStage { get; }
+        internal ResolveBattleSourceDelegate ResolveBattleSourceForStage { get; }
         internal Func<int, UnitSlot> GetSlotById { get; }
         internal Func<int, Sprite> GetUnitIcon { get; }
+        internal Func<string, Sprite> GetGeneralPartIcon { get; }
 
         internal BattleHudEntryArgs(
-            Func<CancellationToken, UniTask<BattleOperationResult>> exitAsync,
+            Func<UniTask<BattleOperationResult>> exitAsync,
             Func<BattleInputResult> recruit,
             Func<int, int, BattleInputResult> dropUnit,
             Func<IReadOnlyList<UnitSlot>> getPlayerReserveSlots,
             ResolveBattleSlotDelegate resolveBattleSlotForStage,
+            ResolveBattleSourceDelegate resolveBattleSourceForStage,
             Func<int, UnitSlot> getSlotById,
-            Func<int, Sprite> getUnitIcon)
+            Func<int, Sprite> getUnitIcon,
+            Func<string, Sprite> getGeneralPartIcon)
         {
             ExitAsync = exitAsync ?? throw new ArgumentNullException(nameof(exitAsync));
             Recruit = recruit ?? throw new ArgumentNullException(nameof(recruit));
@@ -741,8 +887,11 @@ namespace GameBattle
                 ?? throw new ArgumentNullException(nameof(getPlayerReserveSlots));
             ResolveBattleSlotForStage = resolveBattleSlotForStage
                 ?? throw new ArgumentNullException(nameof(resolveBattleSlotForStage));
+            ResolveBattleSourceForStage = resolveBattleSourceForStage
+                ?? throw new ArgumentNullException(nameof(resolveBattleSourceForStage));
             GetSlotById = getSlotById ?? throw new ArgumentNullException(nameof(getSlotById));
             GetUnitIcon = getUnitIcon ?? throw new ArgumentNullException(nameof(getUnitIcon));
+            GetGeneralPartIcon = getGeneralPartIcon ?? throw new ArgumentNullException(nameof(getGeneralPartIcon));
         }
     }
 
@@ -757,4 +906,21 @@ namespace GameBattle
         float screenX,
         float screenY,
         out int targetSlotId);
+
+    /// <summary>
+    /// 把 Stage 坐标解析为可起拖的玩家战场源槽位标识的委托（统一拖放规则：源只从单位主体起拖）。
+    /// </summary>
+    /// <param name="screenX">Stage X 坐标。</param>
+    /// <param name="screenY">Stage Y 坐标。</param>
+    /// <param name="battleSlotId">解析出的玩家战场源槽位固定标识；未命中为 -1。</param>
+    /// <returns>解析成功、命中战场槽且该槽活动单位 Body 命中屏幕点返回 true。</returns>
+    /// <remarks>
+    /// <para>先锁定玩家战场槽（完整槽位命中），再检查 <see cref="UnityBattleViewPort"/>
+    /// 中对应活动单位 Body SpriteRenderer 的屏幕/世界 bounds。战场格子底框不能起拖，
+    /// 投放目标仍使用完整的 <see cref="ResolveBattleSlotForStage"/> 命中。</para>
+    /// </remarks>
+    internal delegate bool ResolveBattleSourceDelegate(
+        float screenX,
+        float screenY,
+        out int battleSlotId);
 }

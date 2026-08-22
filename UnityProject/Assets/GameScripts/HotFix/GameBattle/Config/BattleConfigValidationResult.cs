@@ -247,6 +247,25 @@ namespace GameBattle
 
         /// <summary>启用行集合非法：不是恰好四条 Basic +1 基础武器（id 0/10/20/31 类别匹配）。</summary>
         WeaponEnabledSetInvalid = 82,
+
+        /// <summary>武将定义、配方、战斗原型、数值、表现或投射物配置非法。</summary>
+        GeneralConfigInvalid = 83,
+
+        // ----------------------------------------------------------------
+        // 武将主动技能绑定（本 change 新增；新增类别只能追加到末尾）
+        // ----------------------------------------------------------------
+
+        /// <summary>武将配置了 skillKey 但 Skill 目录中不存在该技能。</summary>
+        GeneralSkillDefinitionMissing = 84,
+
+        /// <summary>武将引用的技能不是 Active 类别（无法作为主动技能触发）。</summary>
+        GeneralSkillCategoryInvalid = 85,
+
+        /// <summary>武将引用的主动技能缺 triggerAttackCount 或 triggerAttackCount 非正。</summary>
+        GeneralSkillTriggerInvalid = 86,
+
+        /// <summary>武将引用的技能缺少其 handler 专用的 effect 配置字段（如 BattleShout 的 range/buffType/duration、FireArrowBarrage 的 range/damageMultiplier）。</summary>
+        GeneralSkillEffectConfigMissing = 87,
     }
 
     /// <summary>

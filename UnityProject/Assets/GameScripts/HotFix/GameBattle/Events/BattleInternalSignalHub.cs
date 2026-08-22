@@ -146,6 +146,9 @@ namespace GameBattle
         /// </remarks>
         public Signal<UnitMergedFact> UnitMerged { get; } = new Signal<UnitMergedFact>();
 
+        /// <summary>两个武将字成功合成为武将。</summary>
+        public Signal<GeneralSynthesizedFact> GeneralSynthesized { get; } = new Signal<GeneralSynthesizedFact>();
+
         /// <summary>
         /// 征兵完成事实（最终方案：阵营与当前征兵费用）。
         /// </summary>
@@ -189,6 +192,7 @@ namespace GameBattle
             TryClearSignal(BattleFrozen, nameof(BattleFrozen));
             TryClearSignal(SlotChanged, nameof(SlotChanged));
             TryClearSignal(UnitMerged, nameof(UnitMerged));
+            TryClearSignal(GeneralSynthesized, nameof(GeneralSynthesized));
             TryClearSignal(RecruitCompleted, nameof(RecruitCompleted));
         }
 
@@ -480,6 +484,18 @@ namespace GameBattle
             TargetSlotId = targetSlotId;
             MergedUnit = mergedUnit;
             NewLevel = newLevel;
+        }
+    }
+
+    internal readonly struct GeneralSynthesizedFact
+    {
+        public readonly UnitSlotId TargetSlotId;
+        public readonly BattleUnit General;
+
+        public GeneralSynthesizedFact(UnitSlotId targetSlotId, BattleUnit general)
+        {
+            TargetSlotId = targetSlotId;
+            General = general;
         }
     }
 

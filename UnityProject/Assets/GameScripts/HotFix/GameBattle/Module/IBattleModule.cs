@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
 
@@ -75,9 +74,8 @@ namespace GameBattle
     //   GameBattle 对外唯一战斗模块入口契约。定义 Start/Restart/Exit 公共异步 API
     //   和只读状态查询。实现由 BattleModule.cs（task 2.6/2.7）提供。
     //
-    //   公共异步 API 使用 UniTask + CancellationToken（CLAUDE.md 红线：异步优先）。
+    //   公共异步 API 使用 UniTask（CLAUDE.md 红线：异步优先）。
     //   预期失败返回 BattleOperationResult 而非异常（spec: "预期失败 MUST 返回结构化结果"）。
-    //   调用方取消抛出 OperationCanceledException，保留取消异常语义（决策 0.7）。
     //
     //   不修改 TEngine ModuleSystem 公共实现（task 2.7 约束）。
     // ============================================================================
@@ -97,9 +95,9 @@ namespace GameBattle
     /// 重复 Start 返回 <see cref="BattleErrorCode.AlreadyActive"/> 且不创建第二个活动运行时。</item>
     /// <item><see cref="RestartAsync"/>：只允许 <see cref="BattleModuleState.Settling"/> 状态调用；
     /// 其他状态返回结构化失败结果，不销毁当前运行时。</item>
-    /// <item><see cref="ExitAsync"/>：在任意状态幂等，并发调用共享进行中的退出操作而不重复执行清理。</item>
+    /// <item><see cref="ExitAsync"/>：在任意状态幂等；活动状态退出返回成功，重复 Exit 在
+    /// 退出中返回 <see cref="BattleErrorCode.Exiting"/> 且不重复执行清理。</item>
     /// <item>预期失败（状态、配置、资源）返回 <see cref="BattleOperationResult"/> 而非异常。</item>
-    /// <item>调用方取消抛出 <see cref="OperationCanceledException"/>，保留取消异常语义。</item>
     /// </list>
     ///
     /// <para><b>只读状态查询：</b></para>
@@ -133,10 +131,6 @@ namespace GameBattle
         /// 开始一局战斗（公共异步 API）。
         /// </summary>
         /// <param name="loadout">不可变战斗装载信息（地图、种子、配置版本/hash 占位、牌组预设）。</param>
-        /// <param name="cancellationToken">
-        /// 调用方取消令牌。取消时抛出 <see cref="OperationCanceledException"/>，保留取消异常语义（决策 0.7）。
-        /// 取消不能绕过内部清理（task 2.6）。
-        /// </param>
         /// <returns>
         /// 结构化操作结果。成功时 <see cref="BattleOperationResult.IsSuccess"/> 为 true 且状态为
         /// <see cref="BattleModuleState.Running"/>；预期失败返回错误码（如
@@ -151,21 +145,13 @@ namespace GameBattle
         /// <see cref="BattleErrorCode.AlreadyActive"/>，不创建第二个活动运行时，不改变当前运行时状态。</item>
         /// <item>加载失败（配置/Scene/UI/资源）执行反向回滚，返回对应错误码，模块回到 Idle 或 Faulted。</item>
         /// </list>
-        /// <para><b>异常语义：</b>预期失败返回结构化结果；调用方取消抛出
-        /// <see cref="OperationCanceledException"/>；非预期异常包装为
-        /// <see cref="BattleErrorCode.Unknown"/> 错误码。</para>
         /// </remarks>
-        UniTask<BattleOperationResult> StartAsync(
-            BattleLoadoutDto loadout,
-            CancellationToken cancellationToken = default);
+        UniTask<BattleOperationResult> StartAsync(BattleLoadoutDto loadout);
 
         /// <summary>
         /// 再来一局（公共异步 API）。
         /// </summary>
         /// <param name="loadout">新局的不可变战斗装载信息。</param>
-        /// <param name="cancellationToken">
-        /// 调用方取消令牌。取消时抛出 <see cref="OperationCanceledException"/>。
-        /// </param>
         /// <returns>
         /// 结构化操作结果。成功时状态为 <see cref="BattleModuleState.Running"/>；
         /// 非 Settling 状态调用返回 <see cref="BattleErrorCode.NotSettling"/>。
@@ -181,32 +167,28 @@ namespace GameBattle
         /// <item>允许复用的资源和池与单局状态分离（design.md 决策 0.2）。</item>
         /// </list>
         /// </remarks>
-        UniTask<BattleOperationResult> RestartAsync(
-            BattleLoadoutDto loadout,
-            CancellationToken cancellationToken = default);
+        UniTask<BattleOperationResult> RestartAsync(BattleLoadoutDto loadout);
 
         /// <summary>
         /// 退出战斗、返回主界面（公共异步 API）。
         /// </summary>
-        /// <param name="cancellationToken">
-        /// 调用方取消令牌。取消时抛出 <see cref="OperationCanceledException"/>。
-        /// 取消不能绕过内部清理（task 2.6）。
-        /// </param>
         /// <returns>
         /// 结构化操作结果。成功时状态为 <see cref="BattleModuleState.Idle"/>。
-        /// Exit 在任意状态幂等，退出完成后再次调用返回已完成的幂等结果。
+        /// Exit 在任意状态幂等；Idle 状态退出返回成功，活动状态退出执行一次清理后回到 Idle，
+        /// 退出中（Exiting）重复调用返回 <see cref="BattleErrorCode.Exiting"/> 且不重复执行清理。
         /// </returns>
         /// <remarks>
-        /// <para><b>状态约束（spec "Exit is idempotent and concurrent-safe"）：</b></para>
+        /// <para><b>状态约束（spec "Exit is idempotent"）：</b></para>
         /// <list type="bullet">
         /// <item>在任意状态调用均安全，Exit 是幂等操作。</item>
-        /// <item>多个调用方并发请求退出时共享进行中的退出操作，不重复执行清理。</item>
-        /// <item>退出完成后再次调用返回已完成结果（Idle 状态）。</item>
-        /// <item>退出时停止逻辑推进、取消异步操作和表现回调、关闭战斗 UI、销毁当前运行时，
-        /// 按所有权规则卸载 Scene 和释放战斗资源（spec "Exit releases battle-owned state"）。</item>
+        /// <item>活动状态（Entering/Running/Settling/Restarting）调用立即迁移到 Exiting，
+        /// 只执行一次清理后回到 Idle。</item>
+        /// <item>退出中（Exiting）重复调用返回 <see cref="BattleErrorCode.Exiting"/>，不重复清理。</item>
+        /// <item>退出完成后（Idle）再次调用返回成功结果。</item>
+        /// <item>退出时停止逻辑推进、关闭战斗 UI、销毁当前运行时，按所有权规则释放战斗资源
+        /// （spec "Exit releases battle-owned state"）。</item>
         /// </list>
         /// </remarks>
-        UniTask<BattleOperationResult> ExitAsync(
-            CancellationToken cancellationToken = default);
+        UniTask<BattleOperationResult> ExitAsync();
     }
 }

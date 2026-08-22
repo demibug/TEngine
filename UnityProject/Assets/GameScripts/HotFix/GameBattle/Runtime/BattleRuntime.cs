@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using GameCommon.Battle;
 using TEngine;
 
@@ -15,10 +14,10 @@ namespace GameBattle
     //   （决策 0.2：重开重建 Runtime）。
     //
     //   本类型证明“同一时刻最多一个活动 Runtime”不变量：由 BattleModule（task 2.6）
-    //   在串行门保护下只持有一个当前活动 Runtime 引用（后续接入时由 _activeScope 升级为
+    //   只持有一个当前活动 Runtime 引用（后续接入时由 _activeScope 升级为
     //   BattleRuntime 引用）；重复 Start 返回 AlreadyActive，不创建第二个 Runtime
     //   （spec "Duplicate start returns AlreadyActive"）。本类型自身不强制“唯一性”，
-    //   唯一性由 BattleModule 的状态机与串行门保证。
+    //   唯一性由 BattleModule 的状态机保证。
     //
     //   本类型为 internal，只供 GameBattle 内部 BattleModule 使用，不对其他程序集暴露。
     //   对外公共生命周期经 IBattleModule / BattleModule 转发。
@@ -61,14 +60,14 @@ namespace GameBattle
     /// 清空池容量并释放战斗专属宿主资源（由 BattleModule 负责）。</para>
     ///
     /// <para><b>同一时刻最多一个活动 Runtime（spec "Battle module exposes one authoritative lifecycle"）：</b></para>
-    /// <para>由 BattleModule 在串行门保护下只持有一个当前活动 Runtime 引用
+    /// <para>由 BattleModule 只持有一个当前活动 Runtime 引用
     /// （后续接入时由 <c>_activeScope</c> 升级为 BattleRuntime 引用）。
     /// 重复 Start 返回 <see cref="BattleErrorCode.AlreadyActive"/>，不创建第二个 Runtime。
-    /// 本类型自身不强制“唯一性”，唯一性由 BattleModule 的状态机与串行门保证。</para>
+    /// 本类型自身不强制“唯一性”，唯一性由 BattleModule 的状态机保证。</para>
     ///
     /// <para><b>与 BattleRuntimeFactory 的连接（design.md 决策 1 / task 2.9）：</b></para>
     /// <para><see cref="BattleRuntimeFactory.Create"/> 产生 <see cref="BattleRuntimeAssembly"/>，
-    /// 本类型在构造时接管 Assembly 的全部所有权（Scope、Simulation、Token 等）。
+    /// 本类型在构造时接管 Assembly 的全部所有权（Scope、Simulation 等）。
     /// Factory 负责组装依赖，Runtime 负责持有与驱动。若组装失败，Assembly 已被回滚，
     /// 不应构造 Runtime（调用方据错误码返回结构化失败结果，不留下半初始化运行时）。</para>
     ///
@@ -79,12 +78,12 @@ namespace GameBattle
     ///
     /// <para><b>Settling 静默清理（spec "Runtime quiescence and cleanup have one ordered owner"）：</b></para>
     /// <para>首次 TryFreeze 成功后，BattleModule 进入 Settling 状态，调用 <see cref="EnterSettling"/>
-    /// 执行幂等静默清理，按依赖顺序：关闭命令和生产入口 → 停止模拟并取消 Token/到期动作/回调 →
+    /// 执行幂等静默清理，按依赖顺序：关闭命令和生产入口 → 停止模拟、到期动作和回调 →
     /// 清理攻击效果 → 清理投射物 → 先停止 WaveManager 再清理敌人及空间索引（task 4.9：
     /// 波次停止必须前置，使 Forced 移除事实不促成波次完成或误判胜利）→ 清理单位及监听 →
     /// 清理波次/牌组/预留（含 WaveManager.Cleanup 与 Boss 端口）→ 解除剩余局部监听 →
     /// 断言无活动对象 → 发布已冻结结果。</para>
-    /// <para>当前骨架实现已实现部分（停止模拟、取消 Token、释放 Scope），后续 Phase 接入 Manager 后
+    /// <para>当前骨架实现已实现部分（停止模拟、冻结调度器、释放 Scope），后续 Phase 接入 Manager 后
     /// 在对应清理步骤处补充。</para>
     /// </remarks>
     internal sealed class BattleRuntime : IDisposable
@@ -104,7 +103,7 @@ namespace GameBattle
 
         /// <summary>
         /// 本局运行时所有权作用域（task 2.8 产物）。
-        /// <para>跟踪本局取得的全部可释放所有权（CTS、GameEvent 监听、到期动作、表现回调、
+        /// <para>跟踪本局取得的全部可释放所有权（GameEvent 监听、到期动作、表现回调、
         /// 资源租约、池租借），提供幂等逆序释放与失败初始化回滚。由
         /// <see cref="BattleRuntimeFactory"/> 组装并登记，本类型接管持有。</para>
         /// <para>Dispose 时通过 Scope 一次性逆序释放全部登记所有权。</para>
@@ -120,14 +119,6 @@ namespace GameBattle
         /// 一并销毁（BattleModule 新建 Runtime 时由 Factory 产生新 Simulation）。</para>
         /// </summary>
         public BattleSimulation Simulation { get; }
-
-        /// <summary>
-        /// 本局运行时取消令牌源。
-        /// <para>由 <see cref="BattleRuntimeFactory"/> 创建并登记到 Scope，本类型接管持有。
-        /// 用于取消本局所有异步操作与表现回调。Settling 静默清理时 Cancel，
-        /// 使迟到回调因 Token 失效（spec "Exit releases battle-owned state"）。</para>
-        /// </summary>
-        public CancellationTokenSource RuntimeTokenSource { get; }
 
         /// <summary>
         /// 本局不可变装载信息（只读副本）。
@@ -485,7 +476,7 @@ namespace GameBattle
         /// 为 false）。调用方应在构造前检查，此异常为防御性校验。
         /// </exception>
         /// <remarks>
-        /// <para>构造后本类型接管 Assembly 携带的 Scope、Simulation、RuntimeTokenSource、Loadout
+        /// <para>构造后本类型接管 Assembly 携带的 Scope、Simulation、Loadout
         /// 所有权。Dispose 时通过 Scope 逆序释放全部登记所有权。</para>
         /// <para>本构造函数不执行加载步骤（加载由 Factory 组装阶段完成），只接管已组装的产物。
         /// 这保证 Runtime 构造后立即可用，不留下半初始化状态。</para>
@@ -507,10 +498,9 @@ namespace GameBattle
             }
 
             // 接管 Assembly 的全部所有权。Assembly 的 Scope 此时持有已登记的所有权
-            // （CTS、后续 Phase 的资源句柄等），由本类型持有并在 Dispose 时释放。
+            // （后续 Phase 的资源句柄等），由本类型持有并在 Dispose 时释放。
             Scope = assembly.Scope;
             Simulation = assembly.Simulation;
-            RuntimeTokenSource = assembly.RuntimeTokenSource;
             Loadout = assembly.Loadout;
             ConfigSnapshot = assembly.ConfigSnapshot;
             BuffManager = assembly.BuffManager;
@@ -620,7 +610,7 @@ namespace GameBattle
         /// <para><b>静默清理顺序（spec "Runtime quiescence and cleanup have one ordered owner"）：</b></para>
         /// <list type="number">
         /// <item>关闭命令和生产入口（停止接收新输入、停止新生成、停止新攻击）。</item>
-        /// <item>停止 <see cref="BattleSimulation"/> 并取消运行时 Token、到期动作和动画回调。</item>
+        /// <item>停止 <see cref="BattleSimulation"/>、到期动作和动画回调。</item>
         /// <item>清理 AttackEffectManager（task 5.3 接入）。</item>
         /// <item>清理 ProjectileManager（task 5.8 接入）。</item>
         /// <item>先停止 <see cref="WaveManager"/>（task 4.9：Stop 置 stopped、清待出生与 handle、
@@ -636,7 +626,7 @@ namespace GameBattle
         /// <item>完成静默后发布一次已冻结的不可变结果。</item>
         /// </list>
         /// <para>当前实现已执行步骤 1（标记 Settling + 关闭 InputController + 清空
-        /// CommandId 缓存 task 6.8）、步骤 2（停止模拟 + 取消 Token + 冻结调度器）、
+        /// CommandId 缓存 task 6.8）、步骤 2（停止模拟 + 冻结调度器）、
         /// 步骤 3（清理 AttackEffectManager）、步骤 4（清理 ProjectileManager）、步骤 5
         /// （先停止 WaveManager 再清理 EnemyManager，task 4.9）、步骤 6（清理 UnitRegistry）、
         /// 步骤 7（清理 BattleManager/WaveManager/BattleEconomy/SlotBoard/PlacementReservationRegistry）
@@ -693,23 +683,8 @@ namespace GameBattle
             }
 
             // ----------------------------------------------------------
-            // 步骤 2：停止模拟并取消运行时 Token、到期动作和动画回调。
+            // 步骤 2：停止模拟、到期动作和动画回调。
             // ----------------------------------------------------------
-
-            // 取消运行时 Token：使所有挂起异步操作与表现回调失效。
-            // spec "Exit releases battle-owned state"：迟到回调因 Token 失效。
-            try
-            {
-                if (RuntimeTokenSource != null && !RuntimeTokenSource.IsCancellationRequested)
-                {
-                    RuntimeTokenSource.Cancel();
-                }
-            }
-            catch (Exception ex)
-            {
-                // ObjectDisposedException 等不阻断静默清理。
-                Log.Error($"{LogTag} Settling 取消运行时 Token 异常: {ex}");
-            }
 
             // 冻结调度器：停止推进冷却、停止触发/注册新到期动作。
             // BattleActionScheduler.Freeze 幂等（task 2.11 产物）。
@@ -849,7 +824,7 @@ namespace GameBattle
                 }
             }
 
-            Log.Info($"{LogTag} Settling 静默清理完成（已停止模拟、取消 Token、冻结调度器、" +
+            Log.Info($"{LogTag} Settling 静默清理完成（已停止模拟、冻结调度器、" +
                 "先停止 WaveManager 再清理 Enemy/UnitRegistry，清理 BattleManager/WaveManager/" +
                 "BattleEconomy/SlotBoard/PlacementReservationRegistry）");
         }
@@ -879,7 +854,7 @@ namespace GameBattle
         /// <para><b>Settling 未完成时 Dispose：</b>若未调用 <see cref="EnterSettling"/> 就直接
         /// Dispose（如 Exit 从 Running 状态直接退出），本方法仍会释放全部所有权：先停止
         /// WaveManager、清理敌人/单位实体并归还对象池、完成 BattleManager/Wave/Boss cleanup
-        /// （task 4.9：不能只依赖 Scope 强清导致 callbacks/ownership 残留），再取消 Token、
+        /// （task 4.9：不能只依赖 Scope 强清导致 callbacks/ownership 残留），再冻结调度器、
         /// 冻结调度器、逆序释放 Scope。</para>
         /// <para><b>已进入 Settling 后 Dispose：</b>EnterSettling 已完成波次/实体清理，
         /// 本方法跳过重复清理（幂等），只逆序释放 Scope，不重复产生副作用（task 4.9/4.10）。</para>
@@ -894,8 +869,8 @@ namespace GameBattle
 
             Log.Info($"{LogTag} Dispose，开始逆序释放全部所有权");
 
-            // 若未进入 Settling，先执行最小静默（取消 Token、冻结调度器），
-            // 保证退出时迟到回调与到期动作不继续触发。
+            // 若未进入 Settling，先执行最小静默（冻结调度器），
+            // 保证退出时到期动作不继续触发。
             // task 6.8：同时清空 InputController 的 CommandId 缓存，确保不跨局保留
             // （spec "Restart creates clean per-battle state"）。若已进入 Settling，
             // 缓存已在 EnterSettling 步骤 1 清空，此处跳过。
@@ -921,18 +896,6 @@ namespace GameBattle
 
                 try
                 {
-                    if (RuntimeTokenSource != null && !RuntimeTokenSource.IsCancellationRequested)
-                    {
-                        RuntimeTokenSource.Cancel();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Error($"{LogTag} Dispose 取消运行时 Token 异常: {ex}");
-                }
-
-                try
-                {
                     Simulation?.ActionScheduler?.Freeze();
                 }
                 catch (Exception ex)
@@ -947,7 +910,7 @@ namespace GameBattle
                 StopWavesAndClearCombatants();
             }
 
-            // 逆序释放 Scope 全部登记所有权（CTS Dispose、GameEvent Clear、资源句柄 Release、
+            // 逆序释放 Scope 全部登记所有权（GameEvent Clear、资源句柄 Release、
             // 池租借归还等）。BattleRuntimeScope.Dispose 幂等逆序，单条异常不阻断后续释放。
             try
             {

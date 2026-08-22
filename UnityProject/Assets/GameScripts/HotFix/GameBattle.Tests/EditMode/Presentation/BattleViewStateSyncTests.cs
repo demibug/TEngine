@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace GameBattle.Tests.EditMode.Presentation
 {
@@ -266,6 +267,67 @@ namespace GameBattle.Tests.EditMode.Presentation
             fixture.Synchronizer.Sync(0f);
             Assert.AreEqual(1, fixture.ObjectSync.ResetPoseCallCount,
                 "回池后再次创建不应触发额外待机复位");
+        }
+
+        [Test]
+        [Description("进入无目标状态时不瞬间回正，而是按恒定角速度逐帧恢复并在到达后停止。")]
+        public void BodyRotationReturn_BeginAndTick_ReturnsSmoothlyWithoutSnap()
+        {
+            var go = new GameObject("BodyRotationReturnTest");
+            try
+            {
+                go.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                var returner = go.AddComponent<BattlePresenter.SoldierBodyRotationReturn>();
+
+                returner.BeginReturn(Quaternion.identity, 60f);
+
+                Assert.AreEqual(90f, Quaternion.Angle(go.transform.localRotation, Quaternion.identity), 0.01f,
+                    "开始回正时不应瞬间改变当前角度");
+                Assert.IsTrue(returner.IsReturning, "开始回正后应处于恢复状态");
+
+                returner.Tick(0.25f);
+                Assert.AreEqual(75f, Quaternion.Angle(go.transform.localRotation, Quaternion.identity), 0.01f,
+                    "60°/s 推进 0.25s 应只恢复 15°");
+                Assert.IsTrue(returner.IsReturning, "尚未到达初始角度时应继续恢复");
+
+                returner.Tick(1.25f);
+                Assert.AreEqual(0f, Quaternion.Angle(go.transform.localRotation, Quaternion.identity), 0.01f,
+                    "累计推进足够时间后应精确回到初始角度");
+                Assert.IsFalse(returner.IsReturning, "到达初始角度后应停止恢复");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        [Description("回正期间出现新目标时立即转到目标角度，并取消旧回正避免下一帧覆盖。")]
+        public void BodyRotationReturn_SetImmediate_InterruptsReturnForNewTarget()
+        {
+            var go = new GameObject("BodyRotationInterruptTest");
+            try
+            {
+                go.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                var returner = go.AddComponent<BattlePresenter.SoldierBodyRotationReturn>();
+                returner.BeginReturn(Quaternion.identity, 60f);
+                returner.Tick(0.1f);
+
+                Quaternion enemyRotation = Quaternion.Euler(0f, 0f, -45f);
+                returner.SetImmediate(enemyRotation);
+
+                Assert.AreEqual(0f, Quaternion.Angle(go.transform.localRotation, enemyRotation), 0.01f,
+                    "出现新目标时必须立即应用目标角度");
+                Assert.IsFalse(returner.IsReturning, "立即转向新目标后必须取消旧回正");
+
+                returner.Tick(1f);
+                Assert.AreEqual(0f, Quaternion.Angle(go.transform.localRotation, enemyRotation), 0.01f,
+                    "取消后的旧回正不得在后续帧覆盖新目标角度");
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
         }
     }
 }

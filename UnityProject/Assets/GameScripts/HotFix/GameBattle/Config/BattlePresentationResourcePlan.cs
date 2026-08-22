@@ -148,5 +148,102 @@ namespace GameBattle
 
             return result;
         }
+
+        /// <summary>
+        /// 收集所有已启用 General 的配置 Prefab 地址，按配置顺序稳定去重。
+        /// </summary>
+        internal static IReadOnlyList<string> CollectGeneralResourceAddresses(
+            BattleConfigSnapshot config)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            IReadOnlyList<GeneralConfigSnapshot> definitions =
+                config.GeneralCatalog?.Definitions;
+            if (definitions == null)
+            {
+                return result;
+            }
+
+            for (int index = 0; index < definitions.Count; index++)
+            {
+                GeneralConfigSnapshot definition = definitions[index];
+                if (definition == null)
+                {
+                    continue;
+                }
+
+                string address = definition.PrefabAddress;
+                if (string.IsNullOrWhiteSpace(address))
+                {
+                    throw new BattleConfigDataException(
+                        BattleConfigErrorCategory.GeneralConfigInvalid,
+                        $"General index={definition.Index} name='{definition.Name}' 的表现地址为空",
+                        $"GeneralCatalog.{definition.Index}.PrefabAddress");
+                }
+
+                if (seen.Add(address))
+                {
+                    result.Add(address);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 收集所有已启用武将的拆字，按配置顺序稳定去重，供字形贴图预加载。
+        /// </summary>
+        /// <remarks>
+        /// GeneralCatalogSnapshot.Definitions 仅含 Luban 解析时已启用的武将，
+        /// 故此处不再过滤 Enabled。每个武将取 PartWords[0] 与 PartWords[1] 两个单字。
+        /// </remarks>
+        internal static IReadOnlyList<string> CollectGeneralPartWords(BattleConfigSnapshot config)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            IReadOnlyList<GeneralConfigSnapshot> definitions =
+                config.GeneralCatalog?.Definitions;
+            if (definitions == null)
+            {
+                return result;
+            }
+
+            for (int index = 0; index < definitions.Count; index++)
+            {
+                GeneralConfigSnapshot definition = definitions[index];
+                if (definition == null)
+                {
+                    continue;
+                }
+
+                IReadOnlyList<string> partWords = definition.PartWords;
+                if (partWords == null)
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < partWords.Count; i++)
+                {
+                    string word = partWords[i];
+                    if (!string.IsNullOrEmpty(word) && seen.Add(word))
+                    {
+                        result.Add(word);
+                    }
+                }
+            }
+
+            return result;
+        }
+
     }
 }

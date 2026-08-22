@@ -366,6 +366,19 @@ namespace GameBattle
             }
         }
 
+        /// <summary>
+        /// 当前真实有效攻击伤害（只读）：等级缩放后的基础攻击力 + 基础武器附加攻击力
+        /// + Buff 聚合附加攻击力，再按阵营乘对手方倍率。
+        /// </summary>
+        /// <remarks>
+        /// <para>语义上等价于 <see cref="AttackDamage"/>（SoldierBase.js:125-128
+        /// <c>attackDamage</c> getter），是技能/效果读取攻击数值的唯一生产入口。
+        /// 生产代码禁止使用 <see cref="AttackDamageForTest"/>（仅限测试断言）。</para>
+        /// <para>对应黄忠 FireArrowBarrage（火箭烈）等武将技能：每箭伤害 =
+        /// 当前有效攻击力 × 技能倍率（spec "每箭伤害 = 当前有效攻击力 × 倍率"）。</para>
+        /// </remarks>
+        internal int EffectiveAttackDamage => AttackDamage;
+
         /// <summary>当前攻击伤害（测试访问器，供等级数值测试断言）。</summary>
         internal int AttackDamageForTest => AttackDamage;
 

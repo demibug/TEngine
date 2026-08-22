@@ -257,6 +257,150 @@ namespace GameBattle.Tests.EditMode.Skill
         }
 
         // ====================================================================
+        // 武将主动技能绑定校验测试（GeneralSkill binding）
+        // ====================================================================
+
+        [Test]
+        [Description("ZhangFei→BattleShout(15,3.5,buff8,2000) 与 HuangZhong→FireArrowBarrage(30,5.5,2.0) " +
+                     "合法绑定通过校验。")]
+        public void Validate_GeneralSkillBinding_BattleShoutAndFireArrowBarrage_Valid()
+        {
+            SkillCatalogSnapshot skills = new SkillCatalogSnapshot(new[]
+            {
+                Def("ArrowRain", SkillCategory.Active, 0, "ArrowRain"),
+                new SkillDefinitionSnapshot(
+                    "BattleShout", SkillCategory.Active, 6000, "BattleShout",
+                    8, 2000, 3.5f, 15, null),
+                new SkillDefinitionSnapshot(
+                    "FireArrowBarrage", SkillCategory.Active, 8000, "FireArrowBarrage",
+                    null, null, 5.5f, 30, 2.0f),
+            });
+            GeneralCatalogSnapshot generals = new GeneralCatalogSnapshot(new[]
+            {
+                ZhangFeiGeneral(skillKey: "BattleShout"),
+                HuangZhongGeneral(skillKey: "FireArrowBarrage"),
+            });
+            BattleConfigSnapshot snapshot = RebuildWithGeneralAndSkill(generals, skills);
+
+            BattleConfigValidationResult result = BattleConfigValidator.Validate(snapshot);
+
+            Assert.IsFalse(HasGeneralSkillError(result),
+                "合法的 BattleShout/FireArrowBarrage 绑定不应产生武将技能校验错误。");
+        }
+
+        [Test]
+        [Description("武将引用的技能在 Skill 目录中不存在 → GeneralSkillDefinitionMissing。")]
+        public void Validate_GeneralSkill_MissingDefinition_ReturnsDefinitionMissing()
+        {
+            SkillCatalogSnapshot skills = new SkillCatalogSnapshot(new[]
+            {
+                Def("ArrowRain", SkillCategory.Active, 0, "ArrowRain"),
+            });
+            GeneralCatalogSnapshot generals = new GeneralCatalogSnapshot(new[]
+            {
+                ZhangFeiGeneral(skillKey: "BattleShout"),
+            });
+            BattleConfigSnapshot snapshot = RebuildWithGeneralAndSkill(generals, skills);
+
+            BattleConfigValidationResult result = BattleConfigValidator.Validate(snapshot);
+
+            Assert.IsTrue(HasError(result, BattleConfigErrorCategory.GeneralSkillDefinitionMissing),
+                "引用不存在的技能应报告 GeneralSkillDefinitionMissing。");
+        }
+
+        [Test]
+        [Description("武将引用的技能类别不是 Active → GeneralSkillCategoryInvalid。")]
+        public void Validate_GeneralSkill_WrongCategory_ReturnsCategoryInvalid()
+        {
+            SkillCatalogSnapshot skills = new SkillCatalogSnapshot(new[]
+            {
+                Def("ArrowRain", SkillCategory.Active, 0, "ArrowRain"),
+                new SkillDefinitionSnapshot(
+                    "BattleShout", SkillCategory.Passive, 6000, "BattleShout",
+                    8, 2000, 3.5f, 15, null),
+            });
+            GeneralCatalogSnapshot generals = new GeneralCatalogSnapshot(new[]
+            {
+                ZhangFeiGeneral(skillKey: "BattleShout"),
+            });
+            BattleConfigSnapshot snapshot = RebuildWithGeneralAndSkill(generals, skills);
+
+            BattleConfigValidationResult result = BattleConfigValidator.Validate(snapshot);
+
+            Assert.IsTrue(HasError(result, BattleConfigErrorCategory.GeneralSkillCategoryInvalid),
+                "非 Active 类别应报告 GeneralSkillCategoryInvalid。");
+        }
+
+        [Test]
+        [Description("武将引用的主动技能 triggerAttackCount 为空或非正 → GeneralSkillTriggerInvalid。")]
+        public void Validate_GeneralSkill_InvalidTrigger_ReturnsTriggerInvalid()
+        {
+            SkillCatalogSnapshot skills = new SkillCatalogSnapshot(new[]
+            {
+                Def("ArrowRain", SkillCategory.Active, 0, "ArrowRain"),
+                new SkillDefinitionSnapshot(
+                    "BattleShout", SkillCategory.Active, 6000, "BattleShout",
+                    8, 2000, 3.5f, null, null),
+            });
+            GeneralCatalogSnapshot generals = new GeneralCatalogSnapshot(new[]
+            {
+                ZhangFeiGeneral(skillKey: "BattleShout"),
+            });
+            BattleConfigSnapshot snapshot = RebuildWithGeneralAndSkill(generals, skills);
+
+            BattleConfigValidationResult result = BattleConfigValidator.Validate(snapshot);
+
+            Assert.IsTrue(HasError(result, BattleConfigErrorCategory.GeneralSkillTriggerInvalid),
+                "triggerAttackCount 为空应报告 GeneralSkillTriggerInvalid。");
+        }
+
+        [Test]
+        [Description("BattleShout 缺少专用 effect 配置（range/buffType/duration）→ GeneralSkillEffectConfigMissing。")]
+        public void Validate_GeneralSkill_BattleShoutMissingEffect_ReturnsEffectConfigMissing()
+        {
+            SkillCatalogSnapshot skills = new SkillCatalogSnapshot(new[]
+            {
+                Def("ArrowRain", SkillCategory.Active, 0, "ArrowRain"),
+                new SkillDefinitionSnapshot(
+                    "BattleShout", SkillCategory.Active, 6000, "BattleShout",
+                    null, null, null, 15, null),
+            });
+            GeneralCatalogSnapshot generals = new GeneralCatalogSnapshot(new[]
+            {
+                ZhangFeiGeneral(skillKey: "BattleShout"),
+            });
+            BattleConfigSnapshot snapshot = RebuildWithGeneralAndSkill(generals, skills);
+
+            BattleConfigValidationResult result = BattleConfigValidator.Validate(snapshot);
+
+            Assert.IsTrue(HasError(result, BattleConfigErrorCategory.GeneralSkillEffectConfigMissing),
+                "BattleShout 缺少专用 effect 配置应报告 GeneralSkillEffectConfigMissing。");
+        }
+
+        [Test]
+        [Description("FireArrowBarrage 缺少专用 effect 配置（range/damageMultiplier）→ GeneralSkillEffectConfigMissing。")]
+        public void Validate_GeneralSkill_FireArrowBarrageMissingEffect_ReturnsEffectConfigMissing()
+        {
+            SkillCatalogSnapshot skills = new SkillCatalogSnapshot(new[]
+            {
+                Def("ArrowRain", SkillCategory.Active, 0, "ArrowRain"),
+                new SkillDefinitionSnapshot(
+                    "FireArrowBarrage", SkillCategory.Active, 8000, "FireArrowBarrage",
+                    null, null, null, 30, null),
+            });
+            GeneralCatalogSnapshot generals = new GeneralCatalogSnapshot(new[]
+            {
+                HuangZhongGeneral(skillKey: "FireArrowBarrage"),
+            });
+            BattleConfigSnapshot snapshot = RebuildWithGeneralAndSkill(generals, skills);
+
+            BattleConfigValidationResult result = BattleConfigValidator.Validate(snapshot);
+
+            Assert.IsTrue(HasError(result, BattleConfigErrorCategory.GeneralSkillEffectConfigMissing),
+                "FireArrowBarrage 缺少专用 effect 配置应报告 GeneralSkillEffectConfigMissing。");
+        }
+
+        // ====================================================================
         // Luban Provider 显式消费测试（task 2.2）
         // ====================================================================
 
@@ -266,13 +410,17 @@ namespace GameBattle.Tests.EditMode.Skill
         {
             TbSkill tbSkill = BuildTbSkill(
                 SkillRow("ArrowRain", "active", 0, "46141", null, "ArrowRain", null, null),
-                SkillRow("SoulCapture", "boss", 8, "12054", null, "SoulCapture", 13, 2000),
+                SkillRow("SoulCapture", "boss", 8, "12054", null, "SoulCapture", 13, 2000, 2f),
                 SkillRow("StunPassive", "passive", 0, "46279", null, "StunPassive", null, null),
-                SkillRow("Inspire", "boss", 10, "12070", "INFERRED_HEALTH_MULTIPLIER", "Inspire", null, null));
+                SkillRow("Inspire", "boss", 10, "12070", "INFERRED_HEALTH_MULTIPLIER", "Inspire", null, null),
+                SkillRow("BattleShout", "active", 6, "46300", null, "BattleShout",
+                    8, 2000, 3.5f, 15),
+                SkillRow("FireArrowBarrage", "active", 8, "46400", null, "FireArrowBarrage",
+                    null, null, 5.5f, 30, 2.0f));
 
             SkillCatalogSnapshot catalog = LubanBattleConfigProvider.BuildSkillCatalogFromLuban(tbSkill);
 
-            Assert.AreEqual(4, catalog.Definitions.Count);
+            Assert.AreEqual(6, catalog.Definitions.Count);
 
             Assert.IsTrue(catalog.TryGetByKey("ArrowRain", out SkillDefinitionSnapshot arrowRain));
             Assert.AreEqual(SkillCategory.Active, arrowRain.Category);
@@ -280,6 +428,8 @@ namespace GameBattle.Tests.EditMode.Skill
             Assert.AreEqual("ArrowRain", arrowRain.HandlerKey);
             Assert.IsNull(arrowRain.EffectBuffType);
             Assert.IsNull(arrowRain.EffectDurationMs);
+            Assert.IsNull(arrowRain.TriggerAttackCount);
+            Assert.IsNull(arrowRain.EffectDamageMultiplier);
 
             Assert.IsTrue(catalog.TryGetByKey("SoulCapture", out SkillDefinitionSnapshot soulCapture));
             Assert.AreEqual(SkillCategory.Boss, soulCapture.Category);
@@ -291,6 +441,23 @@ namespace GameBattle.Tests.EditMode.Skill
             Assert.AreEqual(SkillCategory.Passive, stunPassive.Category, "passive 应严格映射 Passive");
 
             Assert.IsTrue(catalog.TryGetByKey("Inspire", out _));
+
+            // BattleShout / FireArrowBarrage 主动技能透传 triggerAttackCount / rangeTiles /
+            // effectDamageMultiplier / effectBuffType / effectDurationMs。
+            Assert.IsTrue(catalog.TryGetByKey("BattleShout", out SkillDefinitionSnapshot battleShout));
+            Assert.AreEqual(SkillCategory.Active, battleShout.Category);
+            Assert.AreEqual(6000L, battleShout.CooldownMs, "cooldownSeconds=6 应转 6000ms");
+            Assert.AreEqual(15, battleShout.TriggerAttackCount, "TriggerAttackCount 应来自配置行");
+            Assert.AreEqual(3.5f, battleShout.RangeTiles, "RangeTiles 应来自配置行");
+            Assert.AreEqual(8, battleShout.EffectBuffType, "EffectBuffType 应来自配置行");
+            Assert.AreEqual(2000, battleShout.EffectDurationMs, "EffectDurationMs 应来自配置行");
+
+            Assert.IsTrue(catalog.TryGetByKey("FireArrowBarrage", out SkillDefinitionSnapshot fireArrowBarrage));
+            Assert.AreEqual(SkillCategory.Active, fireArrowBarrage.Category);
+            Assert.AreEqual(8000L, fireArrowBarrage.CooldownMs, "cooldownSeconds=8 应转 8000ms");
+            Assert.AreEqual(30, fireArrowBarrage.TriggerAttackCount, "TriggerAttackCount 应来自配置行");
+            Assert.AreEqual(5.5f, fireArrowBarrage.RangeTiles, "RangeTiles 应来自配置行");
+            Assert.AreEqual(2.0f, fireArrowBarrage.EffectDamageMultiplier, "EffectDamageMultiplier 应来自配置行");
         }
 
         [Test]
@@ -398,6 +565,14 @@ namespace GameBattle.Tests.EditMode.Skill
         /// <summary>用自定义 Skill 目录重建快照（其余子节沿用黄金基线）。</summary>
         private static BattleConfigSnapshot RebuildWithCatalog(SkillCatalogSnapshot skillCatalog)
         {
+            return RebuildWithGeneralAndSkill(null, skillCatalog);
+        }
+
+        /// <summary>用自定义 General + Skill 目录重建快照（其余子节沿用黄金基线）。</summary>
+        private static BattleConfigSnapshot RebuildWithGeneralAndSkill(
+            GeneralCatalogSnapshot generalCatalog,
+            SkillCatalogSnapshot skillCatalog)
+        {
             BattleConfigSnapshot basis = GoldenSnapshot();
             return new BattleConfigSnapshot(
                 map: basis.Map,
@@ -413,7 +588,8 @@ namespace GameBattle.Tests.EditMode.Skill
                 enemyCatalog: basis.EnemyCatalog,
                 orderedWavePlan: basis.OrderedWavePlan,
                 buffCatalog: basis.BuffCatalog,
-                skillCatalog: skillCatalog);
+                skillCatalog: skillCatalog,
+                generalCatalog: generalCatalog ?? basis.GeneralCatalog);
         }
 
         /// <summary>构造合法 Skill 定义（默认空 effect 字段）。</summary>
@@ -469,6 +645,40 @@ namespace GameBattle.Tests.EditMode.Skill
             return false;
         }
 
+        /// <summary>是否含武将主动技能绑定错误（GeneralSkill* 类别）。</summary>
+        private static bool HasGeneralSkillError(BattleConfigValidationResult result)
+        {
+            for (int i = 0; i < result.Errors.Count; i++)
+            {
+                BattleConfigErrorCategory category = result.Errors[i].Category;
+                if (category >= BattleConfigErrorCategory.GeneralSkillDefinitionMissing
+                    && category <= BattleConfigErrorCategory.GeneralSkillEffectConfigMissing)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>构造张飞武将定义（枪兵原型，携带指定 skillKey）。</summary>
+        private static GeneralConfigSnapshot ZhangFeiGeneral(string skillKey)
+        {
+            return new GeneralConfigSnapshot(
+                1, "张飞", "张", new[] { "张", "飞" }, GeneralCombatArchetype.Pike,
+                2.5f, 15, 1f, "近战枪击", "nearest", "SpearSoldier", "default",
+                "", 0, 1, skillKey);
+        }
+
+        /// <summary>构造黄忠武将定义（弓兵原型，携带指定 skillKey）。</summary>
+        private static GeneralConfigSnapshot HuangZhongGeneral(string skillKey)
+        {
+            return new GeneralConfigSnapshot(
+                4, "黄忠", "黄", new[] { "黄", "忠" }, GeneralCombatArchetype.Bow,
+                3.5f, 13, 0.8f, "单体", "nearest", "BowSoldier", "default",
+                "SimpleDynamicArrow", 200, 1, skillKey);
+        }
+
         // ====================================================================
         // Luban Bean 构造（手写 ByteBuf，字段顺序与生成代码一致）
         // ====================================================================
@@ -483,10 +693,14 @@ namespace GameBattle.Tests.EditMode.Skill
             public readonly string HandlerKey;
             public readonly int? EffectBuffType;
             public readonly int? EffectDurationMs;
+            public readonly float? RangeTiles;
+            public readonly int? TriggerAttackCount;
+            public readonly float? EffectDamageMultiplier;
 
             public SkillRowData(
                 string key, string category, int? cooldownSeconds, string source,
-                string confidence, string handlerKey, int? effectBuffType, int? effectDurationMs)
+                string confidence, string handlerKey, int? effectBuffType, int? effectDurationMs,
+                float? rangeTiles, int? triggerAttackCount, float? effectDamageMultiplier)
             {
                 Key = key;
                 Category = category;
@@ -496,15 +710,20 @@ namespace GameBattle.Tests.EditMode.Skill
                 HandlerKey = handlerKey;
                 EffectBuffType = effectBuffType;
                 EffectDurationMs = effectDurationMs;
+                RangeTiles = rangeTiles;
+                TriggerAttackCount = triggerAttackCount;
+                EffectDamageMultiplier = effectDamageMultiplier;
             }
         }
 
         private static SkillRowData SkillRow(
             string key, string category, int? cooldownSeconds, string source,
-            string confidence, string handlerKey, int? effectBuffType, int? effectDurationMs)
+            string confidence, string handlerKey, int? effectBuffType, int? effectDurationMs,
+            float? rangeTiles = null, int? triggerAttackCount = null, float? effectDamageMultiplier = null)
         {
             return new SkillRowData(key, category, cooldownSeconds, source, confidence,
-                handlerKey, effectBuffType, effectDurationMs);
+                handlerKey, effectBuffType, effectDurationMs, rangeTiles, triggerAttackCount,
+                effectDamageMultiplier);
         }
 
         private static TbSkill BuildTbSkill(params SkillRowData[] rows)
@@ -527,13 +746,28 @@ namespace GameBattle.Tests.EditMode.Skill
             buf.WriteString("");            // Description
             buf.WriteBool(false);           // HealthMultiplier: null
             buf.WriteBool(false);           // Speed: null
-            buf.WriteBool(false);           // RangeTiles: null
+            WriteNullableFloat(buf, row.RangeTiles); // RangeTiles
             WriteNullableInt(buf, row.CooldownSeconds); // CooldownSeconds
             buf.WriteString(row.Source);    // Source
             WriteNullableString(buf, row.Confidence);   // Confidence
             buf.WriteString(row.HandlerKey); // HandlerKey
             WriteNullableInt(buf, row.EffectBuffType);  // EffectBuffType
             WriteNullableInt(buf, row.EffectDurationMs); // EffectDurationMs
+            WriteNullableInt(buf, row.TriggerAttackCount); // TriggerAttackCount
+            WriteNullableFloat(buf, row.EffectDamageMultiplier); // EffectDamageMultiplier
+        }
+
+        private static void WriteNullableFloat(ByteBuf buf, float? value)
+        {
+            if (value.HasValue)
+            {
+                buf.WriteBool(true);
+                buf.WriteFloat(value.Value);
+            }
+            else
+            {
+                buf.WriteBool(false);
+            }
         }
 
         private static void WriteNullableInt(ByteBuf buf, int? value)

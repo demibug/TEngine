@@ -197,11 +197,227 @@ namespace GameBattle
             // 9e. 武器目录（结构 + 启用集合，tasks 3.2/3.3）。
             ValidateWeaponCatalog(snapshot, errors);
 
+            // 9f. 启用武将目录、有序配方与招募权重。
+            ValidateGeneralCatalog(snapshot, errors);
+
             // 10. 运行能力校验（Boss 波 gate，spec "Reject Boss content when the capability is absent"）
             ValidateBossCapabilities(snapshot, capabilities, errors);
 
             // 若前面已致命错误，后续校验可能无意义，但仍收集所有错误便于诊断。
             return new BattleConfigValidationResult(errors);
+        }
+
+        private static void ValidateGeneralCatalog(
+            BattleConfigSnapshot snapshot,
+            List<BattleConfigValidationError> errors)
+        {
+            GeneralCatalogSnapshot catalog = snapshot.GeneralCatalog;
+            if (catalog == null)
+            {
+                return;
+            }
+
+            var indices = new HashSet<int>();
+            var recipes = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < catalog.Definitions.Count; i++)
+            {
+                GeneralConfigSnapshot general = catalog.Definitions[i];
+                string path = $"GeneralCatalog.Definitions[{i}]";
+                if (general == null)
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralConfigInvalid,
+                        "武将定义为空",
+                        path));
+                    continue;
+                }
+
+                if (!indices.Add(general.Index))
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralConfigInvalid,
+                        $"武将 index={general.Index} 重复",
+                        path + ".Index"));
+                }
+
+                if (string.IsNullOrWhiteSpace(general.Name)
+                    || string.IsNullOrWhiteSpace(general.Family)
+                    || general.PartWords.Count != 2
+                    || string.IsNullOrWhiteSpace(general.PartWords.Count > 0 ? general.PartWords[0] : null)
+                    || string.IsNullOrWhiteSpace(general.PartWords.Count > 1 ? general.PartWords[1] : null)
+                    || (general.PartWords.Count == 2 && general.PartWords[0] == general.PartWords[1]))
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralConfigInvalid,
+                        "武将名称/姓氏缺失，或配方不是两个非空且不同的字",
+                        path + ".PartWords"));
+                }
+                else if (!recipes.Add(general.RecipeKey))
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralConfigInvalid,
+                        $"有序武将配方 '{general.PartWords[0]}+{general.PartWords[1]}' 重复",
+                        path + ".PartWords"));
+                }
+
+                if (general.RangeCells <= 0f
+                    || general.AttackDamage <= 0
+                    || general.AttackIntervalSeconds <= 0f
+                    || general.PartRecruitWeight <= 0)
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralConfigInvalid,
+                        "武将距离、伤害、攻击间隔和武将字招募权重必须为正",
+                        path));
+                }
+
+                if (string.IsNullOrWhiteSpace(general.PrefabAddress)
+                    || string.IsNullOrWhiteSpace(general.AnimationKey)
+                    || string.IsNullOrWhiteSpace(general.DamageMode)
+                    || string.IsNullOrWhiteSpace(general.TargetPolicy))
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralConfigInvalid,
+                        "武将表现地址、动画键、伤害模式和目标策略不能为空",
+                        path));
+                }
+
+                if (general.CombatArchetype == GeneralCombatArchetype.Bow)
+                {
+                    if (string.IsNullOrWhiteSpace(general.ProjectileType)
+                        || general.ProjectileSpeed <= 0
+                        || snapshot.Projectile == null
+                        || !Contains(snapshot.Projectile.Types, general.ProjectileType))
+                    {
+                        errors.Add(new BattleConfigValidationError(
+                            BattleConfigErrorCategory.GeneralConfigInvalid,
+                            "弓兵原型武将必须引用已注册投射物并配置正速度",
+                            path + ".ProjectileType"));
+                    }
+                }
+                else if (general.CombatArchetype == GeneralCombatArchetype.Pike)
+                {
+                    if (!string.IsNullOrEmpty(general.ProjectileType) || general.ProjectileSpeed != 0)
+                    {
+                        errors.Add(new BattleConfigValidationError(
+                            BattleConfigErrorCategory.GeneralConfigInvalid,
+                            "枪兵原型武将不得配置投射物",
+                            path + ".ProjectileType"));
+                    }
+                }
+                else
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralConfigInvalid,
+                        $"未知武将战斗原型 {(int)general.CombatArchetype}",
+                        path + ".CombatArchetype"));
+                }
+
+                // 武将主动技能绑定（本 change 起）：配置了 skillKey 的武将严格校验
+                // 技能存在、类别 Active、triggerAttackCount 正，以及 handler 专用 effect 字段。
+                ValidateGeneralSkill(snapshot, general, path, errors);
+            }
+        }
+
+        /// <summary>
+        /// 校验配置了主动技能键（skillKey）的武将：技能存在、Category=Active、
+        /// triggerAttackCount 正，以及该技能 handler 专用 effect 配置字段完整。
+        /// 未配置技能（skillKey 为空）的武将与普通士兵完全不受影响。
+        /// </summary>
+        /// <remarks>
+        /// <para>spec "Skill definitions are validated before use"：运行时不 fallback、
+        /// 不按 key 推导缺失字段。缺技能 / 错误类别 / 非法 trigger / handler 专用
+        /// effect 字段缺失 MUST 在启动前被检出并阻断。</para>
+        /// <para>只校验本框架已实现的 handler（BattleShout / FireArrowBarrage）；
+        /// 配置了未实现 handler 的武将技能同样要求存在与 Active，但不做 handler
+        /// 专用字段假设（禁止为其他未实现技能发明 fallback 配置）。</para>
+        /// </remarks>
+        private static void ValidateGeneralSkill(
+            BattleConfigSnapshot snapshot,
+            GeneralConfigSnapshot general,
+            string path,
+            List<BattleConfigValidationError> errors)
+        {
+            if (string.IsNullOrEmpty(general.SkillKey))
+            {
+                return;
+            }
+
+            SkillCatalogSnapshot skillCatalog = snapshot.SkillCatalog;
+            if (skillCatalog == null || !skillCatalog.TryGetByKey(general.SkillKey, out SkillDefinitionSnapshot skillDef))
+            {
+                errors.Add(new BattleConfigValidationError(
+                    BattleConfigErrorCategory.GeneralSkillDefinitionMissing,
+                    $"武将 index={general.Index} 引用的技能 skillKey='{general.SkillKey}' 在 Skill 目录中不存在",
+                    path + ".SkillKey"));
+                return;
+            }
+
+            string skillPath = $"Skill.{general.SkillKey}";
+
+            if (skillDef.Category != SkillCategory.Active)
+            {
+                errors.Add(new BattleConfigValidationError(
+                    BattleConfigErrorCategory.GeneralSkillCategoryInvalid,
+                    $"武将 index={general.Index} 引用的技能 '{general.SkillKey}' 类别={skillDef.Category}" +
+                    "，主动技能必须为 Active",
+                    path + ".SkillKey"));
+            }
+
+            if (!skillDef.TriggerAttackCount.HasValue || skillDef.TriggerAttackCount.Value <= 0)
+            {
+                errors.Add(new BattleConfigValidationError(
+                    BattleConfigErrorCategory.GeneralSkillTriggerInvalid,
+                    $"武将 index={general.Index} 引用的技能 '{general.SkillKey}' triggerAttackCount 非法" +
+                    $"（值={skillDef.TriggerAttackCount}，要求正数）",
+                    path + ".SkillKey"));
+            }
+
+            // handler 专用 effect 配置：只对本框架已实现 handler 校验专用字段。
+            // 禁止为其他未实现技能发明 fallback 配置。
+            if (string.Equals(skillDef.HandlerKey, "BattleShout", StringComparison.Ordinal))
+            {
+                if (!skillDef.RangeTiles.HasValue || skillDef.RangeTiles.Value <= 0f
+                    || !skillDef.EffectBuffType.HasValue
+                    || !skillDef.EffectDurationMs.HasValue
+                    || skillDef.EffectDurationMs.Value <= 0)
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralSkillEffectConfigMissing,
+                        $"武将 index={general.Index} 引用的 BattleShout 技能 '{general.SkillKey}' " +
+                        "缺少专用 effect 配置（要求 range>0 / buffType / duration>0）",
+                        $"{skillPath}.EffectConfig"));
+                }
+            }
+            else if (string.Equals(skillDef.HandlerKey, "FireArrowBarrage", StringComparison.Ordinal))
+            {
+                bool invalidMultiplier = !skillDef.EffectDamageMultiplier.HasValue
+                    || float.IsNaN(skillDef.EffectDamageMultiplier.Value)
+                    || float.IsInfinity(skillDef.EffectDamageMultiplier.Value)
+                    || skillDef.EffectDamageMultiplier.Value <= 0f;
+                if (!skillDef.RangeTiles.HasValue || skillDef.RangeTiles.Value <= 0f
+                    || invalidMultiplier)
+                {
+                    errors.Add(new BattleConfigValidationError(
+                        BattleConfigErrorCategory.GeneralSkillEffectConfigMissing,
+                        $"武将 index={general.Index} 引用的 FireArrowBarrage 技能 '{general.SkillKey}' " +
+                        "缺少专用 effect 配置（要求 range>0 / 有限正 damageMultiplier）",
+                        $"{skillPath}.EffectConfig"));
+                }
+            }
+        }
+
+        private static bool Contains(IReadOnlyList<string> values, string expected)
+        {
+            for (int i = 0; i < values.Count; i++)
+            {
+                if (string.Equals(values[i], expected, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // ====================================================================

@@ -269,6 +269,60 @@ namespace GameBattle.Tests.EditMode.Unit
             _factory.Release(cavalry);
         }
 
+        [Test]
+        public void ActivateGeneral_PreservesIdentityAndPublishesConfiguredPresentation()
+        {
+            var definition = new GeneralConfigSnapshot(
+                4, "黄忠", "黄", new[] { "黄", "忠" }, GeneralCombatArchetype.Bow,
+                3.5f, 13, 0.8f, "单体", "nearest", "BowSoldier", "default",
+                "SimpleDynamicArrow", 200, 1);
+            BattleUnit general = BattleUnit.CreateGeneral(400, true, definition);
+            UnitSpawnViewData published = default;
+            int publishCount = 0;
+            _registry.ConfiguredUnitPlaced += dto =>
+            {
+                published = dto;
+                publishCount++;
+            };
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                3, new[] { 1f, 2f, 4f }, new[] { 1f, 1.5f, 2f }));
+
+            SoldierBase runtime = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                1, 0, UnitWidth, UnitHeight);
+
+            Assert.IsInstanceOf<BowSoldier>(runtime);
+            Assert.AreEqual(13, runtime.AttackDamageForTest);
+            Assert.AreEqual(1, publishCount);
+            Assert.AreEqual((int)UnitKind.General, published.IdentityKind);
+            Assert.AreEqual(4, published.GeneralIndex);
+            Assert.AreEqual("黄忠", published.DisplayName);
+            Assert.AreEqual("BowSoldier", published.PrefabAddress);
+            Assert.AreEqual("default", published.AnimationKey);
+            Assert.AreEqual(400, general.UnitId, "运行时创建不得改写局内武将身份");
+
+            int firstRuntimeId = runtime.Id;
+            SoldierBase moved = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                2, 1, UnitWidth, UnitHeight);
+            Assert.AreSame(runtime, moved, "武将战场换位必须复用同一运行时实例");
+            Assert.AreEqual(2, moved.GridX);
+            Assert.AreEqual(1, moved.GridY);
+
+            long cooldown = _registry.DeactivateBattleUnit(general.UnitId);
+            Assert.GreaterOrEqual(cooldown, 0L);
+            Assert.AreEqual(0, _registry.Count, "武将下场必须解除战斗实例");
+            Assert.IsNull(_registry.GetActiveByUnitId(general.UnitId));
+            Assert.AreEqual(UnitKind.General, general.Kind, "下场只清理运行时，不改变槽位武将身份");
+
+            SoldierBase reactivated = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                0, 0, UnitWidth, UnitHeight);
+            Assert.Greater(reactivated.Id, firstRuntimeId,
+                "重新上场可复用对象池对象，但必须获得新的运行时 ID，避免跨生命周期绑定污染");
+            Assert.AreEqual(1, _registry.Count);
+        }
+
         /// <summary>
         /// 验证 Acquire 拒绝 null 配置。
         /// </summary>
@@ -779,6 +833,362 @@ namespace GameBattle.Tests.EditMode.Unit
             Assert.IsFalse(bow.IsActive, "弓兵 GameOver 后 IsActive=false");
             Assert.IsFalse(spear.IsActive, "枪兵 GameOver 后 IsActive=false");
             Assert.IsFalse(cavalry.IsActive, "骑兵 GameOver 后 IsActive=false");
+        }
+
+        // ====================================================================
+        // Wave 3：武将技能生命周期集成测试
+        // ====================================================================
+
+        /// <summary>构造带 SkillKey 的武将配置快照。</summary>
+        private static GeneralConfigSnapshot MakeGeneralConfigWithSkill(
+            string skillKey, int triggerAttackCount = 3, long cooldownMs = 0)
+        {
+            return new GeneralConfigSnapshot(
+                4, "黄忠", "黄", new[] { "黄", "忠" }, GeneralCombatArchetype.Bow,
+                3.5f, 13, 0.8f, "单体", "nearest", "BowSoldier", "default",
+                "SimpleDynamicArrow", 200, 1, skillKey);
+        }
+
+        /// <summary>构造带 TriggerAttackCount 的 Skill 定义。</summary>
+        private static SkillDefinitionSnapshot MakeSkillDef(
+            string key, int triggerAttackCount, long cooldownMs = 0)
+        {
+            return new SkillDefinitionSnapshot(
+                key, SkillCategory.Active, cooldownMs, key, null, null,
+                rangeTiles: null, triggerAttackCount: triggerAttackCount);
+        }
+
+        /// <summary>构造并装配 GeneralSkillRuntime 到 registry。</summary>
+        private GeneralSkillRuntime AssembleSkillRuntime(
+            UnitRegistry registry, BattleActionScheduler scheduler,
+            SkillDefinitionSnapshot skillDef, ISkillHandler handler = null)
+        {
+            var catalog = new SkillCatalogSnapshot(new[] { skillDef });
+            var skillRegistry = new SkillHandlerRegistry();
+            if (handler != null)
+            {
+                skillRegistry.Register(skillDef.HandlerKey, handler);
+            }
+
+            var runner = new SkillRunner(catalog, skillRegistry, scheduler);
+            var runtime = new GeneralSkillRuntime(runner, catalog);
+            registry.AssembleGeneralSkillRuntime(runtime);
+            return runtime;
+        }
+
+        /// <summary>构造并装配 GeneralSkillRuntime 到 registry，返回 runner/runtime 供租期与 owner 断言。</summary>
+        private SkillHarness AssembleSkillHarness(
+            UnitRegistry registry, string skillKey, int triggerAttackCount,
+            ISkillHandler handler = null)
+        {
+            var actionScheduler = new BattleActionScheduler();
+            var skillDef = MakeSkillDef(skillKey, triggerAttackCount);
+            var catalog = new SkillCatalogSnapshot(new[] { skillDef });
+            var skillRegistry = new SkillHandlerRegistry();
+            if (handler != null)
+            {
+                skillRegistry.Register(skillDef.HandlerKey, handler);
+            }
+
+            var runner = new SkillRunner(catalog, skillRegistry, actionScheduler);
+            var runtime = new GeneralSkillRuntime(runner, catalog);
+            registry.AssembleGeneralSkillRuntime(runtime);
+            var harness = new SkillHarness(runner, runtime);
+            return harness;
+        }
+
+        /// <summary>Skill 装配结果：runner 与 runtime（供租期/owner 回滚断言）。</summary>
+        private sealed class SkillHarness
+        {
+            internal readonly SkillRunner Runner;
+            internal readonly GeneralSkillRuntime Runtime;
+
+            internal SkillHarness(SkillRunner runner, GeneralSkillRuntime runtime)
+            {
+                Runner = runner;
+                Runtime = runtime;
+            }
+        }
+
+        /// <summary>最小 ISkillHandler 测试替身（记录调用次数）。</summary>
+        private sealed class CountingHandler : ISkillHandler
+        {
+            internal int EffectCount;
+            internal int CompleteCount;
+            internal int CancelCount;
+
+            public void Effect(SkillActivationContext context) => EffectCount++;
+            public void Complete(SkillActivationContext context) => CompleteCount++;
+            public void Cancel(SkillActivationContext context, bool effectCommitted) => CancelCount++;
+        }
+
+        [Test]
+        [Description("General 首次上场绑定技能租期；场内换位复用不重复绑定。")]
+        public void General_FirstActivation_BindsSkill_InplaceMove_NoDoubleBind()
+        {
+            var actionScheduler = new BattleActionScheduler();
+            var skillDef = MakeSkillDef("AlphaStrike", 3);
+            var handler = new CountingHandler();
+            GeneralSkillRuntime runtime = AssembleSkillRuntime(_registry, actionScheduler, skillDef, handler);
+
+            var definition = MakeGeneralConfigWithSkill("AlphaStrike");
+            BattleUnit general = BattleUnit.CreateGeneral(400, true, definition);
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                3, new[] { 1f, 2f, 4f }, new[] { 1f, 1.5f, 2f }));
+
+            SoldierBase first = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                1, 0, UnitWidth, UnitHeight);
+
+            Assert.AreEqual(1, runtime.ActiveLeaseCount, "首次上场应绑定 1 个活动租期");
+
+            // 场内换位复用同一实例，不应重复绑定。
+            SoldierBase moved = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                2, 1, UnitWidth, UnitHeight);
+
+            Assert.AreSame(first, moved, "场内换位复用同一实例");
+            Assert.AreEqual(1, runtime.ActiveLeaseCount, "换位不应新增租期");
+        }
+
+        [Test]
+        [Description("General 下场再上场保留 AttackCount 累计。")]
+        public void General_DeactivateReenter_PreservesAttackCount()
+        {
+            var actionScheduler = new BattleActionScheduler();
+            var skillDef = MakeSkillDef("AlphaStrike", 5);
+            var handler = new CountingHandler();
+            GeneralSkillRuntime runtime = AssembleSkillRuntime(_registry, actionScheduler, skillDef, handler);
+
+            var definition = MakeGeneralConfigWithSkill("AlphaStrike");
+            BattleUnit general = BattleUnit.CreateGeneral(400, true, definition);
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                3, new[] { 1f, 2f, 4f }, new[] { 1f, 1.5f, 2f }));
+
+            // 首次上场。
+            SoldierBase first = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                1, 0, UnitWidth, UnitHeight);
+
+            // 累计 3 次。
+            runtime.OnBasicAttack(first);
+            runtime.OnBasicAttack(first);
+            runtime.OnBasicAttack(first);
+
+            // 下场。
+            _registry.DeactivateBattleUnit(general.UnitId);
+            Assert.AreEqual(0, runtime.ActiveLeaseCount, "下场后活动租期清零");
+            Assert.AreEqual(1, runtime.StateCount, "持久状态应保留");
+
+            // 重新上场。
+            SoldierBase reentered = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                0, 0, UnitWidth, UnitHeight);
+
+            Assert.AreEqual(1, runtime.ActiveLeaseCount, "重新上场应重新绑定");
+            // 累计应保留（3 + 2 = 5，达阈值可激活）。
+            runtime.OnBasicAttack(reentered);
+            runtime.OnBasicAttack(reentered);
+
+            actionScheduler.BeginFrame(1000);
+            bool activated = runtime.TryActivateInsteadOfAttack(reentered);
+            Assert.IsTrue(activated, "上下场保留累计，5 次后应可激活");
+            // Flush 到期动作以执行 effect 回调。
+            actionScheduler.FlushDueActions(1);
+            Assert.AreEqual(1, handler.EffectCount, "技能 Effect 应调用一次");
+        }
+
+        [Test]
+        [Description("GameOver 最终清理武将技能租期与累计。")]
+        public void GameOver_ClearsGeneralSkillRuntime()
+        {
+            var actionScheduler = new BattleActionScheduler();
+            var skillDef = MakeSkillDef("AlphaStrike", 3);
+            var handler = new CountingHandler();
+            GeneralSkillRuntime runtime = AssembleSkillRuntime(_registry, actionScheduler, skillDef, handler);
+
+            var definition = MakeGeneralConfigWithSkill("AlphaStrike");
+            BattleUnit general = BattleUnit.CreateGeneral(400, true, definition);
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                3, new[] { 1f, 2f, 4f }, new[] { 1f, 1.5f, 2f }));
+
+            SoldierBase first = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                1, 0, UnitWidth, UnitHeight);
+
+            runtime.OnBasicAttack(first);
+            runtime.OnBasicAttack(first);
+
+            Assert.AreEqual(1, runtime.ActiveLeaseCount, "应有 1 个活动租期");
+            Assert.AreEqual(1, runtime.StateCount, "应有 1 个持久状态");
+
+            _registry.GameOver();
+
+            Assert.AreEqual(0, runtime.ActiveLeaseCount, "GameOver 后活动租期清零");
+            Assert.AreEqual(0, runtime.StateCount, "GameOver 后持久状态清零");
+        }
+
+        [Test]
+        [Description("未装配 GeneralSkillRuntime 的旧路径回归：武将上场/下场/GameOver 行为不变。")]
+        public void General_WithoutSkillRuntime_OldBehaviorUnchanged()
+        {
+            // 不调用 AssembleGeneralSkillRuntime，_skillRuntime 为 null。
+            var definition = MakeGeneralConfigWithSkill("AlphaStrike");
+            BattleUnit general = BattleUnit.CreateGeneral(400, true, definition);
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                3, new[] { 1f, 2f, 4f }, new[] { 1f, 1.5f, 2f }));
+
+            SoldierBase first = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                1, 0, UnitWidth, UnitHeight);
+
+            Assert.IsNotNull(first, "武将应正常上场");
+            Assert.AreEqual(1, _registry.Count, "Count=1");
+
+            long cooldown = _registry.DeactivateBattleUnit(general.UnitId);
+            Assert.GreaterOrEqual(cooldown, 0L);
+            Assert.AreEqual(0, _registry.Count, "下场后 Count=0");
+
+            _registry.GameOver();
+            Assert.AreEqual(0, _registry.Count, "GameOver 后 Count=0");
+        }
+
+        // ====================================================================
+        // Wave 3 补充：技能绑定失败回滚与直接移除的注册表完整性回归
+        // --------------------------------------------------------------------
+        // 场景（RunId 466d140a058f431bae75fba1912a9006 生产修正后补测试）：
+        //   1. catalog 有定义但 handler 未注册 → Attach 返回 HandlerMissing，
+        //      Bind 原子回滚并抛 InvalidOperationException，ActivateBattleUnit 沿
+        //      创建事务完整回滚：registry/mapping/runner/state/lease 全部无残留，
+        //      不发布 UnitPlaced/ConfiguredUnitPlaced，且池可正常复用。
+        //   2. PrepareBattleInstance + ActivatePrepared 同路径回滚；
+        //      ReleasePrepared 幂等，可再次 Acquire。
+        //   3. 成功绑定后直接 Remove(runtimeId)：租期解除但持久 AttackCount 保留，
+        //      GameOver 最终清 StateCount。
+        // ====================================================================
+
+        [Test]
+        [Description("handler 未注册时武将上场 Bind 抛异常：registry/mapping/runner/state 全回滚，事件不发布，池可复用。")]
+        public void ActivateBattleUnit_HandlerMissing_RollsBackFullyAndPoolReusable()
+        {
+            SkillHarness harness = AssembleSkillHarness(
+                _registry, "AlphaStrike", 3, handler: null);
+            var definition = MakeGeneralConfigWithSkill("AlphaStrike");
+            BattleUnit general = BattleUnit.CreateGeneral(400, true, definition);
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                3, new[] { 1f, 2f, 4f }, new[] { 1f, 1.5f, 2f }));
+
+            int placedCount = 0;
+            int configuredCount = 0;
+            _registry.UnitPlaced += (id, side, type, gx, gy, level) => placedCount++;
+            _registry.ConfiguredUnitPlaced += dto => configuredCount++;
+
+            Assert.Throws<InvalidOperationException>(() => _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                1, 0, UnitWidth, UnitHeight));
+
+            // 完整回滚：注册集合、UnitId 映射、技能租期与 owner 全部无残留。
+            Assert.AreEqual(0, _registry.Count, "回滚后 Count=0");
+            Assert.IsNull(_registry.GetActiveByUnitId(general.UnitId), "回滚后 UnitId 映射已清除");
+            Assert.AreEqual(0, harness.Runtime.ActiveLeaseCount, "回滚后无活动租期");
+            Assert.AreEqual(0, harness.Runtime.StateCount, "Bind 失败不得写入持久状态");
+            Assert.AreEqual(0, harness.Runner.OwnerCount, "回滚后 runner 无 owner 残留");
+            Assert.AreEqual(0, placedCount, "失败不得发布 UnitPlaced");
+            Assert.AreEqual(0, configuredCount, "失败不得发布 ConfiguredUnitPlaced");
+
+            // 用合法 handler 重新激活同一 registry，证明池/注册表无污染。
+            SkillHarness validHarness = AssembleSkillHarness(
+                _registry, "AlphaStrike", 3, new CountingHandler());
+            SoldierBase reactivated = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                1, 0, UnitWidth, UnitHeight);
+
+            Assert.IsNotNull(reactivated, "重新激活应成功");
+            Assert.AreEqual(1, _registry.Count, "重新激活后 Count=1");
+            Assert.AreSame(reactivated, _registry.GetActiveByUnitId(general.UnitId));
+            Assert.AreEqual(1, validHarness.Runtime.ActiveLeaseCount, "重新激活绑定 1 个租期");
+            Assert.AreEqual(1, validHarness.Runner.OwnerCount, "重新激活注册 1 个 owner");
+        }
+
+        [Test]
+        [Description("PrepareBattleInstance + ActivatePrepared 在 handler 未注册时同样回滚，ReleasePrepared 幂等且可再次 Acquire。")]
+        public void PrepareAndActivatePrepared_HandlerMissing_RollsBackAndReleasePreparedIdempotent()
+        {
+            SkillHarness harness = AssembleSkillHarness(
+                _registry, "AlphaStrike", 3, handler: null);
+            var definition = MakeGeneralConfigWithSkill("AlphaStrike");
+            BattleUnit general = BattleUnit.CreateGeneral(400, true, definition);
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                3, new[] { 1f, 2f, 4f }, new[] { 1f, 1.5f, 2f }));
+
+            int placedCount = 0;
+            int configuredCount = 0;
+            _registry.UnitPlaced += (id, side, type, gx, gy, level) => placedCount++;
+            _registry.ConfiguredUnitPlaced += dto => configuredCount++;
+
+            SoldierBase prepared = _registry.PrepareBattleInstance(
+                general, definition.ToUnitConfigSnapshot(), UnitWidth, UnitHeight);
+            Assert.IsNotNull(prepared, "Prepare 阶段应成功");
+            Assert.AreEqual(0, _registry.Count, "Prepare 不注册");
+
+            Assert.Throws<InvalidOperationException>(() => _registry.ActivatePrepared(
+                general, prepared, levelService, 1, 0,
+                definition.ToUnitConfigSnapshot()));
+
+            // 完整回滚：registry/mapping/runner 无残留，事件不发布。
+            Assert.AreEqual(0, _registry.Count, "回滚后 Count=0");
+            Assert.IsNull(_registry.GetActiveByUnitId(general.UnitId), "回滚后 UnitId 映射已清除");
+            Assert.AreEqual(0, harness.Runtime.ActiveLeaseCount, "回滚后无活动租期");
+            Assert.AreEqual(0, harness.Runtime.StateCount, "Bind 失败不得写入持久状态");
+            Assert.AreEqual(0, harness.Runner.OwnerCount, "回滚后 runner 无 owner 残留");
+            Assert.AreEqual(0, placedCount, "失败不得发布 UnitPlaced");
+            Assert.AreEqual(0, configuredCount, "失败不得发布 ConfiguredUnitPlaced");
+
+            // ReleasePrepared 幂等：池级重复 Release 守卫不抛异常、不再入池。
+            _registry.ReleasePrepared(prepared);
+            _registry.ReleasePrepared(prepared);
+
+            // 池可再次 Acquire：证明回滚后的对象可正常复用。
+            SoldierBase reused = _registry.PrepareBattleInstance(
+                general, definition.ToUnitConfigSnapshot(), UnitWidth, UnitHeight);
+            Assert.IsNotNull(reused, "再次 Prepare 应成功");
+            Assert.Greater(reused.Id, prepared.Id, "再次 Prepare 获得新运行时 ID");
+            _registry.ReleasePrepared(reused);
+        }
+
+        [Test]
+        [Description("成功激活后直接 Remove(runtimeId)：租期解除、持久累计保留；GameOver 最终清 StateCount。")]
+        public void RemoveAfterActivation_ReleasesLeaseKeepsState_GameOverClears()
+        {
+            SkillHarness harness = AssembleSkillHarness(
+                _registry, "AlphaStrike", 3, new CountingHandler());
+            var definition = MakeGeneralConfigWithSkill("AlphaStrike");
+            BattleUnit general = BattleUnit.CreateGeneral(400, true, definition);
+            var levelService = new UnitLevelService(new UnitLevelConfigSnapshot(
+                3, new[] { 1f, 2f, 4f }, new[] { 1f, 1.5f, 2f }));
+
+            SoldierBase soldier = _registry.ActivateBattleUnit(
+                general, definition.ToUnitConfigSnapshot(), levelService,
+                1, 0, UnitWidth, UnitHeight);
+            int runtimeId = soldier.Id;
+
+            harness.Runtime.OnBasicAttack(soldier);
+            harness.Runtime.OnBasicAttack(soldier);
+            Assert.AreEqual(1, harness.Runtime.ActiveLeaseCount, "激活后 1 个租期");
+            Assert.AreEqual(1, harness.Runtime.StateCount, "激活后 1 个持久状态");
+            Assert.AreEqual(1, harness.Runner.OwnerCount, "激活后 1 个 owner");
+
+            Assert.IsTrue(_registry.Remove(runtimeId), "直接 Remove 应成功");
+
+            Assert.AreEqual(0, _registry.Count, "Remove 后 Count=0");
+            Assert.IsNull(_registry.GetActiveByUnitId(general.UnitId), "Remove 后 UnitId 映射已清除");
+            Assert.AreEqual(0, harness.Runtime.ActiveLeaseCount, "Remove 后租期解除");
+            Assert.AreEqual(0, harness.Runner.OwnerCount, "Remove 后 runner 无 owner 残留");
+            Assert.AreEqual(1, harness.Runtime.StateCount, "Remove 保留持久累计（StateCount=1）");
+
+            _registry.GameOver();
+            Assert.AreEqual(0, harness.Runtime.StateCount, "GameOver 后持久状态清零");
+            Assert.AreEqual(0, harness.Runtime.ActiveLeaseCount, "GameOver 后无租期残留");
         }
     }
 }

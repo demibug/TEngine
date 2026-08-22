@@ -187,6 +187,9 @@ namespace GameBattle
             _resourceAddress = resourceAddress ?? string.Empty;
             _stats = stats;
             _definition = definition;
+            // 写入基础移动速度（与 ConfiguredEnemyBase.SetResolvedStats 一致），
+            // Init 内部 _moveSpeed = _baseMoveSpeed，否则 Boss 会用默认 50 而非配置值。
+            BaseMoveSpeed = stats.MoveSpeed;
             Configure(map, cellSize, endPointTarget, onEnemyKilled, onDeathRequested);
             Init(isPlayerLane, stats.MaxHealth, definition.LogicalWidth, definition.LogicalHeight);
         }

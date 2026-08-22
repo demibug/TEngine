@@ -788,5 +788,287 @@ namespace GameBattle.Tests.EditMode.Combat
                 StateChanges.Clear();
             }
         }
+
+        // ====================================================================
+        // 场景 12：普通兵在有 GeneralSkillRuntime 的 AttackScheduler 中行为不变
+        // ====================================================================
+
+        /// <summary>
+        /// 构造带 GeneralSkillRuntime 的 AttackScheduler（skillRuntime 非 null）。
+        /// </summary>
+        private static AttackScheduler CreateSchedulerWithSkillRuntime(
+            BattleActionScheduler actionScheduler, GeneralSkillRuntime skillRuntime)
+        {
+            return new AttackScheduler(actionScheduler, new AttackResolver(), CellWidth, CellHeight, skillRuntime);
+        }
+
+        [Test]
+        [Description("普通兵（FakeUnit，非 SoldierBase）在有 GeneralSkillRuntime 的 AttackScheduler 中行为不变。")]
+        public void NormalUnit_WithSkillRuntime_BehaviorUnchanged()
+        {
+            var actionScheduler = new BattleActionScheduler();
+            actionScheduler.BeginFrame(1000);
+            // 构造一个非 null 但无绑定的 GeneralSkillRuntime（不影响 FakeUnit）。
+            var skillCatalog = new SkillCatalogSnapshot(new[]
+            {
+                new SkillDefinitionSnapshot("AlphaStrike", SkillCategory.Active, 0, "AlphaStrike", null, null,
+                    rangeTiles: null, triggerAttackCount: 3),
+            });
+            var skillRegistry = new SkillHandlerRegistry();
+            var skillRunner = new SkillRunner(skillCatalog, skillRegistry, actionScheduler);
+            var skillRuntime = new GeneralSkillRuntime(skillRunner, skillCatalog);
+            AttackScheduler scheduler = CreateSchedulerWithSkillRuntime(actionScheduler, skillRuntime);
+            EnemyManager mgr = MakeManagerWithEnemy(out _);
+
+            // FakeUnit 不是 SoldierBase，技能路径跳过，走普通 Attack。
+            var unit = new FakeUnit
+            {
+                IsActive = true,
+                Side = true,
+                CenterX = 40f,
+                CenterY = 40f,
+                AttackRange = 50f,
+                AttackIntervalSeconds = 1f,
+                LastAttackTimeMs = 0,
+            };
+            unit.ForceState(AttackUnitState.Attack);
+
+            var units = new List<IAttackUnit> { unit };
+            int count = scheduler.Update(units, mgr);
+
+            Assert.AreEqual(1, count, "普通兵应触发一次普通攻击");
+            Assert.AreEqual(1, unit.AttackCount, "普通兵应调用 Attack() 一次");
+        }
+
+        // ====================================================================
+        // 场景 13/14：武将技能成功替代普通 Attack / 失败继续普通 Attack 且累计
+        // --------------------------------------------------------------------
+        // 这两个测试需要真实 SoldierBase（AttackScheduler 通过 `is SoldierBase` 判断
+        // 是否走技能路径），使用与 UnitFactoryAndRegistryTests 一致的真实基础设施。
+        // ====================================================================
+
+        /// <summary>技能替换攻击槽测试专用 fixture（真实 SoldierBase + SkillRuntime）。</summary>
+        [Test]
+        [Description("武将技能成功替代普通 Attack：AttackCount 达阈值后技能激活，跳过普通 Attack。")]
+        public void SkillActivation_Success_ReplacesNormalAttack()
+        {
+            SkillAttackTestContext ctx = SkillAttackTestContext.Create(
+                triggerAttackCount: 2, cooldownMs: 0);
+
+            // 绑定武将并累计到阈值。
+            ctx.Runtime.Bind(unitId: 100, ctx.Soldier, "AlphaStrike");
+            ctx.Runtime.OnBasicAttack(ctx.Soldier);
+            ctx.Runtime.OnBasicAttack(ctx.Soldier);
+
+            ctx.ActionScheduler.BeginFrame(1000);
+
+            // 武将处于 Attack 态、冷却完毕、有目标 → 先 TryActivate（成功）。
+            int count = ctx.AttackScheduler.Update(
+                new List<IAttackUnit> { ctx.Soldier }, ctx.EnemyManager);
+
+            Assert.AreEqual(1, count, "应触发一次攻击槽（被技能消费）");
+            // Flush 到期动作以执行 effect 回调。
+            ctx.ActionScheduler.FlushDueActions(1);
+            Assert.AreEqual(1, ctx.Handler.EffectCount, "技能 Effect 应调用一次");
+            // 技能成功消费槽，不调用普通 Attack。
+            // AttackCount 应已清零。
+            ctx.Dispose();
+        }
+
+        [Test]
+        [Description("武将技能失败（未达阈值）继续普通 Attack 且累计不清零。")]
+        public void SkillActivation_Failure_ContinuesNormalAttack_AccumulatesNoClear()
+        {
+            SkillAttackTestContext ctx = SkillAttackTestContext.Create(
+                triggerAttackCount: 5, cooldownMs: 0);
+
+            // 绑定武将，累计但未达阈值。
+            ctx.Runtime.Bind(unitId: 100, ctx.Soldier, "AlphaStrike");
+            ctx.Runtime.OnBasicAttack(ctx.Soldier);
+            ctx.Runtime.OnBasicAttack(ctx.Soldier);
+
+            ctx.ActionScheduler.BeginFrame(1000);
+
+            // 武将处于 Attack 态、冷却完毕、有目标 → TryActivate（失败）→ 普通 Attack + OnBasicAttack。
+            int count = ctx.AttackScheduler.Update(
+                new List<IAttackUnit> { ctx.Soldier }, ctx.EnemyManager);
+
+            Assert.AreEqual(1, count, "应触发一次普通攻击");
+            Assert.AreEqual(0, ctx.Handler.EffectCount, "技能不应激活");
+            // 普通 Attack 后 OnBasicAttack 累计（从 2 到 3）。
+            // 阈值 5，3 < 5 仍不可激活。
+            bool canActivate = ctx.Runtime.TryActivateInsteadOfAttack(ctx.Soldier);
+            Assert.IsFalse(canActivate, "累计 3 < 5 不应激活");
+
+            ctx.Dispose();
+        }
+
+        /// <summary>
+        /// 技能替换攻击槽测试上下文：持有真实 SoldierBase、SkillRuntime 和 AttackScheduler。
+        /// </summary>
+        private sealed class SkillAttackTestContext : IDisposable
+        {
+            private const float UnitWidth = 40f;
+            private const float UnitHeight = 40f;
+            private const float CellSize = 80f;
+            private const int GridSize = 80;
+
+            private readonly BattlePoolScope _poolScope;
+            private readonly UnitFactory _factory;
+
+            internal BattleActionScheduler ActionScheduler;
+            internal GeneralSkillRuntime Runtime;
+            internal AttackScheduler AttackScheduler;
+            internal SoldierBase Soldier;
+            internal EnemyManager EnemyManager;
+            internal RecordingSkillHandler Handler;
+
+            private SkillAttackTestContext(
+                BattlePoolScope poolScope,
+                UnitFactory factory)
+            {
+                _poolScope = poolScope;
+                _factory = factory;
+            }
+
+            internal static SkillAttackTestContext Create(int triggerAttackCount, long cooldownMs)
+            {
+                var poolScope = new BattlePoolScope();
+                var idAllocator = new RuntimeIdAllocator();
+                var enemyManager = new EnemyManager(GridSize);
+                var attackResolver = new AttackResolver();
+                var attackEffectManager = new AttackEffectManager();
+                var arrowPool = poolScope.GetPool<SimpleDynamicArrow>(() => new SimpleDynamicArrow());
+                var projectileFactory = new ProjectileFactory(
+                    idAllocator, arrowPool, enemyManager, CellSize);
+                var projectileManager = new ProjectileManager(projectileFactory);
+
+                var factory = new UnitFactory(
+                    idAllocator,
+                    poolScope.GetPool<KnifeSoldier>(() => new KnifeSoldier()),
+                    poolScope.GetPool<BowSoldier>(() => new BowSoldier()),
+                    poolScope.GetPool<SpearSoldier>(() => new SpearSoldier()),
+                    poolScope.GetPool<CavalrySoldier>(() => new CavalrySoldier()),
+                    enemyManager, attackResolver, attackEffectManager,
+                    projectileFactory, projectileManager,
+                    CellSize, 1);
+
+                var config = new UnitConfigSnapshot(0, "刀", "knife", 1.5f, 3, 0.8f, "单体", "nearest");
+
+                // 创建武将技能运行时。
+                var catalog = new SkillCatalogSnapshot(new[]
+                {
+                    new SkillDefinitionSnapshot("AlphaStrike", SkillCategory.Active, cooldownMs,
+                        "AlphaStrike", null, null, rangeTiles: null, triggerAttackCount: triggerAttackCount),
+                });
+                var skillRegistry = new SkillHandlerRegistry();
+                var handler = new RecordingSkillHandler();
+                skillRegistry.Register("AlphaStrike", handler);
+
+                var actionScheduler = new BattleActionScheduler();
+                var skillRunner = new SkillRunner(catalog, skillRegistry, actionScheduler);
+                var runtime = new GeneralSkillRuntime(skillRunner, catalog);
+                var attackScheduler = new AttackScheduler(
+                    actionScheduler, attackResolver, CellSize, CellSize, runtime);
+
+                // 创建并激活刀兵。
+                SoldierBase soldier = factory.Acquire(SoldierType.Knife, config, true, UnitWidth, UnitHeight);
+                soldier.SetPlacement(0, 0);
+                soldier.ActivatePlacement(0, 0);
+                soldier.SetState(AttackUnitState.Attack);
+
+                // 注册一个在玩家方车道、位于 (40,40) 的敌人供目标查询。
+                var enemy = new TestEnemy
+                {
+                    Id = 1,
+                    IsPlayerLane = true,
+                    X = 40,
+                    Y = 40,
+                    Health = 100,
+                    CurrentState = 1,
+                };
+                enemyManager.Register(enemy);
+
+                return new SkillAttackTestContext(poolScope, factory)
+                {
+                    ActionScheduler = actionScheduler,
+                    Runtime = runtime,
+                    AttackScheduler = attackScheduler,
+                    Soldier = soldier,
+                    EnemyManager = enemyManager,
+                    Handler = handler,
+                };
+            }
+
+            public void Dispose()
+            {
+                _factory?.Release(Soldier);
+            }
+        }
+
+        /// <summary>最小 IEnemyEntity 测试替身（与 FakeEnemy 一致，供技能替换测试使用）。</summary>
+        private sealed class TestEnemy : IEnemyEntity
+        {
+            public int Id { get; set; }
+            public bool IsPlayerLane { get; set; }
+            public int CurrentState { get; set; }
+            public float X { get; set; }
+            public float Y { get; set; }
+            public float Width { get; set; } = 40f;
+            public float Height { get; set; } = 40f;
+            public float ProjectileAimOffsetX => 0f;
+            public float ProjectileAimOffsetY => 0f;
+            public float RemainingPathDistance { get; set; } = float.PositiveInfinity;
+            public int CurrentPathIndex { get; set; }
+            public int Health { get; set; }
+            public int MaxHealth { get; set; }
+            public bool Targetable { get; set; } = true;
+
+            public void Update(long deltaMs) { }
+
+            public bool Hit(int damage, int attackerId)
+            {
+                if (Health <= 0 || damage <= 0) return false;
+                Health = Math.Max(0, Health - damage);
+                if (Health <= 0) CurrentState = 4;
+                return true;
+            }
+
+            public bool GameOver()
+            {
+                CurrentState = 4;
+                Targetable = false;
+                return true;
+            }
+
+            public bool IsTargetableBy(bool playerSide)
+            {
+                return CurrentState != 0 && CurrentState != 4
+                    && Targetable && IsPlayerLane == playerSide;
+            }
+        }
+
+        /// <summary>记录 ISkillHandler 调用的测试 handler（技能替换测试专用）。</summary>
+        private sealed class RecordingSkillHandler : ISkillHandler
+        {
+            internal int EffectCount;
+            internal int CompleteCount;
+            internal int CancelCount;
+
+            public void Effect(SkillActivationContext context)
+            {
+                EffectCount++;
+            }
+
+            public void Complete(SkillActivationContext context)
+            {
+                CompleteCount++;
+            }
+
+            public void Cancel(SkillActivationContext context, bool effectCommitted)
+            {
+                CancelCount++;
+            }
+        }
     }
 }

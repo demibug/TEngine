@@ -66,7 +66,8 @@ namespace GameBattle.Tests.EditMode.Config
             BuffCatalogSnapshot buffCatalog = null,
             SkillCatalogSnapshot skillCatalog = null,
             BossCatalogSnapshot bossCatalog = null,
-            WeaponCatalogSnapshot weaponCatalog = null)
+            WeaponCatalogSnapshot weaponCatalog = null,
+            GeneralCatalogSnapshot generalCatalog = null)
         {
             var basis = new JsonBattleConfigProvider().GetSnapshot();
             return new BattleConfigSnapshot(
@@ -85,7 +86,8 @@ namespace GameBattle.Tests.EditMode.Config
                 buffCatalog: buffCatalog ?? basis.BuffCatalog,
                 skillCatalog: skillCatalog ?? basis.SkillCatalog,
                 bossCatalog: bossCatalog ?? basis.BossCatalog,
-                weaponCatalog: weaponCatalog);
+                weaponCatalog: weaponCatalog,
+                generalCatalog: generalCatalog ?? basis.GeneralCatalog);
         }
 
         // ====================================================================
@@ -116,6 +118,23 @@ namespace GameBattle.Tests.EditMode.Config
 
             Assert.AreEqual(originalUnitCount, snapshot.Units.Count, "Units 数量不应被修改。");
             Assert.AreEqual(originalWaveCount, snapshot.Wave.WaveUnitCounts.Count, "WaveUnitCounts 数量不应被修改。");
+        }
+
+        [Test]
+        public void Validate_GeneralCatalog_RejectsMalformedRecipeAndInvalidBowProjectile()
+        {
+            var invalid = new GeneralConfigSnapshot(
+                4, "黄忠", "黄", new[] { "黄", "黄" }, GeneralCombatArchetype.Bow,
+                3.5f, 13, 0.8f, "单体", "nearest", "BowSoldier", "default",
+                "MissingArrow", 0, 0);
+            BattleConfigSnapshot snapshot = Rebuild(
+                generalCatalog: new GeneralCatalogSnapshot(new[] { invalid }));
+
+            BattleConfigValidationResult result = BattleConfigValidator.Validate(snapshot);
+
+            Assert.IsFalse(result.IsValid);
+            Assert.AreEqual(BattleErrorCode.ConfigInvalid, result.ErrorCode);
+            Assert.IsTrue(result.Errors.Any(e => e.Category == BattleConfigErrorCategory.GeneralConfigInvalid));
         }
 
         [Test]

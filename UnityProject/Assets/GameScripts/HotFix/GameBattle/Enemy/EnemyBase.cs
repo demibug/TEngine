@@ -157,6 +157,7 @@ namespace GameBattle
                 new[]
                 {
                     BuffStateChannel.MovementDisabled,
+                    BuffStateChannel.AttackDisabled,
                     BuffStateChannel.Suppressed,
                     BuffStateChannel.MovementLocked,
                 });
@@ -249,6 +250,7 @@ namespace GameBattle
         private bool _stopMovement;
 
         private bool _buffMovementDisabled;
+        private bool _buffAttackDisabled;
         private bool _buffSuppressed;
         private bool _buffMovementLocked;
 
@@ -480,6 +482,12 @@ namespace GameBattle
 
         internal bool MovementStoppedForTest => _stopMovement;
 
+        /// <summary>Buff 聚合的移动禁用状态是否生效（诊断/测试用）。</summary>
+        internal bool BuffMovementDisabledForTest => _buffMovementDisabled;
+
+        /// <summary>Buff 聚合的攻击禁用状态是否生效（诊断/测试用）。</summary>
+        internal bool BuffAttackDisabledForTest => _buffAttackDisabled;
+
         /// <summary>
         /// 击杀奖励值（供 <see cref="Hit"/> 在死亡点提交，默认特殊 10 / 普通 1）。
         /// </summary>
@@ -551,6 +559,7 @@ namespace GameBattle
             _movementDirectionY = 0f;
             _stopMovement = false;
             _buffMovementDisabled = false;
+            _buffAttackDisabled = false;
             _buffSuppressed = false;
             _buffMovementLocked = false;
             _skillMovementPause = false;
@@ -703,6 +712,9 @@ namespace GameBattle
                 case BuffStateChannel.MovementDisabled:
                     _buffMovementDisabled = active;
                     break;
+                case BuffStateChannel.AttackDisabled:
+                    _buffAttackDisabled = active;
+                    break;
                 case BuffStateChannel.Suppressed:
                     _buffSuppressed = active;
                     break;
@@ -730,6 +742,7 @@ namespace GameBattle
             _healthBuffModifier = 0;
             _moveSpeed = _baseMoveSpeed;
             _buffMovementDisabled = false;
+            _buffAttackDisabled = false;
             _buffSuppressed = false;
             _buffMovementLocked = false;
             RecomputeStopMovement();

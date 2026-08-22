@@ -36,6 +36,12 @@ namespace GameBattle
     {
         /// <summary>士兵（刀/弓/枪/骑四兵之一）。</summary>
         Soldier = 0,
+
+        /// <summary>武将合成字，只能停留在玩家待上场槽。</summary>
+        GeneralPart = 1,
+
+        /// <summary>已合成武将，可进入战场并复用配置指定的战斗原型。</summary>
+        General = 2,
     }
 
     /// <summary>

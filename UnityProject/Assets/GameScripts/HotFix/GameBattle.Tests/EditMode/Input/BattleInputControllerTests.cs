@@ -127,7 +127,7 @@ namespace GameBattle.Tests.EditMode.Input
                 _levelService);
             _unitRegistry = new UnitRegistry(_unitFactory, CellSize);
 
-            _slotBoard = new UnitSlotBoard(_levelService.MaxLevel);
+            _slotBoard = new UnitSlotBoard(_levelService.MaxLevel, _configSnapshot.GeneralCatalog);
             _slotBoard.Initialize(_mapData, RecruitDefinitions.ReserveSlotCount);
 
             _recruitManager = new RecruitManager(
@@ -223,7 +223,8 @@ namespace GameBattle.Tests.EditMode.Input
                     movementStrategy: "TargetEnemyBezier",
                     hitStrategy: "HitEnemy"),
                 missingFieldNotes: Array.Empty<string>(),
-                sourceTag: "Test");
+                sourceTag: "Test",
+                generalCatalog: new GeneralCatalogSnapshot(new[] { ZhangFeiDefinition() }));
         }
 
         /// <summary>构造单位配置快照辅助方法。</summary>
@@ -235,6 +236,12 @@ namespace GameBattle.Tests.EditMode.Input
                 index, text, animKey, rangeCells, damage, interval,
                 "单体", "nearest");
         }
+
+        /// <summary>张飞配置（有序配方：张左飞右；枪系远程定位为 Spear 兵种）。</summary>
+        private static GeneralConfigSnapshot ZhangFeiDefinition()
+            => new GeneralConfigSnapshot(
+                1, "张飞", "张", new[] { "张", "飞" }, GeneralCombatArchetype.Pike,
+                2.5f, 15, 1f, "近战枪击", "nearest", "SpearSoldier", "default", "", 0, 1);
 
         // ====================================================================
         // 槽位辅助
@@ -490,14 +497,14 @@ namespace GameBattle.Tests.EditMode.Input
         }
 
         [Test]
-        [Description("合并失败：不同兵种不合并，不修改状态。")]
-        public void DropUnit_Merge_DifferentSoldierType_Rejects()
+        [Description("互换：不同兵种互换位置，双方单位属性不变（不再拒绝）。")]
+        public void DropUnit_Swap_DifferentSoldierType_Swaps()
         {
             IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
             UnitSlot source = reserves[0];
             UnitSlot target = reserves[1];
 
-            // 源刀兵，目标弓兵。
+            // 源刀兵，目标弓兵（不同兵种不可合并 → 互换）。
             FillReserveAll(
                 MakeKnife(100, 1),
                 new BattleUnit(200, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1));
@@ -505,48 +512,60 @@ namespace GameBattle.Tests.EditMode.Input
             BattleInputResult result = _controller.Execute(
                 BattleInputCommand.CreateDropUnit(6, source.SlotId.Id, target.SlotId.Id));
 
-            Assert.IsFalse(result.IsSuccess, "不同兵种应失败");
-            Assert.AreEqual(BattleInputRejectReason.TargetMismatch, result.RejectReason);
-            Assert.IsFalse(_slotBoard.GetSlotById(source.SlotId.Id).IsEmpty, "源槽未变");
-            Assert.AreEqual(1, _slotBoard.GetSlotById(target.SlotId.Id).Occupant.Value.Level, "目标等级未变");
+            Assert.IsTrue(result.IsSuccess, "不同兵种应互换而非拒绝");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(source.SlotId.Id).OccupantUnitId,
+                "源槽换入目标单位");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(target.SlotId.Id).OccupantUnitId,
+                "目标槽换入源单位");
+            Assert.AreEqual(0, _unitRegistry.Count, "R→R 互换不创建战斗实例");
         }
 
         [Test]
-        [Description("合并失败：不同等级不合并，不修改状态。")]
-        public void DropUnit_Merge_DifferentLevel_Rejects()
+        [Description("互换：不同等级互换位置，双方单位属性不变（不再拒绝）。")]
+        public void DropUnit_Swap_DifferentLevel_Swaps()
         {
             IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
             UnitSlot source = reserves[0];
             UnitSlot target = reserves[1];
 
-            FillReserveAll(MakeKnife(100, 1), MakeKnife(200, 2));
+            // 源 2 级、目标 1 级；互换后源单位应在目标槽保持 2 级。
+            FillReserveAll(MakeKnife(100, 2), MakeKnife(200, 1));
 
             BattleInputResult result = _controller.Execute(
                 BattleInputCommand.CreateDropUnit(7, source.SlotId.Id, target.SlotId.Id));
 
-            Assert.IsFalse(result.IsSuccess, "不同等级应失败");
-            Assert.AreEqual(BattleInputRejectReason.TargetMismatch, result.RejectReason);
-            Assert.IsFalse(_slotBoard.GetSlotById(source.SlotId.Id).IsEmpty, "源槽未变");
+            Assert.IsTrue(result.IsSuccess, "不同等级应互换而非拒绝");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(source.SlotId.Id).OccupantUnitId,
+                "源槽换入目标单位");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(target.SlotId.Id).OccupantUnitId,
+                "目标槽换入源单位");
+            Assert.AreEqual(1, _slotBoard.GetSlotById(source.SlotId.Id).Occupant.Value.Level,
+                "源槽换入的目标单位保留 1 级");
+            Assert.AreEqual(2, _slotBoard.GetSlotById(target.SlotId.Id).Occupant.Value.Level,
+                "目标槽换入的源单位保留 2 级");
         }
 
         [Test]
-        [Description("合并失败：目标已满级不合并，不修改状态。")]
-        public void DropUnit_Merge_MaxLevel_Rejects()
+        [Description("互换：目标已满级互换位置，不修改任何单位属性（不再拒绝）。")]
+        public void DropUnit_Swap_MaxLevel_Swaps()
         {
             IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
             UnitSlot source = reserves[0];
             UnitSlot target = reserves[1];
 
-            // 目标 3 级 = 最大等级，不可再合并。
+            // 目标 3 级 = 最大等级，不可再合并 → 互换。
             FillReserveAll(MakeKnife(100, 3), MakeKnife(200, 3));
 
             BattleInputResult result = _controller.Execute(
                 BattleInputCommand.CreateDropUnit(8, source.SlotId.Id, target.SlotId.Id));
 
-            Assert.IsFalse(result.IsSuccess, "满级目标应失败");
-            Assert.AreEqual(BattleInputRejectReason.MaxLevelReached, result.RejectReason);
-            Assert.IsFalse(_slotBoard.GetSlotById(source.SlotId.Id).IsEmpty, "源槽未变");
-            Assert.AreEqual(3, _slotBoard.GetSlotById(target.SlotId.Id).Occupant.Value.Level, "目标等级未变");
+            Assert.IsTrue(result.IsSuccess, "满级目标应互换而非拒绝");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(source.SlotId.Id).OccupantUnitId,
+                "源槽换入目标单位");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(target.SlotId.Id).OccupantUnitId,
+                "目标槽换入源单位");
+            Assert.AreEqual(3, _slotBoard.GetSlotById(target.SlotId.Id).Occupant.Value.Level,
+                "互换不改变等级");
         }
 
         [Test]
@@ -566,6 +585,226 @@ namespace GameBattle.Tests.EditMode.Input
             Assert.IsFalse(result.IsSuccess, "跨阵营应失败");
             Assert.AreEqual(BattleInputRejectReason.CrossSideMerge, result.RejectReason);
             Assert.IsFalse(_slotBoard.GetSlotById(source.SlotId.Id).IsEmpty, "源槽未变");
+        }
+
+        // ====================================================================
+        // 互换（Swap）四向覆盖（含 Runtime 迁移语义）
+        // ====================================================================
+
+        /// <summary>把指定待上场槽的单位换到第一个空战场槽（控制器 Move），返回目标战场槽。</summary>
+        private UnitSlot MoveReserveToBattle(UnitSlot reserve)
+        {
+            IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
+            for (int i = 0; i < battles.Count; i++)
+            {
+                if (battles[i].IsEmpty)
+                {
+                    BattleInputResult result = _controller.Execute(
+                        BattleInputCommand.CreateDropUnit(3000 + i, reserve.SlotId.Id, battles[i].SlotId.Id));
+                    Assert.IsTrue(result.IsSuccess, "测试前置：Move 到战场槽应成功");
+                    return _slotBoard.GetSlot(battles[i].SlotId);
+                }
+            }
+
+            throw new InvalidOperationException("测试前置：无空战场槽可放入单位");
+        }
+
+        [Test]
+        [Description("互换 R→R：待上场源与待上场目标互换位置，不触碰 Runtime。")]
+        public void DropUnit_Swap_ReserveToReserve_SwapsOccupants()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            UnitSlot source = reserves[0];
+            UnitSlot target = reserves[1];
+
+            FillReserveAll(
+                MakeKnife(100, 1),
+                new BattleUnit(200, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1));
+
+            BattleInputResult result = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(31, source.SlotId.Id, target.SlotId.Id));
+
+            Assert.IsTrue(result.IsSuccess, "R→R 互换应成功");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(source.SlotId.Id).OccupantUnitId, "源槽换入目标单位");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(target.SlotId.Id).OccupantUnitId, "目标槽换入源单位");
+            Assert.AreEqual(0, _unitRegistry.Count, "R→R 互换不创建战斗实例");
+        }
+
+        [Test]
+        [Description("互换 R→B：待上场源上场，战场目标下场保留冷却。")]
+        public void DropUnit_Swap_ReserveToBattle_SwapsOccupants()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            UnitSlot source = reserves[0];
+
+            // 弓兵（冷却 5000ms）先上场到战场槽；刀兵源与它互换。
+            FillReserveAll(
+                MakeKnife(100, 1),
+                new BattleUnit(200, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1, 5000L));
+            UnitSlot battle = MoveReserveToBattle(reserves[1]);
+            Assert.IsFalse(battle.IsEmpty, "前置：战场槽已占用弓兵");
+            Assert.IsNotNull(_unitRegistry.GetActiveByUnitId(200), "前置：弓兵已有活动实例");
+            Assert.AreEqual(5000L, _unitRegistry.GetActiveByUnitId(200).LastAttackTimeMs,
+                "前置：弓兵活动实例冷却为 5000ms");
+
+            BattleInputResult result = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(32, source.SlotId.Id, battle.SlotId.Id));
+
+            Assert.IsTrue(result.IsSuccess, "R→B 互换应成功");
+            // 槽位：源待上场槽换入弓兵，战场槽换入刀兵。
+            Assert.AreEqual(200, _slotBoard.GetSlotById(source.SlotId.Id).OccupantUnitId, "源待上场槽换入弓兵");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(battle.SlotId.Id).OccupantUnitId, "战场槽换入刀兵");
+            // Runtime：弓兵下场（解除实例、保留冷却），刀兵首次上场激活。
+            Assert.IsNull(_unitRegistry.GetActiveByUnitId(200), "弓兵下场后应解除活动实例");
+            Assert.AreEqual(5000L, _slotBoard.GetSlotById(source.SlotId.Id).Occupant.Value.LastAttackTimeMs,
+                "弓兵下场保留攻击冷却");
+            SoldierBase knifeActive = _unitRegistry.GetActiveByUnitId(100);
+            Assert.IsNotNull(knifeActive, "刀兵应激活战斗实例");
+            Assert.AreEqual(battle.SlotId.GridPosition.X, knifeActive.GridX, "刀兵在目标战场格 X");
+            Assert.AreEqual(battle.SlotId.GridPosition.Y, knifeActive.GridY, "刀兵在目标战场格 Y");
+            Assert.AreEqual(1, _unitRegistry.Count, "场上仍只有一个活动实例（刀兵）");
+        }
+
+        [Test]
+        [Description("互换 B→R：战场源下场保留冷却，待上场目标上场。")]
+        public void DropUnit_Swap_BattleToReserve_SwapsOccupants()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            UnitSlot target = reserves[1];
+
+            // 刀兵（冷却 0）先上场到战场槽；待上场弓兵（冷却 7000ms）与它互换。
+            FillReserveAll(
+                MakeKnife(100, 1),
+                new BattleUnit(200, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1, 7000L));
+            UnitSlot sourceBattle = MoveReserveToBattle(reserves[0]);
+            Assert.IsFalse(sourceBattle.IsEmpty, "前置：战场源槽已占用刀兵");
+            Assert.IsNotNull(_unitRegistry.GetActiveByUnitId(100), "前置：刀兵已有活动实例");
+
+            BattleInputResult result = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(33, sourceBattle.SlotId.Id, target.SlotId.Id));
+
+            Assert.IsTrue(result.IsSuccess, "B→R 互换应成功");
+            // 槽位：战场槽换入弓兵，待上场槽换入刀兵。
+            Assert.AreEqual(200, _slotBoard.GetSlotById(sourceBattle.SlotId.Id).OccupantUnitId, "战场槽换入弓兵");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(target.SlotId.Id).OccupantUnitId, "待上场槽换入刀兵");
+            // Runtime：刀兵下场（解除实例、保留冷却），弓兵首次上场激活。
+            Assert.IsNull(_unitRegistry.GetActiveByUnitId(100), "刀兵下场后应解除活动实例");
+            Assert.AreEqual(0L, _slotBoard.GetSlotById(target.SlotId.Id).Occupant.Value.LastAttackTimeMs,
+                "刀兵下场保留攻击冷却");
+            SoldierBase bowActive = _unitRegistry.GetActiveByUnitId(200);
+            Assert.IsNotNull(bowActive, "弓兵应激活战斗实例");
+            Assert.AreEqual(sourceBattle.SlotId.GridPosition.X, bowActive.GridX, "弓兵在源战场格 X");
+            Assert.AreEqual(sourceBattle.SlotId.GridPosition.Y, bowActive.GridY, "弓兵在源战场格 Y");
+            Assert.AreEqual(7000L, bowActive.LastAttackTimeMs, "弓兵首次上场导入冷却");
+            Assert.AreEqual(1, _unitRegistry.Count, "场上仍只有一个活动实例（弓兵）");
+        }
+
+        [Test]
+        [Description("互换 B→B：两个活动实例互换战场格，双方世界位置更新。")]
+        public void DropUnit_Swap_BattleToBattle_MovesBothActiveInstances()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+
+            FillReserveAll(
+                MakeKnife(100, 1),
+                new BattleUnit(200, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1));
+            UnitSlot battle0 = MoveReserveToBattle(reserves[0]);
+            UnitSlot battle1 = MoveReserveToBattle(reserves[1]);
+            Assert.IsFalse(battle0.IsEmpty, "前置：battle0 已占用");
+            Assert.IsFalse(battle1.IsEmpty, "前置：battle1 已占用");
+
+            SoldierBase knifeBefore = _unitRegistry.GetActiveByUnitId(100);
+            SoldierBase bowBefore = _unitRegistry.GetActiveByUnitId(200);
+            Assert.IsNotNull(knifeBefore, "前置：刀兵有活动实例");
+            Assert.IsNotNull(bowBefore, "前置：弓兵有活动实例");
+            Assert.AreEqual(battle0.SlotId.GridPosition.X, knifeBefore.GridX, "前置：刀兵在 battle0");
+            Assert.AreEqual(battle1.SlotId.GridPosition.X, bowBefore.GridX, "前置：弓兵在 battle1");
+
+            BattleInputResult result = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(34, battle0.SlotId.Id, battle1.SlotId.Id));
+
+            Assert.IsTrue(result.IsSuccess, "B→B 互换应成功");
+            // 槽位：battle0 换入弓兵，battle1 换入刀兵。
+            Assert.AreEqual(200, _slotBoard.GetSlotById(battle0.SlotId.Id).OccupantUnitId, "battle0 换入弓兵");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(battle1.SlotId.Id).OccupantUnitId, "battle1 换入刀兵");
+            // Runtime：双方仍活动，位置互换。
+            SoldierBase knifeAfter = _unitRegistry.GetActiveByUnitId(100);
+            SoldierBase bowAfter = _unitRegistry.GetActiveByUnitId(200);
+            Assert.IsNotNull(knifeAfter, "刀兵仍活动");
+            Assert.IsNotNull(bowAfter, "弓兵仍活动");
+            Assert.AreEqual(battle1.SlotId.GridPosition.X, knifeAfter.GridX, "刀兵世界位置更新到 battle1");
+            Assert.AreEqual(battle1.SlotId.GridPosition.Y, knifeAfter.GridY, "刀兵世界位置更新到 battle1");
+            Assert.AreEqual(battle0.SlotId.GridPosition.X, bowAfter.GridX, "弓兵世界位置更新到 battle0");
+            Assert.AreEqual(battle0.SlotId.GridPosition.Y, bowAfter.GridY, "弓兵世界位置更新到 battle0");
+            Assert.AreEqual(2, _unitRegistry.Count, "B→B 互换不增删活动实例");
+        }
+
+        // ====================================================================
+        // 事实发布（SlotChanged / UnitMerged）
+        // ====================================================================
+
+        /// <summary>构造带 SignalHub 的控制器（用于验证事实发布）。</summary>
+        private BattleInternalSignalHub BuildControllerWithHub(out BattleInputController controller)
+        {
+            var hub = new BattleInternalSignalHub();
+            controller = new BattleInputController(
+                _slotBoard, _recruitManager, _levelService, _economy, _unitRegistry, _configSnapshot, hub);
+            controller.StartGame();
+            return hub;
+        }
+
+        [Test]
+        [Description("互换发布两个槽位的最终状态事实（不再固定源槽为空）。")]
+        public void DropUnit_Swap_PublishesBothSlotChangedFacts()
+        {
+            BattleInternalSignalHub hub = BuildControllerWithHub(out BattleInputController hubController);
+
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            int sourceSlotId = reserves[0].SlotId.Id;
+            int targetSlotId = reserves[1].SlotId.Id;
+
+            FillReserveAll(
+                MakeKnife(100, 1),
+                new BattleUnit(200, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1));
+
+            var published = new List<SlotChangedFact>();
+            hub.SlotChanged.Subscribe(fact => published.Add(fact));
+
+            BattleInputResult result = hubController.Execute(
+                BattleInputCommand.CreateDropUnit(41, sourceSlotId, targetSlotId));
+
+            Assert.IsTrue(result.IsSuccess, "互换应成功");
+            Assert.AreEqual(2, published.Count, "应发布两个槽位的最终状态");
+            SlotChangedFact sourceFact = published.Find(f => f.SlotId.Id == sourceSlotId);
+            SlotChangedFact targetFact = published.Find(f => f.SlotId.Id == targetSlotId);
+            Assert.AreEqual(sourceSlotId, sourceFact.SlotId.Id, "源槽事实已发布");
+            Assert.AreEqual(targetSlotId, targetFact.SlotId.Id, "目标槽事实已发布");
+            Assert.AreEqual(200, sourceFact.Occupant?.UnitId ?? -1, "源槽最终占用弓兵");
+            Assert.AreEqual(100, targetFact.Occupant?.UnitId ?? -1, "目标槽最终占用刀兵");
+        }
+
+        [Test]
+        [Description("合并发布 UnitMerged 事实：目标槽、升级后的单位与新等级。")]
+        public void DropUnit_Merge_PublishesUnitMergedFact()
+        {
+            BattleInternalSignalHub hub = BuildControllerWithHub(out BattleInputController hubController);
+
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            int sourceSlotId = reserves[0].SlotId.Id;
+            int targetSlotId = reserves[1].SlotId.Id;
+
+            FillReserveAll(MakeKnife(100, 1), MakeKnife(200, 1));
+
+            UnitMergedFact merged = default;
+            hub.UnitMerged.Subscribe(fact => merged = fact);
+
+            BattleInputResult result = hubController.Execute(
+                BattleInputCommand.CreateDropUnit(42, sourceSlotId, targetSlotId));
+
+            Assert.IsTrue(result.IsSuccess, "合并应成功");
+            Assert.AreEqual(targetSlotId, merged.TargetSlotId.Id, "合并事实携带目标槽");
+            Assert.AreEqual(200, merged.MergedUnit.UnitId, "合并结果保留目标 UnitId");
+            Assert.AreEqual(2, merged.NewLevel, "合并事实新等级为 2");
         }
 
         // ====================================================================
@@ -610,6 +849,200 @@ namespace GameBattle.Tests.EditMode.Input
 
             Assert.AreEqual(goldBefore - firstCost - secondCost, _economy.GetBalance(true),
                 "两次征兵各扣一次费");
+        }
+
+        // ====================================================================
+        // 武将字上战场（放开战场区域限制）：零运行时实例语义
+        // ====================================================================
+
+        [Test]
+        [Description("单字上阵：字牌 Move 到空战场槽成功，不创建士兵战斗实例，槽位与事实正常。")]
+        public void DropUnit_GeneralPartToBattle_Moves_NoCombatInstance()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            UnitSlot battle = GetFirstPlayerBattleSlot();
+            FillReserveAll(BattleUnit.CreateGeneralPart(100, true, "张"));
+
+            BattleInputResult result = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(501, reserves[0].SlotId.Id, battle.SlotId.Id));
+
+            Assert.IsTrue(result.IsSuccess, "单字上阵应成功");
+            UnitSlot battleAfter = _slotBoard.GetSlotById(battle.SlotId.Id);
+            Assert.AreEqual(100, battleAfter.OccupantUnitId, "战场槽承载字牌");
+            Assert.AreEqual(UnitKind.GeneralPart, battleAfter.Occupant.Value.Kind, "战场槽占用为字牌");
+            Assert.IsTrue(_slotBoard.GetSlotById(reserves[0].SlotId.Id).IsEmpty, "源待上场槽变空");
+            Assert.AreEqual(0, _unitRegistry.Count, "单字上阵不创建战斗实例");
+            Assert.IsNull(_unitRegistry.GetActiveByUnitId(100), "字牌无战斗实例");
+        }
+
+        [Test]
+        [Description("字牌与战场士兵互换：士兵回待上场并保留冷却，字牌进战场且不创建战斗实例。")]
+        public void DropUnit_GeneralPart_SwapWithBattleSoldier_NoCombatInstance()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            UnitSlot source = reserves[0];
+            UnitSlot target = reserves[1];
+
+            FillReserveAll(
+                BattleUnit.CreateGeneralPart(100, true, "张"),
+                new BattleUnit(200, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1, 5000L));
+            UnitSlot battle = MoveReserveToBattle(target);
+            Assert.IsNotNull(_unitRegistry.GetActiveByUnitId(200), "前置：弓兵已有活动实例");
+
+            BattleInputResult result = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(502, source.SlotId.Id, battle.SlotId.Id));
+
+            Assert.IsTrue(result.IsSuccess, "字牌与士兵互换应成功");
+            Assert.AreEqual(200, _slotBoard.GetSlotById(source.SlotId.Id).OccupantUnitId, "待上场槽换入弓兵");
+            Assert.AreEqual(100, _slotBoard.GetSlotById(battle.SlotId.Id).OccupantUnitId, "战场槽换入字牌");
+            Assert.AreEqual(UnitKind.GeneralPart, _slotBoard.GetSlotById(battle.SlotId.Id).Occupant.Value.Kind,
+                "战场槽占用为字牌");
+            Assert.IsNull(_unitRegistry.GetActiveByUnitId(200), "弓兵下场后解除战斗实例");
+            Assert.AreEqual(5000L, _slotBoard.GetSlotById(source.SlotId.Id).Occupant.Value.LastAttackTimeMs,
+                "弓兵下场保留冷却");
+            Assert.AreEqual(0, _unitRegistry.Count, "场上无任何战斗实例");
+        }
+
+        [Test]
+        [Description("刷新区武将字只交换不合成，也不创建战斗实例。")]
+        public void DropUnit_GeneralParts_InReserve_SwapWithoutSynthesisOrRuntime()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            FillReserveAll(
+                BattleUnit.CreateGeneralPart(100, true, "飞"),
+                BattleUnit.CreateGeneralPart(200, true, "张"));
+
+            BattleInputResult result = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(510, reserves[0].SlotId.Id, reserves[1].SlotId.Id));
+
+            Assert.IsTrue(result.IsSuccess, "刷新区武将字交换应成功");
+            BattleUnit left = _slotBoard.GetSlotById(reserves[0].SlotId.Id).Occupant.Value;
+            BattleUnit right = _slotBoard.GetSlotById(reserves[1].SlotId.Id).Occupant.Value;
+            Assert.AreEqual(UnitKind.GeneralPart, left.Kind, "刷新区左槽仍是武将字");
+            Assert.AreEqual(UnitKind.GeneralPart, right.Kind, "刷新区右槽仍是武将字");
+            Assert.AreEqual("张", left.GeneralPartText);
+            Assert.AreEqual("飞", right.GeneralPartText);
+            Assert.AreEqual(0, _unitRegistry.Count, "刷新区交换不得创建战斗实例");
+        }
+
+        [Test]
+        [Description("战场张左飞右：两字牌上场后合成双格张飞，左半格激活一个武将战斗实例。")]
+        public void DropUnit_GeneralParts_SynthesizeInBattle_ActivatesGeneralInstance()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
+            FillReserveAll(
+                BattleUnit.CreateGeneralPart(100, true, "张"),
+                BattleUnit.CreateGeneralPart(200, true, "飞"));
+
+            BattleInputResult moveZhang = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(511, reserves[0].SlotId.Id, battles[0].SlotId.Id));
+            Assert.IsTrue(moveZhang.IsSuccess, "张字应可 Move 到战场槽");
+            BattleInputResult moveFei = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(512, reserves[1].SlotId.Id, battles[1].SlotId.Id));
+            Assert.IsTrue(moveFei.IsSuccess, "飞字应可 Move 到战场槽");
+            BattleInputResult result = moveFei;
+
+            Assert.IsTrue(result.IsSuccess, "飞字放到张字右侧后应立即按最终布局合成");
+            BattleUnit leftCell = _slotBoard.GetSlotById(battles[0].SlotId.Id).Occupant.Value;
+            BattleUnit rightCell = _slotBoard.GetSlotById(battles[1].SlotId.Id).Occupant.Value;
+            Assert.AreEqual(UnitKind.General, leftCell.Kind, "左槽为武将半格");
+            Assert.AreEqual(UnitKind.General, rightCell.Kind, "右槽为武将半格");
+            Assert.AreEqual(0, leftCell.GeneralCellIndex, "左槽为左半格");
+            Assert.AreEqual(1, rightCell.GeneralCellIndex, "右槽为右半格");
+            Assert.AreEqual(100, leftCell.UnitId, "Move 合成保留原地邻字 UnitId");
+            Assert.AreEqual(100, rightCell.UnitId, "Move 合成保留原地邻字 UnitId");
+            Assert.AreEqual("张飞", leftCell.GeneralName, "合成武将名正确");
+            SoldierBase generalActive = _unitRegistry.GetActiveByUnitId(100);
+            Assert.IsNotNull(generalActive, "合成武将应在左半格激活一个战斗实例");
+            Assert.AreEqual(battles[0].SlotId.GridPosition.X, generalActive.GridX, "武将实例在左半格 X");
+            Assert.AreEqual(battles[0].SlotId.GridPosition.Y, generalActive.GridY, "武将实例在左半格 Y");
+            Assert.AreEqual(1, _unitRegistry.Count, "双格武将只激活一个实例");
+        }
+
+        [Test]
+        [Description("战场完整武将单字下阵：整将解散为独立字牌，旧武将战斗实例只解除一次，分离字牌不创建实例。")]
+        public void DropUnit_GeneralCell_DragToReserve_DeactivatesGeneralRuntimeOnce()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
+            FillReserveAll(
+                BattleUnit.CreateGeneralPart(100, true, "张"),
+                BattleUnit.CreateGeneralPart(200, true, "飞"));
+
+            Assert.IsTrue(_controller.Execute(
+                BattleInputCommand.CreateDropUnit(521, reserves[0].SlotId.Id, battles[0].SlotId.Id)).IsSuccess);
+            BattleInputResult synthesize = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(522, reserves[1].SlotId.Id, battles[1].SlotId.Id));
+            Assert.IsTrue(synthesize.IsSuccess, "武将应先在战场合成");
+            Assert.IsNotNull(_unitRegistry.GetActiveByUnitId(100), "前置：合成武将已有战斗实例");
+            Assert.AreEqual(1, _unitRegistry.Count);
+
+            BattleInputResult moveDown = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(523, battles[1].SlotId.Id, reserves[1].SlotId.Id));
+            Assert.IsTrue(moveDown.IsSuccess, "单字下阵应成功");
+            Assert.AreEqual(UnitKind.GeneralPart,
+                _slotBoard.GetSlotById(battles[0].SlotId.Id).Occupant.Value.Kind,
+                "武将解散后左格为独立字牌");
+            Assert.AreEqual("张",
+                _slotBoard.GetSlotById(battles[0].SlotId.Id).Occupant.Value.GeneralPartText,
+                "左格为张字");
+            Assert.AreEqual(UnitKind.GeneralPart,
+                _slotBoard.GetSlotById(reserves[1].SlotId.Id).Occupant.Value.Kind,
+                "点击格飞字独立移动到待上场槽");
+            Assert.AreEqual("飞",
+                _slotBoard.GetSlotById(reserves[1].SlotId.Id).Occupant.Value.GeneralPartText,
+                "待上场槽为飞字");
+            Assert.IsNull(_unitRegistry.GetActiveByUnitId(100), "旧武将战斗实例已解除");
+            Assert.AreEqual(0, _unitRegistry.Count, "分离字牌不创建任何战斗实例");
+
+            BattleInputResult moveUp = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(524, reserves[0].SlotId.Id, battles[0].SlotId.Id));
+            Assert.IsTrue(moveUp.IsSuccess, "张字移回应成功");
+            Assert.AreEqual(UnitKind.GeneralPart,
+                _slotBoard.GetSlotById(battles[0].SlotId.Id).Occupant.Value.Kind,
+                "飞字不在相邻格，张字独立在战场，不重新合成");
+            Assert.AreEqual(0, _unitRegistry.Count, "独立字牌仍不创建战斗实例");
+        }
+
+        [Test]
+        [Description("战场完整武将单字拖到另一格（张→飞）：同将内部互换后旧武将实例恰好解除一次，反序字牌无战斗实例。")]
+        public void DropUnit_CompleteGeneral_InternalSwap_DeactivatesRuntimeExactlyOnce()
+        {
+            IReadOnlyList<UnitSlot> reserves = _slotBoard.GetSlots(true, SlotZone.Reserve);
+            IReadOnlyList<UnitSlot> battles = _slotBoard.GetSlots(true, SlotZone.Battle);
+            FillReserveAll(
+                BattleUnit.CreateGeneralPart(100, true, "张"),
+                BattleUnit.CreateGeneralPart(200, true, "飞"));
+
+            Assert.IsTrue(_controller.Execute(
+                BattleInputCommand.CreateDropUnit(531, reserves[0].SlotId.Id, battles[0].SlotId.Id)).IsSuccess);
+            BattleInputResult synthesize = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(532, reserves[1].SlotId.Id, battles[1].SlotId.Id));
+            Assert.IsTrue(synthesize.IsSuccess, "武将应先在战场合成");
+            Assert.IsNotNull(_unitRegistry.GetActiveByUnitId(100), "前置：合成武将已有战斗实例");
+
+            int removedCount = 0;
+            _unitRegistry.UnitRemoved += id => removedCount++;
+            BattleInputResult result = _controller.Execute(
+                BattleInputCommand.CreateDropUnit(533, battles[0].SlotId.Id, battles[1].SlotId.Id));
+
+            Assert.IsTrue(result.IsSuccess, "同将内部互换应成功");
+            Assert.AreEqual(UnitKind.GeneralPart,
+                _slotBoard.GetSlotById(battles[0].SlotId.Id).Occupant.Value.Kind,
+                "源格最终为独立字牌");
+            Assert.AreEqual("飞",
+                _slotBoard.GetSlotById(battles[0].SlotId.Id).Occupant.Value.GeneralPartText,
+                "源格最终为飞字");
+            Assert.AreEqual(UnitKind.GeneralPart,
+                _slotBoard.GetSlotById(battles[1].SlotId.Id).Occupant.Value.Kind,
+                "目标格最终为独立字牌");
+            Assert.AreEqual("张",
+                _slotBoard.GetSlotById(battles[1].SlotId.Id).Occupant.Value.GeneralPartText,
+                "目标格最终为张字");
+            Assert.IsNull(_unitRegistry.GetActiveByUnitId(100), "旧张飞战斗实例已解除并停止攻击");
+            Assert.AreEqual(0, _unitRegistry.Count, "反序字牌不激活任何战斗实例");
+            Assert.AreEqual(1, removedCount, "旧武将战斗实例恰好解除一次");
         }
     }
 }

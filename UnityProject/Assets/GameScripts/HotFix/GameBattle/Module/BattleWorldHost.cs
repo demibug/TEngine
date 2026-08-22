@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using Cysharp.Threading.Tasks;
 using TEngine;
 using UnityEngine;
@@ -14,7 +13,7 @@ namespace GameBattle
         internal const string WORLD_ROOT_NAME = "BattleWorldRoot";
         internal const string MAP_ADDRESS = "BattleMap0";
 
-        private readonly Func<Transform, CancellationToken, UniTask<GameObject>> _loadOverride;
+        private readonly Func<Transform, UniTask<GameObject>> _loadOverride;
         private IResourceModule _resourceModule;
         private GameObject _worldRootObject;
         private GameObject _mapInstance;
@@ -27,12 +26,14 @@ namespace GameBattle
         private CameraSnapshot _cameraSnapshot;
         private bool _hasCameraSnapshot;
 
+        /// <summary>地图加载代数。Release 或地图实例替换时递增；携带旧代数的迟到加载必须销毁实例且不得提交。</summary>
+        private int _loadGeneration;
+
         internal BattleWorldHost()
         {
         }
 
-        internal BattleWorldHost(
-            Func<Transform, CancellationToken, UniTask<GameObject>> loadOverride)
+        internal BattleWorldHost(Func<Transform, UniTask<GameObject>> loadOverride)
         {
             _loadOverride = loadOverride ?? throw new ArgumentNullException(nameof(loadOverride));
         }
@@ -72,10 +73,8 @@ namespace GameBattle
         /// <summary>
         /// 加载或复用 BattleMap0 实例（兼容 map0 数据入口）；并发调用共享同一个加载任务。
         /// </summary>
-        internal async UniTask<GameObject> EnsureWorldAsync(
-            CancellationToken cancellationToken = default)
+        internal async UniTask<GameObject> EnsureWorldAsync()
         {
-            cancellationToken.ThrowIfCancellationRequested();
             Transform root = EnsureRoot();
             if (_mapInstance != null)
             {
@@ -84,18 +83,17 @@ namespace GameBattle
 
             if (_worldLoadTask == null)
             {
-                _worldLoadTask = UniTask.Lazy(
-                    () => LoadWorldAsync(root, cancellationToken));
+                int generation = _loadGeneration;
+                _worldLoadTask = UniTask.Lazy(() => LoadWorldAsync(root, generation));
             }
 
-            return await _worldLoadTask.Task.AttachExternalCancellation(cancellationToken);
+            return await _worldLoadTask.Task;
         }
 
         /// <summary>
         /// 按地图运行快照的 ResourceAddress 加载或复用世界实例，并按当前 MapData 重建绑定。
         /// </summary>
         /// <param name="map">当前地图运行快照（尺寸、cell 宽高、双路端点、资源地址）。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
         /// <returns>已就绪并完成当前地图绑定的世界实例。</returns>
         /// <remarks>
         /// <para><b>地址复用/替换（design.md 决策 4）：</b></para>
@@ -103,14 +101,13 @@ namespace GameBattle
         /// <item>地址相同：复用已加载实例，仅按当前 MapData 重建绑定。</item>
         /// <item>地址不同：先清理动态根与当前绑定，Destroy 旧实例（AssetsReference 自动归还引用），
         /// 再异步加载新实例。</item>
-        /// <item>加载、取消或绑定失败：finally 销毁孤儿实例并清空加载任务，允许重试。</item>
+        /// <item>加载或绑定失败：finally 销毁孤儿实例并清空加载任务，允许重试。</item>
+        /// <item>加载代（<see cref="_loadGeneration"/>）：Release 或地图实例替换时递增。迟到的
+        /// GameObject 加载若携带旧代数，必须 Destroy 实例且不得提交/赋值。</item>
         /// </list>
         /// </remarks>
-        internal async UniTask<GameObject> EnsureWorldForMapAsync(
-            MapData map,
-            CancellationToken cancellationToken = default)
+        internal async UniTask<GameObject> EnsureWorldForMapAsync(MapData map)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             if (map == null)
             {
                 throw new ArgumentNullException(nameof(map));
@@ -134,11 +131,7 @@ namespace GameBattle
             {
                 try
                 {
-                    await _worldLoadTask.Task.AttachExternalCancellation(cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
+                    await _worldLoadTask.Task;
                 }
                 catch (Exception)
                 {
@@ -158,12 +151,11 @@ namespace GameBattle
             {
                 if (_worldLoadTask == null)
                 {
-                    _worldLoadTask = UniTask.Lazy(
-                        () => LoadWorldForMapAsync(root, address, cancellationToken));
+                    int generation = _loadGeneration;
+                    _worldLoadTask = UniTask.Lazy(() => LoadWorldForMapAsync(root, address, generation));
                 }
 
-                GameObject loaded = await _worldLoadTask.Task
-                    .AttachExternalCancellation(cancellationToken);
+                GameObject loaded = await _worldLoadTask.Task;
                 if (_mapInstance == null)
                 {
                     throw new BattleMapLoadException(
@@ -341,6 +333,7 @@ namespace GameBattle
             RestoreCamera();
             HideWorld();
             ClearDynamicRoots(destroyImmediate);
+            _loadGeneration++;
 
             if (_mapInstance != null)
             {
@@ -367,17 +360,27 @@ namespace GameBattle
             }
         }
 
-        private async UniTask<GameObject> LoadWorldAsync(
-            Transform root,
-            CancellationToken cancellationToken)
+        private async UniTask<GameObject> LoadWorldAsync(Transform root, int generation)
         {
             GameObject instance = null;
             try
             {
                 instance = _loadOverride == null
-                    ? await LoadFromResourceModuleAsync(root, MAP_ADDRESS, cancellationToken)
-                    : await _loadOverride(root, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
+                    ? await LoadFromResourceModuleAsync(root, MAP_ADDRESS)
+                    : await _loadOverride(root);
+                if (generation != _loadGeneration)
+                {
+                    if (instance != null)
+                    {
+                        DestroyInstance(instance);
+                    }
+
+                    instance = null;
+                    throw new BattleMapLoadException(
+                        $"战斗地图资源加载已失效（地图已被替换或释放）：{MAP_ADDRESS}",
+                        MAP_ADDRESS);
+                }
+
                 if (instance == null)
                 {
                     throw new InvalidOperationException(
@@ -404,14 +407,16 @@ namespace GameBattle
             }
             finally
             {
-                // 实例在写入模块级字段前发生取消或校验异常时，所有权仍归本方法。
+                // 实例在写入模块级字段前发生校验异常时，所有权仍归本方法。
                 // 必须立即销毁，以触发 AssetsReference 自动归还资源引用，避免重试留下第二张地图。
                 if (instance != null && _mapInstance == null)
                 {
                     DestroyInstance(instance);
                 }
 
-                if (_mapInstance == null)
+                // 只允许本代加载清理共享任务。旧代加载可能在 Release 后迟到收尾，
+                // 此时新一代加载已经写入 _worldLoadTask，不能被旧 finally 覆盖。
+                if (generation == _loadGeneration && _mapInstance == null)
                 {
                     _worldLoadTask = null;
                     _currentResourceAddress = null;
@@ -422,7 +427,7 @@ namespace GameBattle
         private async UniTask<GameObject> LoadWorldForMapAsync(
             Transform root,
             string address,
-            CancellationToken cancellationToken)
+            int generation)
         {
             GameObject instance = null;
             try
@@ -430,12 +435,8 @@ namespace GameBattle
                 try
                 {
                     instance = _loadOverride == null
-                        ? await LoadFromResourceModuleAsync(root, address, cancellationToken)
-                        : await _loadOverride(root, cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
+                        ? await LoadFromResourceModuleAsync(root, address)
+                        : await _loadOverride(root);
                 }
                 catch (BattleMapResourceAddressException)
                 {
@@ -451,7 +452,20 @@ namespace GameBattle
                         ex);
                 }
 
-                cancellationToken.ThrowIfCancellationRequested();
+                // 迟到的加载（Release 或地图替换已递增代数）：实例已失效，必须销毁且不得提交。
+                if (generation != _loadGeneration)
+                {
+                    if (instance != null)
+                    {
+                        DestroyInstance(instance);
+                    }
+
+                    instance = null;
+                    throw new BattleMapLoadException(
+                        $"战斗地图资源加载已失效（地图已被替换或释放）：{address}",
+                        address);
+                }
+
                 if (instance == null)
                 {
                     throw new BattleMapLoadException(
@@ -468,13 +482,14 @@ namespace GameBattle
             }
             finally
             {
-                // 取消或加载失败时所有权仍归本方法：立即销毁孤儿并清空加载状态，允许重试。
+                // 加载或校验失败时所有权仍归本方法：立即销毁孤儿并清空加载状态，允许重试。
                 if (instance != null && _mapInstance == null)
                 {
                     DestroyInstance(instance);
                 }
 
-                if (_mapInstance == null)
+                // 只清理本代状态，避免迟到的旧加载把新一代在途任务清空。
+                if (generation == _loadGeneration && _mapInstance == null)
                 {
                     _worldLoadTask = null;
                     _currentResourceAddress = null;
@@ -485,6 +500,8 @@ namespace GameBattle
         /// <summary>销毁当前地图实例并清空绑定、引用与加载状态（地址替换/绑定失败用）。</summary>
         private void DestroyMapInstance()
         {
+            _loadGeneration++;
+
             if (_mapInstance != null)
             {
                 _mapInstance.transform.SetParent(null, false);
@@ -500,8 +517,7 @@ namespace GameBattle
 
         private async UniTask<GameObject> LoadFromResourceModuleAsync(
             Transform root,
-            string location,
-            CancellationToken cancellationToken)
+            string location)
         {
             if (_resourceModule == null)
             {
@@ -520,10 +536,7 @@ namespace GameBattle
                     location);
             }
 
-            return await _resourceModule.LoadGameObjectAsync(
-                location,
-                root,
-                cancellationToken);
+            return await _resourceModule.LoadGameObjectAsync(location, root);
         }
 
         private static void ClearChildren(Transform root, bool destroyImmediate)

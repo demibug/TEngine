@@ -294,6 +294,45 @@ namespace GameBattle.Tests.EditMode.Config
                 "路径应定位到武器 id 与 Type 字段。");
         }
 
+        [Test]
+        public void BuildGeneralCatalog_LoadsOnlyEnabledRows_AndIndexesOrderedRecipes()
+        {
+            TbGeneral table = BuildTbGeneral(
+                new GeneralRow(0, "赵云", new[] { "赵", "云" }, false, "", "", "", 0),
+                new GeneralRow(1, "张飞", new[] { "张", "飞" }, true, "pike", "SpearSoldier", "", 0, "BattleShout"),
+                new GeneralRow(4, "黄忠", new[] { "黄", "忠" }, true, "bow", "BowSoldier", "SimpleDynamicArrow", 200, "FireArrowBarrage"));
+
+            GeneralCatalogSnapshot catalog = LubanBattleConfigProvider.BuildGeneralCatalogFromLuban(table);
+
+            Assert.AreEqual(2, catalog.Definitions.Count);
+            Assert.IsNull(catalog.GetByIndexOrDefault(0), "禁用行不得进入运行时目录");
+            Assert.AreEqual("张飞", catalog.GetByRecipeOrDefault("张", "飞").Name);
+            Assert.IsNull(catalog.GetByRecipeOrDefault("飞", "张"), "反序配方必须返回 null");
+            Assert.AreEqual("黄忠", catalog.GetByRecipeOrDefault("黄", "忠").Name);
+            Assert.IsNull(catalog.GetByRecipeOrDefault("忠", "黄"), "反序配方必须返回 null");
+            Assert.AreEqual(4, catalog.PartRecruitEntries.Count);
+
+            // SkillKey 透传：启用武将携带的 skillKey 原样进入快照。
+            Assert.AreEqual("BattleShout", catalog.GetByIndexOrDefault(1).SkillKey,
+                "张飞 SkillKey 应来自配置行");
+            Assert.AreEqual("FireArrowBarrage", catalog.GetByIndexOrDefault(4).SkillKey,
+                "黄忠 SkillKey 应来自配置行");
+        }
+
+        [Test]
+        [Description("武将 SkillKey 为 null 时规范化为空串（不进入主动技能绑定校验）。")]
+        public void BuildGeneralCatalog_NullSkillKey_NormalizedToEmpty()
+        {
+            TbGeneral table = BuildTbGeneral(
+                new GeneralRow(1, "张飞", new[] { "张", "飞" }, true, "pike", "SpearSoldier", "", 0, null));
+
+            GeneralCatalogSnapshot catalog = LubanBattleConfigProvider.BuildGeneralCatalogFromLuban(table);
+
+            Assert.AreEqual(1, catalog.Definitions.Count);
+            Assert.AreEqual(string.Empty, catalog.GetByIndexOrDefault(1).SkillKey,
+                "null SkillKey 应规范化为空串");
+        }
+
         // ====================================================================
         // 测试辅助：构造受控 Luban bean（手写 ByteBuf，字段顺序与生成代码一致）
         // ====================================================================
@@ -378,7 +417,7 @@ namespace GameBattle.Tests.EditMode.Config
         }
 
         /// <summary>武器测试行（只填 Provider 消费的字段）。</summary>
-        private readonly struct WeaponRow
+        private readonly struct WeaponRowData
         {
             public readonly int Id;
             public readonly int Type;
@@ -387,7 +426,7 @@ namespace GameBattle.Tests.EditMode.Config
             public readonly bool Enabled;
             public readonly string HandlerKey;
 
-            public WeaponRow(int id, int type, string txt, int addAttPower, string handlerKey, bool enabled)
+            public WeaponRowData(int id, int type, string txt, int addAttPower, string handlerKey, bool enabled)
             {
                 Id = id;
                 Type = type;
@@ -398,8 +437,35 @@ namespace GameBattle.Tests.EditMode.Config
             }
         }
 
-        private static WeaponRow WeaponRow(int id, int type, string txt, int addAttPower, string handlerKey, bool enabled)
-            => new WeaponRow(id, type, txt, addAttPower, handlerKey, enabled);
+        private readonly struct GeneralRow
+        {
+            public readonly int Index;
+            public readonly string Name;
+            public readonly string[] Parts;
+            public readonly bool Enabled;
+            public readonly string Archetype;
+            public readonly string PrefabAddress;
+            public readonly string ProjectileType;
+            public readonly int ProjectileSpeed;
+            public readonly string SkillKey;
+
+            public GeneralRow(int index, string name, string[] parts, bool enabled, string archetype,
+                string prefabAddress, string projectileType, int projectileSpeed, string skillKey = null)
+            {
+                Index = index;
+                Name = name;
+                Parts = parts;
+                Enabled = enabled;
+                Archetype = archetype;
+                PrefabAddress = prefabAddress;
+                ProjectileType = projectileType;
+                ProjectileSpeed = projectileSpeed;
+                SkillKey = skillKey;
+            }
+        }
+
+        private static WeaponRowData WeaponRow(int id, int type, string txt, int addAttPower, string handlerKey, bool enabled)
+            => new WeaponRowData(id, type, txt, addAttPower, handlerKey, enabled);
 
         private static float[] StrategyProfile(int length, float value)
         {
@@ -552,7 +618,7 @@ namespace GameBattle.Tests.EditMode.Config
             return new TbWave(buf);
         }
 
-        private static TbWeapon BuildTbWeapon(params WeaponRow[] rows)
+        private static TbWeapon BuildTbWeapon(params WeaponRowData[] rows)
         {
             var buf = new ByteBuf();
             buf.WriteSize(rows.Length);
@@ -564,11 +630,66 @@ namespace GameBattle.Tests.EditMode.Config
             return new TbWeapon(buf);
         }
 
+        private static TbGeneral BuildTbGeneral(params GeneralRow[] rows)
+        {
+            var buf = new ByteBuf();
+            buf.WriteSize(rows.Length);
+            for (int i = 0; i < rows.Length; i++)
+            {
+                GeneralRow row = rows[i];
+                buf.WriteInt(row.Index);
+                buf.WriteString(row.Name);
+                buf.WriteString(row.Parts.Length > 0 ? row.Parts[0] : string.Empty);
+                buf.WriteSize(row.Parts.Length);
+                for (int p = 0; p < row.Parts.Length; p++)
+                {
+                    buf.WriteString(row.Parts[p]);
+                }
+
+                buf.WriteInt(1); // WeaponType
+                buf.WriteBool(false); // Status = null
+                buf.WriteBool(row.Enabled);
+                buf.WriteString(row.Archetype ?? string.Empty);
+                buf.WriteFloat(row.Enabled ? 2.5f : 0f);
+                buf.WriteInt(row.Enabled ? 10 : 0);
+                buf.WriteFloat(row.Enabled ? 1f : 0f);
+                buf.WriteString(row.Enabled ? "single" : string.Empty);
+                buf.WriteString(row.Enabled ? "nearest" : string.Empty);
+                buf.WriteString(row.PrefabAddress ?? string.Empty);
+                buf.WriteString(row.Enabled ? "default" : string.Empty);
+                bool hasProjectile = !string.IsNullOrEmpty(row.ProjectileType);
+                buf.WriteBool(hasProjectile);
+                if (hasProjectile)
+                {
+                    buf.WriteString(row.ProjectileType);
+                }
+
+                buf.WriteInt(row.ProjectileSpeed);
+                buf.WriteInt(row.Enabled ? 1 : 0);
+                WriteNullableString(buf, row.SkillKey); // SkillKey
+            }
+
+            return new TbGeneral(buf);
+        }
+
+        private static void WriteNullableString(ByteBuf buf, string value)
+        {
+            if (value != null)
+            {
+                buf.WriteBool(true);
+                buf.WriteString(value);
+            }
+            else
+            {
+                buf.WriteBool(false);
+            }
+        }
+
         /// <summary>
         /// 按生成 Weapon.cs 反序列化字段顺序写入：Id/Type/Txt/Rarity/(RareTxt?)/
         /// AddAttPower/(Exclusive?)/Scale/AnchorY/Intro/FragmentNum/Enabled/HandlerKey。
         /// </summary>
-        private static void WriteWeaponRow(ByteBuf buf, WeaponRow row)
+        private static void WriteWeaponRow(ByteBuf buf, WeaponRowData row)
         {
             buf.WriteInt(row.Id);
             buf.WriteInt(row.Type);

@@ -164,6 +164,9 @@ namespace GameBattle
         /// </summary>
         UnsupportedCommand = 30,
 
+        /// <summary>武将字尝试进入战场或离开同阵营待上场区域。</summary>
+        UnitZoneRestricted = 31,
+
         /// <summary>
         /// 未知/非预期错误。实现层捕获非预期异常后包装为此拒绝原因。
         /// </summary>

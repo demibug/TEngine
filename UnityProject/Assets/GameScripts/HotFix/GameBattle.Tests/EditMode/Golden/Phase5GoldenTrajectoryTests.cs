@@ -508,8 +508,8 @@ namespace GameBattle.Tests.EditMode.Golden
         }
 
         [Test]
-        [Description("spec 'Input commands are atomic'：DropUnit 目标不匹配时不修改任何槽位状态。")]
-        public void DropUnit_TargetMismatch_NoStateChange()
+        [Description("spec 'Input commands are atomic'：DropUnit 目标不匹配时走互换，两槽原子交换（不再拒绝）。")]
+        public void DropUnit_TargetMismatch_Swaps()
         {
             TestRuntimeContext ctx = BuildContext();
             StartBattle(ctx);
@@ -518,32 +518,27 @@ namespace GameBattle.Tests.EditMode.Golden
             UnitSlot source = reserves[0];
             UnitSlot target = reserves[1];
 
-            // 源槽放 1 级刀兵，目标槽放 1 级弓兵（不同兵种不可合并）。
+            // 源槽放 1 级刀兵，目标槽放 1 级弓兵（不同兵种不可合并 → 互换）。
             var knife = new BattleUnit(
                 5000, true, UnitKind.Soldier, SoldierType.Knife, "刀", 1);
             var bow = new BattleUnit(
                 5001, true, UnitKind.Soldier, SoldierType.Bow, "弓", 1);
             FillReserveAll(ctx, true, knife, bow);
 
-            int sourceUnitId = ctx.SlotBoard.GetSlot(source.SlotId).OccupantUnitId;
-            int targetUnitId = ctx.SlotBoard.GetSlot(target.SlotId).OccupantUnitId;
-
             BattleInputResult result = ctx.InputController.Execute(
                 BattleInputCommand.CreateDropUnit(101, source.SlotId.Id, target.SlotId.Id));
 
-            Assert.IsFalse(result.IsSuccess, "不同兵种应失败");
-            Assert.AreEqual(BattleInputRejectReason.TargetMismatch, result.RejectReason,
-                "失败原因应为 TargetMismatch");
-            Assert.AreEqual(sourceUnitId, ctx.SlotBoard.GetSlot(source.SlotId).OccupantUnitId,
-                "源槽单位未变");
-            Assert.AreEqual(targetUnitId, ctx.SlotBoard.GetSlot(target.SlotId).OccupantUnitId,
-                "目标槽单位未变");
-            Assert.AreEqual(0, ctx.UnitRegistry.Count, "未创建/修改战斗实例");
+            Assert.IsTrue(result.IsSuccess, "不同兵种应互换而非失败");
+            Assert.AreEqual(bow.UnitId, ctx.SlotBoard.GetSlot(source.SlotId).OccupantUnitId,
+                "源槽换入目标单位");
+            Assert.AreEqual(knife.UnitId, ctx.SlotBoard.GetSlot(target.SlotId).OccupantUnitId,
+                "目标槽换入源单位");
+            Assert.AreEqual(0, ctx.UnitRegistry.Count, "R→R 互换未创建/修改战斗实例");
         }
 
         [Test]
-        [Description("spec 'Input commands are atomic'：DropUnit 目标满级时不修改任何槽位状态。")]
-        public void DropUnit_MaxLevel_NoStateChange()
+        [Description("spec 'Input commands are atomic'：DropUnit 目标满级时互换，两槽原子交换（不再拒绝）。")]
+        public void DropUnit_MaxLevel_Swaps()
         {
             TestRuntimeContext ctx = BuildContext();
             StartBattle(ctx);
@@ -552,7 +547,7 @@ namespace GameBattle.Tests.EditMode.Golden
             UnitSlot source = reserves[0];
             UnitSlot target = reserves[1];
 
-            // 源与目标都是 3 级刀兵（满级不可合并）。
+            // 源与目标都是 3 级刀兵（满级不可合并 → 互换）。
             var sourceUnit = new BattleUnit(
                 6000, true, UnitKind.Soldier, SoldierType.Knife, "刀", 3);
             var targetUnit = new BattleUnit(
@@ -562,11 +557,12 @@ namespace GameBattle.Tests.EditMode.Golden
             BattleInputResult result = ctx.InputController.Execute(
                 BattleInputCommand.CreateDropUnit(102, source.SlotId.Id, target.SlotId.Id));
 
-            Assert.IsFalse(result.IsSuccess, "满级应失败");
-            Assert.AreEqual(BattleInputRejectReason.MaxLevelReached, result.RejectReason,
-                "失败原因应为 MaxLevelReached");
-            Assert.IsFalse(ctx.SlotBoard.GetSlot(source.SlotId).IsEmpty, "源槽未变");
-            Assert.AreEqual(3, ctx.SlotBoard.GetSlot(target.SlotId).Occupant.Value.Level, "目标等级未变");
+            Assert.IsTrue(result.IsSuccess, "满级目标应互换而非失败");
+            Assert.AreEqual(targetUnit.UnitId, ctx.SlotBoard.GetSlot(source.SlotId).OccupantUnitId,
+                "源槽换入目标单位");
+            Assert.AreEqual(sourceUnit.UnitId, ctx.SlotBoard.GetSlot(target.SlotId).OccupantUnitId,
+                "目标槽换入源单位");
+            Assert.AreEqual(3, ctx.SlotBoard.GetSlot(source.SlotId).Occupant.Value.Level, "互换不改变等级");
         }
 
         // ====================================================================

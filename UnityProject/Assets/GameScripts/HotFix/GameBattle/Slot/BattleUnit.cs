@@ -54,6 +54,21 @@ namespace GameBattle
         /// </summary>
         public readonly long LastAttackTimeMs;
 
+        public readonly int GeneralIndex;
+        public readonly string GeneralName;
+        public readonly string GeneralPartText;
+
+        /// <summary>General 双格中的半格序号：0=左字，1=右字；非 General 为 -1。</summary>
+        public readonly int GeneralCellIndex;
+
+        /// <summary>
+        /// General 半格合成前对应的独立字牌 ID；General 解散时恢复该身份。
+        /// GeneralPart 时等于 <see cref="UnitId"/>，普通士兵为 -1。
+        /// </summary>
+        public readonly int GeneralPartUnitId;
+
+        public bool IsGeneralPrimaryCell => Kind == UnitKind.General && GeneralCellIndex == 0;
+
         /// <summary>
         /// 构造局内单位权威数据。
         /// </summary>
@@ -71,7 +86,12 @@ namespace GameBattle
             SoldierType soldierType,
             string soldierText,
             int level,
-            long lastAttackTimeMs = 0L)
+            long lastAttackTimeMs = 0L,
+            int generalIndex = -1,
+            string generalName = "",
+            string generalPartText = "",
+            int generalCellIndex = -1,
+            int generalPartUnitId = -1)
         {
             UnitId = unitId;
             Side = side;
@@ -80,6 +100,55 @@ namespace GameBattle
             SoldierText = soldierText ?? string.Empty;
             Level = level > 0 ? level : 1;
             LastAttackTimeMs = lastAttackTimeMs;
+            GeneralIndex = generalIndex;
+            GeneralName = generalName ?? string.Empty;
+            GeneralPartText = generalPartText ?? string.Empty;
+            GeneralCellIndex = kind == UnitKind.General ? generalCellIndex : -1;
+            GeneralPartUnitId = kind == UnitKind.GeneralPart
+                ? unitId
+                : kind == UnitKind.General ? generalPartUnitId : -1;
+        }
+
+        internal static BattleUnit CreateGeneralPart(
+            int unitId,
+            bool side,
+            string partText,
+            int level = 1,
+            long lastAttackTimeMs = 0L)
+            => new BattleUnit(unitId, side, UnitKind.GeneralPart, default, string.Empty, level,
+                lastAttackTimeMs,
+                generalPartText: partText);
+
+        internal static BattleUnit CreateGeneral(int unitId, bool side, GeneralConfigSnapshot definition)
+            => CreateGeneralCell(unitId, side, definition, 0);
+
+        internal static BattleUnit CreateGeneralCell(
+            int unitId,
+            bool side,
+            GeneralConfigSnapshot definition,
+            int cellIndex,
+            int generalPartUnitId = -1,
+            int level = 1,
+            long lastAttackTimeMs = 0L)
+            => new BattleUnit(
+                unitId,
+                side,
+                UnitKind.General,
+                definition.LogicalSoldierType,
+                definition.LogicalSoldierText,
+                level,
+                lastAttackTimeMs,
+                generalIndex: definition.Index,
+                generalName: definition.Name,
+                generalPartText: definition.PartWords[cellIndex],
+                generalCellIndex: cellIndex,
+                generalPartUnitId: generalPartUnitId > 0 ? generalPartUnitId : unitId);
+
+        /// <summary>把 General 半格还原为合成前的独立武将字。</summary>
+        internal BattleUnit ToGeneralPart()
+        {
+            int partUnitId = GeneralPartUnitId > 0 ? GeneralPartUnitId : UnitId;
+            return CreateGeneralPart(partUnitId, Side, GeneralPartText, Level, LastAttackTimeMs);
         }
 
         /// <summary>
@@ -91,7 +160,8 @@ namespace GameBattle
         /// 合并升级保留目标单位的冷却时间戳（最终方案"上下场不刷新攻击冷却"）。
         /// </remarks>
         internal BattleUnit WithLevel(int newLevel)
-            => new BattleUnit(UnitId, Side, Kind, SoldierType, SoldierText, newLevel, LastAttackTimeMs);
+            => new BattleUnit(UnitId, Side, Kind, SoldierType, SoldierText, newLevel, LastAttackTimeMs,
+                GeneralIndex, GeneralName, GeneralPartText, GeneralCellIndex, GeneralPartUnitId);
 
         /// <summary>
         /// 返回同单位但攻击冷却为 <paramref name="lastAttackTimeMs"/> 的新副本。
@@ -102,10 +172,12 @@ namespace GameBattle
         /// 下场时把 <see cref="SoldierBase.LastAttackTimeMs"/> 写回 BattleUnit，重新上场时导入。
         /// </remarks>
         internal BattleUnit WithAttackCooldown(long lastAttackTimeMs)
-            => new BattleUnit(UnitId, Side, Kind, SoldierType, SoldierText, Level, lastAttackTimeMs);
+            => new BattleUnit(UnitId, Side, Kind, SoldierType, SoldierText, Level, lastAttackTimeMs,
+                GeneralIndex, GeneralName, GeneralPartText, GeneralCellIndex, GeneralPartUnitId);
 
         /// <inheritdoc/>
         public override string ToString()
-            => $"[BattleUnit Id={UnitId} Text={SoldierText} Side={(Side ? "Player" : "Opponent")} Lv={Level} Cd={LastAttackTimeMs}]";
+            => $"[BattleUnit Id={UnitId} Kind={Kind} Cell={GeneralCellIndex} PartId={GeneralPartUnitId} Text={SoldierText}{GeneralPartText}{GeneralName} " +
+               $"Side={(Side ? "Player" : "Opponent")} Lv={Level} Cd={LastAttackTimeMs}]";
     }
 }

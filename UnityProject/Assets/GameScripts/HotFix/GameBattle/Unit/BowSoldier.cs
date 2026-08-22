@@ -77,6 +77,10 @@ namespace GameBattle
         /// <summary>箭矢飞行速度缩放（对应原工程固定值 1.75）。</summary>
         private const float ArrowSpeedScale = 1.75f;
 
+        private float _arrowSpeedScale = ArrowSpeedScale;
+
+        internal float ArrowSpeedScaleForDiagnostics => _arrowSpeedScale;
+
         // ====================================================================
         // 弓兵专属依赖
         // ====================================================================
@@ -142,7 +146,14 @@ namespace GameBattle
         internal void ActivateAt(float pixelX, float pixelY) => ActivatePlacement(pixelX, pixelY);
 
         /// <summary>暴露 InitializeStats 供 UnitFactory/测试调用。</summary>
-        internal void InitStats(UnitConfigSnapshot config) => InitializeStats(config);
+        internal void InitStats(UnitConfigSnapshot config)
+        {
+            InitializeStats(config);
+            // 配置表使用整数速度（如 200）；既有投射物移动器消费 scale，适配为 100=1.0。
+            _arrowSpeedScale = config != null && config.ProjectileSpeed > 0
+                ? config.ProjectileSpeed / 100f
+                : ArrowSpeedScale;
+        }
 
         // ====================================================================
         // PerformAttack —— 创建箭矢攻击链（对应 JS launchArrow）
@@ -238,7 +249,7 @@ namespace GameBattle
                 attackerDamage: AttackDamage,
                 explicitDamage: true,
                 damage: AttackDamage,
-                speedScale: ArrowSpeedScale,
+                speedScale: _arrowSpeedScale,
                 curveHeight: ArrowCurveHeight);
 
             // 从本单位逻辑中心发射箭矢（对应 JS projectile.fire(startX, startY)）。
@@ -271,6 +282,7 @@ namespace GameBattle
         {
             _projectileFactory = null;
             _projectileManager = null;
+            _arrowSpeedScale = ArrowSpeedScale;
             base.ResetState();
         }
     }

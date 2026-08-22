@@ -25,6 +25,19 @@ public sealed partial class General : Luban.BeanBase
         {int n0 = _buf.ReadSize(); PartWords = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); PartWords.Add(_e0);}}
         WeaponType = _buf.ReadInt();
         if(_buf.ReadBool()){ Status = _buf.ReadString(); } else { Status = null; }
+        Enabled = _buf.ReadBool();
+        CombatArchetype = _buf.ReadString();
+        RangeCells = _buf.ReadFloat();
+        AttackDamage = _buf.ReadInt();
+        AttackIntervalSeconds = _buf.ReadFloat();
+        DamageMode = _buf.ReadString();
+        TargetPolicy = _buf.ReadString();
+        PrefabAddress = _buf.ReadString();
+        AnimationKey = _buf.ReadString();
+        if(_buf.ReadBool()){ ProjectileType = _buf.ReadString(); } else { ProjectileType = null; }
+        ProjectileSpeed = _buf.ReadInt();
+        PartRecruitWeight = _buf.ReadInt();
+        if(_buf.ReadBool()){ SkillKey = _buf.ReadString(); } else { SkillKey = null; }
     }
 
     public static General DeserializeGeneral(ByteBuf _buf)
@@ -56,6 +69,58 @@ public sealed partial class General : Luban.BeanBase
     /// 状态
     /// </summary>
     public readonly string Status;
+    /// <summary>
+    /// 是否进入本期配置快照与配方索引
+    /// </summary>
+    public readonly bool Enabled;
+    /// <summary>
+    /// pike 或 bow，映射既有逻辑原型
+    /// </summary>
+    public readonly string CombatArchetype;
+    /// <summary>
+    /// 当前 Unity 网格攻击范围
+    /// </summary>
+    public readonly float RangeCells;
+    /// <summary>
+    /// 1 级基础伤害
+    /// </summary>
+    public readonly int AttackDamage;
+    /// <summary>
+    /// 基础攻击间隔
+    /// </summary>
+    public readonly float AttackIntervalSeconds;
+    /// <summary>
+    /// 近战枪击 或 单体，供校验/表现描述
+    /// </summary>
+    public readonly string DamageMode;
+    /// <summary>
+    /// 复用现有目标策略键
+    /// </summary>
+    public readonly string TargetPolicy;
+    /// <summary>
+    /// 当前枪兵/弓兵回退地址，后续可替换为专属 Prefab
+    /// </summary>
+    public readonly string PrefabAddress;
+    /// <summary>
+    /// 表现绑定键
+    /// </summary>
+    public readonly string AnimationKey;
+    /// <summary>
+    /// 仅远程武将需要，本期为 SimpleDynamicArrow
+    /// </summary>
+    public readonly string ProjectileType;
+    /// <summary>
+    /// 仅远程武将使用，本期 200
+    /// </summary>
+    public readonly int ProjectileSpeed;
+    /// <summary>
+    /// 每个配方字加入玩家池的权重，首版为 1
+    /// </summary>
+    public readonly int PartRecruitWeight;
+    /// <summary>
+    /// 主动技能Key
+    /// </summary>
+    public readonly string SkillKey;
    
     public const int __ID__ = 1636813202;
     public override int GetTypeId() => __ID__;
@@ -73,6 +138,19 @@ public sealed partial class General : Luban.BeanBase
         + "partWords:" + Luban.StringUtil.CollectionToString(PartWords) + ","
         + "weaponType:" + WeaponType + ","
         + "status:" + Status + ","
+        + "enabled:" + Enabled + ","
+        + "combatArchetype:" + CombatArchetype + ","
+        + "rangeCells:" + RangeCells + ","
+        + "attackDamage:" + AttackDamage + ","
+        + "attackIntervalSeconds:" + AttackIntervalSeconds + ","
+        + "damageMode:" + DamageMode + ","
+        + "targetPolicy:" + TargetPolicy + ","
+        + "prefabAddress:" + PrefabAddress + ","
+        + "animationKey:" + AnimationKey + ","
+        + "projectileType:" + ProjectileType + ","
+        + "projectileSpeed:" + ProjectileSpeed + ","
+        + "partRecruitWeight:" + PartRecruitWeight + ","
+        + "skillKey:" + SkillKey + ","
         + "}";
     }
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using GameBattle;
 using NUnit.Framework;
@@ -41,7 +40,8 @@ namespace GameBattle.Tests.EditMode.Presentation
         [Test]
         public async Task Preload_SpawnAndRemove_SelectsAddressPoolAndResetsReusedHealthBar()
         {
-            await _viewPort.PreloadAsync(new[] { "Mob1", "Mob3" }, CancellationToken.None);
+            await _viewPort.PreloadAsync(
+                new[] { "Mob1", "Mob3" }, Array.Empty<string>(), Array.Empty<string>());
 
             _viewPort.OnEnemySpawned(new EnemySpawnViewData(101, "Mob1", "Mob1", true, 0f, 0f));
             GameObject firstMob1 = FindActiveEnemy("Mob1(Clone)");
@@ -76,7 +76,8 @@ namespace GameBattle.Tests.EditMode.Presentation
             BattlePresentationLoadException loadException = null;
             try
             {
-                await _viewPort.PreloadAsync(new[] { "Mob0", "Mob1" }, CancellationToken.None);
+                await _viewPort.PreloadAsync(
+                    new[] { "Mob0", "Mob1" }, Array.Empty<string>(), Array.Empty<string>());
             }
             catch (BattlePresentationLoadException exception)
             {
@@ -90,7 +91,8 @@ namespace GameBattle.Tests.EditMode.Presentation
 
             int failedBatchCount = _loader.Leases.Count;
             _loader.InvalidAtCall = null;
-            await _viewPort.PreloadAsync(new[] { "Mob0", "Mob1" }, CancellationToken.None);
+            await _viewPort.PreloadAsync(
+                new[] { "Mob0", "Mob1" }, Array.Empty<string>(), Array.Empty<string>());
 
             Assert.Greater(_loader.Leases.Count, failedBatchCount, "失败后必须允许完整重试。");
             Assert.IsTrue(_loader.Leases.Exists(lease => lease.DisposeCount == 0),
@@ -104,38 +106,55 @@ namespace GameBattle.Tests.EditMode.Presentation
         }
 
         [Test]
-        public async Task Preload_CanceledAfterFirstLease_ReleasesAndCanRetry()
+        public async Task Preload_ConfiguredGeneralAddress_LoadsAndInstantiatesByConfiguredPoolKey()
         {
-            using (var cancellation = new CancellationTokenSource())
-            {
-                _loader.OnLoad = callIndex =>
-                {
-                    if (callIndex == 1)
-                    {
-                        cancellation.Cancel();
-                    }
-                };
+            await _viewPort.PreloadAsync(
+                Array.Empty<string>(), new[] { "FutureGeneralPrefab" }, Array.Empty<string>());
 
-                bool canceled = false;
-                try
-                {
-                    await _viewPort.PreloadAsync(new[] { "Mob0" }, cancellation.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    canceled = true;
-                }
+            CollectionAssert.Contains(_loader.LoadedLocations, "FutureGeneralPrefab");
+            _viewPort.OnConfiguredUnitPlaced(new UnitSpawnViewData(
+                301, true, 2, 99, "测试武将", 2,
+                "FutureGeneralPrefab", "default", 0, 0, 1));
 
-                Assert.IsTrue(canceled, "预加载应传播取消异常。");
-            }
+            Transform soldierRoot = _bindings.SoldierRoot;
+            Assert.AreEqual(1, soldierRoot.childCount);
+            Assert.AreEqual("FutureGeneralPrefab(Clone)", soldierRoot.GetChild(0).name);
+        }
 
-            Assert.GreaterOrEqual(_loader.Leases.Count, 1);
-            AssertAllDisposed(_loader.Leases, "取消必须释放取消前已取得的租约。");
+        [Test]
+        public async Task ConfiguredGeneralWithoutBody_UsesVisibleMeshRendererForDragHit()
+        {
+            await _viewPort.PreloadAsync(
+                Array.Empty<string>(), new[] { "SpineGeneralPrefab" }, Array.Empty<string>());
 
-            int canceledBatchCount = _loader.Leases.Count;
-            _loader.OnLoad = null;
-            await _viewPort.PreloadAsync(new[] { "Mob0" }, CancellationToken.None);
-            Assert.Greater(_loader.Leases.Count, canceledBatchCount, "取消后必须允许重新预加载。");
+            _viewPort.OnConfiguredUnitPlaced(new UnitSpawnViewData(
+                302, true, 2, 1, "张飞", 2,
+                "SpineGeneralPrefab", "zhan1", 0, 0, 1));
+
+            GameObject placed = _bindings.SoldierRoot.GetChild(0).gameObject;
+            Assert.IsNull(placed.transform.Find("Body"), "测试 Prefab 模拟 Spine 武将，不提供 Body 节点");
+            Renderer dragRenderer = UnityBattleViewPort.ResolveUnitDragRenderer(placed);
+
+            Assert.IsNotNull(dragRenderer, "没有 Body 的配置化武将仍应找到可见主体作为拖拽命中区域");
+            Assert.IsInstanceOf<MeshRenderer>(dragRenderer);
+            Assert.AreEqual("Skeleton", dragRenderer.gameObject.name);
+        }
+
+        [Test]
+        public async Task Preload_GeneralPartWords_LoadsGlyphSpritesAndExposesByPartWord()
+        {
+            await _viewPort.PreloadAsync(
+                Array.Empty<string>(),
+                Array.Empty<string>(),
+                new[] { "张", "飞", "黄", "忠" });
+
+            // 字形地址由 GeneralPartGlyphMap 映射：张=2 飞=3 黄=10 忠=11
+            Assert.Contains("Sprites/Extracted/GameObject/soldier/generalParts_2", _loader.LoadedLocations);
+            Assert.Contains("Sprites/Extracted/GameObject/soldier/generalParts_11", _loader.LoadedLocations);
+
+            Assert.IsNotNull(_viewPort.GetGeneralPartIcon("张"), "已预加载的拆字应返回字形 Sprite。");
+            Assert.IsNotNull(_viewPort.GetGeneralPartIcon("黄"), "已预加载的拆字应返回字形 Sprite。");
+            Assert.IsNull(_viewPort.GetGeneralPartIcon("赵"), "未预加载的拆字应返回 null。");
         }
 
         private GameObject FindActiveEnemy(string expectedName)
@@ -229,14 +248,14 @@ namespace GameBattle.Tests.EditMode.Presentation
 
             internal List<FakeLease> Leases { get; } = new List<FakeLease>();
 
-            internal int? InvalidAtCall { get; set; }
+            internal List<string> LoadedLocations { get; } = new List<string>();
 
-            internal Action<int> OnLoad { get; set; }
+            internal int? InvalidAtCall { get; set; }
 
             public IBattleAssetLease LoadAsync<T>(string location) where T : UnityEngine.Object
             {
+                LoadedLocations.Add(location);
                 int callIndex = ++_callCount;
-                OnLoad?.Invoke(callIndex);
 
                 bool valid = InvalidAtCall != callIndex;
                 object asset = null;
@@ -284,9 +303,19 @@ namespace GameBattle.Tests.EditMode.Presentation
                 }
 
                 prefab = new GameObject(location);
-                GameObject body = new GameObject("Body");
-                body.transform.SetParent(prefab.transform, false);
-                body.AddComponent<SpriteRenderer>().sprite = _sprite;
+                if (location == "SpineGeneralPrefab")
+                {
+                    GameObject skeleton = new GameObject("Skeleton");
+                    skeleton.transform.SetParent(prefab.transform, false);
+                    skeleton.AddComponent<MeshFilter>();
+                    skeleton.AddComponent<MeshRenderer>();
+                }
+                else
+                {
+                    GameObject body = new GameObject("Body");
+                    body.transform.SetParent(prefab.transform, false);
+                    body.AddComponent<SpriteRenderer>().sprite = _sprite;
+                }
 
                 Transform visualRoot = new GameObject("VisualRoot").transform;
                 visualRoot.SetParent(prefab.transform, false);

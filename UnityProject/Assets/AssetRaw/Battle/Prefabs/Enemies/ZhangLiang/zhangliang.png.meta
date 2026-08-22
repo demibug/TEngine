@@ -1,0 +1,949 @@
+fileFormatVersion: 2
+guid: 10e44b5f93c34ca42ba663ff8d938e92
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -6849962419871346340
+    second: zhangliang_0
+  - first:
+      213: -1305019488862169478
+    second: zhangliang_1
+  - first:
+      213: 4942436859188514402
+    second: zhangliang_2
+  - first:
+      213: 5529028634085149853
+    second: zhangliang_3
+  - first:
+      213: 6691191392304880679
+    second: zhangliang_4
+  - first:
+      213: -2491928283063917807
+    second: zhangliang_5
+  - first:
+      213: -8655081957108516461
+    second: zhangliang_6
+  - first:
+      213: -9040109150451381772
+    second: zhangliang_7
+  - first:
+      213: 4129819622086493915
+    second: zhangliang_8
+  - first:
+      213: 800160541138014322
+    second: zhangliang_9
+  - first:
+      213: -6312408611787168431
+    second: zhangliang_10
+  - first:
+      213: 9004728296291550337
+    second: zhangliang_11
+  - first:
+      213: -558969684354584568
+    second: zhangliang_12
+  - first:
+      213: 2059348035597646658
+    second: zhangliang_13
+  - first:
+      213: 7255997687853514561
+    second: zhangliang_14
+  - first:
+      213: -431006208604805064
+    second: zhangliang_15
+  - first:
+      213: 4582932063669475202
+    second: zhangliang_16
+  - first:
+      213: -1216044012192981781
+    second: zhangliang_17
+  - first:
+      213: 9126207791876126970
+    second: zhangliang_18
+  - first:
+      213: -7750774093737254939
+    second: zhangliang_19
+  - first:
+      213: 1112158225420633183
+    second: zhangliang_20
+  - first:
+      213: -453200394131536459
+    second: zhangliang_21
+  - first:
+      213: -4653988222543521710
+    second: zhangliang_22
+  - first:
+      213: 208279930185163397
+    second: zhangliang_23
+  - first:
+      213: 1429372243947931618
+    second: zhangliang_24
+  - first:
+      213: 4810261373323406878
+    second: zhangliang_25
+  - first:
+      213: -963935626266732856
+    second: zhangliang_26
+  - first:
+      213: 4916638932811357790
+    second: zhangliang_27
+  - first:
+      213: -3732134058347301938
+    second: zhangliang_28
+  - first:
+      213: 3989393255070596795
+    second: zhangliang_29
+  - first:
+      213: 7882671966775064435
+    second: zhangliang_30
+  - first:
+      213: 5684208429452089423
+    second: zhangliang_31
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 0
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 0
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 0
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: zhangliang_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 450
+        width: 221
+        height: 62
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c511bc6c87b00f0a0800000000000000
+      internalID: -6849962419871346340
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_1
+      rect:
+        serializedVersion: 2
+        x: 47
+        y: 427
+        width: 39
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a76986d60b3a3ede0800000000000000
+      internalID: -1305019488862169478
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_2
+      rect:
+        serializedVersion: 2
+        x: 173
+        y: 276
+        width: 89
+        height: 178
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 26e8ab42320179440800000000000000
+      internalID: 4942436859188514402
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_3
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 276
+        width: 159
+        height: 109
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d9ccb97af3e0bbc40800000000000000
+      internalID: 5529028634085149853
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_4
+      rect:
+        serializedVersion: 2
+        x: 8
+        y: 377
+        width: 167
+        height: 71
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 72cdb7eae13ebdc50800000000000000
+      internalID: 6691191392304880679
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_5
+      rect:
+        serializedVersion: 2
+        x: 129
+        y: 341
+        width: 35
+        height: 42
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 113e93aed64ea6dd0800000000000000
+      internalID: -2491928283063917807
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_6
+      rect:
+        serializedVersion: 2
+        x: 8
+        y: 15
+        width: 270
+        height: 258
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 39977ac01d8f2e780800000000000000
+      internalID: -8655081957108516461
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_7
+      rect:
+        serializedVersion: 2
+        x: 276
+        y: 228
+        width: 7
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4f9469ccf941b8280800000000000000
+      internalID: -9040109150451381772
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_8
+      rect:
+        serializedVersion: 2
+        x: 277
+        y: 168
+        width: 42
+        height: 85
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bd647e8c011105930800000000000000
+      internalID: 4129819622086493915
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_9
+      rect:
+        serializedVersion: 2
+        x: 308
+        y: 139
+        width: 120
+        height: 122
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 270d0d1d5cdba1b00800000000000000
+      internalID: 800160541138014322
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_10
+      rect:
+        serializedVersion: 2
+        x: 288
+        y: 138
+        width: 22
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1552f49efc1d568a0800000000000000
+      internalID: -6312408611787168431
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_11
+      rect:
+        serializedVersion: 2
+        x: 308
+        y: 147
+        width: 6
+        height: 13
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 184cd572da837fc70800000000000000
+      internalID: 9004728296291550337
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_12
+      rect:
+        serializedVersion: 2
+        x: 375
+        y: 132
+        width: 28
+        height: 26
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 80035db98042e38f0800000000000000
+      internalID: -558969684354584568
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_13
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 80
+        width: 65
+        height: 115
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 24b32b2a026449c10800000000000000
+      internalID: 2059348035597646658
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_14
+      rect:
+        serializedVersion: 2
+        x: 285
+        y: 114
+        width: 15
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 14f7093047b72b460800000000000000
+      internalID: 7255997687853514561
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_15
+      rect:
+        serializedVersion: 2
+        x: 399
+        y: 126
+        width: 15
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8386f180322c40af0800000000000000
+      internalID: -431006208604805064
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_16
+      rect:
+        serializedVersion: 2
+        x: 267
+        y: 105
+        width: 27
+        height: 14
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 28754c43e68d99f30800000000000000
+      internalID: 4582932063669475202
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_17
+      rect:
+        serializedVersion: 2
+        x: 270
+        y: 85
+        width: 26
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bec1ffde96ebf1fe0800000000000000
+      internalID: -1216044012192981781
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_18
+      rect:
+        serializedVersion: 2
+        x: 394
+        y: 78
+        width: 16
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: af8bd2d42adc6ae70800000000000000
+      internalID: 9126207791876126970
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_19
+      rect:
+        serializedVersion: 2
+        x: 408
+        y: 80
+        width: 20
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5ef9d70f608bf6490800000000000000
+      internalID: -7750774093737254939
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_20
+      rect:
+        serializedVersion: 2
+        x: 439
+        y: 15
+        width: 64
+        height: 67
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f54c938730e2f6f00800000000000000
+      internalID: 1112158225420633183
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_21
+      rect:
+        serializedVersion: 2
+        x: 269
+        y: 58
+        width: 29
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5b509b784a8e5b9f0800000000000000
+      internalID: -453200394131536459
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_22
+      rect:
+        serializedVersion: 2
+        x: 287
+        y: 48
+        width: 13
+        height: 11
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 25811769e56b96fb0800000000000000
+      internalID: -4653988222543521710
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_23
+      rect:
+        serializedVersion: 2
+        x: 381
+        y: 50
+        width: 29
+        height: 22
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 582a7843e75f3e200800000000000000
+      internalID: 208279930185163397
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_24
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 57
+        width: 9
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2e7c1549b7626d310800000000000000
+      internalID: 1429372243947931618
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_25
+      rect:
+        serializedVersion: 2
+        x: 298
+        y: 32
+        width: 23
+        height: 20
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e1e69b1bb3b71c240800000000000000
+      internalID: 4810261373323406878
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_26
+      rect:
+        serializedVersion: 2
+        x: 346
+        y: 15
+        width: 31
+        height: 31
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8c61702b7a96f92f0800000000000000
+      internalID: -963935626266732856
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_27
+      rect:
+        serializedVersion: 2
+        x: 372
+        y: 36
+        width: 13
+        height: 18
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e5e93175f096b3440800000000000000
+      internalID: 4916638932811357790
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_28
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 39
+        width: 7
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ec3721ef8dbc43cc0800000000000000
+      internalID: -3732134058347301938
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_29
+      rect:
+        serializedVersion: 2
+        x: 392
+        y: 44
+        width: 10
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bbe72dd570c2d5730800000000000000
+      internalID: 3989393255070596795
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_30
+      rect:
+        serializedVersion: 2
+        x: 315
+        y: 24
+        width: 11
+        height: 15
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 377be8cb360e46d60800000000000000
+      internalID: 7882671966775064435
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: zhangliang_31
+      rect:
+        serializedVersion: 2
+        x: 330
+        y: 21
+        width: 12
+        height: 17
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f48d5ca437d52ee40800000000000000
+      internalID: 5684208429452089423
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      zhangliang_0: -6849962419871346340
+      zhangliang_1: -1305019488862169478
+      zhangliang_10: -6312408611787168431
+      zhangliang_11: 9004728296291550337
+      zhangliang_12: -558969684354584568
+      zhangliang_13: 2059348035597646658
+      zhangliang_14: 7255997687853514561
+      zhangliang_15: -431006208604805064
+      zhangliang_16: 4582932063669475202
+      zhangliang_17: -1216044012192981781
+      zhangliang_18: 9126207791876126970
+      zhangliang_19: -7750774093737254939
+      zhangliang_2: 4942436859188514402
+      zhangliang_20: 1112158225420633183
+      zhangliang_21: -453200394131536459
+      zhangliang_22: -4653988222543521710
+      zhangliang_23: 208279930185163397
+      zhangliang_24: 1429372243947931618
+      zhangliang_25: 4810261373323406878
+      zhangliang_26: -963935626266732856
+      zhangliang_27: 4916638932811357790
+      zhangliang_28: -3732134058347301938
+      zhangliang_29: 3989393255070596795
+      zhangliang_3: 5529028634085149853
+      zhangliang_30: 7882671966775064435
+      zhangliang_31: 5684208429452089423
+      zhangliang_4: 6691191392304880679
+      zhangliang_5: -2491928283063917807
+      zhangliang_6: -8655081957108516461
+      zhangliang_7: -9040109150451381772
+      zhangliang_8: 4129819622086493915
+      zhangliang_9: 800160541138014322
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

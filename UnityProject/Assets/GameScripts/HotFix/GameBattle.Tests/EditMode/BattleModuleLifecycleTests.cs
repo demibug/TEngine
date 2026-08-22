@@ -1,6 +1,5 @@
 using System;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
@@ -12,17 +11,16 @@ using UnityEngine.TestTools;
 namespace GameBattle.Tests.EditMode
 {
     /// <summary>
-    /// BattleModule 生命周期门控测试（task 2.6）。
+    /// BattleModule 生命周期状态防重测试（task 2.6）。
     /// </summary>
     /// <remarks>
     /// <para>验证 task 2.6 的全部关键要求：</para>
     /// <list type="bullet">
-    /// <item>Start/Restart/Exit 串行门（同一时刻只有一个生命周期操作在执行）</item>
+    /// <item>Start/Restart/Exit 在第一次 await 前同步更新状态</item>
     /// <item>重复 Start 返回 AlreadyActive</item>
     /// <item>Restart 只允许 Settling 状态</item>
-    /// <item>Exit 在任意状态幂等且合并并发请求</item>
+    /// <item>Exit 在任意状态幂等，Exiting 时拒绝重复清理</item>
     /// <item>加载失败执行反向回滚</item>
-    /// <item>调用方取消不能绕过内部清理</item>
     /// <item>Faulted 必须先清理才能回到 Idle</item>
     /// <item>使用 BattleModuleStateTransitions.CanTransition 校验状态迁移</item>
     /// </list>
@@ -55,14 +53,14 @@ namespace GameBattle.Tests.EditMode
         /// 默认成功加载委托：立即返回成功（Running）。
         /// </summary>
         private static BattleModule.BattleEntryHandler DefaultSuccessEntry =>
-            (loadout, scope, ct) =>
+            (loadout, scope) =>
                 UniTask.FromResult(BattleOperationResult.Ok(BattleModuleState.Running));
 
         /// <summary>
         /// 默认清理委托：释放 scope 并返回成功（Idle）。
         /// </summary>
         private static BattleModule.BattleExitHandler DefaultExit =>
-            (scope, ct) =>
+            scope =>
             {
                 if (scope != null)
                 {
@@ -78,48 +76,82 @@ namespace GameBattle.Tests.EditMode
             => BattleLoadoutDto.CreateMinimalDefault();
 
         // ====================================================================
-        // 串行门测试
+        // 状态防重测试
         // ====================================================================
 
         [Test]
-        [Description("串行门：同一时刻只有一个生命周期操作在执行。")]
-        public async Task SerialGate_OnlyOneOperationAtATime()
+        [Description("第一次 Start 在首次 await 前进入 Entering，第二次 Start 直接返回 AlreadyActive。")]
+        public async Task StartStateGuard_TransitionsBeforeAwait_AndRejectsDuplicate()
         {
-            // 使用延迟加载委托模拟耗时操作，验证串行门阻止并发执行。
-            var entryCallOrder = new System.Collections.Generic.List<int>();
             int entryCallCount = 0;
+            var entryAllowed = new UniTaskCompletionSource<BattleOperationResult>();
 
-            BattleModule.BattleEntryHandler slowEntry = (loadout, scope, ct) =>
+            BattleModule.BattleEntryHandler slowEntry = (loadout, scope) =>
             {
-                int callId = ++entryCallCount;
-                entryCallOrder.Add(callId);
-                // 模拟异步加载延迟。
-                return UniTask.Delay(50, cancellationToken: ct)
-                    .ContinueWith(() =>
-                        BattleOperationResult.Ok(BattleModuleState.Running));
+                ++entryCallCount;
+                return entryAllowed.Task;
             };
 
             BattleModule module = CreateModule(slowEntry, DefaultExit);
 
-            // 并发发起两个 Start（第二个应返回 AlreadyActive 而非真正执行加载）。
             UniTask<BattleOperationResult> task1 = module.StartAsync(CreateLoadout());
-            UniTask<BattleOperationResult> task2 = module.StartAsync(CreateLoadout());
+            Assert.AreEqual(BattleModuleState.Entering, module.State,
+                "第一次 Start 返回等待任务前必须同步进入 Entering。");
+            BattleOperationResult result2 = await module.StartAsync(CreateLoadout());
 
+            Assert.IsFalse(result2.IsSuccess, "第二个 Start 应返回失败。");
+            Assert.AreEqual(BattleErrorCode.AlreadyActive, result2.ErrorCode);
+            Assert.AreEqual(1, entryCallCount, "加载委托应只被调用一次。");
+
+            entryAllowed.TrySetResult(BattleOperationResult.Ok(BattleModuleState.Running));
             BattleOperationResult result1 = await task1;
-            BattleOperationResult result2 = await task2;
-
-            // 第一个 Start 成功。
             Assert.IsTrue(result1.IsSuccess, "第一个 Start 应成功。");
             Assert.AreEqual(BattleModuleState.Running, result1.CurrentState);
 
-            // 第二个 Start 返回 AlreadyActive（串行门阻止了并发加载）。
-            Assert.IsFalse(result2.IsSuccess, "第二个 Start 应返回失败。");
-            Assert.AreEqual(BattleErrorCode.AlreadyActive, result2.ErrorCode);
-
-            // 加载委托只被调用一次（串行门保证）。
-            Assert.AreEqual(1, entryCallCount, "加载委托应只被调用一次。");
-
             // 清理。
+            await module.ExitAsync();
+        }
+
+        [Test]
+        [Description("Entering 期间退出后，迟到的 Start 结果不得重新提交 Running，且模块可再次开始。")]
+        public async Task ExitDuringEntering_InvalidatesLateStartCommit_AndAllowsRetry()
+        {
+            var firstEntryAllowed = new UniTaskCompletionSource<BattleOperationResult>();
+            var firstExitAllowed = new UniTaskCompletionSource<BattleOperationResult>();
+            int entryCallCount = 0;
+            int exitCallCount = 0;
+            BattleModule module = CreateModule(
+                (loadout, scope) => ++entryCallCount == 1
+                    ? firstEntryAllowed.Task
+                    : UniTask.FromResult(BattleOperationResult.Ok(BattleModuleState.Running)),
+                scope => ++exitCallCount == 1
+                    ? firstExitAllowed.Task
+                    : UniTask.FromResult(BattleOperationResult.Ok(BattleModuleState.Idle)));
+
+            UniTask<BattleOperationResult> firstStart = module.StartAsync(CreateLoadout());
+            Assert.AreEqual(BattleModuleState.Entering, module.State);
+
+            UniTask<BattleOperationResult> firstExit = module.ExitAsync();
+            Assert.AreEqual(BattleModuleState.Exiting, module.State);
+            Assert.AreEqual(1, exitCallCount);
+
+            firstEntryAllowed.TrySetResult(BattleOperationResult.Ok(BattleModuleState.Running));
+            BattleOperationResult staleStart = await firstStart;
+            Assert.IsFalse(staleStart.IsSuccess, "退出后的迟到 Start 结果不得重新提交 Running。");
+            Assert.AreEqual(BattleErrorCode.Exiting, staleStart.ErrorCode);
+            Assert.AreEqual(BattleModuleState.Exiting, module.State,
+                "迟到 Start 不得抢占 Exit 的清理所有权或提前切回 Idle。");
+
+            firstExitAllowed.TrySetResult(BattleOperationResult.Ok(BattleModuleState.Idle));
+            BattleOperationResult exit = await firstExit;
+            Assert.IsTrue(exit.IsSuccess);
+            Assert.AreEqual(BattleModuleState.Idle, module.State);
+
+            BattleOperationResult retry = await module.StartAsync(CreateLoadout());
+            Assert.IsTrue(retry.IsSuccess);
+            Assert.AreEqual(BattleModuleState.Running, module.State);
+            Assert.AreEqual(2, entryCallCount);
+
             await module.ExitAsync();
         }
 
@@ -192,7 +224,7 @@ namespace GameBattle.Tests.EditMode
         public async Task Restart_DuringSettling_Succeeds()
         {
             int entryCallCount = 0;
-            BattleModule.BattleEntryHandler countingEntry = (loadout, scope, ct) =>
+            BattleModule.BattleEntryHandler countingEntry = (loadout, scope) =>
             {
                 ++entryCallCount;
                 return UniTask.FromResult(BattleOperationResult.Ok(BattleModuleState.Running));
@@ -241,7 +273,7 @@ namespace GameBattle.Tests.EditMode
         public async Task Exit_Running_ReturnsToIdle()
         {
             bool exitHandlerCalled = false;
-            BattleModule.BattleExitHandler trackingExit = (scope, ct) =>
+            BattleModule.BattleExitHandler trackingExit = scope =>
             {
                 exitHandlerCalled = true;
                 if (scope != null)
@@ -262,44 +294,33 @@ namespace GameBattle.Tests.EditMode
         }
 
         [Test]
-        [Description("Exit 并发合并：多个并发退出请求共享同一个退出操作。")]
-        public async Task Exit_Concurrent_MergesRequests()
+        [Description("Exit 进行中重复调用返回 Exiting，且不重复清理。")]
+        public async Task Exit_WhileExiting_RejectsDuplicateWithoutExtraCleanup()
         {
             int exitCallCount = 0;
-            var exitStarted = new UniTaskCompletionSource();
             var exitAllowed = new UniTaskCompletionSource();
 
-            BattleModule.BattleExitHandler slowExit = (scope, ct) =>
+            BattleModule.BattleExitHandler slowExit = scope =>
             {
                 ++exitCallCount;
-                exitStarted.TrySetResult();
-                return ExitSlowCore(scope, ct, exitAllowed);
+                return ExitSlowCore(scope, exitAllowed);
             };
 
             BattleModule module = CreateModule(DefaultSuccessEntry, slowExit);
             await module.StartAsync(CreateLoadout());
 
-            // 并发发起三个 Exit。
             UniTask<BattleOperationResult> exit1 = module.ExitAsync();
-            UniTask<BattleOperationResult> exit2 = module.ExitAsync();
-            UniTask<BattleOperationResult> exit3 = module.ExitAsync();
+            Assert.AreEqual(BattleModuleState.Exiting, module.State);
 
-            // 等待退出操作开始。
-            await exitStarted.Task;
+            BattleOperationResult r2 = await module.ExitAsync();
+            BattleOperationResult r3 = await module.ExitAsync();
+            Assert.AreEqual(BattleErrorCode.Exiting, r2.ErrorCode);
+            Assert.AreEqual(BattleErrorCode.Exiting, r3.ErrorCode);
+            Assert.AreEqual(1, exitCallCount, "重复 Exit 不得再次调用清理委托。");
 
-            // 允许退出操作完成。
             exitAllowed.TrySetResult();
-
             BattleOperationResult r1 = await exit1;
-            BattleOperationResult r2 = await exit2;
-            BattleOperationResult r3 = await exit3;
-
-            // 三个并发退出都成功。
-            Assert.IsTrue(r1.IsSuccess && r2.IsSuccess && r3.IsSuccess,
-                "所有并发 Exit 应共享退出操作并返回成功。");
-
-            // 清理委托只被调用一次（合并）。
-            Assert.AreEqual(1, exitCallCount, "并发 Exit 应合并为一次清理调用。");
+            Assert.IsTrue(r1.IsSuccess);
             Assert.AreEqual(BattleModuleState.Idle, module.State);
         }
 
@@ -308,7 +329,7 @@ namespace GameBattle.Tests.EditMode
         public async Task Exit_AfterComplete_IsIdempotent()
         {
             int exitCallCount = 0;
-            BattleModule.BattleExitHandler countingExit = (scope, ct) =>
+            BattleModule.BattleExitHandler countingExit = scope =>
             {
                 ++exitCallCount;
                 if (scope != null)
@@ -341,7 +362,7 @@ namespace GameBattle.Tests.EditMode
         public async Task LoadFailure_PerformsRollback()
         {
             bool scopeReleased = false;
-            BattleModule.BattleEntryHandler failingEntry = (loadout, scope, ct) =>
+            BattleModule.BattleEntryHandler failingEntry = (loadout, scope) =>
             {
                 // 模拟部分初始化后失败。
                 scope.Track(BattleRuntimeScope.OwnershipKind.Generic,
@@ -380,7 +401,7 @@ namespace GameBattle.Tests.EditMode
         public async Task Restart_LoadFailure_RollsBackAndReturnsToIdle()
         {
             int entryCallCount = 0;
-            BattleModule.BattleEntryHandler entryHandler = (loadout, scope, ct) =>
+            BattleModule.BattleEntryHandler entryHandler = (loadout, scope) =>
             {
                 ++entryCallCount;
                 if (entryCallCount == 1)
@@ -418,7 +439,7 @@ namespace GameBattle.Tests.EditMode
         public async Task FullLifecycle_Start_Restart_Exit_Start()
         {
             int entryCallCount = 0;
-            BattleModule.BattleEntryHandler entry = (loadout, scope, ct) =>
+            BattleModule.BattleEntryHandler entry = (loadout, scope) =>
             {
                 ++entryCallCount;
                 return UniTask.FromResult(BattleOperationResult.Ok(BattleModuleState.Running));
@@ -489,32 +510,26 @@ namespace GameBattle.Tests.EditMode
         }
 
         [Test]
-        [Description("战斗入口参数应把装载信息和窗口取消令牌原样传给开始命令。")]
-        public async Task BattleStartEntryArgs_ForwardsLoadoutAndCancellation()
+        [Description("战斗入口参数应把装载信息原样传给无令牌开始命令。")]
+        public async Task BattleStartEntryArgs_ForwardsLoadoutToTokenlessCommand()
         {
             BattleLoadoutDto loadout = CreateLoadout();
             bool called = false;
             BattleLoadoutDto receivedLoadout = default;
-            CancellationToken receivedToken = default;
 
             var entryArgs = new BattleStartEntryArgs(
                 loadout,
-                (requestedLoadout, cancellationToken) =>
+                requestedLoadout =>
                 {
                     called = true;
                     receivedLoadout = requestedLoadout;
-                    receivedToken = cancellationToken;
                     return UniTask.FromResult(BattleOperationResult.Ok(BattleModuleState.Running));
                 });
 
-            using var cancellationSource = new CancellationTokenSource();
-            BattleOperationResult result = await entryArgs.StartAsync(
-                entryArgs.Loadout,
-                cancellationSource.Token);
+            BattleOperationResult result = await entryArgs.StartAsync(entryArgs.Loadout);
 
             Assert.IsTrue(called);
             Assert.AreEqual(loadout.MapId, receivedLoadout.MapId);
-            Assert.AreEqual(cancellationSource.Token, receivedToken);
             Assert.IsTrue(result.IsSuccess);
         }
 
@@ -541,10 +556,9 @@ namespace GameBattle.Tests.EditMode
         /// </summary>
         private static async UniTask<BattleOperationResult> ExitSlowCore(
             BattleRuntimeScope scope,
-            CancellationToken ct,
             UniTaskCompletionSource exitAllowed)
         {
-            await exitAllowed.Task.AttachExternalCancellation(ct);
+            await exitAllowed.Task;
             if (scope != null)
             {
                 scope.Release();
