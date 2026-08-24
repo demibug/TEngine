@@ -19,9 +19,9 @@ public sealed partial class UnitLevel : Luban.BeanBase
 {
     public UnitLevel(ByteBuf _buf) 
     {
-        MaxLevel = _buf.ReadInt();
-        {int n0 = _buf.ReadSize(); DamageLevelMultipliers = new System.Collections.Generic.List<float>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { float _e0;  _e0 = _buf.ReadFloat(); DamageLevelMultipliers.Add(_e0);}}
-        {int n0 = _buf.ReadSize(); AttackSpeedLevelMultipliers = new System.Collections.Generic.List<float>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { float _e0;  _e0 = _buf.ReadFloat(); AttackSpeedLevelMultipliers.Add(_e0);}}
+        Id = _buf.ReadInt();
+        DamageLevelMultipliers = _buf.ReadFloat();
+        AttackSpeedLevelMultipliers = _buf.ReadFloat();
     }
 
     public static UnitLevel DeserializeUnitLevel(ByteBuf _buf)
@@ -30,17 +30,17 @@ public sealed partial class UnitLevel : Luban.BeanBase
     }
 
     /// <summary>
-    /// 最大等级
+    /// 等级ID(主键)
     /// </summary>
-    public readonly int MaxLevel;
+    public readonly int Id;
     /// <summary>
-    /// 伤害等级倍数
+    /// 该等级伤害倍数
     /// </summary>
-    public readonly System.Collections.Generic.List<float> DamageLevelMultipliers;
+    public readonly float DamageLevelMultipliers;
     /// <summary>
-    /// 攻速等级倍数
+    /// 该等级攻速倍数
     /// </summary>
-    public readonly System.Collections.Generic.List<float> AttackSpeedLevelMultipliers;
+    public readonly float AttackSpeedLevelMultipliers;
    
     public const int __ID__ = 242246282;
     public override int GetTypeId() => __ID__;
@@ -52,9 +52,9 @@ public sealed partial class UnitLevel : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "maxLevel:" + MaxLevel + ","
-        + "damageLevelMultipliers:" + Luban.StringUtil.CollectionToString(DamageLevelMultipliers) + ","
-        + "attackSpeedLevelMultipliers:" + Luban.StringUtil.CollectionToString(AttackSpeedLevelMultipliers) + ","
+        + "id:" + Id + ","
+        + "damageLevelMultipliers:" + DamageLevelMultipliers + ","
+        + "attackSpeedLevelMultipliers:" + AttackSpeedLevelMultipliers + ","
         + "}";
     }
 }

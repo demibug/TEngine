@@ -17,29 +17,29 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbBoss
 {
-    private readonly System.Collections.Generic.Dictionary<string, battle.Boss> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, battle.Boss> _dataMap;
     private readonly System.Collections.Generic.List<battle.Boss> _dataList;
     
     public TbBoss(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, battle.Boss>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.Boss>(n);
         _dataList = new System.Collections.Generic.List<battle.Boss>(n);
         for(int i = n ; i > 0 ; --i)
         {
             battle.Boss _v;
             _v = global::GameConfig.battle.Boss.DeserializeBoss(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.Key, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 
-    public System.Collections.Generic.IReadOnlyDictionary<string, battle.Boss> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.Boss> DataMap => _dataMap;
     public System.Collections.Generic.IReadOnlyList<battle.Boss> DataList => _dataList;
 
-    public battle.Boss GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public battle.Boss Get(string key) => _dataMap[key];
-    public battle.Boss this[string key] => _dataMap[key];
+    public battle.Boss GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.Boss Get(int key) => _dataMap[key];
+    public battle.Boss this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

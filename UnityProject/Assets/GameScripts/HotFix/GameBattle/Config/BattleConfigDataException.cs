@@ -32,7 +32,7 @@ namespace GameBattle
         /// <summary>稳定错误类别，调用方以此做程序化判断。</summary>
         public BattleConfigErrorCategory Category { get; }
 
-        /// <summary>可定位路径（如 "WavePlan.2.EnemyKey"），仅用于诊断。</summary>
+        /// <summary>可定位路径（如 "WavePlan.2.EnemyId"），仅用于诊断。</summary>
         public string Path { get; }
 
         /// <summary>构造结构化配置数据异常。</summary>

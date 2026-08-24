@@ -19,7 +19,7 @@ public sealed partial class Buff : Luban.BeanBase
 {
     public Buff(ByteBuf _buf) 
     {
-        Type = _buf.ReadInt();
+        Id = _buf.ReadInt();
         Name = _buf.ReadString();
         if(_buf.ReadBool()){ Label = _buf.ReadString(); } else { Label = null; }
         Kind = _buf.ReadInt();
@@ -35,9 +35,9 @@ public sealed partial class Buff : Luban.BeanBase
     }
 
     /// <summary>
-    /// 类型(主键)
+    /// ID(主键)
     /// </summary>
-    public readonly int Type;
+    public readonly int Id;
     /// <summary>
     /// 名称
     /// </summary>
@@ -77,7 +77,7 @@ public sealed partial class Buff : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "type:" + Type + ","
+        + "id:" + Id + ","
         + "name:" + Name + ","
         + "label:" + Label + ","
         + "kind:" + Kind + ","

@@ -17,29 +17,29 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbWeaponRegistry
 {
-    private readonly System.Collections.Generic.Dictionary<string, battle.WeaponRegistry> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, battle.WeaponRegistry> _dataMap;
     private readonly System.Collections.Generic.List<battle.WeaponRegistry> _dataList;
     
     public TbWeaponRegistry(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, battle.WeaponRegistry>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.WeaponRegistry>(n);
         _dataList = new System.Collections.Generic.List<battle.WeaponRegistry>(n);
         for(int i = n ; i > 0 ; --i)
         {
             battle.WeaponRegistry _v;
             _v = global::GameConfig.battle.WeaponRegistry.DeserializeWeaponRegistry(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.Symbol, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 
-    public System.Collections.Generic.IReadOnlyDictionary<string, battle.WeaponRegistry> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.WeaponRegistry> DataMap => _dataMap;
     public System.Collections.Generic.IReadOnlyList<battle.WeaponRegistry> DataList => _dataList;
 
-    public battle.WeaponRegistry GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public battle.WeaponRegistry Get(string key) => _dataMap[key];
-    public battle.WeaponRegistry this[string key] => _dataMap[key];
+    public battle.WeaponRegistry GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.WeaponRegistry Get(int key) => _dataMap[key];
+    public battle.WeaponRegistry this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

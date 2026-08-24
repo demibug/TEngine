@@ -17,29 +17,29 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbResultSchema
 {
-    private readonly System.Collections.Generic.Dictionary<string, battle.ResultSchema> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, battle.ResultSchema> _dataMap;
     private readonly System.Collections.Generic.List<battle.ResultSchema> _dataList;
     
     public TbResultSchema(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, battle.ResultSchema>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.ResultSchema>(n);
         _dataList = new System.Collections.Generic.List<battle.ResultSchema>(n);
         for(int i = n ; i > 0 ; --i)
         {
             battle.ResultSchema _v;
             _v = global::GameConfig.battle.ResultSchema.DeserializeResultSchema(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.Field, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 
-    public System.Collections.Generic.IReadOnlyDictionary<string, battle.ResultSchema> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.ResultSchema> DataMap => _dataMap;
     public System.Collections.Generic.IReadOnlyList<battle.ResultSchema> DataList => _dataList;
 
-    public battle.ResultSchema GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public battle.ResultSchema Get(string key) => _dataMap[key];
-    public battle.ResultSchema this[string key] => _dataMap[key];
+    public battle.ResultSchema GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.ResultSchema Get(int key) => _dataMap[key];
+    public battle.ResultSchema this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

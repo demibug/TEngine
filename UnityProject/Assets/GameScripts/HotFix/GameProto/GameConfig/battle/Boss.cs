@@ -19,11 +19,12 @@ public sealed partial class Boss : Luban.BeanBase
 {
     public Boss(ByteBuf _buf) 
     {
-        Key = _buf.ReadString();
+        Id = _buf.ReadInt();
+        ResName = _buf.ReadString();
         Name = _buf.ReadString();
         OriginalSymbol = _buf.ReadString();
         SourceRange = _buf.ReadString();
-        SkillKey = _buf.ReadString();
+        SkillId = _buf.ReadInt();
         AnimationKey = _buf.ReadString();
         if(_buf.ReadBool()){ ResourcePath = _buf.ReadString(); } else { ResourcePath = null; }
         AttackAnimation = _buf.ReadString();
@@ -45,9 +46,13 @@ public sealed partial class Boss : Luban.BeanBase
     }
 
     /// <summary>
-    /// 键(主键)
+    /// ID(主键)
     /// </summary>
-    public readonly string Key;
+    public readonly int Id;
+    /// <summary>
+    /// 资源名(原主键)
+    /// </summary>
+    public readonly string ResName;
     /// <summary>
     /// 名称
     /// </summary>
@@ -61,9 +66,9 @@ public sealed partial class Boss : Luban.BeanBase
     /// </summary>
     public readonly string SourceRange;
     /// <summary>
-    /// 技能键
+    /// 技能ID
     /// </summary>
-    public readonly string SkillKey;
+    public readonly int SkillId;
     /// <summary>
     /// 动画键
     /// </summary>
@@ -128,11 +133,12 @@ public sealed partial class Boss : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "key:" + Key + ","
+        + "id:" + Id + ","
+        + "resName:" + ResName + ","
         + "name:" + Name + ","
         + "originalSymbol:" + OriginalSymbol + ","
         + "sourceRange:" + SourceRange + ","
-        + "skillKey:" + SkillKey + ","
+        + "skillId:" + SkillId + ","
         + "animationKey:" + AnimationKey + ","
         + "resourcePath:" + ResourcePath + ","
         + "attackAnimation:" + AttackAnimation + ","

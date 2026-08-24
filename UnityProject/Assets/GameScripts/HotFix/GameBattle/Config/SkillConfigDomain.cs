@@ -55,14 +55,17 @@ namespace GameBattle
     /// <para><see cref="CooldownMs"/> 是 Provider 以 checked 从
     /// <c>CooldownSeconds</c>（int?）转出的 long 毫秒；null/负值由 Provider 拒绝。
     /// <see cref="EffectBuffType"/> 与 <see cref="EffectDurationMs"/> 只读透传，
-    /// 框架不解释其语义（首个 Boss 技能 SoulCapture 使用 buff type 13 / 2000ms）。
+    /// 框架不解释其语义（首个 Boss 技能 SoulCapture 使用 buff type 14 / 2000ms）。
     /// <see cref="RangeTiles"/> 同样只读透传：SoulCapture 专用 handler 读取它作为
     /// 同路两格筛选范围，不作为通用 DSL 消费。</para>
     /// </remarks>
     public sealed class SkillDefinitionSnapshot
     {
-        /// <summary>技能主键（全局唯一；非空由 Validator 保证）。</summary>
-        public string Key { get; }
+        /// <summary>技能整数主键。</summary>
+        public int Id { get; }
+
+        /// <summary>技能资源名，不参与主键索引。</summary>
+        public string ResName { get; }
 
         /// <summary>技能类别（Active / Boss / Passive）。</summary>
         public SkillCategory Category { get; }
@@ -99,7 +102,8 @@ namespace GameBattle
         /// <param name="triggerAttackCount">触发攻击计数（只读透传；可为空）。</param>
         /// <param name="effectDamageMultiplier">单箭伤害倍率（只读透传；可为空）。</param>
         public SkillDefinitionSnapshot(
-            string key,
+            int id,
+            string resName,
             SkillCategory category,
             long cooldownMs,
             string handlerKey,
@@ -109,7 +113,8 @@ namespace GameBattle
             int? triggerAttackCount = null,
             float? effectDamageMultiplier = null)
         {
-            Key = key ?? string.Empty;
+            Id = id;
+            ResName = resName ?? string.Empty;
             Category = category;
             CooldownMs = cooldownMs;
             HandlerKey = handlerKey ?? string.Empty;
@@ -123,7 +128,7 @@ namespace GameBattle
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"SkillDefinition(key={Key}, category={Category}, cooldownMs={CooldownMs}, " +
+            return $"SkillDefinition(id={Id}, resName='{ResName}', category={Category}, cooldownMs={CooldownMs}, " +
                    $"handlerKey='{HandlerKey}', " +
                    $"effectBuffType={EffectBuffType}, effectDurationMs={EffectDurationMs}, rangeTiles={RangeTiles}, " +
                    $"triggerAttackCount={TriggerAttackCount}, effectDamageMultiplier={EffectDamageMultiplier})";
@@ -148,7 +153,7 @@ namespace GameBattle
         /// <summary>按 key 升序的只读 Skill 定义列表。</summary>
         public IReadOnlyList<SkillDefinitionSnapshot> Definitions { get; }
 
-        private readonly IReadOnlyDictionary<string, SkillDefinitionSnapshot> _byKey;
+        private readonly IReadOnlyDictionary<int, SkillDefinitionSnapshot> _byId;
 
         /// <summary>构造 Skill 目录快照。</summary>
         /// <param name="definitions">Skill 定义列表（构造时深拷贝并按 key 升序排序）。</param>
@@ -162,33 +167,34 @@ namespace GameBattle
                 copy[i] = source[i];
             }
 
-            Array.Sort(copy, (a, b) => string.CompareOrdinal(a.Key, b.Key));
+            Array.Sort(copy, (a, b) => a.Id.CompareTo(b.Id));
 
-            var byKey = new Dictionary<string, SkillDefinitionSnapshot>(copy.Length, StringComparer.Ordinal);
+            var byId = new Dictionary<int, SkillDefinitionSnapshot>(copy.Length);
             for (int i = 0; i < copy.Length; i++)
             {
                 SkillDefinitionSnapshot def = copy[i];
-                if (byKey.ContainsKey(def.Key))
+                if (byId.ContainsKey(def.Id))
                 {
-                    throw new ArgumentException($"Skill 目录存在重复 key='{def.Key}'");
+                    throw new ArgumentException($"Skill 目录存在重复 id={def.Id}");
                 }
 
-                byKey.Add(def.Key, def);
+                byId.Add(def.Id, def);
             }
 
             Definitions = Array.AsReadOnly(copy);
 
-            _byKey = new ReadOnlyDictionary<string, SkillDefinitionSnapshot>(byKey);
+            _byId = new ReadOnlyDictionary<int, SkillDefinitionSnapshot>(byId);
         }
 
         /// <summary>按 key 查询 Skill 定义。</summary>
         /// <param name="key">技能主键。</param>
         /// <param name="definition">命中的定义；未命中时为 null。</param>
         /// <returns>键存在时返回 true。</returns>
-        public bool TryGetByKey(string key, out SkillDefinitionSnapshot definition)
+        public bool TryGetById(int id, out SkillDefinitionSnapshot definition)
         {
-            return _byKey.TryGetValue(key, out definition);
+            return _byId.TryGetValue(id, out definition);
         }
+
 
     }
 }

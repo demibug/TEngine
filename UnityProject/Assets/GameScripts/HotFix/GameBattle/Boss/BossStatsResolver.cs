@@ -62,7 +62,7 @@ namespace GameBattle
             if (double.IsNaN(value) || double.IsInfinity(value) || value < 1d || value > int.MaxValue)
             {
                 throw new EnemyStatsResolutionException(
-                    $"Boss '{bossDefinition.Key}' 解析最大生命={value} 非法（H={baseline.MaxHealth}, " +
+                    $"Boss id={bossDefinition.Id} 解析最大生命={value} 非法（H={baseline.MaxHealth}, " +
                     $"healthMultiplier={bossDefinition.HealthMultiplier}），禁止运行时 fallback");
             }
 

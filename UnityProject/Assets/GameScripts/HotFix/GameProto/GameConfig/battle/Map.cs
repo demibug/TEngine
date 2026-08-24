@@ -19,11 +19,11 @@ public sealed partial class Map : Luban.BeanBase
 {
     public Map(ByteBuf _buf) 
     {
+        Id = _buf.ReadInt();
         GridWidth = _buf.ReadInt();
         GridHeight = _buf.ReadInt();
         Width = _buf.ReadInt();
         Height = _buf.ReadInt();
-        MapIndex = _buf.ReadInt();
         if(_buf.ReadBool()){ Blocks = _buf.ReadString(); } else { Blocks = null; }
         {int n0 = _buf.ReadSize(); PlayerPath = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); PlayerPath.Add(_e0);}}
         {int n0 = _buf.ReadSize(); OpponentPath = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); OpponentPath.Add(_e0);}}
@@ -38,7 +38,7 @@ public sealed partial class Map : Luban.BeanBase
         OpponentStart = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
         OpponentEnd = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
         {int n0 = _buf.ReadSize(); RouteMarkers = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); RouteMarkers.Add(_e0);}}
-        EnemyTypeIndex = _buf.ReadInt();
+        EnemyId = _buf.ReadInt();
         Name = _buf.ReadString();
         ResourceAddress = _buf.ReadString();
     }
@@ -48,11 +48,11 @@ public sealed partial class Map : Luban.BeanBase
         return new battle.Map(_buf);
     }
 
+    public readonly int Id;
     public readonly int GridWidth;
     public readonly int GridHeight;
     public readonly int Width;
     public readonly int Height;
-    public readonly int MapIndex;
     public readonly string Blocks;
     public readonly System.Collections.Generic.List<UnityEngine.Vector2Int> PlayerPath;
     public readonly System.Collections.Generic.List<UnityEngine.Vector2Int> OpponentPath;
@@ -103,7 +103,7 @@ public sealed partial class Map : Luban.BeanBase
     /// <summary>
     /// 本图敌人类型索引
     /// </summary>
-    public readonly int EnemyTypeIndex;
+    public readonly int EnemyId;
     /// <summary>
     /// 地图诊断名称，不参与战斗规则
     /// </summary>
@@ -123,11 +123,11 @@ public sealed partial class Map : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
+        + "id:" + Id + ","
         + "gridWidth:" + GridWidth + ","
         + "gridHeight:" + GridHeight + ","
         + "width:" + Width + ","
         + "height:" + Height + ","
-        + "mapIndex:" + MapIndex + ","
         + "blocks:" + Blocks + ","
         + "playerPath:" + Luban.StringUtil.CollectionToString(PlayerPath) + ","
         + "opponentPath:" + Luban.StringUtil.CollectionToString(OpponentPath) + ","
@@ -142,7 +142,7 @@ public sealed partial class Map : Luban.BeanBase
         + "opponentStart:" + OpponentStart + ","
         + "opponentEnd:" + OpponentEnd + ","
         + "routeMarkers:" + Luban.StringUtil.CollectionToString(RouteMarkers) + ","
-        + "enemyTypeIndex:" + EnemyTypeIndex + ","
+        + "enemyId:" + EnemyId + ","
         + "name:" + Name + ","
         + "resourceAddress:" + ResourceAddress + ","
         + "}";

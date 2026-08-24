@@ -463,7 +463,7 @@ namespace GameBattle
                         "bind-boss-spine",
                         address,
                         new InvalidOperationException(
-                            $"Boss '{dto.BossKey}' Prefab 缺少可初始化的 SkeletonAnimation"));
+                            $"Boss '{dto.BossResName}' Prefab 缺少可初始化的 SkeletonAnimation"));
                 }
 
                 spine.AnimationState.SetAnimation(0, dto.IdleAnimationKey, true);

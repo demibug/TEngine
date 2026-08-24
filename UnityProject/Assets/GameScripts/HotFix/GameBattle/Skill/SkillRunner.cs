@@ -197,7 +197,7 @@ namespace GameBattle
         /// UnknownSkillKey：目录无该 key；UnsupportedCategory：Passive；
         /// HandlerMissing：handler 未注册（不创建 state）。
         /// </returns>
-        internal SkillOperationResult Attach(SkillOwnerHandle owner, string skillKey)
+        internal SkillOperationResult Attach(SkillOwnerHandle owner, int skillId)
         {
             if (_disposed)
             {
@@ -211,31 +211,31 @@ namespace GameBattle
                     $"owner 未注册或句柄过期：{owner}。");
             }
 
-            if (skillKey == null)
+            if (skillId < 1)
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.UnknownSkillKey,
-                    "skillKey 不能为 null。");
+                    "skillId 必须从 1 开始。");
             }
 
-            if (!_catalog.TryGetByKey(skillKey, out SkillDefinitionSnapshot definition))
+            if (!_catalog.TryGetById(skillId, out SkillDefinitionSnapshot definition))
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.UnknownSkillKey,
-                    $"目录中不存在技能 key='{skillKey}'。");
+                    $"目录中不存在技能 id={skillId}。");
             }
 
             if (!IsSupportedCategory(definition.Category))
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.UnsupportedCategory,
-                    $"技能类别不支持 attach：key='{skillKey}', category={definition.Category}。");
+                    $"技能类别不支持 attach：id={skillId}, category={definition.Category}。");
             }
 
             if (!_registry.TryGet(definition.HandlerKey, out ISkillHandler handler))
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.HandlerMissing,
-                    $"技能 handler 未注册：key='{skillKey}', handlerKey='{definition.HandlerKey}'。");
+                    $"技能 handler 未注册：id={skillId}, handlerKey='{definition.HandlerKey}'。");
             }
 
-            if (lease.States.ContainsKey(skillKey))
+            if (lease.States.ContainsKey(skillId))
             {
                 // 重复 attach：幂等成功，保留同一 state（不重复调用 handler）。
                 return SkillOperationResult.Ok();
@@ -246,7 +246,7 @@ namespace GameBattle
                 Definition = definition,
                 Handler = handler,
             };
-            lease.States.Add(skillKey, state);
+            lease.States.Add(skillId, state);
             return SkillOperationResult.Ok();
         }
 
@@ -273,7 +273,7 @@ namespace GameBattle
         /// </remarks>
         internal SkillOperationResult Activate(
             SkillOwnerHandle owner,
-            string skillKey,
+            int skillId,
             SkillActivationPlan plan)
         {
             if (_disposed)
@@ -294,28 +294,28 @@ namespace GameBattle
                     $"owner 未注册或句柄过期：{owner}。");
             }
 
-            if (skillKey == null)
+            if (skillId < 1)
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.UnknownSkillKey,
-                    "skillKey 不能为 null。");
+                    "skillId 必须从 1 开始。");
             }
 
-            if (!_catalog.TryGetByKey(skillKey, out SkillDefinitionSnapshot definition))
+            if (!_catalog.TryGetById(skillId, out SkillDefinitionSnapshot definition))
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.UnknownSkillKey,
-                    $"目录中不存在技能 key='{skillKey}'。");
+                    $"目录中不存在技能 id={skillId}。");
             }
 
             if (!IsSupportedCategory(definition.Category))
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.UnsupportedCategory,
-                    $"技能类别不支持激活：key='{skillKey}', category={definition.Category}。");
+                    $"技能类别不支持激活：id={skillId}, category={definition.Category}。");
             }
 
-            if (!lease.States.TryGetValue(skillKey, out SkillState state))
+            if (!lease.States.TryGetValue(skillId, out SkillState state))
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.NotAttached,
-                    $"技能未 attach：key='{skillKey}'。");
+                    $"技能未 attach：id={skillId}。");
             }
 
             if (plan.EffectDelayMs < 0 || plan.CompleteDelayMs <= plan.EffectDelayMs)
@@ -328,13 +328,13 @@ namespace GameBattle
             if (state.Running)
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.Busy,
-                    $"技能已在运行：key='{skillKey}'。");
+                    $"技能已在运行：id={skillId}。");
             }
 
             if (_scheduler.FrameNowMs < state.NextReadyAtMs)
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.OnCooldown,
-                    $"技能冷却中：key='{skillKey}', 当前帧={_scheduler.FrameNowMs}, " +
+                    $"技能冷却中：id={skillId}, 当前帧={_scheduler.FrameNowMs}, " +
                     $"就绪于={state.NextReadyAtMs}。");
             }
 
@@ -359,7 +359,7 @@ namespace GameBattle
 
             // 按 effect → complete 顺序登记：同批 flush 内 FIFO 保证 effect 先于 complete。
             ScheduledActionHandle effectHandle = _scheduler.Schedule(
-                effectDueMs, () => OnEffectDue(owner, skillKey, nextVersion));
+                effectDueMs, () => OnEffectDue(owner, skillId, nextVersion));
             if (effectHandle == null)
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.InvalidState,
@@ -367,7 +367,7 @@ namespace GameBattle
             }
 
             ScheduledActionHandle completeHandle = _scheduler.Schedule(
-                completeDueMs, () => OnCompleteDue(owner, skillKey, nextVersion));
+                completeDueMs, () => OnCompleteDue(owner, skillId, nextVersion));
             if (completeHandle == null)
             {
                 _scheduler.Cancel(effectHandle);
@@ -392,7 +392,7 @@ namespace GameBattle
         /// Success：已取消；StaleOwner：owner 未注册/句柄过期；
         /// NotAttached：未 attach；NotRunning：无运行中激活（重复取消无额外 handler 调用）。
         /// </returns>
-        internal SkillOperationResult Cancel(SkillOwnerHandle owner, string skillKey)
+        internal SkillOperationResult Cancel(SkillOwnerHandle owner, int skillId)
         {
             if (_disposed)
             {
@@ -406,19 +406,19 @@ namespace GameBattle
                     $"owner 未注册或句柄过期：{owner}。");
             }
 
-            if (skillKey == null || !lease.States.TryGetValue(skillKey, out SkillState state))
+            if (skillId < 1 || !lease.States.TryGetValue(skillId, out SkillState state))
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.NotAttached,
-                    $"技能未 attach：key='{skillKey}'。");
+                    $"技能未 attach：id={skillId}。");
             }
 
             if (!state.Running)
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.NotRunning,
-                    $"技能未在运行：key='{skillKey}'。");
+                    $"技能未在运行：id={skillId}。");
             }
 
-            CancelRunningState(owner, skillKey, state);
+            CancelRunningState(owner, skillId, state);
             return SkillOperationResult.Ok();
         }
 
@@ -429,7 +429,7 @@ namespace GameBattle
         /// Success：state 已移除；StaleOwner：owner 未注册/句柄过期；
         /// NotAttached：未 attach。
         /// </returns>
-        internal SkillOperationResult Detach(SkillOwnerHandle owner, string skillKey)
+        internal SkillOperationResult Detach(SkillOwnerHandle owner, int skillId)
         {
             if (_disposed)
             {
@@ -443,14 +443,14 @@ namespace GameBattle
                     $"owner 未注册或句柄过期：{owner}。");
             }
 
-            if (skillKey == null || !lease.States.TryGetValue(skillKey, out SkillState state))
+            if (skillId < 1 || !lease.States.TryGetValue(skillId, out SkillState state))
             {
                 return SkillOperationResult.Fail(SkillOperationStatus.NotAttached,
-                    $"技能未 attach：key='{skillKey}'。");
+                    $"技能未 attach：id={skillId}。");
             }
 
-            CancelRunningState(owner, skillKey, state);
-            lease.States.Remove(skillKey);
+            CancelRunningState(owner, skillId, state);
+            lease.States.Remove(skillId);
             return SkillOperationResult.Ok();
         }
 
@@ -542,7 +542,7 @@ namespace GameBattle
         /// <param name="state">命中时的状态快照；未命中时为未附着快照。</param>
         /// <returns>该 (owner, skillKey) 已 attach 时返回 true，否则 false。</returns>
         /// <remarks>查询不改变任何状态；owner 已 Dispose、未注册或句柄过期时返回 false。</remarks>
-        internal bool TryGetState(SkillOwnerHandle owner, string skillKey, out SkillStateSnapshot state)
+        internal bool TryGetState(SkillOwnerHandle owner, int skillId, out SkillStateSnapshot state)
         {
             if (_disposed || !TryGetCurrentLease(owner, out OwnerLease lease))
             {
@@ -550,7 +550,7 @@ namespace GameBattle
                 return false;
             }
 
-            if (skillKey == null || !lease.States.TryGetValue(skillKey, out SkillState inner))
+            if (skillId < 1 || !lease.States.TryGetValue(skillId, out SkillState inner))
             {
                 state = NotAttachedSnapshot();
                 return false;
@@ -597,7 +597,7 @@ namespace GameBattle
         private void ClearLease(OwnerLease lease)
         {
             var owner = new SkillOwnerHandle(lease.RuntimeId, lease.Generation);
-            string[] keys = SortedKeys(lease.States);
+            int[] keys = SortedKeys(lease.States);
             for (int i = 0; i < keys.Length; i++)
             {
                 CancelRunningState(owner, keys[i], lease.States[keys[i]]);
@@ -610,7 +610,7 @@ namespace GameBattle
         /// 取消单个运行中激活：每个运行中激活只调用一次 handler.Cancel，并取消未执行
         /// handles、复位 running/effectCommitted；保留 NextReadyAtMs（冷却不退款）。
         /// </summary>
-        private void CancelRunningState(SkillOwnerHandle owner, string skillKey, SkillState state)
+        private void CancelRunningState(SkillOwnerHandle owner, int skillId, SkillState state)
         {
             if (!state.Running)
             {
@@ -618,7 +618,7 @@ namespace GameBattle
             }
 
             var context = new SkillActivationContext(
-                owner, skillKey, _scheduler.FrameNowMs);
+                owner, skillId, _scheduler.FrameNowMs);
             bool effectCommitted = state.EffectCommitted;
             try
             {
@@ -639,9 +639,9 @@ namespace GameBattle
         /// effect 到期回调：重验 current generation、state 存在、Running、runVersion；
         /// 通过后以 callback 当下 FrameNowMs 新建上下文，handler 调用开始即视为已提交。
         /// </summary>
-        private void OnEffectDue(SkillOwnerHandle owner, string skillKey, long runVersion)
+        private void OnEffectDue(SkillOwnerHandle owner, int skillId, long runVersion)
         {
-            if (!TryRevalidateRunning(owner, skillKey, runVersion, out SkillState state))
+            if (!TryRevalidateRunning(owner, skillId, runVersion, out SkillState state))
             {
                 // 迟到 callback：owner 已换租期、state 被清理或版本过期，no-op。
                 return;
@@ -655,7 +655,7 @@ namespace GameBattle
 
             state.EffectCommitted = true;
             var context = new SkillActivationContext(
-                owner, skillKey, _scheduler.FrameNowMs);
+                owner, skillId, _scheduler.FrameNowMs);
             try
             {
                 state.Handler.Effect(context);
@@ -675,9 +675,9 @@ namespace GameBattle
         /// complete 到期回调：重验 current generation、state 存在、Running、runVersion，
         /// 且 effect 已提交后才执行一次并结束 running。
         /// </summary>
-        private void OnCompleteDue(SkillOwnerHandle owner, string skillKey, long runVersion)
+        private void OnCompleteDue(SkillOwnerHandle owner, int skillId, long runVersion)
         {
-            if (!TryRevalidateRunning(owner, skillKey, runVersion, out SkillState state))
+            if (!TryRevalidateRunning(owner, skillId, runVersion, out SkillState state))
             {
                 // 迟到 callback no-op。
                 return;
@@ -690,7 +690,7 @@ namespace GameBattle
             }
 
             var context = new SkillActivationContext(
-                owner, skillKey, _scheduler.FrameNowMs);
+                owner, skillId, _scheduler.FrameNowMs);
             try
             {
                 state.Handler.Complete(context);
@@ -708,7 +708,7 @@ namespace GameBattle
         /// <summary>callback 执行前的统一重验：current generation、state 存在、Running、runVersion。</summary>
         private bool TryRevalidateRunning(
             SkillOwnerHandle owner,
-            string skillKey,
+            int skillId,
             long runVersion,
             out SkillState state)
         {
@@ -728,7 +728,7 @@ namespace GameBattle
                 return false;
             }
 
-            if (!lease.States.TryGetValue(skillKey, out state))
+            if (!lease.States.TryGetValue(skillId, out state))
             {
                 return false;
             }
@@ -756,16 +756,16 @@ namespace GameBattle
         }
 
         /// <summary>按 ordinal 升序返回 state 字典的 key（批量清理稳定顺序）。</summary>
-        private static string[] SortedKeys(Dictionary<string, SkillState> states)
+        private static int[] SortedKeys(Dictionary<int, SkillState> states)
         {
-            var keys = new string[states.Count];
+            var keys = new int[states.Count];
             int index = 0;
-            foreach (string key in states.Keys)
+            foreach (int key in states.Keys)
             {
                 keys[index++] = key;
             }
 
-            Array.Sort(keys, StringComparer.Ordinal);
+            Array.Sort(keys);
             return keys;
         }
 
@@ -779,8 +779,8 @@ namespace GameBattle
         {
             internal readonly int RuntimeId;
             internal readonly long Generation;
-            internal readonly Dictionary<string, SkillState> States =
-                new Dictionary<string, SkillState>(StringComparer.Ordinal);
+            internal readonly Dictionary<int, SkillState> States =
+                new Dictionary<int, SkillState>();
 
             internal OwnerLease(int runtimeId, long generation)
             {

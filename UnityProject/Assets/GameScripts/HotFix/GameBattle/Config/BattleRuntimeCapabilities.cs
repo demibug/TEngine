@@ -36,33 +36,33 @@ namespace GameBattle
         /// <summary>
         /// 支持显式只读的 bossKey 集合（仅当 <see cref="SupportsBossWaves"/> 为 true 时有意义）。
         /// </summary>
-        public IReadOnlyList<string> SupportedBossKeys { get; }
+        public IReadOnlyList<int> SupportedBossIds { get; }
 
         /// <summary>
         /// 无 Boss 能力：不支持 Boss 波、无受支持 bossKey。
         /// </summary>
         public static BattleRuntimeCapabilities None { get; } =
-            new BattleRuntimeCapabilities(supportsBossWaves: false, supportedBossKeys: Array.Empty<string>());
+            new BattleRuntimeCapabilities(supportsBossWaves: false, supportedBossIds: Array.Empty<int>());
 
         /// <summary>当前生产能力：仅支持 ZhangLiang Boss 波。</summary>
         public static BattleRuntimeCapabilities Production { get; } =
-            new BattleRuntimeCapabilities(supportsBossWaves: true, supportedBossKeys: new[] { "ZhangLiang" });
+            new BattleRuntimeCapabilities(supportsBossWaves: true, supportedBossIds: new[] { 1 });
 
         /// <summary>构造运行时能力声明。</summary>
         /// <param name="supportsBossWaves">是否支持 Boss 波。</param>
         /// <param name="supportedBossKeys">支持的 bossKey 集合（构造时深拷贝为只读数组）。</param>
-        public BattleRuntimeCapabilities(bool supportsBossWaves, IReadOnlyList<string> supportedBossKeys)
+        public BattleRuntimeCapabilities(bool supportsBossWaves, IReadOnlyList<int> supportedBossIds)
         {
             SupportsBossWaves = supportsBossWaves;
 
-            IReadOnlyList<string> source = supportedBossKeys ?? Array.Empty<string>();
-            var keys = new string[source.Count];
+            IReadOnlyList<int> source = supportedBossIds ?? Array.Empty<int>();
+            var ids = new int[source.Count];
             for (int i = 0; i < source.Count; i++)
             {
-                keys[i] = source[i];
+                ids[i] = source[i];
             }
 
-            SupportedBossKeys = keys;
+            SupportedBossIds = ids;
         }
 
         /// <summary>
@@ -70,16 +70,16 @@ namespace GameBattle
         /// </summary>
         /// <param name="bossKey">Boss 敌人键。</param>
         /// <returns>支持时返回 true。</returns>
-        public bool SupportsBossKey(string bossKey)
+        public bool SupportsBossId(int bossId)
         {
-            if (!SupportsBossWaves || string.IsNullOrEmpty(bossKey))
+            if (!SupportsBossWaves || bossId < 1)
             {
                 return false;
             }
 
-            for (int i = 0; i < SupportedBossKeys.Count; i++)
+            for (int i = 0; i < SupportedBossIds.Count; i++)
             {
-                if (string.Equals(SupportedBossKeys[i], bossKey, StringComparison.Ordinal))
+                if (SupportedBossIds[i] == bossId)
                 {
                     return true;
                 }

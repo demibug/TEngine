@@ -51,7 +51,7 @@ namespace GameBattle
         private readonly EnemyDefinitionSnapshot _baselineDefinition;
 
         /// <summary>封闭注册表：Boss 键 → 租借/回收委托 + 定义快照。</summary>
-        private readonly IReadOnlyDictionary<string, BossTypeRegistration> _registry;
+        private readonly IReadOnlyDictionary<int, BossTypeRegistration> _registry;
 
         // ====================================================================
         // 构造
@@ -89,22 +89,22 @@ namespace GameBattle
         /// <summary>
         /// 由目录定义构建封闭注册表：只注册 ZhangLiang 并绑定独立类型池。
         /// </summary>
-        private static IReadOnlyDictionary<string, BossTypeRegistration> BuildRegistry(
+        private static IReadOnlyDictionary<int, BossTypeRegistration> BuildRegistry(
             BossCatalogSnapshot catalog,
             BattlePoolScope poolScope)
         {
-            var registry = new Dictionary<string, BossTypeRegistration>(StringComparer.Ordinal);
+            var registry = new Dictionary<int, BossTypeRegistration>();
             foreach (BossDefinitionSnapshot definition in catalog.Definitions)
             {
                 // 首期只支持 ZhangLiang；其余行保持配置存在但不可出生。
-                if (!string.Equals(definition.Key, ZhangLiangBoss.BossKeyConst, StringComparison.Ordinal))
+                if (!string.Equals(definition.ResName, ZhangLiangBoss.ResNameConst, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
                 BattleObjectPool<ZhangLiangBoss> pool = poolScope.GetPool(() => new ZhangLiangBoss());
                 registry.Add(
-                    definition.Key,
+                    definition.Id,
                     new BossTypeRegistration(
                         definition,
                         acquire: () => pool.Acquire(),
@@ -138,18 +138,18 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(request));
             }
 
-            if (!_registry.TryGetValue(request.BossKey, out BossTypeRegistration registration))
+            if (!_registry.TryGetValue(request.BossId, out BossTypeRegistration registration))
             {
                 // 封闭注册表：未知/未支持键显式失败，不创建占位 Boss。
                 throw new ArgumentException(
-                    $"{LogTag} 未知或未支持 Boss 键 '{request.BossKey}'（首期只支持 {ZhangLiangBoss.BossKeyConst}，禁止占位）");
+                    $"{LogTag} 未知或未支持 Boss id={request.BossId}（首期只支持 {ZhangLiangBoss.ResNameConst}，禁止占位）");
             }
 
             BossBase boss = registration.Acquire();
             if (boss == null)
             {
                 throw new InvalidOperationException(
-                    $"{LogTag} 池返回 null 对象 key={request.BossKey}");
+                    $"{LogTag} 池返回 null 对象 id={request.BossId}");
             }
 
             try
@@ -196,7 +196,7 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 归还一个 Boss 到其正确类型的池（按 <see cref="BossBase.BossKey"/> 分发）。
+        /// 归还一个 Boss 到其正确类型的池（按 <see cref="BossBase.ResName"/> 分发）。
         /// </summary>
         /// <param name="boss">要归还的 Boss。null 或已归还返回 false。</param>
         /// <returns>成功归还返回 true；null、键未注册或重复 Release 返回 false。</returns>
@@ -212,7 +212,7 @@ namespace GameBattle
                 return false;
             }
 
-            if (!_registry.TryGetValue(boss.BossKey, out BossTypeRegistration registration))
+            if (boss.Definition == null || !_registry.TryGetValue(boss.Definition.Id, out BossTypeRegistration registration))
             {
                 return false;
             }

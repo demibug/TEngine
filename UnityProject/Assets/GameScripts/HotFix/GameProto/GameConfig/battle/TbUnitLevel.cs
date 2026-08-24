@@ -17,36 +17,38 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbUnitLevel
 {
-
-     private readonly battle.UnitLevel _data;
-
-     public battle.UnitLevel Data => _data;
-
+    private readonly System.Collections.Generic.Dictionary<int, battle.UnitLevel> _dataMap;
+    private readonly System.Collections.Generic.List<battle.UnitLevel> _dataList;
+    
     public TbUnitLevel(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        if (n != 1) throw new SerializationException("table mode=one, but size != 1");
-        _data = global::GameConfig.battle.UnitLevel.DeserializeUnitLevel(_buf);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.UnitLevel>(n);
+        _dataList = new System.Collections.Generic.List<battle.UnitLevel>(n);
+        for(int i = n ; i > 0 ; --i)
+        {
+            battle.UnitLevel _v;
+            _v = global::GameConfig.battle.UnitLevel.DeserializeUnitLevel(_buf);
+            _dataList.Add(_v);
+            _dataMap.Add(_v.Id, _v);
+        }
     }
 
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.UnitLevel> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyList<battle.UnitLevel> DataList => _dataList;
 
-    /// <summary>
-    /// 最大等级
-    /// </summary>
-     public int MaxLevel => _data.MaxLevel;
-    /// <summary>
-    /// 伤害等级倍数
-    /// </summary>
-     public System.Collections.Generic.List<float> DamageLevelMultipliers => _data.DamageLevelMultipliers;
-    /// <summary>
-    /// 攻速等级倍数
-    /// </summary>
-     public System.Collections.Generic.List<float> AttackSpeedLevelMultipliers => _data.AttackSpeedLevelMultipliers;
-    
+    public battle.UnitLevel GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.UnitLevel Get(int key) => _dataMap[key];
+    public battle.UnitLevel this[int key] => _dataMap[key];
+
     public void ResolveRef(Tables tables)
     {
-        _data.ResolveRef(tables);
+        foreach(var _v in _dataList)
+        {
+            _v.ResolveRef(tables);
+        }
     }
+
 }
 
 }

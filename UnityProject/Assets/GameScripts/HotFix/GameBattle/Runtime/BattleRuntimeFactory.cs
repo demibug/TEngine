@@ -856,7 +856,7 @@ namespace GameBattle
                     {
                         if (bossFactory == null || !bossFactory.Release(boss))
                         {
-                            Log.Error($"{LogTag} Boss 回收失败 key='{boss.BossKey}'");
+                            Log.Error($"{LogTag} Boss 回收失败 key='{boss.ResName}'");
                         }
                     }
                     else if (enemy is ConfiguredEnemyBase configured)
@@ -951,7 +951,7 @@ namespace GameBattle
                         configSnapshot.GeneralCatalog.Definitions;
                     for (int i = 0; i < generalDefinitions.Count; i++)
                     {
-                        if (!string.IsNullOrEmpty(generalDefinitions[i].SkillKey))
+                        if (generalDefinitions[i].SkillId.HasValue)
                         {
                             hasGeneralSkill = true;
                             break;
@@ -968,8 +968,15 @@ namespace GameBattle
                     // 张梁 SoulCapture 注册（Boss 选中时），保持原有行为，避免重复注册。
                     if (hasSelectedBoss)
                     {
-                        if (!configSnapshot.SkillCatalog.TryGetByKey(
-                                "SoulCapture", out SkillDefinitionSnapshot soulCaptureDefinition))
+                        WavePlanEntry bossRow = null;
+                        foreach (WavePlanEntry row in configSnapshot.OrderedWavePlan.Rows)
+                        {
+                            if (row.Kind == WavePlanKind.Boss) { bossRow = row; break; }
+                        }
+                        if (bossRow == null || !bossRow.BossId.HasValue
+                            || !configSnapshot.BossCatalog.TryGetById(bossRow.BossId.Value, out BossDefinitionSnapshot bossDefinition)
+                            || !configSnapshot.SkillCatalog.TryGetById(
+                                bossDefinition.SkillId, out SkillDefinitionSnapshot soulCaptureDefinition))
                         {
                             throw new InvalidOperationException($"{LogTag} 缺少 SoulCapture 技能定义");
                         }
@@ -990,17 +997,17 @@ namespace GameBattle
                         bool fireArrowBarrageRegistered = false;
                         for (int i = 0; i < generalDefinitions.Count; i++)
                         {
-                            string skillKey = generalDefinitions[i].SkillKey;
-                            if (string.IsNullOrEmpty(skillKey))
+                            int? skillId = generalDefinitions[i].SkillId;
+                            if (!skillId.HasValue)
                             {
                                 continue;
                             }
 
-                            if (!configSnapshot.SkillCatalog.TryGetByKey(
-                                    skillKey, out SkillDefinitionSnapshot generalSkillDefinition))
+                            if (!configSnapshot.SkillCatalog.TryGetById(
+                                    skillId.Value, out SkillDefinitionSnapshot generalSkillDefinition))
                             {
                                 throw new InvalidOperationException(
-                                    $"{LogTag} 武将技能定义缺失：SkillKey='{skillKey}' 在 SkillCatalog 中不存在");
+                                    $"{LogTag} 武将技能定义缺失：SkillId={skillId.Value} 在 SkillCatalog 中不存在");
                             }
 
                             // 决策：switch/注册键统一使用 generalSkillDefinition.HandlerKey
@@ -1046,7 +1053,7 @@ namespace GameBattle
                                 default:
                                     throw new InvalidOperationException(
                                         $"{LogTag} 未实现的武将技能 HandlerKey：" +
-                                        $"SkillKey='{skillKey}', HandlerKey='{generalHandlerKey}'");
+                                        $"SkillId={skillId.Value}, HandlerKey='{generalHandlerKey}'");
                             }
                         }
                     }
@@ -1088,11 +1095,11 @@ namespace GameBattle
                 NormalWaveSpawnHandler normalSpawnHandler = request =>
                 {
                     // 从目录确认定义（未知 key 显式失败，禁止占位）。
-                    if (!configSnapshot.EnemyCatalog.TryGetByKey(
-                            request.EnemyKey, out EnemyDefinitionSnapshot definition))
+                    if (!configSnapshot.EnemyCatalog.TryGetById(
+                            request.EnemyId, out EnemyDefinitionSnapshot definition))
                     {
                         throw new InvalidOperationException(
-                            $"{LogTag} 波次出生未知敌人键 '{request.EnemyKey}'（order={request.WaveOrder}）");
+                            $"{LogTag} 波次出生未知敌人 id={request.EnemyId}（order={request.WaveOrder}）");
                     }
 
                     // 选择正确 lane endpoint：玩家路 → 玩家方目标，电脑路 → 对手方目标。
@@ -1100,7 +1107,7 @@ namespace GameBattle
                         request.IsPlayerLane ? playerTarget : opponentTarget;
 
                     var spawnRequest = new EnemySpawnRequest(
-                        enemyKey: request.EnemyKey,
+                        enemyId: request.EnemyId,
                         isPlayerLane: request.IsPlayerLane,
                         waveOrder: request.WaveOrder,
                         difficultyIndex: request.DifficultyIndex,

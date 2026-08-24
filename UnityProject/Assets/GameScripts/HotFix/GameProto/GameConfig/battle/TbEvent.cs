@@ -17,29 +17,29 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbEvent
 {
-    private readonly System.Collections.Generic.Dictionary<string, battle.Event> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, battle.Event> _dataMap;
     private readonly System.Collections.Generic.List<battle.Event> _dataList;
     
     public TbEvent(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, battle.Event>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.Event>(n);
         _dataList = new System.Collections.Generic.List<battle.Event>(n);
         for(int i = n ; i > 0 ; --i)
         {
             battle.Event _v;
             _v = global::GameConfig.battle.Event.DeserializeEvent(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.EventName, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 
-    public System.Collections.Generic.IReadOnlyDictionary<string, battle.Event> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.Event> DataMap => _dataMap;
     public System.Collections.Generic.IReadOnlyList<battle.Event> DataList => _dataList;
 
-    public battle.Event GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public battle.Event Get(string key) => _dataMap[key];
-    public battle.Event this[string key] => _dataMap[key];
+    public battle.Event GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.Event Get(int key) => _dataMap[key];
+    public battle.Event this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

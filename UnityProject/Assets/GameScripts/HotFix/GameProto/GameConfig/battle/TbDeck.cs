@@ -17,29 +17,29 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbDeck
 {
-    private readonly System.Collections.Generic.Dictionary<string, battle.Deck> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, battle.Deck> _dataMap;
     private readonly System.Collections.Generic.List<battle.Deck> _dataList;
     
     public TbDeck(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, battle.Deck>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.Deck>(n);
         _dataList = new System.Collections.Generic.List<battle.Deck>(n);
         for(int i = n ; i > 0 ; --i)
         {
             battle.Deck _v;
             _v = global::GameConfig.battle.Deck.DeserializeDeck(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.Mode, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 
-    public System.Collections.Generic.IReadOnlyDictionary<string, battle.Deck> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.Deck> DataMap => _dataMap;
     public System.Collections.Generic.IReadOnlyList<battle.Deck> DataList => _dataList;
 
-    public battle.Deck GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public battle.Deck Get(string key) => _dataMap[key];
-    public battle.Deck this[string key] => _dataMap[key];
+    public battle.Deck GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.Deck Get(int key) => _dataMap[key];
+    public battle.Deck this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

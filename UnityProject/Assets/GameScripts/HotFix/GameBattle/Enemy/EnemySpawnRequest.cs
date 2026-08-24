@@ -32,7 +32,7 @@ namespace GameBattle
     internal sealed class EnemySpawnRequest
     {
         /// <summary>生效的普通敌人键（Mob0/Mob1/Mob2/Mob3）。</summary>
-        public string EnemyKey { get; }
+        public int EnemyId { get; }
 
         /// <summary>是否玩家方车道。</summary>
         public bool IsPlayerLane { get; }
@@ -71,7 +71,7 @@ namespace GameBattle
         /// <exception cref="ArgumentException">enemyKey 为空。</exception>
         /// <exception cref="ArgumentNullException">map / endPointTarget / onEnemyKilled / onDeathRequested 为 null。</exception>
         internal EnemySpawnRequest(
-            string enemyKey,
+            int enemyId,
             bool isPlayerLane,
             int waveOrder,
             int difficultyIndex,
@@ -84,12 +84,12 @@ namespace GameBattle
             float width = 40f,
             float height = 40f)
         {
-            if (string.IsNullOrEmpty(enemyKey))
+            if (enemyId < 1)
             {
-                throw new ArgumentException("enemyKey 不能为空", nameof(enemyKey));
+                throw new ArgumentOutOfRangeException(nameof(enemyId), enemyId, "enemyId 必须从 1 开始");
             }
 
-            EnemyKey = enemyKey;
+            EnemyId = enemyId;
             IsPlayerLane = isPlayerLane;
             WaveOrder = waveOrder;
             DifficultyIndex = difficultyIndex;

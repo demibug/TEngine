@@ -116,7 +116,8 @@ namespace GameBattle
             // 地图：按 MapId 精确选择，缺行抛 BattleMapConfigMissingException。
             // ----------------------------------------------------------------
             TbMap tbMap = _tables.TbMap;
-            Map mapRow = tbMap.GetOrDefault(mapId);
+            int mapTableId = checked(mapId + 1);
+            Map mapRow = tbMap.GetOrDefault(mapTableId);
             if (mapRow == null)
             {
                 throw new BattleMapConfigMissingException(mapId);
@@ -133,7 +134,7 @@ namespace GameBattle
             // 有序波次计划（新生产链权威）：activePlanId 精确选择 + Order 升序。
             // ----------------------------------------------------------------
             OrderedWavePlanSnapshot plan = BuildPlanFromLuban(
-                _tables.TbWave, _tables.TbWavePlan, catalog, mapRow.EnemyTypeIndex);
+                _tables.TbWave, _tables.TbWavePlan, catalog, ToZeroBasedIndex(mapRow.EnemyId));
 
             // ----------------------------------------------------------------
             // Buff 目录（新生产链权威）：TbBuff 行显式消费为领域目录。
@@ -163,7 +164,7 @@ namespace GameBattle
             // ----------------------------------------------------------------
             // 【legacy】单敌人快照：由目录按地图 EnemyTypeIndex 派生（兼容 WaveManager）。
             // ----------------------------------------------------------------
-            EnemyConfigSnapshot enemy = BuildLegacyEnemyFromCatalog(catalog, mapRow.EnemyTypeIndex);
+            EnemyConfigSnapshot enemy = BuildLegacyEnemyFromCatalog(catalog, ToZeroBasedIndex(mapRow.EnemyId));
 
             // ----------------------------------------------------------------
             // 【legacy】并行数组式波次快照（兼容 WaveManager/BattleManager）。
@@ -237,12 +238,12 @@ namespace GameBattle
                     default:
                         throw new BattleConfigDataException(
                             BattleConfigErrorCategory.GeneralConfigInvalid,
-                            $"武将 index={row.Index} 的 combatArchetype='{row.CombatArchetype}' 非法",
-                            $"General.{row.Index}.CombatArchetype");
+                            $"武将 id={row.Id} 的 combatArchetype='{row.CombatArchetype}' 非法",
+                            $"General.{row.Id}.CombatArchetype");
                 }
 
                 definitions.Add(new GeneralConfigSnapshot(
-                    row.Index,
+                    ToZeroBasedIndex(row.Id),
                     row.Name,
                     row.Family,
                     row.PartWords,
@@ -257,7 +258,7 @@ namespace GameBattle
                     row.ProjectileType,
                     row.ProjectileSpeed,
                     row.PartRecruitWeight,
-                    row.SkillKey));
+                    row.SkillId));
             }
 
             return new GeneralCatalogSnapshot(definitions);
@@ -288,14 +289,14 @@ namespace GameBattle
             if (mapRow.Grid == null || mapRow.Grid.Count == 0)
             {
                 throw new InvalidOperationException(
-                    $"MapId={mapRow.MapIndex} 的 Grid 为空，无法构建地图格子");
+                    $"MapId={mapRow.Id} 的 Grid 为空，无法构建地图格子");
             }
 
             ValidateGridShapeAndCodes(mapRow);
 
             return BattleConfigNormalizer.NormalizeMap(
                 ConvertGrid(mapRow.Grid),
-                mapIndex: mapRow.MapIndex,
+                mapIndex: ToZeroBasedIndex(mapRow.Id),
                 playerStart: ToGridPosition(mapRow.PlayerStart),
                 playerEnd: ToGridPosition(mapRow.PlayerEnd),
                 opponentStart: ToGridPosition(mapRow.OpponentStart),
@@ -309,7 +310,7 @@ namespace GameBattle
                 playerEntry: ToGridPosition(mapRow.PlayerEntry),
                 opponentEntry: ToGridPosition(mapRow.OpponentEntry),
                 routeMarkers: ConvertMarkers(mapRow.RouteMarkers),
-                enemyTypeIndex: mapRow.EnemyTypeIndex);
+                enemyTypeIndex: ToZeroBasedIndex(mapRow.EnemyId));
         }
 
         /// <summary>
@@ -320,7 +321,7 @@ namespace GameBattle
             if (mapRow.Grid.Count != mapRow.Width)
             {
                 throw new InvalidOperationException(
-                    $"MapId={mapRow.MapIndex} Grid 列数={mapRow.Grid.Count} 不等于 Width={mapRow.Width}");
+                    $"MapId={mapRow.Id} Grid 列数={mapRow.Grid.Count} 不等于 Width={mapRow.Width}");
             }
 
             for (int x = 0; x < mapRow.Grid.Count; x++)
@@ -329,7 +330,7 @@ namespace GameBattle
                 if (column == null || column.Count != mapRow.Height)
                 {
                     throw new InvalidOperationException(
-                        $"MapId={mapRow.MapIndex} Grid 列[{x}] 行数={(column?.Count ?? 0)} 不等于 Height={mapRow.Height}");
+                        $"MapId={mapRow.Id} Grid 列[{x}] 行数={(column?.Count ?? 0)} 不等于 Height={mapRow.Height}");
                 }
 
                 for (int y = 0; y < column.Count; y++)
@@ -338,7 +339,7 @@ namespace GameBattle
                     if (string.IsNullOrEmpty(code))
                     {
                         throw new InvalidOperationException(
-                            $"MapId={mapRow.MapIndex} Grid[{x}][{y}] 格子编码为空");
+                            $"MapId={mapRow.Id} Grid[{x}][{y}] 格子编码为空");
                     }
 
                     string[] parts = code.Split('_');
@@ -349,7 +350,7 @@ namespace GameBattle
                         || lane < 0 || lane > 1)
                     {
                         throw new InvalidOperationException(
-                            $"MapId={mapRow.MapIndex} Grid[{x}][{y}] 编码 '{code}' 非法，" +
+                            $"MapId={mapRow.Id} Grid[{x}][{y}] 编码 '{code}' 非法，" +
                             "应为严格两分段 'kind_lane'（kind ∈ {0,1,2}，lane ∈ {0,1}）");
                     }
                 }
@@ -411,19 +412,20 @@ namespace GameBattle
                     continue;
                 }
 
-                EnemyStats stats = tbEnemyStats.GetOrDefault(enemy.Key);
+                EnemyStats stats = tbEnemyStats.GetOrDefault(enemy.Id);
                 if (stats == null)
                 {
                     throw new BattleConfigDataException(
                         BattleConfigErrorCategory.EnemyStatsMissing,
-                        $"普通敌人 enemyKey='{enemy.Key}'（typeIndex={enemy.TypeIndex.Value}）" +
+                        $"普通敌人 id={enemy.Id}（typeIndex={enemy.TypeIndex.Value}）" +
                         "缺少对应的 EnemyStats 行，敌人目录与数值必须成对关联",
-                        $"Enemy.{enemy.Key}.EnemyStats");
+                        $"Enemy.{enemy.Id}.EnemyStats");
                 }
 
+                int typeIndex = ToZeroBasedIndex(enemy.TypeIndex.Value);
                 definitions.Add(new EnemyDefinitionSnapshot(
-                    typeIndex: enemy.TypeIndex.Value,
-                    key: enemy.Key,
+                    id: enemy.Id,
+                    typeIndex: typeIndex,
                     resourceAddress: enemy.ResourceAddress ?? string.Empty,
                     moveSpeed: stats.MoveSpeed,
                     healthByWave: stats.HealthByWave,
@@ -455,7 +457,7 @@ namespace GameBattle
             if (catalog.TryGetByTypeIndex(mapEnemyTypeIndex, out EnemyDefinitionSnapshot def))
             {
                 return new EnemyConfigSnapshot(
-                    type: def.Key,
+                    id: def.Id,
                     mapEnemyTypeIndex: mapEnemyTypeIndex,
                     speed: def.MoveSpeed,
                     healthByWave: def.HealthByWave,
@@ -509,12 +511,12 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(catalog));
             }
 
-            string activePlanId = tbWave.ActivePlanId ?? string.Empty;
-            if (string.IsNullOrEmpty(activePlanId))
+            int activePlanIdValue = tbWave.ActivePlanId;
+            if (activePlanIdValue < 1)
             {
                 throw new BattleConfigDataException(
                     BattleConfigErrorCategory.WavePlanMissing,
-                    "波次总配置 activePlanId 为空，无法选择逐波计划",
+                    $"波次总配置 activePlanId={activePlanIdValue} 非法，必须从 1 开始",
                     "Wave.ActivePlanId");
             }
 
@@ -524,7 +526,7 @@ namespace GameBattle
             for (int i = 0; i < planRows.Count; i++)
             {
                 WavePlan row = planRows[i];
-                if (!string.Equals(row.PlanId, activePlanId, StringComparison.Ordinal))
+                if (row.Id != activePlanIdValue)
                 {
                     continue;
                 }
@@ -533,18 +535,18 @@ namespace GameBattle
 
                 // Normal 行解析生效敌人键（空键按地图 EnemyTypeIndex 解析）；
                 // Boss 行不占用 enemyKey（BossKey 空串按“未配置”处理，语义遵循 spec/design）。
-                string enemyKey = kind == WavePlanKind.Normal
-                    ? ResolveNormalEnemyKey(row, catalog, mapEnemyTypeIndex)
-                    : string.Empty;
+                int? enemyId = kind == WavePlanKind.Normal
+                    ? ResolveNormalEnemyId(row, catalog, mapEnemyTypeIndex)
+                    : null;
 
                 rows.Add(new WavePlanEntry(
-                    planId: row.PlanId,
+                    planId: activePlanIdValue,
                     order: row.Order,
                     kind: kind,
-                    enemyKey: enemyKey,
+                    enemyId: enemyId,
                     normalCount: row.NormalCount,
                     difficultyIndex: row.DifficultyIndex,
-                    bossKey: row.BossKey ?? string.Empty,
+                    bossId: row.BossId,
                     preDelayMs: row.PreDelayMs,
                     spawnIntervalMs: row.SpawnIntervalMs,
                     postDelayMs: row.PostDelayMs,
@@ -559,7 +561,7 @@ namespace GameBattle
             {
                 throw new BattleConfigDataException(
                     BattleConfigErrorCategory.WavePlanMissing,
-                    $"波次总配置引用的计划 activePlanId='{activePlanId}' 在 TbWavePlan 中没有任何行",
+                    $"波次总配置引用的计划 activePlanId={activePlanIdValue} 在 TbWavePlan 中没有任何行",
                     "WavePlan.PlanId");
             }
 
@@ -572,7 +574,7 @@ namespace GameBattle
                 {
                     throw new BattleConfigDataException(
                         BattleConfigErrorCategory.StrategyProfileInvalid,
-                        $"计划 '{activePlanId}' 引用了不存在的策略 profile 索引={profileIndex}" +
+                        $"计划 {activePlanIdValue} 引用了不存在的策略 profile 索引={profileIndex}" +
                         $"（可用范围 0..{sourceStrategies.Count - 1}）",
                         $"WavePlan.StrategyProfile[{profileIndex}]");
                 }
@@ -580,7 +582,7 @@ namespace GameBattle
                 profiles[profileIndex] = sourceStrategies[profileIndex];
             }
 
-            return new OrderedWavePlanSnapshot(activePlanId, rows, profiles);
+            return new OrderedWavePlanSnapshot(activePlanIdValue, rows, profiles);
         }
 
         /// <summary>
@@ -588,24 +590,33 @@ namespace GameBattle
         /// EnemyTypeIndex 从目录解析，无法解析即为结构化错误（spec "Map default and row
         /// override resolve one enemy key"）。
         /// </summary>
-        private static string ResolveNormalEnemyKey(
+        private static int? ResolveNormalEnemyId(
             WavePlan row, EnemyCatalogSnapshot catalog, int mapEnemyTypeIndex)
         {
-            if (!string.IsNullOrEmpty(row.EnemyKey))
+            if (row.EnemyId.HasValue)
             {
-                return row.EnemyKey;
+                int typeIndex = ToZeroBasedIndex(row.EnemyId.Value);
+                if (catalog.TryGetByTypeIndex(typeIndex, out EnemyDefinitionSnapshot definition))
+                {
+                    return definition.Id;
+                }
+
+                throw new BattleConfigDataException(
+                    BattleConfigErrorCategory.EnemyKeyUnknown,
+                    $"Normal 行（order={row.Order}）引用了目录中不存在的 enemyId={row.EnemyId.Value}",
+                    $"WavePlan.{row.Order}.EnemyId");
             }
 
             if (catalog.TryGetByTypeIndex(mapEnemyTypeIndex, out EnemyDefinitionSnapshot def))
             {
-                return def.Key;
+                return def.Id;
             }
 
             throw new BattleConfigDataException(
                 BattleConfigErrorCategory.EnemyTypeIndexUnknown,
                 $"Normal 行（order={row.Order}）未填写 enemyKey，且地图默认敌人索引 " +
                 $"typeIndex={mapEnemyTypeIndex} 无法在敌人目录中解析",
-                $"WavePlan.{row.Order}.EnemyKey");
+                $"WavePlan.{row.Order}.EnemyId");
         }
 
         /// <summary>
@@ -660,12 +671,12 @@ namespace GameBattle
             {
                 Buff row = rows[i];
                 definitions.Add(new BuffDefinitionSnapshot(
-                    type: row.Type,
+                    type: row.Id,
                     name: row.Name ?? string.Empty,
                     label: row.Label ?? string.Empty,
-                    kind: MapBuffKind(row.Kind, row.Type),
+                    kind: MapBuffKind(row.Kind, row.Id),
                     channels: row.Channels,
-                    stackPolicy: MapBuffStackPolicy(row.StackPolicy, row.Type),
+                    stackPolicy: MapBuffStackPolicy(row.StackPolicy, row.Id),
                     maxStacks: row.MaxStacks,
                     conflictKey: row.ConflictKey ?? string.Empty));
             }
@@ -776,16 +787,17 @@ namespace GameBattle
                 {
                     throw new BattleConfigDataException(
                         BattleConfigErrorCategory.SkillHandlerKeyMissing,
-                        $"Skill key='{row.Key}' 的 handlerKey 为空（必填，不得在代码中推导默认值）",
-                        $"Skill.{row.Key}.HandlerKey");
+                        $"Skill id={row.Id} resName='{row.ResName}' 的 handlerKey 为空（必填，不得在代码中推导默认值）",
+                        $"Skill.{row.Id}.HandlerKey");
                 }
 
                 definitions.Add(new SkillDefinitionSnapshot(
-                    key: row.Key ?? string.Empty,
-                    category: MapSkillCategory(row.Category, row.Key),
-                    cooldownMs: ConvertCooldownToMs(row.CooldownSeconds, row.Key),
+                    id: row.Id,
+                    resName: row.ResName,
+                    category: MapSkillCategory(row.Category, row.ResName),
+                    cooldownMs: ConvertCooldownToMs(row.CooldownSeconds, row.ResName),
                     handlerKey: row.HandlerKey,
-                    effectBuffType: row.EffectBuffType,
+                    effectBuffType: row.EffectBuffId,
                     effectDurationMs: row.EffectDurationMs,
                     rangeTiles: row.RangeTiles,
                     triggerAttackCount: row.TriggerAttackCount,
@@ -905,9 +917,10 @@ namespace GameBattle
                 }
 
                 definitions.Add(new BossDefinitionSnapshot(
-                    key: row.Key ?? string.Empty,
+                    id: row.Id,
+                    resName: row.ResName,
                     name: row.Name ?? string.Empty,
-                    skillKey: row.SkillKey ?? string.Empty,
+                    skillId: row.SkillId,
                     animationKey: row.AnimationKey ?? string.Empty,
                     resourcePath: row.ResourcePath ?? string.Empty,
                     attackAnimation: row.AttackAnimation ?? string.Empty,
@@ -948,7 +961,7 @@ namespace GameBattle
         /// <exception cref="BattleConfigDataException">未知 Type，或重复 id 无法构建
         /// 按 id 索引目录。</exception>
         /// <remarks>
-        /// <para>spec "Exactly four basic weapon definitions are enabled"：每行
+        /// <para>spec "nxactly four basic weapon definitions are enabled"：每行
         /// Id/Type/AddAttPower/Enabled/HandlerKey 被显式消费到领域快照。Type 严格
         /// 映射 0 Bow/1 Spear/2 Knife/3 Sword（大小写以实际 xlsx 为准，不做 fallback）；
         /// 禁用行 handlerKey 为 null 时规范化为空串，不推导 "Basic"。</para>
@@ -1038,7 +1051,7 @@ namespace GameBattle
                 strategies.Add(new List<float>(tbWave.SpawnStrategies[i]));
             }
 
-            // TODO(task 3.1/3.2 BLOCKED)：Luban Wave 表缺失 skipBoss/delayTimeMs/maxRounds
+            // TODO(task 3.1/3.2 BLOCKnD)：Luban Wave 表缺失 skipBoss/delayTimeMs/maxRounds
             missingNotes.Add(
                 "TbWave -> 缺失 skipBoss/delayTimeMs/maxRounds；使用黄金基线值(skipBoss=true/delayTimeMs=10000/maxRounds=20)");
 
@@ -1067,7 +1080,7 @@ namespace GameBattle
             foreach (Unit u in tbUnit.DataList)
             {
                 units.Add(new UnitConfigSnapshot(
-                    index: u.Index,
+                    index: ToZeroBasedIndex(u.Id),
                     text: u.Text,
                     animationKey: u.AnimationKey,
                     rangeCells: u.RangeCells,
@@ -1090,10 +1103,39 @@ namespace GameBattle
         private UnitLevelConfigSnapshot NormalizeUnitLevelFromLuban()
         {
             TbUnitLevel tbUnitLevel = _tables.TbUnitLevel;
+            IReadOnlyList<UnitLevel> rows = tbUnitLevel.DataList;
+            if (rows == null || rows.Count == 0)
+            {
+                throw new BattleConfigDataException(
+                    BattleConfigErrorCategory.MissingField,
+                    "TbUnitLevel 没有任何等级行",
+                    "UnitLevel");
+            }
+
+            var orderedRows = new List<UnitLevel>(rows);
+            orderedRows.Sort((left, right) => left.Id.CompareTo(right.Id));
+            var damageMultipliers = new float[orderedRows.Count];
+            var attackSpeedMultipliers = new float[orderedRows.Count];
+            for (int index = 0; index < orderedRows.Count; index++)
+            {
+                UnitLevel row = orderedRows[index];
+                int expectedId = index + 1;
+                if (row.Id != expectedId)
+                {
+                    throw new BattleConfigDataException(
+                        BattleConfigErrorCategory.MissingField,
+                        $"TbUnitLevel 等级 id 必须从 1 连续递增，期望 {expectedId}，实际 {row.Id}",
+                        $"UnitLevel.{row.Id}.Id");
+                }
+
+                damageMultipliers[index] = row.DamageLevelMultipliers;
+                attackSpeedMultipliers[index] = row.AttackSpeedLevelMultipliers;
+            }
+
             return new UnitLevelConfigSnapshot(
-                maxLevel: tbUnitLevel.MaxLevel,
-                damageLevelMultipliers: tbUnitLevel.DamageLevelMultipliers,
-                attackSpeedLevelMultipliers: tbUnitLevel.AttackSpeedLevelMultipliers);
+                maxLevel: orderedRows.Count,
+                damageLevelMultipliers: damageMultipliers,
+                attackSpeedLevelMultipliers: attackSpeedMultipliers);
         }
 
         // ====================================================================
@@ -1165,6 +1207,19 @@ namespace GameBattle
         // ====================================================================
         // 工具方法
         // ====================================================================
+
+        private static int ToZeroBasedIndex(int id)
+        {
+            if (id < 1)
+            {
+                throw new BattleConfigDataException(
+                    BattleConfigErrorCategory.MissingField,
+                    $"配置 id={id} 非法，主键必须从 1 开始",
+                    "Id");
+            }
+
+            return id - 1;
+        }
 
         /// <summary>
         /// 把 Luban List&lt;Vector2Int&gt; 路径转换为 IReadOnlyList&lt;GridPosition&gt;。

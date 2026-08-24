@@ -17,29 +17,29 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbEnemy
 {
-    private readonly System.Collections.Generic.Dictionary<string, battle.Enemy> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, battle.Enemy> _dataMap;
     private readonly System.Collections.Generic.List<battle.Enemy> _dataList;
     
     public TbEnemy(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, battle.Enemy>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.Enemy>(n);
         _dataList = new System.Collections.Generic.List<battle.Enemy>(n);
         for(int i = n ; i > 0 ; --i)
         {
             battle.Enemy _v;
             _v = global::GameConfig.battle.Enemy.DeserializeEnemy(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.Key, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 
-    public System.Collections.Generic.IReadOnlyDictionary<string, battle.Enemy> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.Enemy> DataMap => _dataMap;
     public System.Collections.Generic.IReadOnlyList<battle.Enemy> DataList => _dataList;
 
-    public battle.Enemy GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public battle.Enemy Get(string key) => _dataMap[key];
-    public battle.Enemy this[string key] => _dataMap[key];
+    public battle.Enemy GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.Enemy Get(int key) => _dataMap[key];
+    public battle.Enemy this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

@@ -19,6 +19,7 @@ public sealed partial class WeaponRegistry : Luban.BeanBase
 {
     public WeaponRegistry(ByteBuf _buf) 
     {
+        Id = _buf.ReadInt();
         Symbol = _buf.ReadString();
         Name = _buf.ReadString();
         Type = _buf.ReadInt();
@@ -32,6 +33,10 @@ public sealed partial class WeaponRegistry : Luban.BeanBase
         return new battle.WeaponRegistry(_buf);
     }
 
+    /// <summary>
+    /// ID(主键)
+    /// </summary>
+    public readonly int Id;
     /// <summary>
     /// 符号(主键)
     /// </summary>
@@ -67,6 +72,7 @@ public sealed partial class WeaponRegistry : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
+        + "id:" + Id + ","
         + "symbol:" + Symbol + ","
         + "name:" + Name + ","
         + "type:" + Type + ","

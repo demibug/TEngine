@@ -273,7 +273,7 @@ namespace GameBattle
         /// <exception cref="ArgumentNullException"><paramref name="skillRuntime"/> 为 null。</exception>
         /// <exception cref="InvalidOperationException">重复装配。</exception>
         /// <remarks>
-        /// <para>装配后，General 首次上场时按 config.SkillKey 绑定技能租期；
+        /// <para>装配后，General 首次上场时按 config.SkillId 绑定技能租期；
         /// 场内换位复用不重复绑定；Deactivate/Remove 前解除租期；GameOver 清局。</para>
         /// <para><b>未装配时旧行为不变：</b>普通兵与未装配 runtime 的旧测试不受影响。</para>
         /// </remarks>
@@ -514,11 +514,11 @@ namespace GameBattle
             // 绑定失败沿创建事务完整回滚（移除注册集合/Buff/映射并归还池），
             // 不发布 UnitPlaced/ConfiguredUnitPlaced，不留下半绑定单位。
             if (_skillRuntime != null && unit.Kind == UnitKind.General
-                && !string.IsNullOrEmpty(config.SkillKey))
+                && config.SkillId.HasValue)
             {
                 try
                 {
-                    _skillRuntime.Bind(unit.UnitId, soldier, config.SkillKey);
+                    _skillRuntime.Bind(unit.UnitId, soldier, config.SkillId.Value);
                 }
                 catch
                 {
@@ -636,11 +636,11 @@ namespace GameBattle
             // 不发布 UnitPlaced/ConfiguredUnitPlaced；外层 ReleasePrepared 因池级
             // 重复 Release 守卫幂等，不会双重入池。
             if (_skillRuntime != null && unit.Kind == UnitKind.General
-                && config != null && !string.IsNullOrEmpty(config.SkillKey))
+                && config != null && config.SkillId.HasValue)
             {
                 try
                 {
-                    _skillRuntime.Bind(unit.UnitId, soldier, config.SkillKey);
+                    _skillRuntime.Bind(unit.UnitId, soldier, config.SkillId.Value);
                 }
                 catch
                 {

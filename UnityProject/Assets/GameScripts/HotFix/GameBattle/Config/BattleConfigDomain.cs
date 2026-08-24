@@ -15,7 +15,7 @@ namespace GameBattle
     // 不变量：
     //   1. 所有类型不可变：字段 readonly，集合在构造时深拷贝为数组并只读暴露。
     //   2. 构造后不暴露源集合引用；源集合后续修改不影响已构造的快照。
-    //   3. EnemyCatalogSnapshot 按 enemyKey / typeIndex 双索引，NormalKeys 稳定只读。
+    //   3. EnemyCatalogSnapshot 按 Id / typeIndex 双索引，Ids 稳定只读。
     //   4. OrderedWavePlanSnapshot 的行按 order 升序稳定排序；
     //      策略 profile 仅保留被所选计划显式引用的原始索引。
     // ============================================================================
@@ -25,10 +25,10 @@ namespace GameBattle
     /// </summary>
     public enum WavePlanKind
     {
-        /// <summary>普通波：按 enemyKey（空时按地图 EnemyTypeIndex）解析普通敌人并分车道出生。</summary>
+        /// <summary>普通波：按 enemyId（空时按地图 EnemyTypeIndex）解析普通敌人并分车道出生。</summary>
         Normal = 1,
 
-        /// <summary>Boss 波：按 bossKey 请求 Boss 波交接端口出生，本波不生成普通敌人。</summary>
+        /// <summary>Boss 波：按 bossId 请求 Boss 波交接端口出生，本波不生成普通敌人。</summary>
         Boss = 2,
     }
 
@@ -38,13 +38,13 @@ namespace GameBattle
     /// <remarks>
     /// <para>spec "Wave order is explicit and valid"：同一 planId 内按 <see cref="Order"/>
     /// 升序推进，运行时不读取原始配置行。</para>
-    /// <para><see cref="EnemyKey"/> 为 Normal 行的“生效”敌人键：配置为空的行在 Provider
-    /// 中已按地图 <c>EnemyTypeIndex</c> 解析为具体键，因此业务层可安全直接消费。</para>
+    /// <para><see cref="EnemyId"/> 为 Normal 行的“生效”敌人 Id：配置为空的行在 Provider
+    /// 中已按地图 <c>EnemyTypeIndex</c> 解析为具体 Id，因此业务层可安全直接消费。</para>
     /// </remarks>
     public sealed class WavePlanEntry
     {
-        /// <summary>计划分组键（与 <see cref="Order"/> 组成业务唯一键）。</summary>
-        public string PlanId { get; }
+        /// <summary>计划分组 Id（与 <see cref="Order"/> 组成业务唯一键）。</summary>
+        public int PlanId { get; }
 
         /// <summary>1-based 严格连续顺序。</summary>
         public int Order { get; }
@@ -52,8 +52,8 @@ namespace GameBattle
         /// <summary>波次类型（Normal / Boss）。</summary>
         public WavePlanKind Kind { get; }
 
-        /// <summary>Normal 行生效的普通敌人键（空键已解析；Boss 行为空串）。</summary>
-        public string EnemyKey { get; }
+        /// <summary>Normal 行生效的普通敌人 Id（空键已解析；Boss 行为 null）。</summary>
+        public int? EnemyId { get; }
 
         /// <summary>每个启用车道的普通敌人数量。</summary>
         public int NormalCount { get; }
@@ -61,8 +61,8 @@ namespace GameBattle
         /// <summary>0-based 难度索引（同时索引血量曲线与策略乘数位置）。</summary>
         public int DifficultyIndex { get; }
 
-        /// <summary>Boss 敌人键（Normal 行为空串，Boss 行必填）。</summary>
-        public string BossKey { get; }
+        /// <summary>Boss 敌人 Id（Normal 行为 null，Boss 行必填）。</summary>
+        public int? BossId { get; }
 
         /// <summary>该行开始到首次出生前的延迟（毫秒）。</summary>
         public long PreDelayMs { get; }
@@ -84,13 +84,13 @@ namespace GameBattle
 
         /// <summary>构造单行波次计划条目。</summary>
         public WavePlanEntry(
-            string planId,
+            int planId,
             int order,
             WavePlanKind kind,
-            string enemyKey,
+            int? enemyId,
             int normalCount,
             int difficultyIndex,
-            string bossKey,
+            int? bossId,
             long preDelayMs,
             long spawnIntervalMs,
             long postDelayMs,
@@ -98,13 +98,13 @@ namespace GameBattle
             bool opponentLane,
             int strategyProfile)
         {
-            PlanId = planId ?? string.Empty;
+            PlanId = planId;
             Order = order;
             Kind = kind;
-            EnemyKey = enemyKey ?? string.Empty;
+            EnemyId = enemyId;
             NormalCount = normalCount;
             DifficultyIndex = difficultyIndex;
-            BossKey = bossKey ?? string.Empty;
+            BossId = bossId;
             PreDelayMs = preDelayMs;
             SpawnIntervalMs = spawnIntervalMs;
             PostDelayMs = postDelayMs;
@@ -116,8 +116,8 @@ namespace GameBattle
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"WavePlanEntry(planId={PlanId}, order={Order}, kind={Kind}, enemyKey={EnemyKey}, " +
-                   $"bossKey={BossKey}, normalCount={NormalCount}, difficulty={DifficultyIndex}, profile={StrategyProfile})";
+            return $"WavePlanEntry(planId={PlanId}, order={Order}, kind={Kind}, enemyId={EnemyId}, " +
+                   $"bossId={BossId}, normalCount={NormalCount}, difficulty={DifficultyIndex}, profile={StrategyProfile})";
         }
     }
 
@@ -133,8 +133,8 @@ namespace GameBattle
     /// </remarks>
     public sealed class OrderedWavePlanSnapshot
     {
-        /// <summary>精确选中的计划标识（不得为空）。</summary>
-        public string ActivePlanId { get; }
+        /// <summary>精确选中的计划 Id（不得为无效值）。</summary>
+        public int ActivePlanId { get; }
 
         /// <summary>按 <see cref="WavePlanEntry.Order"/> 升序稳定排序的只读行列表。</summary>
         public IReadOnlyList<WavePlanEntry> Rows { get; }
@@ -145,16 +145,16 @@ namespace GameBattle
         private readonly IReadOnlyDictionary<int, IReadOnlyList<float>> _profiles;
 
         /// <summary>构造有序波次计划快照。</summary>
-        /// <param name="activePlanId">精确选中的计划标识。</param>
+        /// <param name="activePlanId">精确选中的计划 Id。</param>
         /// <param name="rows">该计划的行（构造时深拷贝并按 order 升序排序）。</param>
         /// <param name="strategyProfiles">仅被行显式引用的策略 profile，键为源表原始索引
         /// （构造时深拷贝为只读数组）。</param>
         public OrderedWavePlanSnapshot(
-            string activePlanId,
+            int activePlanId,
             IReadOnlyList<WavePlanEntry> rows,
             IReadOnlyDictionary<int, IReadOnlyList<float>> strategyProfiles)
         {
-            ActivePlanId = activePlanId ?? string.Empty;
+            ActivePlanId = activePlanId;
 
             IReadOnlyList<WavePlanEntry> source = rows ?? Array.Empty<WavePlanEntry>();
             var rowCopy = new WavePlanEntry[source.Count];
@@ -255,7 +255,7 @@ namespace GameBattle
         public int TypeIndex { get; }
 
         /// <summary>普通敌人键（Mob0/Mob1/Mob2/Mob3）。</summary>
-        public string Key { get; }
+        public int Id { get; }
 
         /// <summary>Unity/YooAsset 资源地址（表现层预加载池键）。</summary>
         public string ResourceAddress { get; }
@@ -285,8 +285,8 @@ namespace GameBattle
         /// <param name="contactDamage">接触目标伤害。</param>
         /// <param name="rewardGold">击杀奖励金币。</param>
         public EnemyDefinitionSnapshot(
+            int id,
             int typeIndex,
-            string key,
             string resourceAddress,
             int moveSpeed,
             IReadOnlyList<int> healthByWave,
@@ -294,8 +294,8 @@ namespace GameBattle
             int contactDamage,
             int rewardGold)
         {
+            Id = id;
             TypeIndex = typeIndex;
-            Key = key ?? string.Empty;
             ResourceAddress = resourceAddress ?? string.Empty;
             MoveSpeed = moveSpeed;
             HealthByWave = CopyInts(healthByWave);
@@ -353,9 +353,9 @@ namespace GameBattle
         public IReadOnlyList<EnemyDefinitionSnapshot> Definitions { get; }
 
         /// <summary>稳定只读的普通敌人键列表（按 typeIndex 升序）。</summary>
-        public IReadOnlyList<string> NormalKeys { get; }
+        public IReadOnlyList<int> NormalIds { get; }
 
-        private readonly IReadOnlyDictionary<string, EnemyDefinitionSnapshot> _byKey;
+        private readonly IReadOnlyDictionary<int, EnemyDefinitionSnapshot> _byId;
         private readonly IReadOnlyDictionary<int, EnemyDefinitionSnapshot> _byTypeIndex;
 
         /// <summary>构造敌人目录快照。</summary>
@@ -372,40 +372,40 @@ namespace GameBattle
 
             Array.Sort(copy, (a, b) => a.TypeIndex.CompareTo(b.TypeIndex));
 
-            var byKey = new Dictionary<string, EnemyDefinitionSnapshot>(copy.Length);
+            var byId = new Dictionary<int, EnemyDefinitionSnapshot>(copy.Length);
             var byTypeIndex = new Dictionary<int, EnemyDefinitionSnapshot>(copy.Length);
             for (int i = 0; i < copy.Length; i++)
             {
                 EnemyDefinitionSnapshot def = copy[i];
-                if (string.IsNullOrEmpty(def.Key))
+                if (def.Id < 1)
                 {
-                    throw new ArgumentException($"敌人定义 typeIndex={def.TypeIndex} 的 Key 为空");
+                    throw new ArgumentException($"敌人定义 id={def.Id} 非法");
                 }
 
-                if (byKey.ContainsKey(def.Key))
+                if (byId.ContainsKey(def.Id))
                 {
-                    throw new ArgumentException($"敌人目录存在重复 enemyKey='{def.Key}'");
+                    throw new ArgumentException($"敌人目录存在重复 id={def.Id}");
                 }
 
                 if (byTypeIndex.ContainsKey(def.TypeIndex))
                 {
-                    throw new ArgumentException($"敌人目录存在重复 typeIndex={def.TypeIndex}（enemyKey='{def.Key}'）");
+                    throw new ArgumentException($"敌人目录存在重复 typeIndex={def.TypeIndex}（id={def.Id}）");
                 }
 
-                byKey.Add(def.Key, def);
+                byId.Add(def.Id, def);
                 byTypeIndex.Add(def.TypeIndex, def);
             }
 
             Definitions = copy;
 
-            var keys = new string[copy.Length];
+            var ids = new int[copy.Length];
             for (int i = 0; i < copy.Length; i++)
             {
-                keys[i] = copy[i].Key;
+                ids[i] = copy[i].Id;
             }
 
-            NormalKeys = keys;
-            _byKey = byKey;
+            NormalIds = ids;
+            _byId = byId;
             _byTypeIndex = byTypeIndex;
         }
 
@@ -413,9 +413,9 @@ namespace GameBattle
         /// <param name="key">普通敌人键。</param>
         /// <param name="definition">命中的定义；未命中时为 null。</param>
         /// <returns>键存在时返回 true。</returns>
-        public bool TryGetByKey(string key, out EnemyDefinitionSnapshot definition)
+        public bool TryGetById(int id, out EnemyDefinitionSnapshot definition)
         {
-            return _byKey.TryGetValue(key, out definition);
+            return _byId.TryGetValue(id, out definition);
         }
 
         /// <summary>按 typeIndex 查询定义。</summary>
@@ -428,9 +428,10 @@ namespace GameBattle
         }
 
         /// <summary>敌人键是否存在于目录中。</summary>
-        public bool ContainsKey(string key)
+        public bool ContainsId(int id)
         {
-            return _byKey.ContainsKey(key);
+            return _byId.ContainsKey(id);
         }
+
     }
 }

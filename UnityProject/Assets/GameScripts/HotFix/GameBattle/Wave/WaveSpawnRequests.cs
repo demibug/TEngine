@@ -38,7 +38,7 @@ namespace GameBattle
     internal sealed class NormalWaveSpawnRequest
     {
         /// <summary>生效的普通敌人键（Mob0/Mob1/Mob2/Mob3；空键已由 Provider 按地图解析）。</summary>
-        public string EnemyKey { get; }
+        public int EnemyId { get; }
 
         /// <summary>是否玩家方车道。</summary>
         public bool IsPlayerLane { get; }
@@ -59,19 +59,19 @@ namespace GameBattle
         /// <exception cref="ArgumentException">enemyKey 为空。</exception>
         /// <exception cref="ArgumentNullException">strategyProfile 为 null。</exception>
         internal NormalWaveSpawnRequest(
-            string enemyKey,
+            int enemyId,
             bool isPlayerLane,
             int waveOrder,
             int difficultyIndex,
             int strategyProfileIndex,
             IReadOnlyList<float> strategyProfile)
         {
-            if (string.IsNullOrEmpty(enemyKey))
+            if (enemyId < 1)
             {
-                throw new ArgumentException("enemyKey 不能为空", nameof(enemyKey));
+                throw new ArgumentOutOfRangeException(nameof(enemyId));
             }
 
-            EnemyKey = enemyKey;
+            EnemyId = enemyId;
             IsPlayerLane = isPlayerLane;
             WaveOrder = waveOrder;
             DifficultyIndex = difficultyIndex;
@@ -83,7 +83,7 @@ namespace GameBattle
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"NormalWaveSpawnRequest(enemyKey={EnemyKey}, playerLane={IsPlayerLane}, " +
+            return $"NormalWaveSpawnRequest(enemyId={EnemyId}, playerLane={IsPlayerLane}, " +
                    $"waveOrder={WaveOrder}, difficulty={DifficultyIndex}, profile={StrategyProfileIndex})";
         }
     }
@@ -98,7 +98,7 @@ namespace GameBattle
     internal sealed class BossWaveSpawnRequest
     {
         /// <summary>Boss 敌人键（Boss 行必填）。</summary>
-        public string BossKey { get; }
+        public int BossId { get; }
 
         /// <summary>是否玩家方车道。</summary>
         public bool IsPlayerLane { get; }
@@ -119,19 +119,19 @@ namespace GameBattle
         /// <exception cref="ArgumentException">bossKey 为空。</exception>
         /// <exception cref="ArgumentNullException">strategyProfile 为 null。</exception>
         internal BossWaveSpawnRequest(
-            string bossKey,
+            int bossId,
             bool isPlayerLane,
             int waveOrder,
             int difficultyIndex,
             int strategyProfileIndex,
             IReadOnlyList<float> strategyProfile)
         {
-            if (string.IsNullOrEmpty(bossKey))
+            if (bossId < 1)
             {
-                throw new ArgumentException("bossKey 不能为空", nameof(bossKey));
+                throw new ArgumentOutOfRangeException(nameof(bossId));
             }
 
-            BossKey = bossKey;
+            BossId = bossId;
             IsPlayerLane = isPlayerLane;
             WaveOrder = waveOrder;
             DifficultyIndex = difficultyIndex;
@@ -143,7 +143,7 @@ namespace GameBattle
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"BossWaveSpawnRequest(bossKey={BossKey}, playerLane={IsPlayerLane}, " +
+            return $"BossWaveSpawnRequest(bossId={BossId}, playerLane={IsPlayerLane}, " +
                    $"waveOrder={WaveOrder}, difficulty={DifficultyIndex}, profile={StrategyProfileIndex})";
         }
     }

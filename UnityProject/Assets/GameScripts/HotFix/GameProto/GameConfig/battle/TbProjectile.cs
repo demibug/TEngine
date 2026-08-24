@@ -30,6 +30,7 @@ public partial class TbProjectile
     }
 
 
+     public int Id => _data.Id;
      public System.Collections.Generic.List<string> Types => _data.Types;
     /// <summary>
     /// 本期唯一注册投射物类型(SimpleDynamicArrow)

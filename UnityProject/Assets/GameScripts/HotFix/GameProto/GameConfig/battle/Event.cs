@@ -19,6 +19,7 @@ public sealed partial class Event : Luban.BeanBase
 {
     public Event(ByteBuf _buf) 
     {
+        Id = _buf.ReadInt();
         EventName = _buf.ReadString();
         Code = _buf.ReadString();
     }
@@ -28,6 +29,10 @@ public sealed partial class Event : Luban.BeanBase
         return new battle.Event(_buf);
     }
 
+    /// <summary>
+    /// ID(主键)
+    /// </summary>
+    public readonly int Id;
     /// <summary>
     /// 事件名(主键)
     /// </summary>
@@ -47,6 +52,7 @@ public sealed partial class Event : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
+        + "id:" + Id + ","
         + "eventName:" + EventName + ","
         + "code:" + Code + ","
         + "}";

@@ -30,7 +30,7 @@ namespace GameBattle
     // ============================================================================
 
     /// <summary>
-    /// Mob0 普通敌人薄类型：固定 <see cref="EnemyKey"/>="Mob0" 与 <see cref="TypeIndex"/>。
+    /// Mob0 普通敌人薄类型：固定 <see cref="ResName"/>="Mob0" 与 <see cref="TypeIndex"/>。
     /// </summary>
     /// <remarks>
     /// <para><b>共享行为上移（design.md 决策 6）：</b>配置数值、出生、死亡表现边界、
@@ -50,7 +50,7 @@ namespace GameBattle
         }
 
         /// <inheritdoc/>
-        internal override string EnemyKey => "Mob0";
+        internal override string ResName => "Mob0";
 
         /// <inheritdoc/>
         internal override int TypeIndex => 0;

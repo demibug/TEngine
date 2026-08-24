@@ -360,7 +360,7 @@ namespace GameBattle
         /// <remarks>
         /// <para><b>task 5.1：</b>出生参数收敛为 <see cref="EnemySpawnViewData"/>（runtimeId +
         /// enemyKey/resourceAddress + 车道 + 逻辑坐标），表现层不再接收散参数。</para>
-        /// <para>配置化普通敌人（<see cref="ConfiguredEnemyBase"/>）携带其固定 EnemyKey 与
+        /// <para>配置化普通敌人（<see cref="ConfiguredEnemyBase"/>）携带其固定 ResName 与
         /// 本次租借注入的 ResourceAddress；测试替身/非普通实体为空串（Unity 端口显式失败，
         /// 禁止静默回退 Mob0）。</para>
         /// </remarks>
@@ -532,7 +532,7 @@ namespace GameBattle
                 registeredBoss.SkillIntentChanged += OnBossSkillIntentChanged;
             }
 
-            // task 5.1：出生表现 DTO 贯通。配置化普通敌人携带固定 EnemyKey 与本次租借注入
+            // task 5.1：出生表现 DTO 贯通。配置化普通敌人携带固定 ResName 与本次租借注入
             // 的 ResourceAddress；Boss 携带 BossKey 与资源路径；其余实体（测试替身/技能召唤
             // 占位）为空串，表现端口显式失败而非静默回退 Mob0。
             string enemyKey = string.Empty;
@@ -543,7 +543,7 @@ namespace GameBattle
             }
             else if (enemy is ConfiguredEnemyBase configured)
             {
-                enemyKey = configured.EnemyKey;
+                enemyKey = configured.ResName;
                 resourceAddress = configured.ResourceAddress;
             }
 
@@ -556,7 +556,7 @@ namespace GameBattle
                 enemy.X,
                 enemy.Y,
                 bossDefinition == null ? EnemyPresentationKind.Normal : EnemyPresentationKind.Boss,
-                bossDefinition?.Key,
+                bossDefinition?.ResName,
                 bossDefinition?.LogicalWidth ?? 0f,
                 bossDefinition?.LogicalHeight ?? 0f,
                 bossDefinition?.IdleAnimation,

@@ -8,7 +8,7 @@ namespace GameBattle
     // ============================================================================
 
     /// <summary>
-    /// Mob1 普通敌人薄类型：固定 <see cref="EnemyKey"/>="Mob1" 与 <see cref="TypeIndex"/>。
+    /// Mob1 普通敌人薄类型：固定 <see cref="ResName"/>="Mob1" 与 <see cref="TypeIndex"/>。
     /// </summary>
     /// <remarks>
     /// <para>所有共享行为（数值初始化、出生、死亡表现边界、presentation-completed 守卫、
@@ -23,7 +23,7 @@ namespace GameBattle
         }
 
         /// <inheritdoc/>
-        internal override string EnemyKey => "Mob1";
+        internal override string ResName => "Mob1";
 
         /// <inheritdoc/>
         internal override int TypeIndex => 1;

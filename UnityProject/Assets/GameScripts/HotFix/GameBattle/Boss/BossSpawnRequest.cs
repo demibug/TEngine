@@ -35,7 +35,7 @@ namespace GameBattle
     internal sealed class BossSpawnRequest
     {
         /// <summary>生效的 Boss 键（如 ZhangLiang）。</summary>
-        public string BossKey { get; }
+        public int BossId { get; }
 
         /// <summary>是否玩家方车道。</summary>
         public bool IsPlayerLane { get; }
@@ -68,7 +68,7 @@ namespace GameBattle
         /// <exception cref="ArgumentException">bossKey 为空。</exception>
         /// <exception cref="ArgumentNullException">map / endPointTarget / onEnemyKilled / onDeathRequested 为 null。</exception>
         internal BossSpawnRequest(
-            string bossKey,
+            int bossId,
             bool isPlayerLane,
             int waveOrder,
             int difficultyIndex,
@@ -79,12 +79,12 @@ namespace GameBattle
             EnemyKilledHandler onEnemyKilled,
             EnemyDeathRequestHandler onDeathRequested)
         {
-            if (string.IsNullOrEmpty(bossKey))
+            if (bossId < 1)
             {
-                throw new ArgumentException("bossKey 不能为空", nameof(bossKey));
+                throw new ArgumentOutOfRangeException(nameof(bossId));
             }
 
-            BossKey = bossKey;
+            BossId = bossId;
             IsPlayerLane = isPlayerLane;
             WaveOrder = waveOrder;
             DifficultyIndex = difficultyIndex;

@@ -19,7 +19,7 @@ public sealed partial class EnemyStats : Luban.BeanBase
 {
     public EnemyStats(ByteBuf _buf) 
     {
-        EnemyKey = _buf.ReadString();
+        Id = _buf.ReadInt();
         MoveSpeed = _buf.ReadInt();
         {int n0 = _buf.ReadSize(); HealthByWave = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); HealthByWave.Add(_e0);}}
         {int n0 = _buf.ReadSize(); EarlyRoundHealthMultipliers = new System.Collections.Generic.List<float>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { float _e0;  _e0 = _buf.ReadFloat(); EarlyRoundHealthMultipliers.Add(_e0);}}
@@ -35,7 +35,7 @@ public sealed partial class EnemyStats : Luban.BeanBase
     /// <summary>
     /// 敌人类型键
     /// </summary>
-    public readonly string EnemyKey;
+    public readonly int Id;
     /// <summary>
     /// 移动速度(px/s)
     /// </summary>
@@ -67,7 +67,7 @@ public sealed partial class EnemyStats : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "enemyKey:" + EnemyKey + ","
+        + "id:" + Id + ","
         + "moveSpeed:" + MoveSpeed + ","
         + "healthByWave:" + Luban.StringUtil.CollectionToString(HealthByWave) + ","
         + "earlyRoundHealthMultipliers:" + Luban.StringUtil.CollectionToString(EarlyRoundHealthMultipliers) + ","

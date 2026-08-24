@@ -19,6 +19,7 @@ public sealed partial class SoldierVisual : Luban.BeanBase
 {
     public SoldierVisual(ByteBuf _buf) 
     {
+        Id = _buf.ReadInt();
         AnimationKey = _buf.ReadString();
         BodyLocalOffset = ExternalTypeUtil.NewVector2(global::GameConfig.vector2.Deserializevector2(_buf));
         HitEffectPointOffset = ExternalTypeUtil.NewVector2(global::GameConfig.vector2.Deserializevector2(_buf));
@@ -34,6 +35,7 @@ public sealed partial class SoldierVisual : Luban.BeanBase
         return new battle.SoldierVisual(_buf);
     }
 
+    public readonly int Id;
     public readonly string AnimationKey;
     public readonly UnityEngine.Vector2 BodyLocalOffset;
     public readonly UnityEngine.Vector2 HitEffectPointOffset;
@@ -53,6 +55,7 @@ public sealed partial class SoldierVisual : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
+        + "id:" + Id + ","
         + "animationKey:" + AnimationKey + ","
         + "bodyLocalOffset:" + BodyLocalOffset + ","
         + "hitEffectPointOffset:" + HitEffectPointOffset + ","

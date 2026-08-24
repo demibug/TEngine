@@ -19,7 +19,7 @@ public sealed partial class Unit : Luban.BeanBase
 {
     public Unit(ByteBuf _buf) 
     {
-        Index = _buf.ReadInt();
+        Id = _buf.ReadInt();
         Text = _buf.ReadString();
         AnimationKey = _buf.ReadString();
         RangeCells = _buf.ReadFloat();
@@ -35,7 +35,7 @@ public sealed partial class Unit : Luban.BeanBase
         return new battle.Unit(_buf);
     }
 
-    public readonly int Index;
+    public readonly int Id;
     public readonly string Text;
     public readonly string AnimationKey;
     public readonly float RangeCells;
@@ -58,7 +58,7 @@ public sealed partial class Unit : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "index:" + Index + ","
+        + "id:" + Id + ","
         + "text:" + Text + ","
         + "animationKey:" + AnimationKey + ","
         + "rangeCells:" + RangeCells + ","

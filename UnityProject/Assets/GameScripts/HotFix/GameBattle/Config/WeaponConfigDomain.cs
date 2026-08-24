@@ -62,7 +62,7 @@ namespace GameBattle
     /// </remarks>
     public sealed class WeaponDefinitionSnapshot
     {
-        /// <summary>武器主键（全局唯一；首期基础武器 id ∈ {0, 10, 20, 31}）。</summary>
+        /// <summary>武器主键（全局唯一；首期基础武器 id ∈ {1, 11, 21, 32}）。</summary>
         public int Id { get; }
 
         /// <summary>武器类别（Bow/Spear/Knife/Sword）。</summary>
@@ -71,7 +71,7 @@ namespace GameBattle
         /// <summary>附加攻击力（基础武器为 1；数值来自 xlsx addAttPower 列）。</summary>
         public int AddAttackPower { get; }
 
-        /// <summary>是否接入基础武器框架（仅 0/10/20/31 为 true，其余 40 行 false）。</summary>
+        /// <summary>是否接入基础武器框架（仅 1/11/21/32 为 true，其余 40 行 false）。</summary>
         public bool Enabled { get; }
 
         /// <summary>武器处理器键（启用行必须为 "Basic"；禁用行可为空）。</summary>
@@ -174,11 +174,11 @@ namespace GameBattle
     /// 首期基础武器默认 resolver：显式 SoldierType → definition 只读映射。
     /// </summary>
     /// <remarks>
-    /// <para>spec "Weapon category mapping is explicit"：映射固定为 Knife→20、
-    /// Bow→0、Spear→10、Cavalry→31。映射集中在本类型，不比较 Weapon 原始 type
+        /// <para>spec "Weapon category mapping is explicit"：映射固定为 Knife→21、
+        /// Bow→1、Spear→11、Cavalry→32。映射集中在本类型，不比较 Weapon 原始 type
     /// 数值与 Soldier 枚举/单位索引数值相等（WeaponType.Bow=0 与 SoldierType.Knife=0
     /// 数值相同但映射不同，禁止据此推断）。</para>
-    /// <para>构造时验证启用行：恰好 id ∈ {0, 10, 20, 31} 四条启用，每行类别与
+        /// <para>构造时验证启用行：恰好 id ∈ {1, 11, 21, 32} 四条启用，每行类别与
     /// 期望一致、handlerKey=Basic、AddAttackPower=1；任一不满足即抛
     /// <see cref="InvalidOperationException"/>（不 fallback）。启动层
     /// <see cref="BattleConfigValidator"/> 先以结构化错误拒绝非法目录，本类型为
@@ -194,16 +194,21 @@ namespace GameBattle
         /// <summary>首期基础武器附加攻击力。</summary>
         internal const int BasicAttackPower = 1;
 
+        internal const int BowWeaponId = 1;
+        internal const int SpearWeaponId = 11;
+        internal const int KnifeWeaponId = 21;
+        internal const int CavalryWeaponId = 32;
+
         /// <summary>
         /// 显式默认映射表：武器 id → 玩家兵种 → 期望武器类别。
         /// 每个条目同时表达类别映射（Sword→Cavalry）与 id 归属，禁止按数值相等推断。
         /// </summary>
         private static readonly (int Id, SoldierType SoldierType, WeaponType WeaponType)[] ExpectedDefaults =
         {
-            (0, SoldierType.Bow, WeaponType.Bow),
-            (10, SoldierType.Spear, WeaponType.Spear),
-            (20, SoldierType.Knife, WeaponType.Knife),
-            (31, SoldierType.Cavalry, WeaponType.Sword),
+            (BowWeaponId, SoldierType.Bow, WeaponType.Bow),
+            (SpearWeaponId, SoldierType.Spear, WeaponType.Spear),
+            (KnifeWeaponId, SoldierType.Knife, WeaponType.Knife),
+            (CavalryWeaponId, SoldierType.Cavalry, WeaponType.Sword),
         };
 
         /// <summary>玩家兵种 → 武器定义只读映射（构造时建立）。</summary>
@@ -236,7 +241,7 @@ namespace GameBattle
             {
                 throw new InvalidOperationException(
                     $"基础武器启用行数={enabledById.Count} 不等于 {ExpectedDefaults.Length}" +
-                    "（必须恰好 id ∈ {0,10,20,31} 四条启用，禁止隐式 fallback）");
+                    "（必须恰好 id ∈ {1,11,21,32} 四条启用，禁止隐式 fallback）");
             }
 
             var mapping = new Dictionary<SoldierType, WeaponDefinitionSnapshot>(ExpectedDefaults.Length);

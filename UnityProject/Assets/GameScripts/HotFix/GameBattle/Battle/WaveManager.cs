@@ -501,7 +501,7 @@ namespace GameBattle
                 }
 
                 handle = _bossPort.Spawn(new BossWaveSpawnRequest(
-                    entry.BossKey,
+                    entry.BossId.Value,
                     isPlayerLane,
                     entry.Order,
                     entry.DifficultyIndex,
@@ -511,7 +511,7 @@ namespace GameBattle
             else
             {
                 handle = _normalSpawnHandler(new NormalWaveSpawnRequest(
-                    entry.EnemyKey,
+                    entry.EnemyId.Value,
                     isPlayerLane,
                     entry.Order,
                     entry.DifficultyIndex,

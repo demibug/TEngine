@@ -19,12 +19,7 @@ public sealed partial class Enemy : Luban.BeanBase
 {
     public Enemy(ByteBuf _buf) 
     {
-        Key = _buf.ReadString();
-        Symbol = _buf.ReadString();
-        if(_buf.ReadBool()){ Status = _buf.ReadString(); } else { Status = null; }
-        if(_buf.ReadBool()){ Resource = _buf.ReadString(); } else { Resource = null; }
-        if(_buf.ReadBool()){ Deferred = _buf.ReadString(); } else { Deferred = null; }
-        {int n0 = _buf.ReadSize(); LevelMultipliers = new System.Collections.Generic.List<float>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { float _e0;  _e0 = _buf.ReadFloat(); LevelMultipliers.Add(_e0);}}
+        Id = _buf.ReadInt();
         if(_buf.ReadBool()){ TypeIndex = _buf.ReadInt(); } else { TypeIndex = null; }
         if(_buf.ReadBool()){ ResourceAddress = _buf.ReadString(); } else { ResourceAddress = null; }
     }
@@ -34,12 +29,7 @@ public sealed partial class Enemy : Luban.BeanBase
         return new battle.Enemy(_buf);
     }
 
-    public readonly string Key;
-    public readonly string Symbol;
-    public readonly string Status;
-    public readonly string Resource;
-    public readonly string Deferred;
-    public readonly System.Collections.Generic.List<float> LevelMultipliers;
+    public readonly int Id;
     /// <summary>
     /// 类型索引
     /// </summary>
@@ -59,12 +49,7 @@ public sealed partial class Enemy : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "key:" + Key + ","
-        + "symbol:" + Symbol + ","
-        + "status:" + Status + ","
-        + "resource:" + Resource + ","
-        + "deferred:" + Deferred + ","
-        + "levelMultipliers:" + Luban.StringUtil.CollectionToString(LevelMultipliers) + ","
+        + "id:" + Id + ","
         + "typeIndex:" + TypeIndex + ","
         + "resourceAddress:" + ResourceAddress + ","
         + "}";

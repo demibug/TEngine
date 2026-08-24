@@ -68,13 +68,16 @@ namespace GameBattle
     public sealed class BossDefinitionSnapshot
     {
         /// <summary>Boss 主键（全局唯一；非空由 Validator 保证）。</summary>
-        public string Key { get; }
+        public int Id { get; }
+
+        /// <summary>Boss 资源名，不参与主键索引。</summary>
+        public string ResName { get; }
 
         /// <summary>显示名。</summary>
         public string Name { get; }
 
         /// <summary>技能键（Boss 行使用的 Skill key，非空由 Validator 保证）。</summary>
-        public string SkillKey { get; }
+        public int SkillId { get; }
 
         /// <summary>动画键（表现层识别用）。</summary>
         public string AnimationKey { get; }
@@ -129,9 +132,10 @@ namespace GameBattle
         /// <param name="logicalWidth">逻辑宽度。</param>
         /// <param name="logicalHeight">逻辑高度。</param>
         public BossDefinitionSnapshot(
-            string key,
+            int id,
+            string resName,
             string name,
-            string skillKey,
+            int skillId,
             string animationKey,
             string resourcePath,
             string attackAnimation,
@@ -145,9 +149,10 @@ namespace GameBattle
             float logicalWidth,
             float logicalHeight)
         {
-            Key = key ?? string.Empty;
+            Id = id;
+            ResName = resName ?? string.Empty;
             Name = name ?? string.Empty;
-            SkillKey = skillKey ?? string.Empty;
+            SkillId = skillId;
             AnimationKey = animationKey ?? string.Empty;
             ResourcePath = resourcePath ?? string.Empty;
             AttackAnimation = attackAnimation ?? string.Empty;
@@ -165,7 +170,7 @@ namespace GameBattle
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"BossDefinition(key={Key}, name={Name}, skillKey={SkillKey}, enabled={Enabled}, " +
+            return $"BossDefinition(id={Id}, resName={ResName}, name={Name}, skillId={SkillId}, enabled={Enabled}, " +
                    $"healthMultiplier={HealthMultiplier}, moveSpeed={MoveSpeed}, " +
                    $"contactDamage={ContactDamage}, rewardGold={RewardGold}, timeline={Timeline})";
         }
@@ -186,7 +191,7 @@ namespace GameBattle
         /// <summary>按 key 升序的只读 Boss 定义列表。</summary>
         public IReadOnlyList<BossDefinitionSnapshot> Definitions { get; }
 
-        private readonly IReadOnlyDictionary<string, BossDefinitionSnapshot> _byKey;
+        private readonly IReadOnlyDictionary<int, BossDefinitionSnapshot> _byId;
 
         /// <summary>构造 Boss 目录快照。</summary>
         /// <param name="definitions">Boss 定义列表（构造时深拷贝并按 key 升序排序）。</param>
@@ -200,37 +205,38 @@ namespace GameBattle
                 copy[i] = source[i];
             }
 
-            Array.Sort(copy, (a, b) => string.CompareOrdinal(a.Key, b.Key));
+            Array.Sort(copy, (a, b) => a.Id.CompareTo(b.Id));
 
-            var byKey = new Dictionary<string, BossDefinitionSnapshot>(copy.Length, StringComparer.Ordinal);
+            var byId = new Dictionary<int, BossDefinitionSnapshot>(copy.Length);
             for (int i = 0; i < copy.Length; i++)
             {
                 BossDefinitionSnapshot def = copy[i];
-                if (byKey.ContainsKey(def.Key))
+                if (byId.ContainsKey(def.Id))
                 {
-                    throw new ArgumentException($"Boss 目录存在重复 key='{def.Key}'");
+                    throw new ArgumentException($"Boss 目录存在重复 id={def.Id}");
                 }
 
-                byKey.Add(def.Key, def);
+                byId.Add(def.Id, def);
             }
 
             Definitions = copy;
-            _byKey = byKey;
+            _byId = byId;
         }
 
         /// <summary>按 key 查询 Boss 定义。</summary>
         /// <param name="key">Boss 主键。</param>
         /// <param name="definition">命中的定义；未命中时为 null。</param>
         /// <returns>键存在时返回 true。</returns>
-        public bool TryGetByKey(string key, out BossDefinitionSnapshot definition)
+        public bool TryGetById(int id, out BossDefinitionSnapshot definition)
         {
-            return _byKey.TryGetValue(key, out definition);
+            return _byId.TryGetValue(id, out definition);
         }
 
+
         /// <summary>Boss 键是否存在于目录中。</summary>
-        public bool ContainsKey(string key)
+        public bool ContainsId(int id)
         {
-            return _byKey.ContainsKey(key);
+            return _byId.ContainsKey(id);
         }
     }
 }

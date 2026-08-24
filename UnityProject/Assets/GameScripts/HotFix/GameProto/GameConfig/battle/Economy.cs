@@ -19,6 +19,7 @@ public sealed partial class Economy : Luban.BeanBase
 {
     public Economy(ByteBuf _buf) 
     {
+        Id = _buf.ReadInt();
         InitialGold = _buf.ReadInt();
         RefreshCostStart = _buf.ReadInt();
         RefreshCostIncrement = _buf.ReadInt();
@@ -33,6 +34,7 @@ public sealed partial class Economy : Luban.BeanBase
         return new battle.Economy(_buf);
     }
 
+    public readonly int Id;
     public readonly int InitialGold;
     public readonly int RefreshCostStart;
     public readonly int RefreshCostIncrement;
@@ -57,6 +59,7 @@ public sealed partial class Economy : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
+        + "id:" + Id + ","
         + "initialGold:" + InitialGold + ","
         + "refreshCostStart:" + RefreshCostStart + ","
         + "refreshCostIncrement:" + RefreshCostIncrement + ","

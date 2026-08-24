@@ -19,6 +19,7 @@ public partial class TbWavePlan
 {
     private readonly System.Collections.Generic.List<battle.WavePlan> _dataList;
 
+    private System.Collections.Generic.Dictionary<(int, int), battle.WavePlan> _dataMapUnion;
 
     public TbWavePlan(ByteBuf _buf)
     {
@@ -30,10 +31,16 @@ public partial class TbWavePlan
             _v = global::GameConfig.battle.WavePlan.DeserializeWavePlan(_buf);
             _dataList.Add(_v);
         }
+        _dataMapUnion = new System.Collections.Generic.Dictionary<(int, int), battle.WavePlan>(n);
+        foreach(var _v in _dataList)
+        {
+            _dataMapUnion.Add((_v.Id, _v.Order), _v);
+        }
     }
 
     public System.Collections.Generic.IReadOnlyList<battle.WavePlan> DataList => _dataList;
 
+    public battle.WavePlan Get(int id, int order) => _dataMapUnion.TryGetValue((id, order), out battle.WavePlan __v) ? __v : default;
     
     public void ResolveRef(Tables tables)
     {

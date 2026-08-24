@@ -30,7 +30,7 @@ public partial class TbGeneral
             battle.General _v;
             _v = global::GameConfig.battle.General.DeserializeGeneral(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.Index, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 

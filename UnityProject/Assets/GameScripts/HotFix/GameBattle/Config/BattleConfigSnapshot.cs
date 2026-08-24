@@ -123,7 +123,7 @@ namespace GameBattle
         /// <para>spec "Exactly four basic weapon definitions are enabled"：全部
         /// Weapon 行（含其余 40 把禁用特殊武器）归一化为不可变目录，按 id 唯一
         /// 查询；运行时只消费本目录，不保留 Luban row，也不做运行时 fallback。
-        /// 首期只有 id ∈ {0, 10, 20, 31} 四条 Basic +1 启用，其余行不产生运行时状态。</para>
+        /// 首期只有 id ∈ {1, 11, 21, 32} 四条 Basic +1 启用，其余行不产生运行时状态。</para>
         /// <para>可为 null（旧兼容构造路径/旧测试直接构造快照）；生产 Luban Provider
         /// 恒构造本目录。为 null 时玩家默认武器不装配（兼容语义），生产装配的
         /// 玩家目录缺失或不兼容默认 MUST 失败而非 fallback。</para>
@@ -294,7 +294,7 @@ namespace GameBattle
     public sealed class EnemyConfigSnapshot
     {
         /// <summary>敌人类型标识（本期唯一 "Mob0"）。</summary>
-        public string Type { get; }
+        public int Id { get; }
 
         /// <summary>地图敌人类型索引（对应 MAP_BLOCKS[mapIndex].enemyTypeIndex）。</summary>
         public int MapEnemyTypeIndex { get; }
@@ -313,14 +313,14 @@ namespace GameBattle
 
         /// <summary>构造敌人配置快照。</summary>
         public EnemyConfigSnapshot(
-            string type,
+            int id,
             int mapEnemyTypeIndex,
             int speed,
             IReadOnlyList<int> healthByWave,
             IReadOnlyList<float> earlyRoundHealthMultipliers,
             int contactDamage)
         {
-            Type = type ?? throw new ArgumentNullException(nameof(type));
+            Id = id;
             MapEnemyTypeIndex = mapEnemyTypeIndex;
             Speed = speed;
             HealthByWave = healthByWave ?? throw new ArgumentNullException(nameof(healthByWave));
@@ -426,7 +426,7 @@ namespace GameBattle
         public string PrefabAddress { get; }
 
         /// <summary>主动技能键（武将单位才有；普通四兵为空串）。</summary>
-        public string SkillKey { get; }
+        public int? SkillId { get; }
 
         /// <summary>构造单位配置快照。</summary>
         public UnitConfigSnapshot(
@@ -441,7 +441,7 @@ namespace GameBattle
             string projectileType = "",
             int projectileSpeed = 0,
             string prefabAddress = "",
-            string skillKey = "")
+            int? skillId = null)
         {
             Index = index;
             Text = text ?? throw new ArgumentNullException(nameof(text));
@@ -454,7 +454,7 @@ namespace GameBattle
             ProjectileType = projectileType ?? string.Empty;
             ProjectileSpeed = projectileSpeed;
             PrefabAddress = prefabAddress ?? string.Empty;
-            SkillKey = skillKey ?? string.Empty;
+            SkillId = skillId;
         }
     }
 

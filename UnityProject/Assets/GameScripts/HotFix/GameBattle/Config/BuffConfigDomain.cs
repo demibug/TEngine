@@ -102,7 +102,7 @@ namespace GameBattle
     /// <para>0/1/2/3/6 为稳定状态：任一贡献层存在即 active、payload 取最大实例 ID；
     /// 4 DamageImpulse 与 5 KnockbackImpulse 是一次性/复合效果，只允许由已注册
     /// Custom Handler 处理，不走普通状态聚合（design.md 决策 3）。</para>
-    /// <para>当前 type 12（knockback）与 type 14（burnStatic）的 Kind/Channels 来自
+    /// <para>当前 type 13（knockback）与 type 15（burnStatic）的 Kind/Channels 来自
     /// 原表，仍属于合法可加载目录；其 4/5 通道的运行时语义在目标申请阶段处理，
     /// 本配置层不拒绝它们。</para>
     /// </remarks>

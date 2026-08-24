@@ -338,39 +338,39 @@ namespace GameBattle
             string path,
             List<BattleConfigValidationError> errors)
         {
-            if (string.IsNullOrEmpty(general.SkillKey))
+            if (!general.SkillId.HasValue)
             {
                 return;
             }
 
             SkillCatalogSnapshot skillCatalog = snapshot.SkillCatalog;
-            if (skillCatalog == null || !skillCatalog.TryGetByKey(general.SkillKey, out SkillDefinitionSnapshot skillDef))
+            if (skillCatalog == null || !skillCatalog.TryGetById(general.SkillId.Value, out SkillDefinitionSnapshot skillDef))
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.GeneralSkillDefinitionMissing,
-                    $"武将 index={general.Index} 引用的技能 skillKey='{general.SkillKey}' 在 Skill 目录中不存在",
-                    path + ".SkillKey"));
+                    $"武将 index={general.Index} 引用的技能 skillKey='{general.SkillId}' 在 Skill 目录中不存在",
+                    path + ".SkillId"));
                 return;
             }
 
-            string skillPath = $"Skill.{general.SkillKey}";
+            string skillPath = $"Skill.{general.SkillId}";
 
             if (skillDef.Category != SkillCategory.Active)
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.GeneralSkillCategoryInvalid,
-                    $"武将 index={general.Index} 引用的技能 '{general.SkillKey}' 类别={skillDef.Category}" +
+                    $"武将 index={general.Index} 引用的技能 '{general.SkillId}' 类别={skillDef.Category}" +
                     "，主动技能必须为 Active",
-                    path + ".SkillKey"));
+                    path + ".SkillId"));
             }
 
             if (!skillDef.TriggerAttackCount.HasValue || skillDef.TriggerAttackCount.Value <= 0)
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.GeneralSkillTriggerInvalid,
-                    $"武将 index={general.Index} 引用的技能 '{general.SkillKey}' triggerAttackCount 非法" +
+                    $"武将 index={general.Index} 引用的技能 '{general.SkillId}' triggerAttackCount 非法" +
                     $"（值={skillDef.TriggerAttackCount}，要求正数）",
-                    path + ".SkillKey"));
+                    path + ".SkillId"));
             }
 
             // handler 专用 effect 配置：只对本框架已实现 handler 校验专用字段。
@@ -384,7 +384,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.GeneralSkillEffectConfigMissing,
-                        $"武将 index={general.Index} 引用的 BattleShout 技能 '{general.SkillKey}' " +
+                        $"武将 index={general.Index} 引用的 BattleShout 技能 '{general.SkillId}' " +
                         "缺少专用 effect 配置（要求 range>0 / buffType / duration>0）",
                         $"{skillPath}.EffectConfig"));
                 }
@@ -400,7 +400,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.GeneralSkillEffectConfigMissing,
-                        $"武将 index={general.Index} 引用的 FireArrowBarrage 技能 '{general.SkillKey}' " +
+                        $"武将 index={general.Index} 引用的 FireArrowBarrage 技能 '{general.SkillId}' " +
                         "缺少专用 effect 配置（要求 range>0 / 有限正 damageMultiplier）",
                         $"{skillPath}.EffectConfig"));
                 }
@@ -967,7 +967,7 @@ namespace GameBattle
                         $"{defPath}.TypeIndex"));
                 }
 
-                if (string.IsNullOrEmpty(def.Key))
+                if (def.Id < 1)
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.EnemyCatalogInvalid,
@@ -979,7 +979,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.EnemyCatalogInvalid,
-                        $"敌人定义 '{def.Key}' 资源地址为空",
+                        $"敌人定义 '{def.Id}' 资源地址为空",
                         $"{defPath}.ResourceAddress"));
                 }
 
@@ -987,7 +987,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.EnemyCatalogInvalid,
-                        $"敌人定义 '{def.Key}' 移动速度={def.MoveSpeed} 非正",
+                        $"敌人定义 '{def.Id}' 移动速度={def.MoveSpeed} 非正",
                         $"{defPath}.MoveSpeed"));
                 }
 
@@ -995,7 +995,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.MissingField,
-                        $"敌人定义 '{def.Key}' 各波次血量数组为空",
+                        $"敌人定义 '{def.Id}' 各波次血量数组为空",
                         $"{defPath}.HealthByWave"));
                 }
                 else
@@ -1006,7 +1006,7 @@ namespace GameBattle
                         {
                             errors.Add(new BattleConfigValidationError(
                                 BattleConfigErrorCategory.EnemyCatalogInvalid,
-                                $"敌人定义 '{def.Key}' 各波次血量[{h}]={def.HealthByWave[h]} 非正",
+                                $"敌人定义 '{def.Id}' 各波次血量[{h}]={def.HealthByWave[h]} 非正",
                                 $"{defPath}.HealthByWave[{h}]"));
                         }
                     }
@@ -1016,7 +1016,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.MissingField,
-                        $"敌人定义 '{def.Key}' 早期波次血量乘数数组为空",
+                        $"敌人定义 '{def.Id}' 早期波次血量乘数数组为空",
                         $"{defPath}.EarlyRoundHealthMultipliers"));
                 }
                 else
@@ -1027,7 +1027,7 @@ namespace GameBattle
                         {
                             errors.Add(new BattleConfigValidationError(
                                 BattleConfigErrorCategory.EnemyCatalogInvalid,
-                                $"敌人定义 '{def.Key}' 早期乘数[{m}]={def.EarlyRoundHealthMultipliers[m]} 非正",
+                                $"敌人定义 '{def.Id}' 早期乘数[{m}]={def.EarlyRoundHealthMultipliers[m]} 非正",
                                 $"{defPath}.EarlyRoundHealthMultipliers[{m}]"));
                         }
                     }
@@ -1037,7 +1037,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.EnemyCatalogInvalid,
-                        $"敌人定义 '{def.Key}' 接触伤害={def.ContactDamage} 为负",
+                        $"敌人定义 '{def.Id}' 接触伤害={def.ContactDamage} 为负",
                         $"{defPath}.ContactDamage"));
                 }
 
@@ -1045,7 +1045,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.EnemyCatalogInvalid,
-                        $"敌人定义 '{def.Key}' 击杀奖励={def.RewardGold} 为负",
+                        $"敌人定义 '{def.Id}' 击杀奖励={def.RewardGold} 为负",
                         $"{defPath}.RewardGold"));
                 }
             }
@@ -1063,7 +1063,7 @@ namespace GameBattle
         /// Provider 以 BuffTypeDuplicate 结构化错误报告）、未知 Kind/StackPolicy、
         /// 未知通道值（合法 0..6）、Numeric/State 定义通道为空、非正 maxStacks。</para>
         /// <para>Custom 定义允许空通道（其 handler 拥有窄效果契约）；若 Custom 显式
-        /// 携带通道仍按已知通道集合校验，不额外拒绝（type 7 custom 配置为空通道）。</para>
+        /// 携带通道仍按已知通道集合校验，不额外拒绝（type 8 custom 配置为空通道）。</para>
         /// <para>所有诊断包含 Buff type 与字段名（路径形如 <c>Buff.{type}.Channels</c>），
         /// 不依赖运行时 fallback 掩盖缺失配置。</para>
         /// </remarks>
@@ -1197,26 +1197,26 @@ namespace GameBattle
             }
 
             IReadOnlyList<SkillDefinitionSnapshot> definitions = catalog.Definitions;
-            var seenKeys = new HashSet<string>(StringComparer.Ordinal);
+            var seenKeys = new HashSet<int>();
             for (int i = 0; i < definitions.Count; i++)
             {
                 SkillDefinitionSnapshot def = definitions[i];
-                string skillPath = $"Skill.{def.Key}";
+                string skillPath = $"Skill.{def.Id}";
 
                 // 空 key（缺失主键）。
-                if (string.IsNullOrEmpty(def.Key))
+                if (def.Id < 1)
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.SkillKeyInvalid,
                         $"Skill 定义（索引 {i}）的 Key 为空",
                         $"SkillCatalog.Definitions[{i}].Key"));
                 }
-                else if (!seenKeys.Add(def.Key))
+                else if (!seenKeys.Add(def.Id))
                 {
                     // 重复 key（目录构造已保证，此处防御性复查）。
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.SkillKeyDuplicate,
-                        $"Skill key='{def.Key}' 重复",
+                        $"Skill key='{def.Id}' 重复",
                         $"{skillPath}.Key"));
                 }
 
@@ -1225,7 +1225,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.SkillCategoryUnknown,
-                        $"Skill key='{def.Key}' 的 Category={def.Category} 未知（合法 active/boss/passive）",
+                        $"Skill key='{def.Id}' 的 Category={def.Category} 未知（合法 active/boss/passive）",
                         $"{skillPath}.Category"));
                 }
 
@@ -1234,7 +1234,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.SkillCooldownInvalid,
-                        $"Skill key='{def.Key}' 的 CooldownMs={def.CooldownMs} 为负",
+                        $"Skill key='{def.Id}' 的 CooldownMs={def.CooldownMs} 为负",
                         $"{skillPath}.CooldownMs"));
                 }
                 // 空 handlerKey（缺配置时在 xlsx 补齐，运行时不 fallback）。
@@ -1242,7 +1242,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.SkillHandlerKeyMissing,
-                        $"Skill key='{def.Key}' 的 handlerKey 为空",
+                        $"Skill key='{def.Id}' 的 handlerKey 为空",
                         $"{skillPath}.HandlerKey"));
                 }
             }
@@ -1276,7 +1276,7 @@ namespace GameBattle
                 return;
             }
 
-            if (string.IsNullOrEmpty(plan.ActivePlanId))
+            if (plan.ActivePlanId < 1)
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.WavePlanMissing,
@@ -1368,12 +1368,12 @@ namespace GameBattle
                 else if (row.Kind == WavePlanKind.Boss)
                 {
                     // Boss 行必须携带 bossKey（spec "Wave order is explicit and valid"）。
-                    if (string.IsNullOrEmpty(row.BossKey))
+                    if (!row.BossId.HasValue)
                     {
                         errors.Add(new BattleConfigValidationError(
                             BattleConfigErrorCategory.WaveBossKeyMissing,
                             "Boss 行缺少 bossKey",
-                            $"{rowPath}.BossKey"));
+                            $"{rowPath}.BossId"));
                     }
                 }
             }
@@ -1410,7 +1410,7 @@ namespace GameBattle
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.DifficultyIndexInvalid,
-                    $"难度索引={row.DifficultyIndex} 越界：敌人 '{definition.Key}' 血量曲线长度={definition.HealthByWave.Count}",
+                    $"难度索引={row.DifficultyIndex} 越界：敌人 '{definition.Id}' 血量曲线长度={definition.HealthByWave.Count}",
                     $"{rowPath}.DifficultyIndex"));
             }
 
@@ -1448,17 +1448,17 @@ namespace GameBattle
                 return false;
             }
 
-            if (!string.IsNullOrEmpty(row.EnemyKey))
+            if (!!row.EnemyId.HasValue)
             {
-                if (catalog.TryGetByKey(row.EnemyKey, out definition))
+                if (catalog.TryGetById(row.EnemyId.Value, out definition))
                 {
                     return true;
                 }
 
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.EnemyKeyUnknown,
-                    $"Normal 行引用了目录中不存在的 enemyKey='{row.EnemyKey}'",
-                    $"{rowPath}.EnemyKey"));
+                    $"Normal 行引用了目录中不存在的 enemyKey='{row.EnemyId}'",
+                    $"{rowPath}.EnemyId"));
                 return false;
             }
 
@@ -1515,9 +1515,9 @@ namespace GameBattle
             for (int i = 0; i < definitions.Count; i++)
             {
                 BossDefinitionSnapshot def = definitions[i];
-                string bossPath = $"Boss.{def.Key}";
+                string bossPath = $"Boss.{def.Id}";
 
-                if (string.IsNullOrEmpty(def.Key))
+                if (def.Id < 1)
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossConfigInvalid,
@@ -1525,19 +1525,19 @@ namespace GameBattle
                         $"BossCatalog.Definitions[{i}].Key"));
                 }
 
-                if (string.IsNullOrEmpty(def.SkillKey))
+                if (def.SkillId < 1)
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossSkillKeyMissing,
-                        $"Boss key='{def.Key}' 缺少技能键（skillKey 为空，必填）",
-                        $"{bossPath}.SkillKey"));
+                        $"Boss key='{def.Id}' 缺少技能键（skillKey 为空，必填）",
+                        $"{bossPath}.SkillId"));
                 }
 
                 if (def.Timeline == null)
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossTimelineInvalid,
-                        $"Boss key='{def.Key}' 技能时间轴为空（必填）",
+                        $"Boss key='{def.Id}' 技能时间轴为空（必填）",
                         $"{bossPath}.Timeline"));
                 }
                 else if (def.Timeline.EffectAtMs < 0
@@ -1545,7 +1545,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossTimelineInvalid,
-                        $"Boss key='{def.Key}' 技能时间轴非法：effect={def.Timeline.EffectAtMs}ms " +
+                        $"Boss key='{def.Id}' 技能时间轴非法：effect={def.Timeline.EffectAtMs}ms " +
                         $"complete={def.Timeline.CompleteAtMs}ms（要求 0 &lt;= effect &lt; complete）",
                         $"{bossPath}.Timeline"));
                 }
@@ -1556,7 +1556,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossConfigInvalid,
-                        $"Boss key='{def.Key}' 生命倍率={def.HealthMultiplier} 非正",
+                        $"Boss key='{def.Id}' 生命倍率={def.HealthMultiplier} 非正",
                         $"{bossPath}.HealthMultiplier"));
                 }
 
@@ -1567,7 +1567,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossConfigInvalid,
-                        $"Boss key='{def.Key}' 移动速度={def.MoveSpeed} 非正",
+                        $"Boss key='{def.Id}' 移动速度={def.MoveSpeed} 非正",
                         $"{bossPath}.MoveSpeed"));
                 }
 
@@ -1575,7 +1575,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossConfigInvalid,
-                        $"Boss key='{def.Key}' 接触伤害={def.ContactDamage} 为负",
+                        $"Boss key='{def.Id}' 接触伤害={def.ContactDamage} 为负",
                         $"{bossPath}.ContactDamage"));
                 }
 
@@ -1583,7 +1583,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossConfigInvalid,
-                        $"Boss key='{def.Key}' 击杀奖励={def.RewardGold} 为负",
+                        $"Boss key='{def.Id}' 击杀奖励={def.RewardGold} 为负",
                         $"{bossPath}.RewardGold"));
                 }
 
@@ -1596,7 +1596,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossConfigInvalid,
-                        $"Boss key='{def.Key}' 逻辑尺寸非法：宽={def.LogicalWidth} 高={def.LogicalHeight}（应为正）",
+                        $"Boss key='{def.Id}' 逻辑尺寸非法：宽={def.LogicalWidth} 高={def.LogicalHeight}（应为正）",
                         $"{bossPath}.LogicalDimensions"));
                 }
             }
@@ -1608,7 +1608,7 @@ namespace GameBattle
         /// <remarks>
         /// <para>spec "Only ZhangLiang is supported in the first slice"：对每个被计划
         /// 引用的 Boss 行校验：Boss 目录存在 → 定义存在 → enabled → skillKey 非空 →
-        /// Skill 定义存在 → handlerKey 非空 → 效果 Buff（type 13）在 Buff 目录中存在 →
+        /// Skill 定义存在 → handlerKey 非空 → 效果 Buff（type 14 / chaos）在 Buff 目录中存在 →
         /// effect 配置（range/duration）完整 → 时间轴合法。</para>
         /// <para><b>不扩展通用 RequiredSkill/RequiredBuff capabilities（design.md 决策 3）：</b>
         /// 只直接校验 selected 行引用的具体 Boss→Skill→Buff 依赖，不新增通用 DSL。
@@ -1634,7 +1634,7 @@ namespace GameBattle
                 }
 
                 string rowPath = $"WavePlan.{row.Order}";
-                if (string.IsNullOrEmpty(row.BossKey))
+                if (!row.BossId.HasValue)
                 {
                     // WaveBossKeyMissing 已在 ValidateOrderedWavePlan 报告。
                     continue;
@@ -1644,19 +1644,19 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossCatalogMissing,
-                        $"计划 '{plan.ActivePlanId}' 含 Boss 行（order={row.Order}，bossKey='{row.BossKey}'），" +
+                        $"计划 '{plan.ActivePlanId}' 含 Boss 行（order={row.Order}，bossKey='{row.BossId}'），" +
                         "但配置快照没有 Boss 目录，无法验证依赖",
-                        $"{rowPath}.BossKey"));
+                        $"{rowPath}.BossId"));
                     continue;
                 }
 
-                if (!catalog.TryGetByKey(row.BossKey, out BossDefinitionSnapshot bossDef))
+                if (!catalog.TryGetById(row.BossId.Value, out BossDefinitionSnapshot bossDef))
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossKeyUnknown,
                         $"计划 '{plan.ActivePlanId}' Boss 行（order={row.Order}）引用了目录中不存在的 " +
-                        $"bossKey='{row.BossKey}'",
-                        $"{rowPath}.BossKey"));
+                        $"bossKey='{row.BossId}'",
+                        $"{rowPath}.BossId"));
                     continue;
                 }
 
@@ -1665,8 +1665,8 @@ namespace GameBattle
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossDisabled,
                         $"计划 '{plan.ActivePlanId}' Boss 行（order={row.Order}）引用的 " +
-                        $"bossKey='{row.BossKey}' 未启用（disabled，不得出生）",
-                        $"{rowPath}.BossKey"));
+                        $"bossKey='{row.BossId}' 未启用（disabled，不得出生）",
+                        $"{rowPath}.BossId"));
                     continue;
                 }
 
@@ -1685,68 +1685,68 @@ namespace GameBattle
             BossDefinitionSnapshot bossDef,
             List<BattleConfigValidationError> errors)
         {
-            string bossPath = $"Boss.{bossDef.Key}";
-            if (string.IsNullOrEmpty(bossDef.SkillKey))
+            string bossPath = $"Boss.{bossDef.Id}";
+            if (bossDef.SkillId < 1)
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.BossSkillKeyMissing,
-                    $"Boss key='{bossDef.Key}'（order={row.Order}）缺少技能键（skillKey 为空）",
-                    $"{bossPath}.SkillKey"));
+                    $"Boss key='{bossDef.Id}'（order={row.Order}）缺少技能键（skillKey 为空）",
+                    $"{bossPath}.SkillId"));
                 return;
             }
 
-            if (string.Equals(bossDef.Key, ZhangLiangBoss.BossKeyConst, StringComparison.Ordinal)
-                && !string.Equals(bossDef.SkillKey, "SoulCapture", StringComparison.Ordinal))
+            if (string.Equals(bossDef.ResName, ZhangLiangBoss.ResNameConst, StringComparison.Ordinal)
+                && bossDef.SkillId < 1)
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.BossSkillDefinitionMissing,
-                    $"首期 ZhangLiang 必须引用 SoulCapture，实际 skillKey='{bossDef.SkillKey}'",
-                    $"{bossPath}.SkillKey"));
+                    $"首期 ZhangLiang 必须引用 SoulCapture，实际 skillKey='{bossDef.SkillId}'",
+                    $"{bossPath}.SkillId"));
                 return;
             }
 
             SkillCatalogSnapshot skillCatalog = snapshot.SkillCatalog;
-            if (skillCatalog == null || !skillCatalog.TryGetByKey(bossDef.SkillKey, out SkillDefinitionSnapshot skillDef))
+            if (skillCatalog == null || !skillCatalog.TryGetById(bossDef.SkillId, out SkillDefinitionSnapshot skillDef))
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.BossSkillDefinitionMissing,
-                    $"Boss key='{bossDef.Key}'（order={row.Order}）引用的技能 " +
-                    $"skillKey='{bossDef.SkillKey}' 在 Skill 目录中不存在",
-                    $"{bossPath}.SkillKey"));
+                    $"Boss key='{bossDef.Id}'（order={row.Order}）引用的技能 " +
+                    $"skillKey='{bossDef.SkillId}' 在 Skill 目录中不存在",
+                    $"{bossPath}.SkillId"));
                 return;
             }
 
             if (string.IsNullOrEmpty(skillDef.HandlerKey)
-                || (string.Equals(bossDef.Key, ZhangLiangBoss.BossKeyConst, StringComparison.Ordinal)
+                || (string.Equals(bossDef.ResName, ZhangLiangBoss.ResNameConst, StringComparison.Ordinal)
                     && !string.Equals(skillDef.HandlerKey, "SoulCapture", StringComparison.Ordinal)))
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.BossSkillHandlerMissing,
-                    $"Boss key='{bossDef.Key}' 引用的技能 '{bossDef.SkillKey}' handlerKey 无生产实现" +
+                    $"Boss key='{bossDef.Id}' 引用的技能 '{bossDef.SkillId}' handlerKey 无生产实现" +
                     $"（实际='{skillDef.HandlerKey}'，首期只注册 SoulCapture）",
-                    $"Skill.{bossDef.SkillKey}.HandlerKey"));
+                    $"Skill.{bossDef.SkillId}.HandlerKey"));
             }
 
-            // 效果 Buff：effectBuffType 必填且 Buff 定义必须存在（SoulCapture/Buff13）。
+            // 效果 Buff：effectBuffType 必填，且必须引用一基主键中的 Buff14（chaos）。
             if (!skillDef.EffectBuffType.HasValue)
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.BossEffectBuffMissing,
-                    $"Boss key='{bossDef.Key}' 引用的技能 '{bossDef.SkillKey}' 缺少效果 Buff 类型 " +
-                    "（effectBuffType 为空，无法施加 Buff13）",
-                    $"Skill.{bossDef.SkillKey}.EffectBuffType"));
+                    $"Boss key='{bossDef.Id}' 引用的技能 '{bossDef.SkillId}' 缺少效果 Buff 类型 " +
+                    "（effectBuffType 为空，无法施加 Buff14）",
+                    $"Skill.{bossDef.SkillId}.EffectBuffType"));
             }
             else
             {
                 int buffType = skillDef.EffectBuffType.Value;
                 BuffCatalogSnapshot buffCatalog = snapshot.BuffCatalog;
-                if (buffType != 13 || buffCatalog == null || !buffCatalog.ContainsType(buffType))
+                if (buffType != 14 || buffCatalog == null || !buffCatalog.ContainsType(buffType))
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossEffectBuffMissing,
-                        $"Boss key='{bossDef.Key}' 引用的技能 '{bossDef.SkillKey}' 效果 Buff " +
-                        $"type={buffType} 无效（SoulCapture 必须使用已存在的 Buff13）",
-                        $"Skill.{bossDef.SkillKey}.EffectBuffType"));
+                        $"Boss key='{bossDef.Id}' 引用的技能 '{bossDef.SkillId}' 效果 Buff " +
+                        $"type={buffType} 无效（SoulCapture 必须使用已存在的 Buff14）",
+                        $"Skill.{bossDef.SkillId}.EffectBuffType"));
                 }
             }
 
@@ -1755,28 +1755,28 @@ namespace GameBattle
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.BossSkillEffectConfigMissing,
-                    $"Boss key='{bossDef.Key}' 引用的技能 '{bossDef.SkillKey}' 效果持续时长非法" +
+                    $"Boss key='{bossDef.Id}' 引用的技能 '{bossDef.SkillId}' 效果持续时长非法" +
                     $"（effectDurationMs={skillDef.EffectDurationMs?.ToString() ?? "null"}，应为正）",
-                    $"Skill.{bossDef.SkillKey}.EffectDurationMs"));
+                    $"Skill.{bossDef.SkillId}.EffectDurationMs"));
             }
 
             if (!skillDef.RangeTiles.HasValue || skillDef.RangeTiles.Value <= 0f)
             {
                 errors.Add(new BattleConfigValidationError(
                     BattleConfigErrorCategory.BossSkillEffectConfigMissing,
-                    $"Boss key='{bossDef.Key}' 引用的技能 '{bossDef.SkillKey}' 效果范围非法" +
+                    $"Boss key='{bossDef.Id}' 引用的技能 '{bossDef.SkillId}' 效果范围非法" +
                     $"（rangeTiles={skillDef.RangeTiles?.ToString() ?? "null"}，应为正）",
-                    $"Skill.{bossDef.SkillKey}.RangeTiles"));
+                    $"Skill.{bossDef.SkillId}.RangeTiles"));
             }
 
-            if (string.Equals(bossDef.Key, ZhangLiangBoss.BossKeyConst, StringComparison.Ordinal))
+            if (string.Equals(bossDef.ResName, ZhangLiangBoss.ResNameConst, StringComparison.Ordinal))
             {
                 if (skillDef.CooldownMs != 8000)
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossSkillEffectConfigMissing,
                         $"SoulCapture cooldownMs 必须为 8000，实际={skillDef.CooldownMs}",
-                        $"Skill.{bossDef.SkillKey}.CooldownMs"));
+                        $"Skill.{bossDef.SkillId}.CooldownMs"));
                 }
 
                 if (skillDef.RangeTiles != 2f || skillDef.EffectDurationMs != 2000)
@@ -1784,7 +1784,7 @@ namespace GameBattle
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossSkillEffectConfigMissing,
                         "SoulCapture 专用配置必须为 rangeTiles=2、effectDurationMs=2000",
-                        $"Skill.{bossDef.SkillKey}"));
+                        $"Skill.{bossDef.SkillId}"));
                 }
 
                 if (bossDef.Timeline == null
@@ -1817,8 +1817,8 @@ namespace GameBattle
         /// 重复 id 由 <see cref="WeaponCatalogSnapshot"/> 构造保证（Provider 以
         /// WeaponIdDuplicate 报告），此处不重复扫描。</para>
         /// <para><b>启用集合校验（spec "Exactly four basic weapon definitions are
-        /// enabled"）：</b>启用行必须恰好为 id ∈ {0, 10, 20, 31}，每行类别与 id 匹配
-        /// （0→Bow、10→Spear、20→Knife、31→Sword）、handlerKey=Basic、AddAttackPower=1；
+        /// enabled"）：</b>启用行必须恰好为 id ∈ {1, 11, 21, 32}，每行类别与 id 匹配
+        /// （1→Bow、11→Spear、21→Knife、32→Sword）、handlerKey=Basic、AddAttackPower=1；
         /// 任一偏离即报告 <see cref="BattleConfigErrorCategory.WeaponEnabledSetInvalid"/>。
         /// 其余 40 行 disabled，MUST 不产生运行时状态。</para>
         /// <para>所有诊断包含武器 id 与字段名（路径形如 <c>Weapon.{id}.HandlerKey</c>），
@@ -1874,7 +1874,7 @@ namespace GameBattle
                 }
             }
 
-            // 启用集合必须恰好为四条基础武器（id 0/10/20/31），不允许缺失或多余。
+            // 启用集合必须恰好为四条基础武器（id 1/11/21/32），不允许缺失或多余。
             for (int i = 0; i < RequiredWeaponEnabledIds.Length; i++)
             {
                 int requiredId = RequiredWeaponEnabledIds[i];
@@ -1882,7 +1882,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.WeaponEnabledSetInvalid,
-                        $"基础武器启用集合缺少 id={requiredId}（首期必须恰好启用 0/10/20/31）",
+                        $"基础武器启用集合缺少 id={requiredId}（首期必须恰好启用 1/11/21/32）",
                         $"Weapon.{requiredId}.Enabled"));
                 }
             }
@@ -1893,7 +1893,7 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.WeaponEnabledSetInvalid,
-                        $"额外启用非基础武器 id={enabledId}（首期仅 0/10/20/31 可启用，其余 40 行 MUST disabled）",
+                        $"额外启用非基础武器 id={enabledId}（首期仅 1/11/21/32 可启用，其余 40 行 MUST disabled）",
                         $"Weapon.{enabledId}.Enabled"));
                 }
             }
@@ -1928,14 +1928,20 @@ namespace GameBattle
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.WeaponEnabledSetInvalid,
-                        $"基础武器 id={def.Id} 的类别={def.Type} 与期望不符（0→Bow、10→Spear、20→Knife、31→Sword）",
+                        $"基础武器 id={def.Id} 的类别={def.Type} 与期望不符（1→Bow、11→Spear、21→Knife、32→Sword）",
                         $"{weaponPath}.Type"));
                 }
             }
         }
 
-        /// <summary>首期启用基础武器 id 集合（0/10/20/31）。</summary>
-        private static readonly int[] RequiredWeaponEnabledIds = { 0, 10, 20, 31 };
+        /// <summary>首期启用基础武器 id 集合（1/11/21/32）。</summary>
+        private static readonly int[] RequiredWeaponEnabledIds =
+        {
+            BasicWeaponResolver.BowWeaponId,
+            BasicWeaponResolver.SpearWeaponId,
+            BasicWeaponResolver.KnifeWeaponId,
+            BasicWeaponResolver.CavalryWeaponId,
+        };
 
         /// <summary>判断武器类别是否为已知业务类别（Bow/Spear/Knife/Sword）。</summary>
         private static bool IsKnownWeaponType(WeaponType type)
@@ -1965,13 +1971,13 @@ namespace GameBattle
         {
             switch (id)
             {
-                case 0:
+                case BasicWeaponResolver.BowWeaponId:
                     return type == WeaponType.Bow;
-                case 10:
+                case BasicWeaponResolver.SpearWeaponId:
                     return type == WeaponType.Spear;
-                case 20:
+                case BasicWeaponResolver.KnifeWeaponId:
                     return type == WeaponType.Knife;
-                case 31:
+                case BasicWeaponResolver.CavalryWeaponId:
                     return type == WeaponType.Sword;
                 default:
                     return false;
@@ -2018,13 +2024,13 @@ namespace GameBattle
                     continue;
                 }
 
-                if (!string.IsNullOrEmpty(row.BossKey) && !effective.SupportsBossKey(row.BossKey))
+                if (!!row.BossId.HasValue && !effective.SupportsBossId(row.BossId.Value))
                 {
                     errors.Add(new BattleConfigValidationError(
                         BattleConfigErrorCategory.BossCapabilityUnsupported,
                         $"计划 '{plan.ActivePlanId}' Boss 行（order={row.Order}）引用了未注册的 " +
-                        $"bossKey='{row.BossKey}'",
-                        $"{rowPath}.BossKey"));
+                        $"bossKey='{row.BossId}'",
+                        $"{rowPath}.BossId"));
                 }
             }
         }

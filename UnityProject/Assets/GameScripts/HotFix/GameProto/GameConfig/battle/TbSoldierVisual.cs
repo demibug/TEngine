@@ -17,29 +17,29 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbSoldierVisual
 {
-    private readonly System.Collections.Generic.Dictionary<string, battle.SoldierVisual> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, battle.SoldierVisual> _dataMap;
     private readonly System.Collections.Generic.List<battle.SoldierVisual> _dataList;
     
     public TbSoldierVisual(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, battle.SoldierVisual>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.SoldierVisual>(n);
         _dataList = new System.Collections.Generic.List<battle.SoldierVisual>(n);
         for(int i = n ; i > 0 ; --i)
         {
             battle.SoldierVisual _v;
             _v = global::GameConfig.battle.SoldierVisual.DeserializeSoldierVisual(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.AnimationKey, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 
-    public System.Collections.Generic.IReadOnlyDictionary<string, battle.SoldierVisual> DataMap => _dataMap;
+    public System.Collections.Generic.IReadOnlyDictionary<int, battle.SoldierVisual> DataMap => _dataMap;
     public System.Collections.Generic.IReadOnlyList<battle.SoldierVisual> DataList => _dataList;
 
-    public battle.SoldierVisual GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public battle.SoldierVisual Get(string key) => _dataMap[key];
-    public battle.SoldierVisual this[string key] => _dataMap[key];
+    public battle.SoldierVisual GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.SoldierVisual Get(int key) => _dataMap[key];
+    public battle.SoldierVisual this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

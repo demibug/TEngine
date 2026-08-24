@@ -30,6 +30,7 @@ public partial class TbEconomy
     }
 
 
+     public int Id => _data.Id;
      public int InitialGold => _data.InitialGold;
      public int RefreshCostStart => _data.RefreshCostStart;
      public int RefreshCostIncrement => _data.RefreshCostIncrement;

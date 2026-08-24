@@ -299,19 +299,19 @@ public static class LayaBattlePrefabImporter
         GenerateSoldierPrefab(
             "KnifeSoldier",
             "resources/img/gameObject/soldier/soldier_0.png",
-            "knife");
+            0);
         GenerateSoldierPrefab(
             "BowSoldier",
             "resources/img/gameObject/soldier/soldier_1.png",
-            "bow");
+            1);
         GenerateSoldierPrefab(
             "SpearSoldier",
             "resources/img/gameObject/soldier/soldier_2.png",
-            "pike");
+            2);
         GenerateSoldierPrefab(
             "CavalrySoldier",
             "resources/img/gameObject/soldier/soldier_3.png",
-            "cavalry");
+            3);
 
         Debug.Log("[LayaBattlePrefabImporter] 已生成四个 Soldier Prefab。");
     }
@@ -320,10 +320,10 @@ public static class LayaBattlePrefabImporter
     /// 读取兵种表现 Profile 配置数据（Luban 导出，唯一真源）。
     /// </summary>
     /// <param name="prefabName">Prefab 名（用于错误提示）。</param>
-    /// <param name="animationKey">动画键（对应 unit.xlsx 的 animationKey）。</param>
+    /// <param name="profileId">兵种表现 Profile 主键（soldier_visual.xlsx 的 id）。</param>
     /// <returns>匹配的兵种表现 Profile。</returns>
     /// <exception cref="InvalidOperationException">
-    /// 配置数据缺失或 animationKey 无匹配记录。
+    /// 配置数据缺失或 profileId 无匹配记录。
     /// </exception>
     /// <remarks>
     /// <para>直接读取 <c>battle_tbsoldiervisual.bytes</c> 并用生成的
@@ -331,7 +331,7 @@ public static class LayaBattlePrefabImporter
     /// （Editor 菜单环境下模块未初始化）。</para>
     /// </remarks>
     private static SoldierVisual LoadSoldierVisualProfile(
-        string prefabName, string animationKey)
+        string prefabName, int profileId)
     {
         TextAsset bytesAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(
             SOLDIER_VISUAL_CONFIG_ASSET);
@@ -343,11 +343,11 @@ public static class LayaBattlePrefabImporter
         }
 
         var table = new TbSoldierVisual(new ByteBuf(bytesAsset.bytes));
-        SoldierVisual profile = table.GetOrDefault(animationKey);
+        SoldierVisual profile = table.GetOrDefault(profileId);
         if (profile == null)
         {
             throw new InvalidOperationException(
-                $"生成 {prefabName} 失败：animationKey={animationKey} " +
+                $"生成 {prefabName} 失败：profileId={profileId} " +
                 "无匹配的兵种表现 Profile 记录（soldier_visual.xlsx）");
         }
 
@@ -399,9 +399,9 @@ public static class LayaBattlePrefabImporter
     private static void GenerateSoldierPrefab(
         string prefabName,
         string skin,
-        string animationKey)
+        int profileId)
     {
-        SoldierVisual profile = LoadSoldierVisualProfile(prefabName, animationKey);
+        SoldierVisual profile = LoadSoldierVisualProfile(prefabName, profileId);
         GameObject soldierRoot = new GameObject(prefabName);
         try
         {

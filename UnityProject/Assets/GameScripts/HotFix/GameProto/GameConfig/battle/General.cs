@@ -19,7 +19,7 @@ public sealed partial class General : Luban.BeanBase
 {
     public General(ByteBuf _buf) 
     {
-        Index = _buf.ReadInt();
+        Id = _buf.ReadInt();
         Name = _buf.ReadString();
         Family = _buf.ReadString();
         {int n0 = _buf.ReadSize(); PartWords = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); PartWords.Add(_e0);}}
@@ -37,7 +37,7 @@ public sealed partial class General : Luban.BeanBase
         if(_buf.ReadBool()){ ProjectileType = _buf.ReadString(); } else { ProjectileType = null; }
         ProjectileSpeed = _buf.ReadInt();
         PartRecruitWeight = _buf.ReadInt();
-        if(_buf.ReadBool()){ SkillKey = _buf.ReadString(); } else { SkillKey = null; }
+        if(_buf.ReadBool()){ SkillId = _buf.ReadInt(); } else { SkillId = null; }
     }
 
     public static General DeserializeGeneral(ByteBuf _buf)
@@ -46,9 +46,9 @@ public sealed partial class General : Luban.BeanBase
     }
 
     /// <summary>
-    /// 索引(主键)
+    /// ID(主键)
     /// </summary>
-    public readonly int Index;
+    public readonly int Id;
     /// <summary>
     /// 名称
     /// </summary>
@@ -118,9 +118,9 @@ public sealed partial class General : Luban.BeanBase
     /// </summary>
     public readonly int PartRecruitWeight;
     /// <summary>
-    /// 主动技能Key
+    /// 主动技能ID
     /// </summary>
-    public readonly string SkillKey;
+    public readonly int? SkillId;
    
     public const int __ID__ = 1636813202;
     public override int GetTypeId() => __ID__;
@@ -132,7 +132,7 @@ public sealed partial class General : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "index:" + Index + ","
+        + "id:" + Id + ","
         + "name:" + Name + ","
         + "family:" + Family + ","
         + "partWords:" + Luban.StringUtil.CollectionToString(PartWords) + ","
@@ -150,7 +150,7 @@ public sealed partial class General : Luban.BeanBase
         + "projectileType:" + ProjectileType + ","
         + "projectileSpeed:" + ProjectileSpeed + ","
         + "partRecruitWeight:" + PartRecruitWeight + ","
-        + "skillKey:" + SkillKey + ","
+        + "skillId:" + SkillId + ","
         + "}";
     }
 }

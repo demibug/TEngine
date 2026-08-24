@@ -124,7 +124,7 @@ namespace GameBattle
         /// <exception cref="ArgumentNullException"><paramref name="soldier"/> 为 null。</exception>
         /// <exception cref="ArgumentException"><paramref name="skillKey"/> 为 null 或空。</exception>
         /// <exception cref="InvalidOperationException">RegisterOwner 或 Attach 失败。</exception>
-        internal void Bind(int unitId, SoldierBase soldier, string skillKey)
+        internal void Bind(int unitId, SoldierBase soldier, int skillId)
         {
             ThrowIfDisposed();
 
@@ -133,9 +133,9 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(soldier));
             }
 
-            if (string.IsNullOrEmpty(skillKey))
+            if (skillId < 1)
             {
-                throw new ArgumentException("skillKey 不能为 null 或空。", nameof(skillKey));
+                throw new ArgumentOutOfRangeException(nameof(skillId), skillId, "skillId 必须从 1 开始。");
             }
 
             var handle = new SkillOwnerHandle(soldier.Id, soldier.LifecycleGeneration);
@@ -147,7 +147,7 @@ namespace GameBattle
                 {
                     // 同 handle：检查 skillKey 是否一致。
                     GeneralSkillState state = GetOrCreateState(unitId);
-                    if (state.SkillKey == skillKey)
+                    if (state.SkillId == skillId)
                     {
                         // 幂等成功。
                         return;
@@ -155,8 +155,8 @@ namespace GameBattle
 
                     // 同活动实例已绑定到不同 skillKey：明确拒绝。
                     throw new InvalidOperationException(
-                        $"UnitId={unitId} 已绑定到 skillKey='{state.SkillKey}'，" +
-                        $"不可重复绑定到 skillKey='{skillKey}'。");
+                        $"UnitId={unitId} 已绑定到 skillId={state.SkillId}，" +
+                        $"不可重复绑定到 skillId={skillId}。");
                 }
 
                 // 不同 handle（新实例）：旧租期应已 Unbind，此处防御性拒绝。
@@ -173,20 +173,20 @@ namespace GameBattle
                     $"UnitId={unitId}, handle={handle}。");
             }
 
-            SkillOperationResult attachResult = _runner.Attach(handle, skillKey);
+            SkillOperationResult attachResult = _runner.Attach(handle, skillId);
             if (!attachResult.IsSuccess)
             {
                 // 原子回滚：UnregisterOwner 恢复。
                 _runner.UnregisterOwner(handle);
                 throw new InvalidOperationException(
                     $"Attach 失败：{attachResult.Status} {attachResult.DiagnosticMessage}。" +
-                    $"UnitId={unitId}, skillKey='{skillKey}'，已回滚 RegisterOwner。");
+                    $"UnitId={unitId}, skillId={skillId}，已回滚 RegisterOwner。");
             }
 
             // 持久状态：RegisterOwner+Attach 全部成功后才创建/更新，保留已有 AttackCount。
             // 失败不得新增/改写持久 state，满足原子语义。
             GeneralSkillState persistent = GetOrCreateState(unitId);
-            persistent.SkillKey = skillKey;
+            persistent.SkillId = skillId;
 
             _activeLeases[unitId] = handle;
         }
@@ -275,12 +275,12 @@ namespace GameBattle
             }
 
             GeneralSkillState state = GetOrCreateState(unitId);
-            if (string.IsNullOrEmpty(state.SkillKey))
+            if (state.SkillId < 1)
             {
                 return false;
             }
 
-            if (!_catalog.TryGetByKey(state.SkillKey, out SkillDefinitionSnapshot definition))
+            if (!_catalog.TryGetById(state.SkillId, out SkillDefinitionSnapshot definition))
             {
                 return false;
             }
@@ -292,7 +292,7 @@ namespace GameBattle
             }
 
             var plan = new SkillActivationPlan(0, 1);
-            SkillOperationResult result = _runner.Activate(handle, state.SkillKey, plan);
+            SkillOperationResult result = _runner.Activate(handle, state.SkillId, plan);
             if (result.IsSuccess)
             {
                 state.AttackCount = 0;
@@ -435,7 +435,7 @@ namespace GameBattle
         /// <summary>武将技能持久状态：SkillKey 与普通攻击累计计数。</summary>
         private sealed class GeneralSkillState
         {
-            internal string SkillKey;
+            internal int SkillId;
             internal int AttackCount;
         }
     }

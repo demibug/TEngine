@@ -81,13 +81,14 @@ namespace GameBattle
                     }
 
                     if (config.BossCatalog == null
-                        || !config.BossCatalog.TryGetByKey(
-                            row.BossKey, out BossDefinitionSnapshot bossDefinition))
+                        || !row.BossId.HasValue
+                        || !config.BossCatalog.TryGetById(
+                            row.BossId.Value, out BossDefinitionSnapshot bossDefinition))
                     {
                         throw new BattleConfigDataException(
                             BattleConfigErrorCategory.BossKeyUnknown,
-                            $"order={row.Order} 的 bossKey='{row.BossKey}' 无法解析表现资源",
-                            $"WavePlan.{row.Order}.BossKey");
+                            $"order={row.Order} 的 bossId={row.BossId} 无法解析表现资源",
+                            $"WavePlan.{row.Order}.BossId");
                     }
 
                     string bossAddress = bossDefinition.ResourcePath;
@@ -95,9 +96,9 @@ namespace GameBattle
                     {
                         throw new BattlePresentationLoadException(
                             "BossPresentationUnavailable",
-                            $"<empty:{row.BossKey}>",
+                            $"<empty:{row.BossId}>",
                             new InvalidOperationException(
-                                $"Boss '{row.BossKey}' 的 Spine 4.3 Prefab 尚未就绪，resourcePath 为空"));
+                                $"Boss id={row.BossId} 的 Spine 4.3 Prefab 尚未就绪，resourcePath 为空"));
                     }
 
                     if (seen.Add(bossAddress))
@@ -113,21 +114,21 @@ namespace GameBattle
                     continue;
                 }
 
-                string enemyKey = row.EnemyKey;
-                if (string.IsNullOrEmpty(enemyKey))
+                int? enemyId = row.EnemyId;
+                if (!enemyId.HasValue)
                 {
                     throw new BattleConfigDataException(
                         BattleConfigErrorCategory.EnemyKeyUnknown,
-                        $"order={row.Order} 的 Normal 行 enemyKey 为空，无法解析资源地址",
-                        $"WavePlan.{row.Order}.EnemyKey");
+                        $"order={row.Order} 的 Normal 行 enemyId 为空，无法解析资源地址",
+                        $"WavePlan.{row.Order}.EnemyId");
                 }
 
-                if (!config.EnemyCatalog.TryGetByKey(enemyKey, out EnemyDefinitionSnapshot definition))
+                if (!config.EnemyCatalog.TryGetById(enemyId.Value, out EnemyDefinitionSnapshot definition))
                 {
                     throw new BattleConfigDataException(
                         BattleConfigErrorCategory.EnemyKeyUnknown,
-                        $"order={row.Order} 的 enemyKey='{enemyKey}' 不在敌人目录中，无法解析资源地址",
-                        $"WavePlan.{row.Order}.EnemyKey");
+                        $"order={row.Order} 的 enemyId={enemyId} 不在敌人目录中，无法解析资源地址",
+                        $"WavePlan.{row.Order}.EnemyId");
                 }
 
                 string address = definition.ResourceAddress;
@@ -135,8 +136,8 @@ namespace GameBattle
                 {
                     throw new BattleConfigDataException(
                         BattleConfigErrorCategory.EnemyCatalogInvalid,
-                        $"enemyKey='{enemyKey}' 的资源地址为空，无法预加载",
-                        $"EnemyCatalog.{enemyKey}.ResourceAddress");
+                        $"enemyId={enemyId.Value} 的资源地址为空，无法预加载",
+                        $"EnemyCatalog.{enemyId.Value}.ResourceAddress");
                 }
 
                 // 按计划首次出现顺序去重（address 是表现池唯一键）。

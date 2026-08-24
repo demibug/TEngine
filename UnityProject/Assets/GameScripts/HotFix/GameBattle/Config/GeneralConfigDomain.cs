@@ -40,7 +40,7 @@ namespace GameBattle
         public string ProjectileType { get; }
         public int ProjectileSpeed { get; }
         public int PartRecruitWeight { get; }
-        public string SkillKey { get; }
+        public int? SkillId { get; }
         public string RecipeKey => GeneralRecipeKey.Create(_partWords[0], _partWords[1]);
         internal SoldierType LogicalSoldierType => CombatArchetype == GeneralCombatArchetype.Bow
             ? SoldierType.Bow
@@ -63,7 +63,7 @@ namespace GameBattle
             string projectileType,
             int projectileSpeed,
             int partRecruitWeight,
-            string skillKey = null)
+            int? skillId = null)
         {
             Index = index;
             Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -90,7 +90,7 @@ namespace GameBattle
             ProjectileType = projectileType ?? string.Empty;
             ProjectileSpeed = projectileSpeed;
             PartRecruitWeight = partRecruitWeight;
-            SkillKey = skillKey ?? string.Empty;
+            SkillId = skillId;
         }
 
         internal UnitConfigSnapshot ToUnitConfigSnapshot()
@@ -106,7 +106,7 @@ namespace GameBattle
                 ProjectileType,
                 ProjectileSpeed,
                 PrefabAddress,
-                SkillKey);
+                SkillId);
     }
 
     public sealed class GeneralCatalogSnapshot

@@ -30,6 +30,11 @@ public partial class TbWave
     }
 
 
+     public int Id => _data.Id;
+    /// <summary>
+    /// 当前生效的波次计划ID
+    /// </summary>
+     public int ActivePlanId => _data.ActivePlanId;
     /// <summary>
     /// 【deprecated】旧字段，不再驱动有限波次
     /// </summary>
@@ -54,10 +59,6 @@ public partial class TbWave
     /// 【deprecated】旧字段，不再驱动有限波次
     /// </summary>
      public bool SkipBoss => _data.SkipBoss;
-    /// <summary>
-    /// 当前生效的波次计划ID
-    /// </summary>
-     public string ActivePlanId => _data.ActivePlanId;
     
     public void ResolveRef(Tables tables)
     {

@@ -9,7 +9,7 @@ namespace GameBattle
     // 职责：
     //   在激活 effect 时点对 owner.CenterX/CenterY、RangeTiles*cellSize 半径内、
     //   当前有效的敌方 IBuffTarget 按 AttackResolver 返回的稳定顺序申请一次
-    //   Buff8/2000ms（source=owner runtime id，Flat value 0）。不直接改 Enemy
+    //   Buff9/2000ms（source=owner runtime id，Flat value 0）。不直接改 Enemy
     //   状态/计时，不造成伤害。
     //
     // 生效时点守卫（与 SoulCaptureHandler 一致的 generation-safe 模式）：
@@ -22,11 +22,11 @@ namespace GameBattle
     // ============================================================================
 
     /// <summary>
-    /// 张飞大喝（BattleShout）：对范围内敌方目标施加 Buff8（移动禁用+攻击禁用）/2000ms。
+    /// 张飞大喝（BattleShout）：对范围内敌方目标施加 Buff9（移动禁用+攻击禁用）/2000ms。
     /// </summary>
     /// <remarks>
     /// <para><b>专用配置：</b>范围/持续/效果 Buff 全部读取
-    /// <see cref="SkillDefinitionSnapshot"/>（RangeTiles=3.5 / EffectBuffType=8 /
+    /// <see cref="SkillDefinitionSnapshot"/>（RangeTiles=3.5 / EffectBuffType=9 /
     /// EffectDurationMs=2000），作为 BattleShout 专用配置而非通用 Skill/Buff DSL。</para>
     /// <para><b>不持有独立计时器：</b>effect/complete/cancel 由
     /// <see cref="SkillRunner"/> 的两节点时间线驱动。</para>
@@ -50,7 +50,7 @@ namespace GameBattle
         /// <summary>攻击解析服务（稳定查询敌方目标，不提交伤害）。</summary>
         private readonly AttackResolver _attackResolver;
 
-        /// <summary>Buff 所有者（提交 Buff8 的唯一入口）。</summary>
+        /// <summary>Buff 所有者（提交 Buff9 的唯一入口）。</summary>
         private readonly BuffManager _buffManager;
 
         /// <summary>格子尺寸（px，用于 RangeTiles → 像素半径换算）。</summary>
@@ -93,7 +93,7 @@ namespace GameBattle
         /// <para>在 effect 时点执行：重新解析当前 owner → 校验 generation/active →
         /// 以 owner.CenterX/CenterY、RangeTiles*cellSize、owner.Side 调
         /// AttackResolver.QueryEnemyObjects 稳定查询敌方 → 按返回稳定顺序对当前有效
-        /// IBuffTarget 调 BuffManager.Apply，每目标一次 Buff8/2000ms（Flat value 0）。</para>
+        /// IBuffTarget 调 BuffManager.Apply，每目标一次 Buff9/2000ms（Flat value 0）。</para>
         /// <para><b>守卫：</b>owner 不存在 / generation 不匹配（池复用迟到）/
         /// not active / in pool 时直接返回。缺专用配置时防御性 no-op（启动 Validator 已拦截）。</para>
         /// </remarks>
@@ -146,7 +146,7 @@ namespace GameBattle
                 null);
 
             // 按返回稳定顺序对当前有效 IBuffTarget 调 BuffManager.Apply。
-            // source 使用 owner runtime id；每目标一次 Buff8，Flat value 0。
+            // source 使用 owner runtime id；每目标一次 Buff9，Flat value 0。
             var source = new BuffSourceHandle(context.Owner.RuntimeId, context.Owner.RuntimeId);
             for (int i = 0; i < enemies.Count; i++)
             {

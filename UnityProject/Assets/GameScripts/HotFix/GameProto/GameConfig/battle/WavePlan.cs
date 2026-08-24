@@ -19,13 +19,13 @@ public sealed partial class WavePlan : Luban.BeanBase
 {
     public WavePlan(ByteBuf _buf) 
     {
-        PlanId = _buf.ReadString();
+        Id = _buf.ReadInt();
         Order = _buf.ReadInt();
         Kind = (battle.EWaveKind)_buf.ReadInt();
-        EnemyKey = _buf.ReadString();
+        if(_buf.ReadBool()){ EnemyId = _buf.ReadInt(); } else { EnemyId = null; }
         NormalCount = _buf.ReadInt();
         DifficultyIndex = _buf.ReadInt();
-        BossKey = _buf.ReadString();
+        if(_buf.ReadBool()){ BossId = _buf.ReadInt(); } else { BossId = null; }
         PreDelayMs = _buf.ReadLong();
         SpawnIntervalMs = _buf.ReadLong();
         PostDelayMs = _buf.ReadLong();
@@ -40,9 +40,9 @@ public sealed partial class WavePlan : Luban.BeanBase
     }
 
     /// <summary>
-    /// 计划ID
+    /// 计划ID(联合主键1，供 wave.activePlanId 选择)
     /// </summary>
-    public readonly string PlanId;
+    public readonly int Id;
     /// <summary>
     /// 波次顺序
     /// </summary>
@@ -54,7 +54,7 @@ public sealed partial class WavePlan : Luban.BeanBase
     /// <summary>
     /// 普通敌人Key
     /// </summary>
-    public readonly string EnemyKey;
+    public readonly int? EnemyId;
     /// <summary>
     /// 普通敌人数量
     /// </summary>
@@ -66,7 +66,7 @@ public sealed partial class WavePlan : Luban.BeanBase
     /// <summary>
     /// Boss敌人Key
     /// </summary>
-    public readonly string BossKey;
+    public readonly int? BossId;
     /// <summary>
     /// 前置延迟(毫秒)
     /// </summary>
@@ -102,13 +102,13 @@ public sealed partial class WavePlan : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "planId:" + PlanId + ","
+        + "id:" + Id + ","
         + "order:" + Order + ","
         + "kind:" + Kind + ","
-        + "enemyKey:" + EnemyKey + ","
+        + "enemyId:" + EnemyId + ","
         + "normalCount:" + NormalCount + ","
         + "difficultyIndex:" + DifficultyIndex + ","
-        + "bossKey:" + BossKey + ","
+        + "bossId:" + BossId + ","
         + "preDelayMs:" + PreDelayMs + ","
         + "spawnIntervalMs:" + SpawnIntervalMs + ","
         + "postDelayMs:" + PostDelayMs + ","

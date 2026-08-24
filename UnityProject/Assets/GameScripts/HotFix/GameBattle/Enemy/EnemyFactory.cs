@@ -80,7 +80,7 @@ namespace GameBattle
         /// <summary>
         /// 封闭注册表：普通敌人键 → 租借/回收委托 + 定义快照。
         /// </summary>
-        private readonly IReadOnlyDictionary<string, EnemyTypeRegistration> _registry;
+        private readonly IReadOnlyDictionary<int, EnemyTypeRegistration> _registry;
 
         /// <summary>
         /// 旧链 Mob0 池（仅旧构造路径使用；新构造路径为 null）。
@@ -124,7 +124,7 @@ namespace GameBattle
         {
             _idAllocator = idAllocator ?? throw new ArgumentNullException(nameof(idAllocator));
             _legacyMob0Pool = mob0Pool ?? throw new ArgumentNullException(nameof(mob0Pool));
-            _registry = new Dictionary<string, EnemyTypeRegistration>();
+            _registry = new Dictionary<int, EnemyTypeRegistration>();
         }
 
         // ====================================================================
@@ -168,33 +168,33 @@ namespace GameBattle
         /// <summary>
         /// 由目录定义构建封闭注册表：按固定键绑定独立类型池，校验 key/typeIndex 一致。
         /// </summary>
-        private static IReadOnlyDictionary<string, EnemyTypeRegistration> BuildRegistry(
+        private static IReadOnlyDictionary<int, EnemyTypeRegistration> BuildRegistry(
             EnemyCatalogSnapshot catalog,
             BattlePoolScope poolScope)
         {
-            var registry = new Dictionary<string, EnemyTypeRegistration>();
+            var registry = new Dictionary<int, EnemyTypeRegistration>();
             foreach (EnemyDefinitionSnapshot definition in catalog.Definitions)
             {
-                if (!FixedTypeIndexByKey.TryGetValue(definition.Key, out int expectedTypeIndex))
+                if (!FixedTypeIndexByKey.TryGetValue(definition.ResourceAddress, out int expectedTypeIndex))
                 {
                     throw new ArgumentException(
-                        $"{LogTag} 敌人目录包含未支持普通敌人键 '{definition.Key}'（只支持 Mob0～Mob3）");
+                        $"{LogTag} 敌人目录 id={definition.Id} 的资源 '{definition.ResourceAddress}' 不受支持（只支持 Mob0～Mob3）");
                 }
 
                 if (definition.TypeIndex != expectedTypeIndex)
                 {
                     throw new ArgumentException(
-                        $"{LogTag} 目录 key='{definition.Key}' 的 typeIndex={definition.TypeIndex} " +
+                        $"{LogTag} 目录 id={definition.Id} 的 typeIndex={definition.TypeIndex} " +
                         $"与固定类型索引 {expectedTypeIndex} 不一致");
                 }
 
-                if (registry.ContainsKey(definition.Key))
+                if (registry.ContainsKey(definition.Id))
                 {
                     throw new ArgumentException(
-                        $"{LogTag} 敌人目录存在重复普通敌人键 '{definition.Key}'");
+                        $"{LogTag} 敌人目录存在重复普通敌人 id={definition.Id}");
                 }
 
-                registry.Add(definition.Key, CreateRegistration(definition.Key, definition, poolScope));
+                registry.Add(definition.Id, CreateRegistration(definition.ResourceAddress, definition, poolScope));
             }
 
             return registry;
@@ -281,18 +281,18 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(request));
             }
 
-            if (!_registry.TryGetValue(request.EnemyKey, out EnemyTypeRegistration registration))
+            if (!_registry.TryGetValue(request.EnemyId, out EnemyTypeRegistration registration))
             {
                 // 封闭注册表：未知键显式失败，不创建占位敌人（spec "Reject an unsupported normal enemy"）。
                 throw new ArgumentException(
-                    $"{LogTag} 未知敌人键 '{request.EnemyKey}'（未注册，禁止创建占位敌人）");
+                    $"{LogTag} 未知敌人 id={request.EnemyId}（未注册，禁止创建占位敌人）");
             }
 
             ConfiguredEnemyBase enemy = registration.Acquire();
             if (enemy == null)
             {
                 throw new InvalidOperationException(
-                    $"{LogTag} 池返回 null 对象 key={request.EnemyKey}");
+                    $"{LogTag} 池返回 null 对象 id={request.EnemyId}");
             }
 
             try
@@ -317,6 +317,7 @@ namespace GameBattle
                     request.OnEnemyKilled,
                     request.OnDeathRequested,
                     stats,
+                    registration.Definition.Id,
                     registration.Definition.ResourceAddress,
                     request.IsPlayerLane,
                     request.WaveOrder,
@@ -326,7 +327,7 @@ namespace GameBattle
                 // 开始移动（SPAWNING → MOVING）。
                 enemy.BeginMoving();
 
-                _createLog.Add(request.EnemyKey);
+                _createLog.Add(registration.Definition.ResourceAddress);
                 return enemy;
             }
             catch
@@ -342,7 +343,7 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 归还一个普通敌人到其正确类型的池（按 <see cref="ConfiguredEnemyBase.EnemyKey"/> 分发）。
+        /// 归还一个普通敌人到其正确类型的池（按 <see cref="ConfiguredEnemyBase.ResName"/> 分发）。
         /// </summary>
         /// <param name="enemy">要归还的普通敌人。null 或已归还返回 false。</param>
         /// <returns>成功归还返回 true；null、键未注册或重复 Release 返回 false。</returns>
@@ -357,7 +358,7 @@ namespace GameBattle
                 return false;
             }
 
-            if (!_registry.TryGetValue(enemy.EnemyKey, out EnemyTypeRegistration registration))
+            if (!_registry.TryGetValue(enemy.EnemyId, out EnemyTypeRegistration registration))
             {
                 return false;
             }
@@ -365,7 +366,7 @@ namespace GameBattle
             bool recovered = registration.Release(enemy);
             if (recovered)
             {
-                _recoverLog.Add(enemy.EnemyKey);
+                _recoverLog.Add(enemy.ResName);
             }
 
             return recovered;

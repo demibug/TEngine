@@ -8,7 +8,7 @@ namespace GameBattle
     // 职责（design.md 决策 2 / specs/zhang-liang-boss-runtime/spec.md
     //   "Boss reuses the enemy combat lifecycle with Boss identity"）：
     //   通过 EnemyBase 复用现有敌人移动/终点接触/空间定位/受击/死亡/移除队列/
-    //   运行时标识与池世代语义；额外承载 BossKey、定义、租借身份（generation +
+    //   运行时标识与池世代语义；额外承载 ResName、定义、租借身份（generation +
     //   waveOrder）、技能 owner 与 auto-cast 时间推进。
     //
     // 技能生命周期（design.md 决策 4）：
@@ -34,7 +34,7 @@ namespace GameBattle
     /// </summary>
     /// <remarks>
     /// <para><b>身份（design.md 决策 2）：</b>薄子类只固定
-    /// <see cref="BossKey"/>；定义快照在出生时注入。租借世代/波次所有权以
+    /// <see cref="ResName"/>；定义快照在出生时注入。租借世代/波次所有权以
     /// <see cref="CurrentLease"/> 暴露，供 EnemyManager 幂等移除（
     /// <see cref="IWaveOwnedEnemyEntity.WaveKind"/> 恒为 Boss）。</para>
     /// <para><b>不重复实现奖励/接触伤害（spec "Kill reward commits once"）：</b>
@@ -50,7 +50,7 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>Boss 主键（与 BossDefinitionSnapshot.Key 一致）。</summary>
-        internal abstract string BossKey { get; }
+        internal abstract string ResName { get; }
 
         // ====================================================================
         // 本次租借状态（BossConfiguredInit 注入；ResetState 清空）
@@ -82,7 +82,7 @@ namespace GameBattle
         private SkillOwnerHandle _owner;
 
         /// <summary>attach 的技能键（SoulCapture）。</summary>
-        private string _skillKey;
+        private int _skillId;
 
         /// <summary>首次可激活的 battle clock 时间戳（spawn + cooldown）。</summary>
         private long _firstReadyMs;
@@ -209,7 +209,7 @@ namespace GameBattle
         /// <para>以当前 (Id, generation) 建立 owner 租期。失败时先解除已注册 owner，
         /// 返回 false 供端口回滚出生事务。</para>
         /// </remarks>
-        internal bool AttachSkill(SkillRunner skillRunner, string skillKey, long firstReadyMs)
+        internal bool AttachSkill(SkillRunner skillRunner, int skillId, long firstReadyMs)
         {
             if (skillRunner == null)
             {
@@ -227,7 +227,7 @@ namespace GameBattle
             }
 
             _skillRunner = skillRunner;
-            _skillKey = skillKey;
+            _skillId = skillId;
             _owner = new SkillOwnerHandle(Id, _generation);
             _firstReadyMs = firstReadyMs;
             _plan = new SkillActivationPlan(_definition.Timeline.EffectAtMs, _definition.Timeline.CompleteAtMs);
@@ -239,7 +239,7 @@ namespace GameBattle
                 return false;
             }
 
-            SkillOperationResult attach = skillRunner.Attach(_owner, skillKey);
+            SkillOperationResult attach = skillRunner.Attach(_owner, skillId);
             if (!attach.IsSuccess)
             {
                 skillRunner.UnregisterOwner(_owner);
@@ -277,7 +277,7 @@ namespace GameBattle
             }
 
             _skillRunner = null;
-            _skillKey = null;
+            _skillId = 0;
             _owner = default;
             _firstReadyMs = 0;
             _plan = null;
@@ -324,7 +324,7 @@ namespace GameBattle
             if (_skillPaused)
             {
                 // 运行中 → 保持暂停；完成/取消 → 只恢复同 generation 存活 Boss 的移动。
-                if (_skillRunner.TryGetState(_owner, _skillKey, out SkillStateSnapshot state)
+                if (_skillRunner.TryGetState(_owner, _skillId, out SkillStateSnapshot state)
                     && state.IsRunning)
                 {
                     return;
@@ -342,7 +342,7 @@ namespace GameBattle
                 return;
             }
 
-            SkillOperationResult result = _skillRunner.Activate(_owner, _skillKey, _plan);
+            SkillOperationResult result = _skillRunner.Activate(_owner, _skillId, _plan);
             if (result.IsSuccess)
             {
                 _skillPaused = true;
@@ -374,7 +374,7 @@ namespace GameBattle
             }
 
             _skillRunner = null;
-            _skillKey = null;
+            _skillId = 0;
             _owner = default;
             _firstReadyMs = 0;
             _plan = null;
@@ -401,7 +401,7 @@ namespace GameBattle
             if (!_stats.HasValue)
             {
                 throw new InvalidOperationException(
-                    $"{BossKey} 尚未注入配置数值，禁止使用固定奖励或接触伤害 fallback");
+                    $"{ResName} 尚未注入配置数值，禁止使用固定奖励或接触伤害 fallback");
             }
 
             return _stats.Value;

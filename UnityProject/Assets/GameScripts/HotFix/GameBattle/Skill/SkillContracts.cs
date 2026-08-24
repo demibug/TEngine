@@ -126,7 +126,7 @@ namespace GameBattle
         public SkillOwnerHandle Owner { get; }
 
         /// <summary>激活的技能 key（与目录定义一致）。</summary>
-        public string SkillKey { get; }
+        public int SkillId { get; }
 
         /// <summary>激活时的战斗帧时间戳（毫秒）。</summary>
         public long BattleNowMs { get; }
@@ -137,11 +137,11 @@ namespace GameBattle
         /// <param name="battleNowMs">战斗帧时间戳（毫秒）。</param>
         public SkillActivationContext(
             SkillOwnerHandle owner,
-            string skillKey,
+            int skillId,
             long battleNowMs)
         {
             Owner = owner;
-            SkillKey = skillKey ?? string.Empty;
+            SkillId = skillId;
             BattleNowMs = battleNowMs;
         }
     }

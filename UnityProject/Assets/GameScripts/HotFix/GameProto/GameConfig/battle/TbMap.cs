@@ -30,7 +30,7 @@ public partial class TbMap
             battle.Map _v;
             _v = global::GameConfig.battle.Map.DeserializeMap(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.MapIndex, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 

@@ -53,7 +53,7 @@ namespace GameBattle
         public int RuntimeId { get; }
 
         /// <summary>普通敌人键（Mob0/Mob1/Mob2/Mob3；非普通实体为空串）。</summary>
-        public string EnemyKey { get; }
+        public string EnemyResName { get; }
 
         /// <summary>表现预加载池键（普通敌人 ResourceAddress 或 Boss ResourcePath）。</summary>
         public string ResourceAddress { get; }
@@ -71,7 +71,7 @@ namespace GameBattle
         public EnemyPresentationKind Kind { get; }
 
         /// <summary>Boss 键；普通敌人为空。</summary>
-        public string BossKey { get; }
+        public string BossResName { get; }
 
         /// <summary>Boss 逻辑宽度；普通敌人为 0。</summary>
         public float LogicalWidth { get; }
@@ -107,13 +107,13 @@ namespace GameBattle
             string skillAnimationKey = null)
         {
             RuntimeId = runtimeId;
-            EnemyKey = enemyKey ?? string.Empty;
+            EnemyResName = enemyKey ?? string.Empty;
             ResourceAddress = resourceAddress ?? string.Empty;
             IsPlayerLane = isPlayerLane;
             LogicX = logicX;
             LogicY = logicY;
             Kind = kind;
-            BossKey = bossKey ?? string.Empty;
+            BossResName = bossKey ?? string.Empty;
             LogicalWidth = logicalWidth;
             LogicalHeight = logicalHeight;
             IdleAnimationKey = idleAnimationKey ?? string.Empty;
@@ -123,7 +123,7 @@ namespace GameBattle
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"EnemySpawnViewData(runtimeId={RuntimeId}, enemyKey={EnemyKey}, " +
+            return $"EnemySpawnViewData(runtimeId={RuntimeId}, enemyResName={EnemyResName}, " +
                    $"resourceAddress={ResourceAddress}, isPlayerLane={IsPlayerLane}, " +
                    $"kind={Kind}, x={LogicX}, y={LogicY})";
         }

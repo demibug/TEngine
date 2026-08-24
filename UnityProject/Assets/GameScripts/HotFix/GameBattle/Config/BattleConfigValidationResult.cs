@@ -223,7 +223,7 @@ namespace GameBattle
         /// <summary>Boss 引用的技能 handlerKey 为空（缺 handler 配置，运行时不 fallback）。</summary>
         BossSkillHandlerMissing = 75,
 
-        /// <summary>Boss 引用的技能缺少效果 Buff 或 Buff 不在 Buff 目录中（如 SoulCapture/Buff13 缺失）。</summary>
+        /// <summary>Boss 引用的技能缺少效果 Buff 或 Buff 不在 Buff 目录中（如 SoulCapture/Buff14 缺失）。</summary>
         BossEffectBuffMissing = 76,
 
         /// <summary>Boss 技能时间轴非法（effect/complete 为负或 effect &gt;= complete）。</summary>
@@ -245,7 +245,7 @@ namespace GameBattle
         /// <summary>武器定义数值非法（负附加攻击力等）。</summary>
         WeaponConfigInvalid = 81,
 
-        /// <summary>启用行集合非法：不是恰好四条 Basic +1 基础武器（id 0/10/20/31 类别匹配）。</summary>
+        /// <summary>启用行集合非法：不是恰好四条 Basic +1 基础武器（id 1/11/21/32 类别匹配）。</summary>
         WeaponEnabledSetInvalid = 82,
 
         /// <summary>武将定义、配方、战斗原型、数值、表现或投射物配置非法。</summary>

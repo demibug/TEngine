@@ -118,7 +118,7 @@ namespace GameBattle
         public bool IsAvailable => !_stopped;
 
         /// <summary>只支持 ZhangLiang。</summary>
-        public IReadOnlyList<string> SupportedBossKeys => new[] { ZhangLiangBoss.BossKeyConst };
+        public IReadOnlyList<string> SupportedBossKeys => new[] { ZhangLiangBoss.ResNameConst };
 
         /// <summary>
         /// 请求一次 Boss 出生（按请求的 bossKey/lane/waveOrder/difficulty）。
@@ -144,27 +144,27 @@ namespace GameBattle
                 throw new InvalidOperationException($"{LogTag} 端口已停止，不再出生新 Boss");
             }
 
-            if (!_bossCatalog.TryGetByKey(request.BossKey, out BossDefinitionSnapshot definition))
+            if (!_bossCatalog.TryGetById(request.BossId, out BossDefinitionSnapshot definition))
             {
                 throw new InvalidOperationException(
-                    $"{LogTag} 未知 bossKey='{request.BossKey}'（目录中不存在，禁止占位）");
+                    $"{LogTag} 未知 bossId={request.BossId}（目录中不存在，禁止占位）");
             }
 
             if (!definition.Enabled)
             {
                 throw new InvalidOperationException(
-                    $"{LogTag} bossKey='{request.BossKey}' 未启用（disabled，不得出生）");
+                    $"{LogTag} bossId={request.BossId} 未启用（disabled，不得出生）");
             }
 
-            if (!IsSupportedKey(request.BossKey))
+            if (!IsSupportedResource(definition.ResName))
             {
                 throw new InvalidOperationException(
-                    $"{LogTag} bossKey='{request.BossKey}' 不受支持（首期只支持 {ZhangLiangBoss.BossKeyConst}）");
+                    $"{LogTag} bossId={request.BossId} 的资源 '{definition.ResName}' 不受支持");
             }
 
             IEnemyEndPointAttackTarget endPointTarget = _endPointTargetResolver(request.IsPlayerLane);
             var spawnRequest = new BossSpawnRequest(
-                bossKey: request.BossKey,
+                bossId: request.BossId,
                 isPlayerLane: request.IsPlayerLane,
                 waveOrder: request.WaveOrder,
                 difficultyIndex: request.DifficultyIndex,
@@ -196,15 +196,15 @@ namespace GameBattle
                 // firstReady = spawn battle clock + Boss 技能冷却（首次 8000ms；
                 // 后续冷却由 SkillRunner 维护）。
                 long firstReadyMs = _skillRunner.Scheduler.FrameNowMs;
-                if (_skillCatalog.TryGetByKey(definition.SkillKey, out SkillDefinitionSnapshot skillDef))
+                if (_skillCatalog.TryGetById(definition.SkillId, out SkillDefinitionSnapshot skillDef))
                 {
                     firstReadyMs = checked(firstReadyMs + skillDef.CooldownMs);
                 }
 
-                if (!boss.AttachSkill(_skillRunner, definition.SkillKey, firstReadyMs))
+                if (!boss.AttachSkill(_skillRunner, definition.SkillId, firstReadyMs))
                 {
                     throw new InvalidOperationException(
-                        $"{LogTag} Boss '{request.BossKey}' 技能 attach 失败（skillKey='{definition.SkillKey}'）");
+                        $"{LogTag} Boss id={request.BossId} 技能 attach 失败（skillId={definition.SkillId}）");
                 }
             }
             catch
@@ -241,9 +241,9 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>判断键是否受支持（首期只支持 ZhangLiang）。</summary>
-        private static bool IsSupportedKey(string bossKey)
+        private static bool IsSupportedResource(string resName)
         {
-            return string.Equals(bossKey, ZhangLiangBoss.BossKeyConst, StringComparison.Ordinal);
+            return string.Equals(resName, ZhangLiangBoss.ResNameConst, StringComparison.Ordinal);
         }
     }
 }

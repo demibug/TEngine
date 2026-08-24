@@ -30,7 +30,7 @@ public partial class TbBuff
             battle.Buff _v;
             _v = global::GameConfig.battle.Buff.DeserializeBuff(_buf);
             _dataList.Add(_v);
-            _dataMap.Add(_v.Type, _v);
+            _dataMap.Add(_v.Id, _v);
         }
     }
 

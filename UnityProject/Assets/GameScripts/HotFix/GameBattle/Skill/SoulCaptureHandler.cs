@@ -9,7 +9,7 @@ namespace GameBattle
     // 职责（design.md 决策 4 / specs/zhang-liang-boss-runtime/spec.md
     //   "SoulCapture uses the Skill and Buff lifecycles"）：
     //   在激活 effect 时点对同路两格内、alive/current 的 Unit 快照按 runtimeId
-    //   升序申请 Buff13/2000ms（source=Boss）。不直接写 Unit 攻击/移动/目标选择/
+    //   升序申请 Buff14/2000ms（source=Boss）。不直接写 Unit 攻击/移动/目标选择/
     //   表现状态，不拥有独立计时器、无 coroutine、不依赖 Unity Time。
     //
     // 生效时点守卫：
@@ -20,7 +20,7 @@ namespace GameBattle
     // ============================================================================
 
     /// <summary>
-    /// 张梁夺魄（SoulCapture）：对同路两格内存活单位按 runtimeId 升序施加 Buff13/2000ms。
+    /// 张梁夺魄（SoulCapture）：对同路两格内存活单位按 runtimeId 升序施加 Buff14/2000ms。
     /// </summary>
     /// <remarks>
     /// <para><b>专用配置（design.md 决策 2 / task 4.2）：</b>范围/持续/效果 Buff 全部
@@ -47,7 +47,7 @@ namespace GameBattle
         /// <summary>单位注册表（effect 时快照活动单位）。</summary>
         private readonly UnitRegistry _unitRegistry;
 
-        /// <summary>Buff 所有者（提交 Buff13 的唯一入口）。</summary>
+        /// <summary>Buff 所有者（提交 Buff14 的唯一入口）。</summary>
         private readonly BuffManager _buffManager;
 
         /// <summary>格子尺寸（px，用于地图格坐标换算）。</summary>
@@ -83,7 +83,7 @@ namespace GameBattle
         /// <remarks>
         /// <para>在 effect 时点（激活 + 配置 effect 偏移，SoulCapture=500ms）执行：
         /// 解析当前 Boss → 筛选同路/两格/alive/current 的 Unit 快照 → 按 runtimeId
-        /// 升序申请 Buff13/2000ms（Boss 为 source，每目标一次）。</para>
+        /// 升序申请 Buff14/2000ms（Boss 为 source，每目标一次）。</para>
         /// <para><b>守卫：</b>Boss 已不存在 / 非 Boss kind / generation 不匹配（池复用
         /// 迟到）/ DEAD（effect 前死亡）时直接返回，不施加混乱。</para>
         /// </remarks>
@@ -157,7 +157,7 @@ namespace GameBattle
             // 按 runtimeId 升序，保证请求顺序确定（spec "Eligible targets are unordered"）。
             targets.Sort((a, b) => a.Id.CompareTo(b.Id));
 
-            // 以 Boss 为 source，每目标申请一次 Buff13/2000ms。
+            // 以 Boss 为 source，每目标申请一次 Buff14/2000ms。
             var source = new BuffSourceHandle(context.Owner.RuntimeId, context.Owner.RuntimeId);
             for (int i = 0; i < targets.Count; i++)
             {

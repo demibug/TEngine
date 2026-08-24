@@ -37,7 +37,7 @@ namespace GameBattle
     /// </summary>
     /// <remarks>
     /// <para><b>职责（design.md 决策 6）：</b>承接当前 Mob0 的配置数值、出生、死亡表现
-    /// 边界与 Reset 契约；Mob0～Mob3 是只固定 <see cref="EnemyKey"/>/<see cref="TypeIndex"/>
+    /// 边界与 Reset 契约；Mob0～Mob3 是只固定 <see cref="ResName"/>/<see cref="TypeIndex"/>
     /// 的薄类型（<see cref="Mob0Enemy"/>/<see cref="Mob1Enemy"/>/<see cref="Mob2Enemy"/>/
     /// <see cref="Mob3Enemy"/>）。技能召唤类不接入本类型链。</para>
     ///
@@ -61,7 +61,7 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>普通敌人键（Mob0/Mob1/Mob2/Mob3）。</summary>
-        internal abstract string EnemyKey { get; }
+        internal abstract string ResName { get; }
 
         /// <summary>普通敌人类型索引（0～3）。</summary>
         internal abstract int TypeIndex { get; }
@@ -84,6 +84,7 @@ namespace GameBattle
         /// 池复用不残留旧地址（design.md 决策 7 / task 5.4）。</para>
         /// </summary>
         private string _resourceAddress;
+        private int _enemyId;
 
         /// <summary>
         /// 租借世代（单调递增，跨租借不重置）。
@@ -144,6 +145,7 @@ namespace GameBattle
         /// 薄类型不得硬编码（task 5.4）。</para>
         /// </summary>
         internal string ResourceAddress => _resourceAddress ?? string.Empty;
+        internal int EnemyId => _enemyId;
 
         /// <summary>运行时 ID（委托 <see cref="EnemyBase.Id"/>）。</summary>
         internal int RuntimeId => Id;
@@ -234,6 +236,7 @@ namespace GameBattle
             EnemyKilledHandler onEnemyKilled,
             EnemyDeathRequestHandler onDeathRequested,
             ConfiguredEnemyResolvedStats stats,
+            int enemyId,
             string resourceAddress,
             bool isPlayerLane,
             int waveOrder,
@@ -242,6 +245,7 @@ namespace GameBattle
         {
             _generation += 1;
             _waveOrder = waveOrder;
+            _enemyId = enemyId;
             _resourceAddress = resourceAddress ?? string.Empty;
             SetResolvedStats(stats);
             Configure(map, cellSize, endPointTarget, onEnemyKilled, onDeathRequested);
@@ -313,7 +317,7 @@ namespace GameBattle
             if (!_stats.HasValue)
             {
                 throw new System.InvalidOperationException(
-                    $"{EnemyKey} 尚未注入配置数值，禁止使用固定奖励或接触伤害 fallback");
+                    $"{ResName} 尚未注入配置数值，禁止使用固定奖励或接触伤害 fallback");
             }
 
             return _stats.Value;
@@ -337,6 +341,7 @@ namespace GameBattle
         {
             _stats = null;
             _resourceAddress = null;
+            _enemyId = 0;
             _waveOrder = 0;
             _deathPresentationStarted = false;
             _deathPresentationCompleted = false;

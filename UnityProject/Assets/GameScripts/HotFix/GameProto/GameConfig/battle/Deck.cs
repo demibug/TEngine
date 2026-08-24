@@ -19,6 +19,7 @@ public sealed partial class Deck : Luban.BeanBase
 {
     public Deck(ByteBuf _buf) 
     {
+        Id = _buf.ReadInt();
         Mode = _buf.ReadString();
         MinimalMode = _buf.ReadBool();
         {int n0 = _buf.ReadSize(); BaseSoldierTexts = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); BaseSoldierTexts.Add(_e0);}}
@@ -32,6 +33,7 @@ public sealed partial class Deck : Luban.BeanBase
         return new battle.Deck(_buf);
     }
 
+    public readonly int Id;
     /// <summary>
     /// 牌组模式(minimal/standard)
     /// </summary>
@@ -67,6 +69,7 @@ public sealed partial class Deck : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
+        + "id:" + Id + ","
         + "mode:" + Mode + ","
         + "minimalMode:" + MinimalMode + ","
         + "baseSoldierTexts:" + Luban.StringUtil.CollectionToString(BaseSoldierTexts) + ","

@@ -19,7 +19,8 @@ public sealed partial class Skill : Luban.BeanBase
 {
     public Skill(ByteBuf _buf) 
     {
-        Key = _buf.ReadString();
+        Id = _buf.ReadInt();
+        ResName = _buf.ReadString();
         Name = _buf.ReadString();
         Category = _buf.ReadString();
         Description = _buf.ReadString();
@@ -30,7 +31,7 @@ public sealed partial class Skill : Luban.BeanBase
         Source = _buf.ReadString();
         if(_buf.ReadBool()){ Confidence = _buf.ReadString(); } else { Confidence = null; }
         HandlerKey = _buf.ReadString();
-        if(_buf.ReadBool()){ EffectBuffType = _buf.ReadInt(); } else { EffectBuffType = null; }
+        if(_buf.ReadBool()){ EffectBuffId = _buf.ReadInt(); } else { EffectBuffId = null; }
         if(_buf.ReadBool()){ EffectDurationMs = _buf.ReadInt(); } else { EffectDurationMs = null; }
         if(_buf.ReadBool()){ TriggerAttackCount = _buf.ReadInt(); } else { TriggerAttackCount = null; }
         if(_buf.ReadBool()){ EffectDamageMultiplier = _buf.ReadFloat(); } else { EffectDamageMultiplier = null; }
@@ -42,9 +43,13 @@ public sealed partial class Skill : Luban.BeanBase
     }
 
     /// <summary>
-    /// 键(主键)
+    /// ID(主键)
     /// </summary>
-    public readonly string Key;
+    public readonly int Id;
+    /// <summary>
+    /// 资源名(原主键)
+    /// </summary>
+    public readonly string ResName;
     /// <summary>
     /// 名称
     /// </summary>
@@ -86,9 +91,9 @@ public sealed partial class Skill : Luban.BeanBase
     /// </summary>
     public readonly string HandlerKey;
     /// <summary>
-    /// 效果Buff类型(可空)
+    /// 效果Buff ID(可空)
     /// </summary>
-    public readonly int? EffectBuffType;
+    public readonly int? EffectBuffId;
     /// <summary>
     /// 效果持续毫秒(可空)
     /// </summary>
@@ -112,7 +117,8 @@ public sealed partial class Skill : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
-        + "key:" + Key + ","
+        + "id:" + Id + ","
+        + "resName:" + ResName + ","
         + "name:" + Name + ","
         + "category:" + Category + ","
         + "description:" + Description + ","
@@ -123,7 +129,7 @@ public sealed partial class Skill : Luban.BeanBase
         + "source:" + Source + ","
         + "confidence:" + Confidence + ","
         + "handlerKey:" + HandlerKey + ","
-        + "effectBuffType:" + EffectBuffType + ","
+        + "effectBuffId:" + EffectBuffId + ","
         + "effectDurationMs:" + EffectDurationMs + ","
         + "triggerAttackCount:" + TriggerAttackCount + ","
         + "effectDamageMultiplier:" + EffectDamageMultiplier + ","

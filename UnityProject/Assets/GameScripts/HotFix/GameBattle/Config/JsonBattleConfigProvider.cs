@@ -153,10 +153,10 @@ namespace GameBattle
             {
                 // 与 Luban Provider 保持同一规范化语义：源行空 enemyKey 已按 map EnemyTypeIndex=0
                 // 解析为 Mob0，WaveManager/NormalWaveSpawnRequest 只消费生效后的非空键。
-                new WavePlanEntry("golden", 1, WavePlanKind.Normal, "Mob0", 3, 0, "", 1000, 500, 500, true, true, 0),
-                new WavePlanEntry("golden", 2, WavePlanKind.Normal, "Mob1", 2, 1, "", 1000, 600, 500, true, false, 1),
-                new WavePlanEntry("golden", 3, WavePlanKind.Normal, "Mob2", 2, 2, "", 1000, 600, 500, false, true, 2),
-                new WavePlanEntry("golden", 4, WavePlanKind.Normal, "Mob3", 1, 3, "", 1000, 700, 500, true, true, 0),
+                new WavePlanEntry(1, 1, WavePlanKind.Normal, 1, 3, 0, null, 1000, 500, 500, true, true, 0),
+                new WavePlanEntry(1, 2, WavePlanKind.Normal, 2, 2, 1, null, 1000, 600, 500, true, false, 1),
+                new WavePlanEntry(1, 3, WavePlanKind.Normal, 3, 2, 2, null, 1000, 600, 500, false, true, 2),
+                new WavePlanEntry(1, 4, WavePlanKind.Normal, 4, 1, 3, null, 1000, 700, 500, true, true, 0),
             };
 
             var profiles = new Dictionary<int, IReadOnlyList<float>>
@@ -166,7 +166,7 @@ namespace GameBattle
                 [2] = GoldenSpawnStrategies[2],
             };
 
-            return new OrderedWavePlanSnapshot("golden", rows, profiles);
+            return new OrderedWavePlanSnapshot(1, rows, profiles);
         }
 
         // ====================================================================
@@ -183,8 +183,8 @@ namespace GameBattle
             for (int i = 0; i < 4; i++)
             {
                 definitions.Add(new EnemyDefinitionSnapshot(
+                    id: i + 1,
                     typeIndex: i,
-                    key: $"Mob{i}",
                     resourceAddress: $"Mob{i}",
                     moveSpeed: 50,
                     healthByWave: GoldenHealthByWave,
@@ -252,13 +252,13 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 黄金 Buff 目录（type 0～19，与 buff.xlsx 导出行完全等价）。
+        /// 黄金 Buff 目录（type 1～20，与 buff.xlsx 导出行完全等价）。
         /// </summary>
         /// <remarks>
         /// <para>显式构造等价目录：type/name/label/kind/channels 与用户导出的
         /// battle_tbbuff.bytes 逐行一致；stackPolicy=Add、maxStacks=1、conflictKey 为空
         /// 同样显式写入（buff-config-mapping.md）。不按 type 推导任何字段。</para>
-        /// <para>type 12（knockback，state channel 5）与 type 14（burnStatic，
+        /// <para>type 13（knockback，state channel 5）与 type 15（burnStatic，
         /// state channel 4）为原表既有合法行；其 4/5 通道的一次性/复合语义在目标申请
         /// 阶段处理，本配置目录保持可加载。</para>
         /// </remarks>
@@ -266,26 +266,26 @@ namespace GameBattle
         {
             var definitions = new List<BuffDefinitionSnapshot>(20)
             {
-                GoldenDef(0, "attPower", "", BuffKind.Numeric, new[] { 0 }),
-                GoldenDef(1, "attSpeed", "", BuffKind.Numeric, new[] { 1 }),
-                GoldenDef(2, "attRange", "", BuffKind.Numeric, new[] { 2 }),
-                GoldenDef(3, "moveSpeed", "", BuffKind.Numeric, new[] { 3 }),
-                GoldenDef(4, "maxHp", "", BuffKind.Numeric, new[] { 4 }),
-                GoldenDef(5, "hp", "", BuffKind.Numeric, new[] { 5 }),
-                GoldenDef(6, "scale", "", BuffKind.Numeric, new[] { 6 }),
-                GoldenDef(7, "custom", "", BuffKind.Custom, Array.Empty<int>()),
-                GoldenDef(8, "stun", "晕眩", BuffKind.State, new[] { 1, 0 }),
-                GoldenDef(9, "fall", "跌倒", BuffKind.State, new[] { 0 }),
-                GoldenDef(10, "pierce", "穿刺", BuffKind.State, new[] { 0 }),
-                GoldenDef(11, "electrocute", "电击", BuffKind.State, new[] { 1, 0 }),
-                GoldenDef(12, "knockback", "击退", BuffKind.State, new[] { 5 }),
-                GoldenDef(13, "chaos", "混乱", BuffKind.State, new[] { 1, 0, 2 }),
-                GoldenDef(14, "burnStatic", "火焰灼烧", BuffKind.State, new[] { 4 }),
-                GoldenDef(15, "limit", "", BuffKind.State, new[] { 6 }),
-                GoldenDef(16, "lock", "封锁", BuffKind.State, new[] { 1, 2 }),
-                GoldenDef(17, "knockdown", "跌倒", BuffKind.State, new[] { 1 }),
-                GoldenDef(18, "suppression", "压制", BuffKind.State, new[] { 3 }),
-                GoldenDef(19, "charm", "魅惑", BuffKind.State, new[] { 2, 3 }),
+                GoldenDef(1, "attPower", "", BuffKind.Numeric, new[] { 0 }),
+                GoldenDef(2, "attSpeed", "", BuffKind.Numeric, new[] { 1 }),
+                GoldenDef(3, "attRange", "", BuffKind.Numeric, new[] { 2 }),
+                GoldenDef(4, "moveSpeed", "", BuffKind.Numeric, new[] { 3 }),
+                GoldenDef(5, "maxHp", "", BuffKind.Numeric, new[] { 4 }),
+                GoldenDef(6, "hp", "", BuffKind.Numeric, new[] { 5 }),
+                GoldenDef(7, "scale", "", BuffKind.Numeric, new[] { 6 }),
+                GoldenDef(8, "custom", "", BuffKind.Custom, Array.Empty<int>()),
+                GoldenDef(9, "stun", "晕眩", BuffKind.State, new[] { 1, 0 }),
+                GoldenDef(10, "fall", "跌倒", BuffKind.State, new[] { 0 }),
+                GoldenDef(11, "pierce", "穿刺", BuffKind.State, new[] { 0 }),
+                GoldenDef(12, "electrocute", "电击", BuffKind.State, new[] { 1, 0 }),
+                GoldenDef(13, "knockback", "击退", BuffKind.State, new[] { 5 }),
+                GoldenDef(14, "chaos", "混乱", BuffKind.State, new[] { 1, 0, 2 }),
+                GoldenDef(15, "burnStatic", "火焰灼烧", BuffKind.State, new[] { 4 }),
+                GoldenDef(16, "limit", "", BuffKind.State, new[] { 6 }),
+                GoldenDef(17, "lock", "封锁", BuffKind.State, new[] { 1, 2 }),
+                GoldenDef(18, "knockdown", "跌倒", BuffKind.State, new[] { 1 }),
+                GoldenDef(19, "suppression", "压制", BuffKind.State, new[] { 3 }),
+                GoldenDef(20, "charm", "魅惑", BuffKind.State, new[] { 2, 3 }),
             };
 
             return new BuffCatalogSnapshot(definitions);
@@ -317,7 +317,7 @@ namespace GameBattle
         /// <para>6 个 active + 1 个 passive + 12 个 boss 行；handlerKey 与 key 相同
         /// （本 change 注册 SoulCapture 生产 handler，其余行可留在目录但不得 attach）。
         /// EffectBuffType/EffectDurationMs/RangeTiles 只读透传：仅 SoulCapture 携带
-        /// buff type 13 / 2000ms / range 2，框架不解释其语义。</para>
+        /// buff type 14 / 2000ms / range 2，框架不解释其语义。</para>
         /// </remarks>
         private static SkillCatalogSnapshot BuildGoldenSkillCatalog()
         {
@@ -330,7 +330,7 @@ namespace GameBattle
                 GoldenSkill("ArrowRain", SkillCategory.Active, 0, null, null, null),
                 GoldenSkill("FireArrowBarrage", SkillCategory.Active, 0, null, null, null),
                 GoldenSkill("StunPassive", SkillCategory.Passive, 0, null, null, null),
-                GoldenSkill("SoulCapture", SkillCategory.Boss, 8000, 13, 2000, 2f),
+                GoldenSkill("SoulCapture", SkillCategory.Boss, 8000, 14, 2000, 2f),
                 GoldenSkill("SoulSummon", SkillCategory.Boss, 8000, null, null, 3f),
                 GoldenSkill("Inspire", SkillCategory.Boss, 10000, null, null, 2f),
                 GoldenSkill("Demolition", SkillCategory.Boss, 10000, null, null, 10f),
@@ -359,7 +359,31 @@ namespace GameBattle
             float? rangeTiles)
         {
             return new SkillDefinitionSnapshot(
-                key, category, cooldownMs, key, effectBuffType, effectDurationMs, rangeTiles);
+                SkillId(key), key, category, cooldownMs, key, effectBuffType, effectDurationMs, rangeTiles);
+        }
+
+        private static int SkillId(string resName)
+        {
+            string[] names =
+            {
+                "LeapSlash", "SevenInSevenOut", "BattleShout", "HolySword", "ArrowRain",
+                "FireArrowBarrage", "StunPassive", "SoulCapture", "SoulSummon", "Inspire",
+                "Demolition", "RainStorm", "Enthrall", "CavalryOrder", "FangTianHalberd",
+                "Devour", "Madness", "DevourEyes", "WarlordSeal"
+            };
+            int index = Array.IndexOf(names, resName);
+            return index + 1;
+        }
+
+        private static int BossId(string resName)
+        {
+            string[] names =
+            {
+                "ZhangLiang", "ZhangBao", "ZhangJiao", "SunShangXiang", "ZhenFu", "DiaoChan",
+                "HuaXiong", "LvBu", "DongZhuo", "DianWei", "XiaHouDun", "CaoCao"
+            };
+            int index = Array.IndexOf(names, resName);
+            return index + 1;
         }
 
         // ====================================================================
@@ -436,7 +460,7 @@ namespace GameBattle
             float logicalHeight)
         {
             return new BossDefinitionSnapshot(
-                key, name, skillKey, animationKey, resourcePath, attackAnimation, idleAnimation,
+                BossId(key), key, name, SkillId(skillKey), animationKey, resourcePath, attackAnimation, idleAnimation,
                 new BossTimelineSnapshot(effectAtMs, completeAtMs),
                 enabled, healthMultiplier, moveSpeed, contactDamage, rewardGold,
                 logicalWidth, logicalHeight);
@@ -447,12 +471,12 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>
-        /// 黄金武器目录（44 行，id 0～43，与 weapon.xlsx 导出行完全等价）。
+        /// 黄金武器目录（44 行，id 1～44，与 weapon.xlsx 导出行完全等价）。
         /// </summary>
         /// <remarks>
         /// <para>显式构造等价目录：id/type/addAttPower/enabled/handlerKey 与用户导出的
         /// battle_tbweapon.bytes 逐行一致。不按 id 推导任何字段。</para>
-        /// <para>首期只启用 id ∈ {0, 10, 20, 31} 四条 Basic +1（type 分别对应
+        /// <para>首期只启用 id ∈ {1, 11, 21, 32} 四条 Basic +1（type 分别对应
         /// Bow/Spear/Knife/Sword），其余 40 行 disabled（handlerKey 空串），
         /// MUST NOT 产生运行时状态或行为对象。</para>
         /// </remarks>
@@ -460,50 +484,50 @@ namespace GameBattle
         {
             var definitions = new List<WeaponDefinitionSnapshot>(44)
             {
-                GoldenWeapon(0, WeaponType.Bow, 1, true, "Basic"),
-                GoldenWeapon(1, WeaponType.Bow, 2, false, null),
+                GoldenWeapon(1, WeaponType.Bow, 1, true, "Basic"),
                 GoldenWeapon(2, WeaponType.Bow, 2, false, null),
-                GoldenWeapon(3, WeaponType.Bow, 3, false, null),
-                GoldenWeapon(4, WeaponType.Bow, 4, false, null),
-                GoldenWeapon(5, WeaponType.Bow, 5, false, null),
+                GoldenWeapon(3, WeaponType.Bow, 2, false, null),
+                GoldenWeapon(4, WeaponType.Bow, 3, false, null),
+                GoldenWeapon(5, WeaponType.Bow, 4, false, null),
                 GoldenWeapon(6, WeaponType.Bow, 5, false, null),
-                GoldenWeapon(7, WeaponType.Bow, 6, false, null),
+                GoldenWeapon(7, WeaponType.Bow, 5, false, null),
                 GoldenWeapon(8, WeaponType.Bow, 6, false, null),
                 GoldenWeapon(9, WeaponType.Bow, 6, false, null),
-                GoldenWeapon(10, WeaponType.Spear, 1, true, "Basic"),
-                GoldenWeapon(11, WeaponType.Spear, 2, false, null),
-                GoldenWeapon(12, WeaponType.Spear, 3, false, null),
-                GoldenWeapon(13, WeaponType.Spear, 4, false, null),
+                GoldenWeapon(10, WeaponType.Bow, 6, false, null),
+                GoldenWeapon(11, WeaponType.Spear, 1, true, "Basic"),
+                GoldenWeapon(12, WeaponType.Spear, 2, false, null),
+                GoldenWeapon(13, WeaponType.Spear, 3, false, null),
                 GoldenWeapon(14, WeaponType.Spear, 4, false, null),
-                GoldenWeapon(15, WeaponType.Spear, 5, false, null),
-                GoldenWeapon(16, WeaponType.Spear, 6, false, null),
+                GoldenWeapon(15, WeaponType.Spear, 4, false, null),
+                GoldenWeapon(16, WeaponType.Spear, 5, false, null),
                 GoldenWeapon(17, WeaponType.Spear, 6, false, null),
-                GoldenWeapon(18, WeaponType.Spear, 9, false, null),
-                GoldenWeapon(19, WeaponType.Spear, 10, false, null),
-                GoldenWeapon(20, WeaponType.Knife, 1, true, "Basic"),
-                GoldenWeapon(21, WeaponType.Knife, 2, false, null),
-                GoldenWeapon(22, WeaponType.Knife, 3, false, null),
-                GoldenWeapon(23, WeaponType.Knife, 4, false, null),
+                GoldenWeapon(18, WeaponType.Spear, 6, false, null),
+                GoldenWeapon(19, WeaponType.Spear, 9, false, null),
+                GoldenWeapon(20, WeaponType.Spear, 10, false, null),
+                GoldenWeapon(21, WeaponType.Knife, 1, true, "Basic"),
+                GoldenWeapon(22, WeaponType.Knife, 2, false, null),
+                GoldenWeapon(23, WeaponType.Knife, 3, false, null),
                 GoldenWeapon(24, WeaponType.Knife, 4, false, null),
-                GoldenWeapon(25, WeaponType.Knife, 5, false, null),
-                GoldenWeapon(26, WeaponType.Knife, 6, false, null),
-                GoldenWeapon(27, WeaponType.Knife, 7, false, null),
-                GoldenWeapon(28, WeaponType.Knife, 8, false, null),
-                GoldenWeapon(29, WeaponType.Knife, 10, false, null),
+                GoldenWeapon(25, WeaponType.Knife, 4, false, null),
+                GoldenWeapon(26, WeaponType.Knife, 5, false, null),
+                GoldenWeapon(27, WeaponType.Knife, 6, false, null),
+                GoldenWeapon(28, WeaponType.Knife, 7, false, null),
+                GoldenWeapon(29, WeaponType.Knife, 8, false, null),
                 GoldenWeapon(30, WeaponType.Knife, 10, false, null),
-                GoldenWeapon(31, WeaponType.Sword, 1, true, "Basic"),
-                GoldenWeapon(32, WeaponType.Sword, 2, false, null),
-                GoldenWeapon(33, WeaponType.Sword, 3, false, null),
-                GoldenWeapon(34, WeaponType.Sword, 4, false, null),
-                GoldenWeapon(35, WeaponType.Sword, 5, false, null),
-                GoldenWeapon(36, WeaponType.Sword, 6, false, null),
+                GoldenWeapon(31, WeaponType.Knife, 10, false, null),
+                GoldenWeapon(32, WeaponType.Sword, 1, true, "Basic"),
+                GoldenWeapon(33, WeaponType.Sword, 2, false, null),
+                GoldenWeapon(34, WeaponType.Sword, 3, false, null),
+                GoldenWeapon(35, WeaponType.Sword, 4, false, null),
+                GoldenWeapon(36, WeaponType.Sword, 5, false, null),
                 GoldenWeapon(37, WeaponType.Sword, 6, false, null),
-                GoldenWeapon(38, WeaponType.Sword, 7, false, null),
-                GoldenWeapon(39, WeaponType.Sword, 8, false, null),
-                GoldenWeapon(40, WeaponType.Sword, 9, false, null),
+                GoldenWeapon(38, WeaponType.Sword, 6, false, null),
+                GoldenWeapon(39, WeaponType.Sword, 7, false, null),
+                GoldenWeapon(40, WeaponType.Sword, 8, false, null),
                 GoldenWeapon(41, WeaponType.Sword, 9, false, null),
                 GoldenWeapon(42, WeaponType.Sword, 9, false, null),
-                GoldenWeapon(43, WeaponType.Sword, 10, false, null),
+                GoldenWeapon(43, WeaponType.Sword, 9, false, null),
+                GoldenWeapon(44, WeaponType.Sword, 10, false, null),
             };
 
             return new WeaponCatalogSnapshot(definitions);
@@ -556,7 +580,7 @@ namespace GameBattle
                 opponentPath: GoldenOpponentPath);
 
             var enemy = new EnemyConfigSnapshot(
-                type: "Mob0",
+                id: 1,
                 mapEnemyTypeIndex: 0,
                 speed: 50,
                 healthByWave: GoldenHealthByWave,

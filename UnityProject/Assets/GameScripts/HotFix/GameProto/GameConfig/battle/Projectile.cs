@@ -19,6 +19,7 @@ public sealed partial class Projectile : Luban.BeanBase
 {
     public Projectile(ByteBuf _buf) 
     {
+        Id = _buf.ReadInt();
         {int n0 = _buf.ReadSize(); Types = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); Types.Add(_e0);}}
         PrimaryType = _buf.ReadString();
         ArrowSpeed = _buf.ReadInt();
@@ -29,6 +30,7 @@ public sealed partial class Projectile : Luban.BeanBase
         return new battle.Projectile(_buf);
     }
 
+    public readonly int Id;
     public readonly System.Collections.Generic.List<string> Types;
     /// <summary>
     /// 本期唯一注册投射物类型(SimpleDynamicArrow)
@@ -49,6 +51,7 @@ public sealed partial class Projectile : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
+        + "id:" + Id + ","
         + "types:" + Luban.StringUtil.CollectionToString(Types) + ","
         + "primaryType:" + PrimaryType + ","
         + "arrowSpeed:" + ArrowSpeed + ","

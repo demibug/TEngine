@@ -140,7 +140,7 @@ namespace GameBattle
                 new[]
                 {
                     // 稳定状态通道：攻击禁用/压制（攻击门控）+ 移动禁用/目标改变
-                    // （SoulCapture/Buff13 混乱可申请；其玩法效果由后续玩法实现）。
+                    // （SoulCapture/Buff14 混乱可申请；其玩法效果由后续玩法实现）。
                     BuffStateChannel.MovementDisabled,
                     BuffStateChannel.AttackDisabled,
                     BuffStateChannel.TargetingAltered,
@@ -180,10 +180,10 @@ namespace GameBattle
         /// <summary>压制状态 Buff 是否生效。</summary>
         private bool _buffSuppressed;
 
-        /// <summary>移动禁用状态 Buff 是否生效（SoulCapture/Buff13 可申请；单位静止，供后续玩法消费）。</summary>
+        /// <summary>移动禁用状态 Buff 是否生效（SoulCapture/Buff14 可申请；单位静止，供后续玩法消费）。</summary>
         private bool _buffMovementDisabled;
 
-        /// <summary>目标改变状态 Buff 是否生效（SoulCapture/Buff13 可申请；供后续玩法消费）。</summary>
+        /// <summary>目标改变状态 Buff 是否生效（SoulCapture/Buff14 可申请；供后续玩法消费）。</summary>
         private bool _buffTargetingAltered;
 
         /// <summary>基础攻击范围（像素，对应 baseAttackRange/w_，UnitBase.js:45）。由 InitializeStats 设置。</summary>

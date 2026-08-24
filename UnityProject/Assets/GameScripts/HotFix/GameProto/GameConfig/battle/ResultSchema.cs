@@ -19,6 +19,7 @@ public sealed partial class ResultSchema : Luban.BeanBase
 {
     public ResultSchema(ByteBuf _buf) 
     {
+        Id = _buf.ReadInt();
         Field = _buf.ReadString();
         TypeDesc = _buf.ReadString();
     }
@@ -28,6 +29,10 @@ public sealed partial class ResultSchema : Luban.BeanBase
         return new battle.ResultSchema(_buf);
     }
 
+    /// <summary>
+    /// ID(主键)
+    /// </summary>
+    public readonly int Id;
     /// <summary>
     /// 字段(主键)
     /// </summary>
@@ -47,6 +52,7 @@ public sealed partial class ResultSchema : Luban.BeanBase
     public override string ToString()
     {
         return "{ "
+        + "id:" + Id + ","
         + "field:" + Field + ","
         + "typeDesc:" + TypeDesc + ","
         + "}";
