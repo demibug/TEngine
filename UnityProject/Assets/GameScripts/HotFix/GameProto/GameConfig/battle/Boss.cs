@@ -22,13 +22,10 @@ public sealed partial class Boss : Luban.BeanBase
         Id = _buf.ReadInt();
         ResName = _buf.ReadString();
         Name = _buf.ReadString();
-        OriginalSymbol = _buf.ReadString();
-        SourceRange = _buf.ReadString();
         SkillId = _buf.ReadInt();
         AnimationKey = _buf.ReadString();
         if(_buf.ReadBool()){ ResourcePath = _buf.ReadString(); } else { ResourcePath = null; }
         AttackAnimation = _buf.ReadString();
-        if(_buf.ReadBool()){ FollowupAnimation = _buf.ReadString(); } else { FollowupAnimation = null; }
         IdleAnimation = _buf.ReadString();
         Timeline = global::GameConfig.boss.Timeline.DeserializeTimeline(_buf);
         Enabled = _buf.ReadBool();
@@ -46,59 +43,47 @@ public sealed partial class Boss : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键，Boss 唯一 ID
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 资源名(原主键)
+    /// 资源名，原主键，保留作溯源
     /// </summary>
     public readonly string ResName;
     /// <summary>
-    /// 名称
+    /// 显示名
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 原始符号
-    /// </summary>
-    public readonly string OriginalSymbol;
-    /// <summary>
-    /// 源码区间
-    /// </summary>
-    public readonly string SourceRange;
-    /// <summary>
-    /// 技能ID
+    /// 技能 ID，引用 skill.Id，技能类别应为 boss
     /// </summary>
     public readonly int SkillId;
     /// <summary>
-    /// 动画键
+    /// Spine 表现绑定键，必填，如 boss0
     /// </summary>
     public readonly string AnimationKey;
     /// <summary>
-    /// 资源路径
+    /// YooAsset Prefab 地址，非磁盘路径，如 ZhangLiang
     /// </summary>
     public readonly string ResourcePath;
     /// <summary>
-    /// 攻击动画
+    /// Spine 普通攻击动画名，如 attackliang
     /// </summary>
     public readonly string AttackAnimation;
     /// <summary>
-    /// 后续动画
-    /// </summary>
-    public readonly string FollowupAnimation;
-    /// <summary>
-    /// 待机动画
+    /// Spine 待机/移动循环动画名，如 goliang
     /// </summary>
     public readonly string IdleAnimation;
     /// <summary>
-    /// 时间轴
+    /// 技能时间轴：effectAtMs（效果提交时刻）/ completeAtMs（完成时刻），后者必须大于前者
     /// </summary>
     public readonly boss.Timeline Timeline;
     /// <summary>
-    /// 是否启用
+    /// 是否启用，只有启用 Boss 才允许进入正式计划
     /// </summary>
     public readonly bool Enabled;
     /// <summary>
-    /// 生命倍率
+    /// Boss 基础生命倍率
     /// </summary>
     public readonly float HealthMultiplier;
     /// <summary>
@@ -106,7 +91,7 @@ public sealed partial class Boss : Luban.BeanBase
     /// </summary>
     public readonly float MoveSpeed;
     /// <summary>
-    /// 终点接触伤害
+    /// 到达终点造成的伤害
     /// </summary>
     public readonly int ContactDamage;
     /// <summary>
@@ -114,7 +99,7 @@ public sealed partial class Boss : Luban.BeanBase
     /// </summary>
     public readonly int RewardGold;
     /// <summary>
-    /// 逻辑宽度
+    /// 逻辑宽度，用于中心、范围及表现定位
     /// </summary>
     public readonly float LogicalWidth;
     /// <summary>
@@ -136,13 +121,10 @@ public sealed partial class Boss : Luban.BeanBase
         + "id:" + Id + ","
         + "resName:" + ResName + ","
         + "name:" + Name + ","
-        + "originalSymbol:" + OriginalSymbol + ","
-        + "sourceRange:" + SourceRange + ","
         + "skillId:" + SkillId + ","
         + "animationKey:" + AnimationKey + ","
         + "resourcePath:" + ResourcePath + ","
         + "attackAnimation:" + AttackAnimation + ","
-        + "followupAnimation:" + FollowupAnimation + ","
         + "idleAnimation:" + IdleAnimation + ","
         + "timeline:" + Timeline + ","
         + "enabled:" + Enabled + ","

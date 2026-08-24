@@ -20,12 +20,6 @@ public sealed partial class Deck : Luban.BeanBase
     public Deck(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Mode = _buf.ReadString();
-        MinimalMode = _buf.ReadBool();
-        {int n0 = _buf.ReadSize(); BaseSoldierTexts = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); BaseSoldierTexts.Add(_e0);}}
-        HandSize = _buf.ReadInt();
-        DefaultLevel = _buf.ReadInt();
-        BaseUnitCost = _buf.ReadInt();
     }
 
     public static Deck DeserializeDeck(ByteBuf _buf)
@@ -33,31 +27,10 @@ public sealed partial class Deck : Luban.BeanBase
         return new battle.Deck(_buf);
     }
 
+    /// <summary>
+    /// 占位
+    /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 牌组模式(minimal/standard)
-    /// </summary>
-    public readonly string Mode;
-    /// <summary>
-    /// 是否最简模式
-    /// </summary>
-    public readonly bool MinimalMode;
-    /// <summary>
-    /// 基础兵字表(最简四兵)
-    /// </summary>
-    public readonly System.Collections.Generic.List<string> BaseSoldierTexts;
-    /// <summary>
-    /// 手牌大小
-    /// </summary>
-    public readonly int HandSize;
-    /// <summary>
-    /// 默认等级
-    /// </summary>
-    public readonly int DefaultLevel;
-    /// <summary>
-    /// 基础单位消耗
-    /// </summary>
-    public readonly int BaseUnitCost;
    
     public const int __ID__ = -795997121;
     public override int GetTypeId() => __ID__;
@@ -70,12 +43,6 @@ public sealed partial class Deck : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "mode:" + Mode + ","
-        + "minimalMode:" + MinimalMode + ","
-        + "baseSoldierTexts:" + Luban.StringUtil.CollectionToString(BaseSoldierTexts) + ","
-        + "handSize:" + HandSize + ","
-        + "defaultLevel:" + DefaultLevel + ","
-        + "baseUnitCost:" + BaseUnitCost + ","
         + "}";
     }
 }

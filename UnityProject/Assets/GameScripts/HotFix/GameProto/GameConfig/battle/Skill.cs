@@ -21,15 +21,9 @@ public sealed partial class Skill : Luban.BeanBase
     {
         Id = _buf.ReadInt();
         ResName = _buf.ReadString();
-        Name = _buf.ReadString();
         Category = _buf.ReadString();
-        Description = _buf.ReadString();
-        if(_buf.ReadBool()){ HealthMultiplier = _buf.ReadInt(); } else { HealthMultiplier = null; }
-        if(_buf.ReadBool()){ Speed = _buf.ReadInt(); } else { Speed = null; }
         if(_buf.ReadBool()){ RangeTiles = _buf.ReadFloat(); } else { RangeTiles = null; }
         if(_buf.ReadBool()){ CooldownSeconds = _buf.ReadInt(); } else { CooldownSeconds = null; }
-        Source = _buf.ReadString();
-        if(_buf.ReadBool()){ Confidence = _buf.ReadString(); } else { Confidence = null; }
         HandlerKey = _buf.ReadString();
         if(_buf.ReadBool()){ EffectBuffId = _buf.ReadInt(); } else { EffectBuffId = null; }
         if(_buf.ReadBool()){ EffectDurationMs = _buf.ReadInt(); } else { EffectDurationMs = null; }
@@ -43,67 +37,43 @@ public sealed partial class Skill : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键，技能唯一 ID
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 资源名(原主键)
+    /// 资源名，原主键
     /// </summary>
     public readonly string ResName;
     /// <summary>
-    /// 名称
-    /// </summary>
-    public readonly string Name;
-    /// <summary>
-    /// 类别
+    /// 类别，只能填 active / boss / passive
     /// </summary>
     public readonly string Category;
     /// <summary>
-    /// 描述
-    /// </summary>
-    public readonly string Description;
-    /// <summary>
-    /// 血量倍数
-    /// </summary>
-    public readonly int? HealthMultiplier;
-    /// <summary>
-    /// 速度
-    /// </summary>
-    public readonly int? Speed;
-    /// <summary>
-    /// 范围(格)
+    /// 作用范围格数，只被特定 Handler 解释
     /// </summary>
     public readonly float? RangeTiles;
     /// <summary>
-    /// 冷却(秒)
+    /// 冷却秒数，必须填写且不能为负
     /// </summary>
     public readonly int? CooldownSeconds;
     /// <summary>
-    /// 源码标记
-    /// </summary>
-    public readonly string Source;
-    /// <summary>
-    /// 置信度
-    /// </summary>
-    public readonly string Confidence;
-    /// <summary>
-    /// 技能处理器键
+    /// 代码处理器注册键，不能为空，必须由程序确认已注册
     /// </summary>
     public readonly string HandlerKey;
     /// <summary>
-    /// 效果Buff ID(可空)
+    /// 效果 Buff ID，引用 buff.Id
     /// </summary>
     public readonly int? EffectBuffId;
     /// <summary>
-    /// 效果持续毫秒(可空)
+    /// Buff/效果持续毫秒
     /// </summary>
     public readonly int? EffectDurationMs;
     /// <summary>
-    /// 触发攻击计数
+    /// 累计多少次普通攻击后触发主动技能
     /// </summary>
     public readonly int? TriggerAttackCount;
     /// <summary>
-    /// 单箭伤害倍率
+    /// 单箭伤害倍率，如火箭每箭倍率
     /// </summary>
     public readonly float? EffectDamageMultiplier;
    
@@ -119,15 +89,9 @@ public sealed partial class Skill : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "resName:" + ResName + ","
-        + "name:" + Name + ","
         + "category:" + Category + ","
-        + "description:" + Description + ","
-        + "healthMultiplier:" + HealthMultiplier + ","
-        + "speed:" + Speed + ","
         + "rangeTiles:" + RangeTiles + ","
         + "cooldownSeconds:" + CooldownSeconds + ","
-        + "source:" + Source + ","
-        + "confidence:" + Confidence + ","
         + "handlerKey:" + HandlerKey + ","
         + "effectBuffId:" + EffectBuffId + ","
         + "effectDurationMs:" + EffectDurationMs + ","

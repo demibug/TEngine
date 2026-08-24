@@ -20,7 +20,6 @@ public sealed partial class SoldierVisual : Luban.BeanBase
     public SoldierVisual(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        AnimationKey = _buf.ReadString();
         BodyLocalOffset = ExternalTypeUtil.NewVector2(global::GameConfig.vector2.Deserializevector2(_buf));
         HitEffectPointOffset = ExternalTypeUtil.NewVector2(global::GameConfig.vector2.Deserializevector2(_buf));
         ProjectileOriginOffset = ExternalTypeUtil.NewVector2(global::GameConfig.vector2.Deserializevector2(_buf));
@@ -35,14 +34,37 @@ public sealed partial class SoldierVisual : Luban.BeanBase
         return new battle.SoldierVisual(_buf);
     }
 
+    /// <summary>
+    /// 主键
+    /// </summary>
     public readonly int Id;
-    public readonly string AnimationKey;
+    /// <summary>
+    /// Body 偏移，世界单位
+    /// </summary>
     public readonly UnityEngine.Vector2 BodyLocalOffset;
+    /// <summary>
+    /// 受击特效挂点偏移，世界单位
+    /// </summary>
     public readonly UnityEngine.Vector2 HitEffectPointOffset;
+    /// <summary>
+    /// 箭矢出生点偏移，仅弓兵有值
+    /// </summary>
     public readonly UnityEngine.Vector2 ProjectileOriginOffset;
+    /// <summary>
+    /// 武器挂点偏移，仅枪兵有值
+    /// </summary>
     public readonly UnityEngine.Vector2 WeaponPivotOffset;
+    /// <summary>
+    /// 默认朝向：1=右 / -1=左
+    /// </summary>
     public readonly int DefaultFacing;
+    /// <summary>
+    /// 是否有武器挂点，仅枪兵为 true
+    /// </summary>
     public readonly bool HasWeaponPivot;
+    /// <summary>
+    /// 是否有投射物原点，仅弓兵为 true
+    /// </summary>
     public readonly bool HasProjectileOrigin;
    
     public const int __ID__ = 1181049996;
@@ -56,7 +78,6 @@ public sealed partial class SoldierVisual : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "animationKey:" + AnimationKey + ","
         + "bodyLocalOffset:" + BodyLocalOffset + ","
         + "hitEffectPointOffset:" + HitEffectPointOffset + ","
         + "projectileOriginOffset:" + ProjectileOriginOffset + ","

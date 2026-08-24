@@ -25,8 +25,6 @@ public sealed partial class Economy : Luban.BeanBase
         RefreshCostIncrement = _buf.ReadInt();
         UnitBaseCost = _buf.ReadInt();
         HandSize = _buf.ReadInt();
-        PlayerMaxHealth = _buf.ReadInt();
-        OpponentMaxHealth = _buf.ReadInt();
     }
 
     public static Economy DeserializeEconomy(ByteBuf _buf)
@@ -34,20 +32,30 @@ public sealed partial class Economy : Luban.BeanBase
         return new battle.Economy(_buf);
     }
 
+    /// <summary>
+    /// 占位
+    /// </summary>
     public readonly int Id;
+    /// <summary>
+    /// 开局金币
+    /// </summary>
     public readonly int InitialGold;
+    /// <summary>
+    /// 首次刷新费用
+    /// </summary>
     public readonly int RefreshCostStart;
+    /// <summary>
+    /// 每次刷新递增的费用
+    /// </summary>
     public readonly int RefreshCostIncrement;
+    /// <summary>
+    /// 基础招募/单位费用
+    /// </summary>
     public readonly int UnitBaseCost;
+    /// <summary>
+    /// 手牌数量
+    /// </summary>
     public readonly int HandSize;
-    /// <summary>
-    /// 玩家方最大生命
-    /// </summary>
-    public readonly int PlayerMaxHealth;
-    /// <summary>
-    /// 对手方最大生命
-    /// </summary>
-    public readonly int OpponentMaxHealth;
    
     public const int __ID__ = -194263320;
     public override int GetTypeId() => __ID__;
@@ -65,8 +73,6 @@ public sealed partial class Economy : Luban.BeanBase
         + "refreshCostIncrement:" + RefreshCostIncrement + ","
         + "unitBaseCost:" + UnitBaseCost + ","
         + "handSize:" + HandSize + ","
-        + "playerMaxHealth:" + PlayerMaxHealth + ","
-        + "opponentMaxHealth:" + OpponentMaxHealth + ","
         + "}";
     }
 }

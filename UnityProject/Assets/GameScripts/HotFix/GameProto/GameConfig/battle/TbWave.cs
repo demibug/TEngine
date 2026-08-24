@@ -30,35 +30,34 @@ public partial class TbWave
     }
 
 
+    /// <summary>
+    /// 占位
+    /// </summary>
      public int Id => _data.Id;
     /// <summary>
-    /// 当前生效的波次计划ID
+    /// 当前启用的波次计划 ID，必须能在 wave_plan.Id 中找到
     /// </summary>
      public int ActivePlanId => _data.ActivePlanId;
     /// <summary>
-    /// 【deprecated】旧字段，不再驱动有限波次
+    /// 已废弃，不再决定波次内容
     /// </summary>
      public System.Collections.Generic.List<int> WaveUnitCounts => _data.WaveUnitCounts;
     /// <summary>
-    /// 【deprecated】旧字段，不再驱动有限波次
+    /// 已废弃
     /// </summary>
      public System.Collections.Generic.List<int> BossWaveNumbers => _data.BossWaveNumbers;
     /// <summary>
-    /// 【deprecated】旧字段，不再驱动有限波次
+    /// 已废弃
     /// </summary>
      public System.Collections.Generic.List<float> BossSpawnChances => _data.BossSpawnChances;
     /// <summary>
-    /// 【deprecated】旧字段，不再驱动有限波次
+    /// 已废弃
     /// </summary>
      public System.Collections.Generic.List<int> SpawnStrategyWeights => _data.SpawnStrategyWeights;
     /// <summary>
-    /// 生成策略表，仅由逐波 strategyProfile 显式引用
+    /// 生成策略权重二维表，wave_plan.strategyProfile 是这里的行索引（从 0 起）
     /// </summary>
      public System.Collections.Generic.List<System.Collections.Generic.List<float>> SpawnStrategies => _data.SpawnStrategies;
-    /// <summary>
-    /// 【deprecated】旧字段，不再驱动有限波次
-    /// </summary>
-     public bool SkipBoss => _data.SkipBoss;
     
     public void ResolveRef(Tables tables)
     {

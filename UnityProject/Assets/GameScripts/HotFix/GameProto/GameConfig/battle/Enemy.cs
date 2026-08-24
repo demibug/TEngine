@@ -29,13 +29,16 @@ public sealed partial class Enemy : Luban.BeanBase
         return new battle.Enemy(_buf);
     }
 
+    /// <summary>
+    /// 主键，敌人唯一 ID
+    /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 类型索引
+    /// 普通敌人类型索引，必须唯一；留空表示技能召唤类，不进入普通波次目录
     /// </summary>
     public readonly int? TypeIndex;
     /// <summary>
-    /// 资源地址
+    /// YooAsset Prefab 地址，如 Mob0，必须与 Prefab 文件名一致
     /// </summary>
     public readonly string ResourceAddress;
    

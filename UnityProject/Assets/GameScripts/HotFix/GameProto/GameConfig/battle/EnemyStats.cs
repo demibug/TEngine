@@ -33,23 +33,23 @@ public sealed partial class EnemyStats : Luban.BeanBase
     }
 
     /// <summary>
-    /// 敌人类型键
+    /// 敌人类型 ID，等于 enemy.Id
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 移动速度(px/s)
+    /// 移动速度，逻辑像素/秒
     /// </summary>
     public readonly int MoveSpeed;
     /// <summary>
-    /// 各波次基础血量(20项)
+    /// 各难度索引的基础血量列表，wave_plan.difficultyIndex 从 0 开始索引它
     /// </summary>
     public readonly System.Collections.Generic.List<int> HealthByWave;
     /// <summary>
-    /// 前10波血量乘数
+    /// 前期波次额外血量倍率
     /// </summary>
     public readonly System.Collections.Generic.List<float> EarlyRoundHealthMultipliers;
     /// <summary>
-    /// 接触目标伤害
+    /// 抵达终点时对目标造成的伤害
     /// </summary>
     public readonly int ContactDamage;
     /// <summary>

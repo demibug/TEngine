@@ -20,13 +20,6 @@ public sealed partial class Rank : Luban.BeanBase
     public Rank(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        RankName = _buf.ReadString();
-        Level = _buf.ReadInt();
-        Reward = _buf.ReadInt();
-        AddHp = _buf.ReadFloat();
-        {int n0 = _buf.ReadSize(); Weapons = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); Weapons.Add(_e0);}}
-        {int n0 = _buf.ReadSize(); Difficulties = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); Difficulties.Add(_e0);}}
-        Map = _buf.ReadString();
     }
 
     public static Rank DeserializeRank(ByteBuf _buf)
@@ -35,37 +28,9 @@ public sealed partial class Rank : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 军衔
-    /// </summary>
-    public readonly string RankName;
-    /// <summary>
-    /// 等级
-    /// </summary>
-    public readonly int Level;
-    /// <summary>
-    /// 奖励
-    /// </summary>
-    public readonly int Reward;
-    /// <summary>
-    /// 加血
-    /// </summary>
-    public readonly float AddHp;
-    /// <summary>
-    /// 武器配置(0-4)
-    /// </summary>
-    public readonly System.Collections.Generic.List<int> Weapons;
-    /// <summary>
-    /// 难度(0-3)
-    /// </summary>
-    public readonly System.Collections.Generic.List<int> Difficulties;
-    /// <summary>
-    /// 地图
-    /// </summary>
-    public readonly string Map;
    
     public const int __ID__ = -795583550;
     public override int GetTypeId() => __ID__;
@@ -78,13 +43,6 @@ public sealed partial class Rank : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "rankName:" + RankName + ","
-        + "level:" + Level + ","
-        + "reward:" + Reward + ","
-        + "addHp:" + AddHp + ","
-        + "weapons:" + Luban.StringUtil.CollectionToString(Weapons) + ","
-        + "difficulties:" + Luban.StringUtil.CollectionToString(Difficulties) + ","
-        + "map:" + Map + ","
         + "}";
     }
 }

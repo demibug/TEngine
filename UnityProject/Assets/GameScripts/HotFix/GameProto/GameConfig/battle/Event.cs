@@ -20,8 +20,6 @@ public sealed partial class Event : Luban.BeanBase
     public Event(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        EventName = _buf.ReadString();
-        Code = _buf.ReadString();
     }
 
     public static Event DeserializeEvent(ByteBuf _buf)
@@ -30,17 +28,9 @@ public sealed partial class Event : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 事件名(主键)
-    /// </summary>
-    public readonly string EventName;
-    /// <summary>
-    /// 事件码
-    /// </summary>
-    public readonly string Code;
    
     public const int __ID__ = 1095325124;
     public override int GetTypeId() => __ID__;
@@ -53,8 +43,6 @@ public sealed partial class Event : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "eventName:" + EventName + ","
-        + "code:" + Code + ","
         + "}";
     }
 }

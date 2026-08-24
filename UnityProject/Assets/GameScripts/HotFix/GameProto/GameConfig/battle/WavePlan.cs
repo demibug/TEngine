@@ -40,55 +40,55 @@ public sealed partial class WavePlan : Luban.BeanBase
     }
 
     /// <summary>
-    /// 计划ID(联合主键1，供 wave.activePlanId 选择)
+    /// 计划 ID，应与 wave.activePlanId 一致
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 波次顺序
+    /// 波次顺序，从 1 开始连续递增，不可重复、不可跳号
     /// </summary>
     public readonly int Order;
     /// <summary>
-    /// 波次类型
+    /// 波次类型：Normal=普通波 / Boss=Boss 波
     /// </summary>
     public readonly battle.EWaveKind Kind;
     /// <summary>
-    /// 普通敌人Key
+    /// Normal 波的敌人 ID，留空时使用地图的 EnemyId
     /// </summary>
     public readonly int? EnemyId;
     /// <summary>
-    /// 普通敌人数量
+    /// Normal 波怪物数量，Boss 波填 0
     /// </summary>
     public readonly int NormalCount;
     /// <summary>
-    /// 难度索引
+    /// 难度索引，索引 enemystats.healthByWave，从 0 开始
     /// </summary>
     public readonly int DifficultyIndex;
     /// <summary>
-    /// Boss敌人Key
+    /// Boss 波必填的 Boss ID，Normal 波留空
     /// </summary>
     public readonly int? BossId;
     /// <summary>
-    /// 前置延迟(毫秒)
+    /// 本波开始前的等待时间，毫秒
     /// </summary>
     public readonly long PreDelayMs;
     /// <summary>
-    /// 刷怪间隔(毫秒)
+    /// 普通怪之间的出生间隔，毫秒
     /// </summary>
     public readonly long SpawnIntervalMs;
     /// <summary>
-    /// 后置延迟(毫秒)
+    /// 本波结束后的等待时间，毫秒
     /// </summary>
     public readonly long PostDelayMs;
     /// <summary>
-    /// 玩家侧是否出怪
+    /// 玩家侧是否生成
     /// </summary>
     public readonly bool PlayerLane;
     /// <summary>
-    /// 对手侧是否出怪
+    /// 对手侧是否生成，至少一侧必须为 true
     /// </summary>
     public readonly bool OpponentLane;
     /// <summary>
-    /// 逐波策略配置
+    /// 生成策略索引，引用 wave.spawnStrategies 的行，从 0 开始
     /// </summary>
     public readonly int StrategyProfile;
    

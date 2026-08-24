@@ -20,8 +20,6 @@ public sealed partial class ResultSchema : Luban.BeanBase
     public ResultSchema(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Field = _buf.ReadString();
-        TypeDesc = _buf.ReadString();
     }
 
     public static ResultSchema DeserializeResultSchema(ByteBuf _buf)
@@ -30,17 +28,9 @@ public sealed partial class ResultSchema : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 字段(主键)
-    /// </summary>
-    public readonly string Field;
-    /// <summary>
-    /// 类型描述
-    /// </summary>
-    public readonly string TypeDesc;
    
     public const int __ID__ = -299124300;
     public override int GetTypeId() => __ID__;
@@ -53,8 +43,6 @@ public sealed partial class ResultSchema : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "field:" + Field + ","
-        + "typeDesc:" + TypeDesc + ","
         + "}";
     }
 }

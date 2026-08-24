@@ -20,16 +20,12 @@ public sealed partial class Map : Luban.BeanBase
     public Map(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        GridWidth = _buf.ReadInt();
-        GridHeight = _buf.ReadInt();
         Width = _buf.ReadInt();
         Height = _buf.ReadInt();
-        if(_buf.ReadBool()){ Blocks = _buf.ReadString(); } else { Blocks = null; }
         {int n0 = _buf.ReadSize(); PlayerPath = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); PlayerPath.Add(_e0);}}
         {int n0 = _buf.ReadSize(); OpponentPath = new System.Collections.Generic.List<UnityEngine.Vector2Int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { UnityEngine.Vector2Int _e0;  _e0 = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf)); OpponentPath.Add(_e0);}}
         CellWidth = _buf.ReadInt();
         CellHeight = _buf.ReadInt();
-        MapCount = _buf.ReadInt();
         {int n0 = _buf.ReadSize(); Grid = new System.Collections.Generic.List<System.Collections.Generic.List<string>>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { System.Collections.Generic.List<string> _e0;  {int n1 = _buf.ReadSize(); _e0 = new System.Collections.Generic.List<string>(n1);for(var i1 = 0 ; i1 < n1 ; i1++) { string _e1;  _e1 = _buf.ReadString(); _e0.Add(_e1);}} Grid.Add(_e0);}}
         PlayerEntry = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
         PlayerStart = ExternalTypeUtil.NewVector2Int(global::GameConfig.vector2int.Deserializevector2int(_buf));
@@ -48,68 +44,76 @@ public sealed partial class Map : Luban.BeanBase
         return new battle.Map(_buf);
     }
 
+    /// <summary>
+    /// 主键，地图唯一 ID，开局选地图的唯一依据
+    /// </summary>
     public readonly int Id;
-    public readonly int GridWidth;
-    public readonly int GridHeight;
+    /// <summary>
+    /// 逻辑格子宽度（当前 8）
+    /// </summary>
     public readonly int Width;
+    /// <summary>
+    /// 逻辑格子高度（当前 10）
+    /// </summary>
     public readonly int Height;
-    public readonly string Blocks;
+    /// <summary>
+    /// 玩家方逻辑路径，点之间分号分隔
+    /// </summary>
     public readonly System.Collections.Generic.List<UnityEngine.Vector2Int> PlayerPath;
+    /// <summary>
+    /// 对手方逻辑路径
+    /// </summary>
     public readonly System.Collections.Generic.List<UnityEngine.Vector2Int> OpponentPath;
     /// <summary>
-    /// 格子像素宽
+    /// 像素格宽（80）
     /// </summary>
     public readonly int CellWidth;
     /// <summary>
-    /// 格子像素高
+    /// 像素格高（80）
     /// </summary>
     public readonly int CellHeight;
     /// <summary>
-    /// 地图总数
-    /// </summary>
-    public readonly int MapCount;
-    /// <summary>
-    /// 列优先 grid[x][y] 格子编码 kind_lane
+    /// 列优先 grid[x][y]，每格编码 kind_lane：kind（0道路/1可放置/2阻挡）、lane（0对手方/1玩家方）
     /// </summary>
     public readonly System.Collections.Generic.List<System.Collections.Generic.List<string>> Grid;
     /// <summary>
-    /// 玩家入口坐标
+    /// 玩家方地图外或边缘入口
     /// </summary>
     public readonly UnityEngine.Vector2Int PlayerEntry;
     /// <summary>
-    /// 玩家路径起点
+    /// 玩家方实际路径起点格
     /// </summary>
     public readonly UnityEngine.Vector2Int PlayerStart;
     /// <summary>
-    /// 玩家路径终点
+    /// 玩家方实际路径终点格
     /// </summary>
     public readonly UnityEngine.Vector2Int PlayerEnd;
     /// <summary>
-    /// 对手入口坐标
+    /// 对手方入口
     /// </summary>
     public readonly UnityEngine.Vector2Int OpponentEntry;
     /// <summary>
-    /// 对手路径起点
+    /// 对手方路径起点格
     /// </summary>
     public readonly UnityEngine.Vector2Int OpponentStart;
     /// <summary>
-    /// 对手路径终点
+    /// 对手方路径终点格
     /// </summary>
     public readonly UnityEngine.Vector2Int OpponentEnd;
     /// <summary>
-    /// 表现层路径标记(含越界标记)
+    /// 纯表现路径标记，可包含越界点，不应混进逻辑路径
     /// </summary>
     public readonly System.Collections.Generic.List<UnityEngine.Vector2Int> RouteMarkers;
     /// <summary>
-    /// 本图敌人类型索引
+    /// Normal 波未指定敌人时使用的默认敌人 ID
     /// </summary>
     public readonly int EnemyId;
     /// <summary>
-    /// 地图诊断名称，不参与战斗规则
+    /// 诊断名称，不参与规则
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// Unity/YooAsset 战斗地图资源地址
+    /// 地图 Prefab 地址，如 BattleMap0
     /// </summary>
     public readonly string ResourceAddress;
    
@@ -124,16 +128,12 @@ public sealed partial class Map : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "gridWidth:" + GridWidth + ","
-        + "gridHeight:" + GridHeight + ","
         + "width:" + Width + ","
         + "height:" + Height + ","
-        + "blocks:" + Blocks + ","
         + "playerPath:" + Luban.StringUtil.CollectionToString(PlayerPath) + ","
         + "opponentPath:" + Luban.StringUtil.CollectionToString(OpponentPath) + ","
         + "cellWidth:" + CellWidth + ","
         + "cellHeight:" + CellHeight + ","
-        + "mapCount:" + MapCount + ","
         + "grid:" + Luban.StringUtil.CollectionToString(Grid) + ","
         + "playerEntry:" + PlayerEntry + ","
         + "playerStart:" + PlayerStart + ","

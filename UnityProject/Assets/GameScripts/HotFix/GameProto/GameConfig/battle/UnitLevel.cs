@@ -30,15 +30,15 @@ public sealed partial class UnitLevel : Luban.BeanBase
     }
 
     /// <summary>
-    /// 等级ID(主键)
+    /// 等级 ID（主键），从 1 开始
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 该等级伤害倍数
+    /// 该等级的伤害倍率，乘到基础攻击力上
     /// </summary>
     public readonly float DamageLevelMultipliers;
     /// <summary>
-    /// 该等级攻速倍数
+    /// 该等级的攻速倍率，乘到基础攻速上
     /// </summary>
     public readonly float AttackSpeedLevelMultipliers;
    

@@ -30,20 +30,30 @@ public partial class TbEconomy
     }
 
 
+    /// <summary>
+    /// 占位
+    /// </summary>
      public int Id => _data.Id;
+    /// <summary>
+    /// 开局金币
+    /// </summary>
      public int InitialGold => _data.InitialGold;
+    /// <summary>
+    /// 首次刷新费用
+    /// </summary>
      public int RefreshCostStart => _data.RefreshCostStart;
+    /// <summary>
+    /// 每次刷新递增的费用
+    /// </summary>
      public int RefreshCostIncrement => _data.RefreshCostIncrement;
+    /// <summary>
+    /// 基础招募/单位费用
+    /// </summary>
      public int UnitBaseCost => _data.UnitBaseCost;
+    /// <summary>
+    /// 手牌数量
+    /// </summary>
      public int HandSize => _data.HandSize;
-    /// <summary>
-    /// 玩家方最大生命
-    /// </summary>
-     public int PlayerMaxHealth => _data.PlayerMaxHealth;
-    /// <summary>
-    /// 对手方最大生命
-    /// </summary>
-     public int OpponentMaxHealth => _data.OpponentMaxHealth;
     
     public void ResolveRef(Tables tables)
     {

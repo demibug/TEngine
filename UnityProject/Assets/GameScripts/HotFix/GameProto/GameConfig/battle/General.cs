@@ -23,8 +23,6 @@ public sealed partial class General : Luban.BeanBase
         Name = _buf.ReadString();
         Family = _buf.ReadString();
         {int n0 = _buf.ReadSize(); PartWords = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); PartWords.Add(_e0);}}
-        WeaponType = _buf.ReadInt();
-        if(_buf.ReadBool()){ Status = _buf.ReadString(); } else { Status = null; }
         Enabled = _buf.ReadBool();
         CombatArchetype = _buf.ReadString();
         RangeCells = _buf.ReadFloat();
@@ -46,79 +44,71 @@ public sealed partial class General : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键，武将唯一 ID
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 名称
+    /// 完整名称
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 姓氏
+    /// 姓氏字
     /// </summary>
     public readonly string Family;
     /// <summary>
-    /// 名字拆字
+    /// 名字拆字，严格两个不同的字，按顺序构成合成配方，如 张,飞
     /// </summary>
     public readonly System.Collections.Generic.List<string> PartWords;
-    /// <summary>
-    /// 武器类型
-    /// </summary>
-    public readonly int WeaponType;
-    /// <summary>
-    /// 状态
-    /// </summary>
-    public readonly string Status;
     /// <summary>
     /// 是否进入本期配置快照与配方索引
     /// </summary>
     public readonly bool Enabled;
     /// <summary>
-    /// pike 或 bow，映射既有逻辑原型
+    /// 战斗原型，只能填 pike 或 bow
     /// </summary>
     public readonly string CombatArchetype;
     /// <summary>
-    /// 当前 Unity 网格攻击范围
+    /// 攻击范围，格，必须为正
     /// </summary>
     public readonly float RangeCells;
     /// <summary>
-    /// 1 级基础伤害
+    /// 1 级基础伤害，必须为正
     /// </summary>
     public readonly int AttackDamage;
     /// <summary>
-    /// 基础攻击间隔
+    /// 基础攻击间隔，必须为正
     /// </summary>
     public readonly float AttackIntervalSeconds;
     /// <summary>
-    /// 近战枪击 或 单体，供校验/表现描述
+    /// 伤害模式：近战枪击 或 单体
     /// </summary>
     public readonly string DamageMode;
     /// <summary>
-    /// 复用现有目标策略键
+    /// 选敌策略，复用现有目标策略键
     /// </summary>
     public readonly string TargetPolicy;
     /// <summary>
-    /// 当前枪兵/弓兵回退地址，后续可替换为专属 Prefab
+    /// 武将 Prefab 地址，如 ZhangFei
     /// </summary>
     public readonly string PrefabAddress;
     /// <summary>
-    /// 表现绑定键
+    /// Spine 待机动画名，当前统一为 zhan1
     /// </summary>
     public readonly string AnimationKey;
     /// <summary>
-    /// 仅远程武将需要，本期为 SimpleDynamicArrow
+    /// 投射物类型，仅远程武将必填，当前为 SimpleDynamicArrow；枪型留空
     /// </summary>
     public readonly string ProjectileType;
     /// <summary>
-    /// 仅远程武将使用，本期 200
+    /// 投射物速度，仅远程武将使用，当前 200；枪型填 0
     /// </summary>
     public readonly int ProjectileSpeed;
     /// <summary>
-    /// 每个配方字加入玩家池的权重，首版为 1
+    /// 每个配方字加入玩家池的权重，必须大于 0
     /// </summary>
     public readonly int PartRecruitWeight;
     /// <summary>
-    /// 主动技能ID
+    /// 主动技能 ID，引用 skill.Id
     /// </summary>
     public readonly int? SkillId;
    
@@ -136,8 +126,6 @@ public sealed partial class General : Luban.BeanBase
         + "name:" + Name + ","
         + "family:" + Family + ","
         + "partWords:" + Luban.StringUtil.CollectionToString(PartWords) + ","
-        + "weaponType:" + WeaponType + ","
-        + "status:" + Status + ","
         + "enabled:" + Enabled + ","
         + "combatArchetype:" + CombatArchetype + ","
         + "rangeCells:" + RangeCells + ","

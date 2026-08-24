@@ -20,12 +20,6 @@ public sealed partial class WeaponRegistry : Luban.BeanBase
     public WeaponRegistry(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Symbol = _buf.ReadString();
-        Name = _buf.ReadString();
-        Type = _buf.ReadInt();
-        Index = _buf.ReadString();
-        if(_buf.ReadBool()){ Status = _buf.ReadString(); } else { Status = null; }
-        if(_buf.ReadBool()){ BuffDependency = _buf.ReadString(); } else { BuffDependency = null; }
     }
 
     public static WeaponRegistry DeserializeWeaponRegistry(ByteBuf _buf)
@@ -34,33 +28,9 @@ public sealed partial class WeaponRegistry : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 符号(主键)
-    /// </summary>
-    public readonly string Symbol;
-    /// <summary>
-    /// 名称
-    /// </summary>
-    public readonly string Name;
-    /// <summary>
-    /// 类型
-    /// </summary>
-    public readonly int Type;
-    /// <summary>
-    /// 索引
-    /// </summary>
-    public readonly string Index;
-    /// <summary>
-    /// 状态
-    /// </summary>
-    public readonly string Status;
-    /// <summary>
-    /// Buff依赖
-    /// </summary>
-    public readonly string BuffDependency;
    
     public const int __ID__ = 1815578255;
     public override int GetTypeId() => __ID__;
@@ -73,12 +43,6 @@ public sealed partial class WeaponRegistry : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "symbol:" + Symbol + ","
-        + "name:" + Name + ","
-        + "type:" + Type + ","
-        + "index:" + Index + ","
-        + "status:" + Status + ","
-        + "buffDependency:" + BuffDependency + ","
         + "}";
     }
 }

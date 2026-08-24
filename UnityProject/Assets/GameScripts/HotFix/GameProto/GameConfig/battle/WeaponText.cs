@@ -20,8 +20,6 @@ public sealed partial class WeaponText : Luban.BeanBase
     public WeaponText(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
-        Txt = _buf.ReadString();
-        Quality = _buf.ReadInt();
     }
 
     public static WeaponText DeserializeWeaponText(ByteBuf _buf)
@@ -30,17 +28,9 @@ public sealed partial class WeaponText : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键
     /// </summary>
     public readonly int Id;
-    /// <summary>
-    /// 单字
-    /// </summary>
-    public readonly string Txt;
-    /// <summary>
-    /// 品质
-    /// </summary>
-    public readonly int Quality;
    
     public const int __ID__ = -1689414529;
     public override int GetTypeId() => __ID__;
@@ -53,8 +43,6 @@ public sealed partial class WeaponText : Luban.BeanBase
     {
         return "{ "
         + "id:" + Id + ","
-        + "txt:" + Txt + ","
-        + "quality:" + Quality + ","
         + "}";
     }
 }

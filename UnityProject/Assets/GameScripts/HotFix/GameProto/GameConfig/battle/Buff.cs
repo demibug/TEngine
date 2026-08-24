@@ -35,35 +35,35 @@ public sealed partial class Buff : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 全局唯一 Buff 数字 ID
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 名称
+    /// 稳定英文键
     /// </summary>
     public readonly string Name;
     /// <summary>
-    /// 中文标签
+    /// 中文显示名，可空
     /// </summary>
     public readonly string Label;
     /// <summary>
-    /// 类别
+    /// 类别：0=Numeric 数值型 / 1=State 状态型 / 2=Custom 自定义处理器
     /// </summary>
     public readonly int Kind;
     /// <summary>
-    /// 通道列表
+    /// 通道列表。Numeric：0攻击/1攻速/2范围/3移速/4最大生命/5当前生命/6缩放；State：0禁移动/1禁攻击/2改变选敌/3压制/4伤害脉冲/5击退脉冲/6移动锁定
     /// </summary>
     public readonly System.Collections.Generic.List<int> Channels;
     /// <summary>
-    /// 叠层策略
+    /// 叠层策略，严格填 Add / Refresh / Replace
     /// </summary>
     public readonly string StackPolicy;
     /// <summary>
-    /// 最大层数
+    /// 最大层数，必须大于 0
     /// </summary>
     public readonly int MaxStacks;
     /// <summary>
-    /// 冲突键
+    /// 冲突键，同键的其他 Buff 会被替换；无互斥需求留空
     /// </summary>
     public readonly string ConflictKey;
    

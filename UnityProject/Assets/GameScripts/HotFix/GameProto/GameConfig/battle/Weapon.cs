@@ -21,15 +21,7 @@ public sealed partial class Weapon : Luban.BeanBase
     {
         Id = _buf.ReadInt();
         Type = _buf.ReadInt();
-        Txt = _buf.ReadString();
-        Rarity = _buf.ReadInt();
-        if(_buf.ReadBool()){ RareTxt = _buf.ReadString(); } else { RareTxt = null; }
         AddAttPower = _buf.ReadInt();
-        if(_buf.ReadBool()){ Exclusive = _buf.ReadString(); } else { Exclusive = null; }
-        Scale = _buf.ReadFloat();
-        AnchorY = _buf.ReadFloat();
-        Intro = _buf.ReadString();
-        FragmentNum = _buf.ReadInt();
         Enabled = _buf.ReadBool();
         HandlerKey = _buf.ReadString();
     }
@@ -40,55 +32,23 @@ public sealed partial class Weapon : Luban.BeanBase
     }
 
     /// <summary>
-    /// ID(主键)
+    /// 主键，武器唯一 ID
     /// </summary>
     public readonly int Id;
     /// <summary>
-    /// 类型
+    /// 武器类型：0弓/1枪/2刀/3剑
     /// </summary>
     public readonly int Type;
     /// <summary>
-    /// 名称
-    /// </summary>
-    public readonly string Txt;
-    /// <summary>
-    /// 稀有度
-    /// </summary>
-    public readonly int Rarity;
-    /// <summary>
-    /// 稀有字
-    /// </summary>
-    public readonly string RareTxt;
-    /// <summary>
-    /// 附加攻击力
+    /// 增加攻击力
     /// </summary>
     public readonly int AddAttPower;
     /// <summary>
-    /// 专属
-    /// </summary>
-    public readonly string Exclusive;
-    /// <summary>
-    /// 缩放
-    /// </summary>
-    public readonly float Scale;
-    /// <summary>
-    /// 锚点Y
-    /// </summary>
-    public readonly float AnchorY;
-    /// <summary>
-    /// 简介
-    /// </summary>
-    public readonly string Intro;
-    /// <summary>
-    /// 碎片数
-    /// </summary>
-    public readonly int FragmentNum;
-    /// <summary>
-    /// 是否接入基础武器框架
+    /// 是否正式接入基础武器框架
     /// </summary>
     public readonly bool Enabled;
     /// <summary>
-    /// 武器处理器键(禁用行可空)
+    /// 武器处理器键，启用武器必填，当前基础武器为 Basic
     /// </summary>
     public readonly string HandlerKey;
    
@@ -104,15 +64,7 @@ public sealed partial class Weapon : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "type:" + Type + ","
-        + "txt:" + Txt + ","
-        + "rarity:" + Rarity + ","
-        + "rareTxt:" + RareTxt + ","
         + "addAttPower:" + AddAttPower + ","
-        + "exclusive:" + Exclusive + ","
-        + "scale:" + Scale + ","
-        + "anchorY:" + AnchorY + ","
-        + "intro:" + Intro + ","
-        + "fragmentNum:" + FragmentNum + ","
         + "enabled:" + Enabled + ","
         + "handlerKey:" + HandlerKey + ","
         + "}";

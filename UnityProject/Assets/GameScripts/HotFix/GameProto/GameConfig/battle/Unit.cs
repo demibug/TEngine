@@ -27,7 +27,6 @@ public sealed partial class Unit : Luban.BeanBase
         AttackIntervalSeconds = _buf.ReadFloat();
         DamageMode = _buf.ReadString();
         TargetPolicy = _buf.ReadString();
-        if(_buf.ReadBool()){ Status = _buf.ReadString(); } else { Status = null; }
     }
 
     public static Unit DeserializeUnit(ByteBuf _buf)
@@ -35,18 +34,38 @@ public sealed partial class Unit : Luban.BeanBase
         return new battle.Unit(_buf);
     }
 
-    public readonly int Id;
-    public readonly string Text;
-    public readonly string AnimationKey;
-    public readonly float RangeCells;
-    public readonly int AttackDamage;
-    public readonly float AttackIntervalSeconds;
-    public readonly string DamageMode;
-    public readonly string TargetPolicy;
     /// <summary>
-    /// 状态标注(CORE_COMPLETE)
+    /// 主键，兵种唯一 ID
     /// </summary>
-    public readonly string Status;
+    public readonly int Id;
+    /// <summary>
+    /// 显示名
+    /// </summary>
+    public readonly string Text;
+    /// <summary>
+    /// 动画键，关联 soldier_visual 表取得锚点偏移（knife/bow/pike/cavalry）
+    /// </summary>
+    public readonly string AnimationKey;
+    /// <summary>
+    /// 攻击范围，以格为单位
+    /// </summary>
+    public readonly float RangeCells;
+    /// <summary>
+    /// 基础攻击力
+    /// </summary>
+    public readonly int AttackDamage;
+    /// <summary>
+    /// 攻击间隔，秒
+    /// </summary>
+    public readonly float AttackIntervalSeconds;
+    /// <summary>
+    /// 伤害模式：近战/单体/近战枪击/范围
+    /// </summary>
+    public readonly string DamageMode;
+    /// <summary>
+    /// 选敌策略：nearest（最近）/ closest_end（离终点最近）
+    /// </summary>
+    public readonly string TargetPolicy;
    
     public const int __ID__ = -795481830;
     public override int GetTypeId() => __ID__;
@@ -66,7 +85,6 @@ public sealed partial class Unit : Luban.BeanBase
         + "attackIntervalSeconds:" + AttackIntervalSeconds + ","
         + "damageMode:" + DamageMode + ","
         + "targetPolicy:" + TargetPolicy + ","
-        + "status:" + Status + ","
         + "}";
     }
 }
