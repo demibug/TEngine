@@ -58,7 +58,13 @@ namespace GameBattle
                    && Loadout.RandomSeed == loadout.RandomSeed
                    && Loadout.ConfigVersion == loadout.ConfigVersion
                    && string.Equals(Loadout.ConfigHash, loadout.ConfigHash, StringComparison.Ordinal)
-                   && Loadout.DeckPreset == loadout.DeckPreset;
+                   && Loadout.DeckPreset == loadout.DeckPreset
+                   && Loadout.OpponentMode == loadout.OpponentMode
+                   && Loadout.OpponentAiDifficulty == loadout.OpponentAiDifficulty
+                   && Loadout.Weapons.BowWeaponId == loadout.Weapons.BowWeaponId
+                   && Loadout.Weapons.SpearWeaponId == loadout.Weapons.SpearWeaponId
+                   && Loadout.Weapons.KnifeWeaponId == loadout.Weapons.KnifeWeaponId
+                   && Loadout.Weapons.SwordWeaponId == loadout.Weapons.SwordWeaponId;
         }
 
         /// <summary>

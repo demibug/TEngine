@@ -176,6 +176,9 @@ namespace GameBattle
         /// <summary>下一单位 ID（BattleUnit 分配，递增，不复用）。</summary>
         private int _nextUnitId = 1;
 
+        /// <summary>下一槽位 ID。初始化后动态开垦槽从全部固定槽之后递增，不复用。</summary>
+        private int _nextSlotId;
+
         /// <summary>最大等级（合并上限，来自 UnitLevelConfigSnapshot.MaxLevel）。</summary>
         private readonly int _maxLevel;
 
@@ -233,10 +236,11 @@ namespace GameBattle
             // 玩家待上场槽。
             nextId = CreateReserveSlotsForSide(isPlayerSide: true, reserveSlotCount, nextId);
             // 对手待上场槽。
-            CreateReserveSlotsForSide(isPlayerSide: false, reserveSlotCount, nextId);
+            nextId = CreateReserveSlotsForSide(isPlayerSide: false, reserveSlotCount, nextId);
 
             _initialized = true;
             _revision = 0;
+            _nextSlotId = nextId;
         }
 
         /// <summary>为指定阵营创建战场槽（按地图遍历顺序确定性分配 ID）。</summary>
@@ -315,6 +319,8 @@ namespace GameBattle
                 }
             }
 
+            result.Sort((left, right) => left.SlotId.Id.CompareTo(right.SlotId.Id));
+
             return result;
         }
 
@@ -326,6 +332,8 @@ namespace GameBattle
             {
                 result.Add(slot);
             }
+
+            result.Sort((left, right) => left.SlotId.Id.CompareTo(right.SlotId.Id));
 
             return result;
         }
@@ -352,6 +360,63 @@ namespace GameBattle
         internal BattleUnit? GetOccupant(UnitSlotId slotId)
         {
             return GetSlotById(slotId.Id).Occupant;
+        }
+
+        internal bool TryCommitShovelUse(
+            int sourceSlotId,
+            GridPosition target,
+            out ShovelBoardChange change)
+        {
+            change = default;
+            if (!_initialized
+                || !_slotsById.TryGetValue(sourceSlotId, out UnitSlot source)
+                || source.SlotId.Zone != SlotZone.Reserve
+                || !source.Occupant.HasValue
+                || !source.Occupant.Value.IsShovel
+                || TryFindBattleSlot(source.SlotId.Side, target, out _))
+            {
+                return false;
+            }
+
+            int revisionBefore = _revision;
+            BattleUnit shovel = source.Occupant.Value;
+            int slotIdValue = _nextSlotId;
+            _nextSlotId++;
+            var battleSlotId = new UnitSlotId(
+                slotIdValue,
+                source.SlotId.Side,
+                SlotZone.Battle,
+                target);
+
+            _slotsById[sourceSlotId] = new UnitSlot(source.SlotId, occupant: null);
+            _slotsById.Add(slotIdValue, new UnitSlot(battleSlotId, occupant: null));
+            _revision++;
+            change = new ShovelBoardChange(
+                source.SlotId,
+                shovel,
+                battleSlotId,
+                revisionBefore,
+                _revision);
+            return true;
+        }
+
+        internal bool TryRollbackShovelUse(ShovelBoardChange change)
+        {
+            if (!change.IsValid
+                || _revision != change.RevisionAfter
+                || !_slotsById.TryGetValue(change.SourceSlotId.Id, out UnitSlot source)
+                || source.Occupant.HasValue
+                || !_slotsById.TryGetValue(change.AddedBattleSlotId.Id, out UnitSlot added)
+                || added.SlotId != change.AddedBattleSlotId
+                || added.Occupant.HasValue)
+            {
+                return false;
+            }
+
+            _slotsById[change.SourceSlotId.Id] = new UnitSlot(change.SourceSlotId, change.Shovel);
+            _slotsById.Remove(change.AddedBattleSlotId.Id);
+            _revision++;
+            return true;
         }
 
         /// <summary>
@@ -976,6 +1041,34 @@ namespace GameBattle
             _slotsById.Clear();
             _initialized = false;
             _revision = 0;
+            _nextSlotId = 0;
+        }
+    }
+
+    internal readonly struct ShovelBoardChange
+    {
+        internal readonly UnitSlotId SourceSlotId;
+        internal readonly BattleUnit Shovel;
+        internal readonly UnitSlotId AddedBattleSlotId;
+        internal readonly int RevisionBefore;
+        internal readonly int RevisionAfter;
+        internal bool IsValid => SourceSlotId.IsValid
+                                 && AddedBattleSlotId.IsValid
+                                 && Shovel.IsShovel
+                                 && RevisionAfter > RevisionBefore;
+
+        internal ShovelBoardChange(
+            UnitSlotId sourceSlotId,
+            BattleUnit shovel,
+            UnitSlotId addedBattleSlotId,
+            int revisionBefore,
+            int revisionAfter)
+        {
+            SourceSlotId = sourceSlotId;
+            Shovel = shovel;
+            AddedBattleSlotId = addedBattleSlotId;
+            RevisionBefore = revisionBefore;
+            RevisionAfter = revisionAfter;
         }
     }
 

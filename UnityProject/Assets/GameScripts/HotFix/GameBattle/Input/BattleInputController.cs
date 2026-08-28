@@ -111,6 +111,11 @@ namespace GameBattle
         /// </summary>
         private readonly BattleInternalSignalHub _signalHub;
 
+        /// <summary>单局可变地图状态；模板仍由 BattleConfigSnapshot.Map 持有且不可变。</summary>
+        private readonly BattleMapState _mapState;
+
+        internal BattleMapState MapState => _mapState;
+
         // ====================================================================
         // 局内可变状态
         // ====================================================================
@@ -149,7 +154,8 @@ namespace GameBattle
             BattleEconomy economy,
             UnitRegistry unitRegistry,
             BattleConfigSnapshot configSnapshot,
-            BattleInternalSignalHub signalHub = null)
+            BattleInternalSignalHub signalHub = null,
+            BattleMapState mapState = null)
         {
             _slotBoard = slotBoard ?? throw new ArgumentNullException(nameof(slotBoard));
             _recruitManager = recruitManager ?? throw new ArgumentNullException(nameof(recruitManager));
@@ -158,6 +164,7 @@ namespace GameBattle
             _unitRegistry = unitRegistry ?? throw new ArgumentNullException(nameof(unitRegistry));
             _configSnapshot = configSnapshot ?? throw new ArgumentNullException(nameof(configSnapshot));
             _signalHub = signalHub;
+            _mapState = mapState ?? new BattleMapState(configSnapshot.Map);
 
             _started = false;
         }
@@ -181,6 +188,7 @@ namespace GameBattle
         internal void GameOver()
         {
             _started = false;
+            _mapState.Clear();
         }
 
         /// <summary>
@@ -242,12 +250,99 @@ namespace GameBattle
                 case BattleInputCommandType.DropUnit:
                     return ExecuteDropUnit(command);
 
+                case BattleInputCommandType.UseShovel:
+                    return ExecuteUseShovel(command);
+
                 default:
                     return BattleInputResult.Fail(
                         command.CommandId,
                         BattleInputRejectReason.UnsupportedCommand,
                         $"不支持的命令类型 {command.CommandType}");
             }
+        }
+
+        private BattleInputResult ExecuteUseShovel(BattleInputCommand command)
+        {
+            UseShovelPayload payload = command.UseShovelPayload;
+            if (!_slotBoard.ContainsSlotId(payload.SourceReserveSlotId))
+            {
+                return BattleInputResult.Fail(
+                    command.CommandId,
+                    BattleInputRejectReason.InvalidShovelSource,
+                    $"铲子来源槽 {payload.SourceReserveSlotId} 不存在");
+            }
+
+            UnitSlot source = _slotBoard.GetSlotById(payload.SourceReserveSlotId);
+            if (source.SlotId.Zone != SlotZone.Reserve
+                || !source.Occupant.HasValue
+                || !source.Occupant.Value.IsShovel)
+            {
+                return BattleInputResult.Fail(
+                    command.CommandId,
+                    BattleInputRejectReason.InvalidShovelSource,
+                    $"来源槽 {payload.SourceReserveSlotId} 不是待上场铲子");
+            }
+
+            bool playerSide = source.SlotId.Side;
+            OpenTileRejectReason openReject = _mapState.CanOpenTile(playerSide, payload.Target);
+            if (openReject != OpenTileRejectReason.None)
+            {
+                return MapOpenTileRejection(command.CommandId, openReject, payload.Target);
+            }
+
+            OpenTileResult openResult = _mapState.TryOpenTile(playerSide, payload.Target);
+            if (!openResult.IsSuccess)
+            {
+                return MapOpenTileRejection(command.CommandId, openResult.RejectReason, payload.Target);
+            }
+
+            if (!_slotBoard.TryCommitShovelUse(
+                    payload.SourceReserveSlotId,
+                    payload.Target,
+                    out ShovelBoardChange boardChange))
+            {
+                bool rolledBack = _mapState.TryRollback(openResult.Change);
+                if (!rolledBack)
+                {
+                    Log.Error($"{LogTag} 铲子槽位提交失败且地图回滚失败，target={payload.Target}");
+                }
+
+                return BattleInputResult.Fail(
+                    command.CommandId,
+                    BattleInputRejectReason.ShovelTransactionFailed,
+                    $"铲子槽位事务提交失败，target={payload.Target}");
+            }
+
+            _signalHub?.SlotChanged.Publish(
+                new SlotChangedFact(boardChange.SourceSlotId, occupant: null));
+            _signalHub?.SlotChanged.Publish(
+                new SlotChangedFact(boardChange.AddedBattleSlotId, occupant: null));
+            _signalHub?.TileOpened.Publish(
+                new TileOpenedFact(
+                    playerSide,
+                    payload.Target,
+                    boardChange.SourceSlotId,
+                    boardChange.AddedBattleSlotId));
+
+            return BattleInputResult.Ok(command.CommandId);
+        }
+
+        private static BattleInputResult MapOpenTileRejection(
+            int commandId,
+            OpenTileRejectReason rejectReason,
+            GridPosition target)
+        {
+            BattleInputRejectReason inputReason = rejectReason switch
+            {
+                OpenTileRejectReason.WrongSide => BattleInputRejectReason.ShovelTargetWrongSide,
+                OpenTileRejectReason.AlreadyOpened => BattleInputRejectReason.ShovelTargetAlreadyOpened,
+                _ => BattleInputRejectReason.InvalidShovelTarget,
+            };
+
+            return BattleInputResult.Fail(
+                commandId,
+                inputReason,
+                $"铲子目标 {target} 非法：{rejectReason}");
         }
 
         // ====================================================================
@@ -392,6 +487,17 @@ namespace GameBattle
 
             UnitSlotId sourceSlotId = _slotBoard.GetSlotById(payload.SourceSlotId).SlotId;
             UnitSlotId targetSlotId = _slotBoard.GetSlotById(payload.TargetSlotId).SlotId;
+
+            UnitSlot sourceSlot = _slotBoard.GetSlotById(payload.SourceSlotId);
+            if (sourceSlot.Occupant.HasValue
+                && sourceSlot.Occupant.Value.Kind == UnitKind.Prop
+                && targetSlotId.Zone == SlotZone.Battle)
+            {
+                return BattleInputResult.Fail(
+                    commandId,
+                    BattleInputRejectReason.UnitZoneRestricted,
+                    "道具不能通过普通换槽命令放入战场，请拖到可开垦地图格");
+            }
 
             // 阶段 0：战斗内冷却同步（修复 P0）。
             // 先把源/目标 Battle 槽占用单位的实时冷却写回 Board，避免换格/战场合并

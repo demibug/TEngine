@@ -735,6 +735,32 @@ namespace GameBattle.Tests.EditMode.Enemy
         }
 
         [Test]
+        public void Register_Overkill_ForwardsRawDamageAfterHealthChanged()
+        {
+            MapData map = BuildLinearPathMapData();
+            var mgr = new EnemyManager(GridSize);
+            var order = new List<string>();
+            EnemyDamageViewData damageFact = default;
+            mgr.EnemyHealthChanged += (_, _, _, _) => order.Add("health");
+            mgr.EnemyDamaged += fact =>
+            {
+                order.Add("damage");
+                damageFact = fact;
+            };
+
+            var enemy = CreateMovingEnemy(
+                map, AlwaysTrueTarget,
+                onEnemyKilled: null, id: 12, maxHealth: 3);
+            mgr.Register(enemy);
+
+            enemy.Hit(10, attackerId: 10);
+
+            CollectionAssert.AreEqual(new[] { "health", "damage" }, order);
+            Assert.AreEqual(12, damageFact.RuntimeId);
+            Assert.AreEqual(10, damageFact.RawDamage);
+        }
+
+        [Test]
         [Description("敌人血量归零时 EnemyHealthChanged 转发 current=0，供表现层立即隐藏血条。")]
         public void Register_HitKills_ForwardsZeroHealth()
         {

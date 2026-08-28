@@ -214,6 +214,9 @@ namespace GameBattle
         /// </summary>
         public BattleInputController InputController { get; }
 
+        /// <summary>本局可选的本地对手 AI；未启用时为 null。</summary>
+        internal OpponentAI OpponentAI { get; }
+
         // ====================================================================
         // task 6.10 闭环新增：闭环必需的 Manager / 状态 / 服务
         // --------------------------------------------------------------------
@@ -510,6 +513,7 @@ namespace GameBattle
             UnitFactory = assembly.UnitFactory;
             UnitRegistry = assembly.UnitRegistry;
             InputController = assembly.InputController;
+            OpponentAI = assembly.OpponentAI;
             // task 6.10 闭环新增 Manager / 状态 / 服务
             BattleState = assembly.BattleState;
             BattleManager = assembly.BattleManager;
@@ -664,6 +668,15 @@ namespace GameBattle
             // 确保不跨局保留（spec "Restart creates clean per-battle state"）。
             // 放在 GameOver 之后，使本局后续 Execute（返回未启动失败）不再依赖缓存。
             // ----------------------------------------------------------
+            try
+            {
+                OpponentAI?.Stop();
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"{LogTag} Settling 停止 OpponentAI 异常: {ex}");
+            }
+
             try
             {
                 InputController?.GameOver();
@@ -876,6 +889,15 @@ namespace GameBattle
             // 缓存已在 EnterSettling 步骤 1 清空，此处跳过。
             if (!IsSettling)
             {
+                try
+                {
+                    OpponentAI?.Stop();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"{LogTag} Dispose 停止 OpponentAI 异常: {ex}");
+                }
+
                 try
                 {
                     InputController?.GameOver();

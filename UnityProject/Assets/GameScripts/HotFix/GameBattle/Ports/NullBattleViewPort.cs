@@ -91,10 +91,17 @@ namespace GameBattle
         }
 
         /// <inheritdoc/>
-        /// <remarks>Null 实现：空操作。</remarks>
+        /// <remarks>Null 实现：空操作，不创建伤害飘字表现。</remarks>
         public void OnEnemyRemoved(int runtimeId, bool playDeathEffect)
         {
             // 空操作：不销毁敌人表现对象。
+        }
+
+        /// <inheritdoc/>
+        /// <remarks>Null 实现：空操作，不创建伤害飘字表现。</remarks>
+        public void OnEnemyDamaged(EnemyDamageViewData dto)
+        {
+            // 空操作：纯逻辑运行不创建伤害飘字。
         }
 
         public void OnBossSkillIntent(int runtimeId, string animationKey, bool active)

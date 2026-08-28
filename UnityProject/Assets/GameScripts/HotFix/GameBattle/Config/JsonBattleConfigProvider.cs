@@ -533,6 +533,22 @@ namespace GameBattle
             return new WeaponCatalogSnapshot(definitions);
         }
 
+        private static OpponentAiProfileCatalogSnapshot BuildGoldenOpponentAiProfiles()
+        {
+            int[] incomeWaves = { 3, 5, 8, 11, 14, 17 };
+            return new OpponentAiProfileCatalogSnapshot(new[]
+            {
+                new OpponentAiProfileSnapshot(0, 2000, 10, incomeWaves,
+                    new[] { 0, 0, 0, 0, 0, 0 }, OpponentAiPlacementPolicy.Random, 0),
+                new OpponentAiProfileSnapshot(1, 1500, 10, incomeWaves,
+                    new[] { 0, 0, 0, 0, 0, 0 }, OpponentAiPlacementPolicy.Random, 0),
+                new OpponentAiProfileSnapshot(2, 1000, 10, incomeWaves,
+                    new[] { 10, 10, 10, 10, 10, 10 }, OpponentAiPlacementPolicy.RouteAware, 5),
+                new OpponentAiProfileSnapshot(3, 500, 10, incomeWaves,
+                    new[] { 20, 20, 20, 20, 20, 20 }, OpponentAiPlacementPolicy.RouteAware, 5),
+            });
+        }
+
         /// <summary>
         /// 构造单条黄金武器定义（显式逐字段，不按 id 推导）。
         /// </summary>
@@ -634,7 +650,8 @@ namespace GameBattle
                 buffCatalog: buffCatalog,
                 skillCatalog: skillCatalog,
                 bossCatalog: bossCatalog,
-                weaponCatalog: weaponCatalog);
+                weaponCatalog: weaponCatalog,
+                opponentAiProfiles: BuildGoldenOpponentAiProfiles());
         }
     }
 }

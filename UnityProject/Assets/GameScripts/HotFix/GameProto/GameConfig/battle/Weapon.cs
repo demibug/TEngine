@@ -24,6 +24,14 @@ public sealed partial class Weapon : Luban.BeanBase
         AddAttPower = _buf.ReadInt();
         Enabled = _buf.ReadBool();
         HandlerKey = _buf.ReadString();
+        Rarity = _buf.ReadInt();
+        FragmentNum = _buf.ReadInt();
+        Obtainable = _buf.ReadBool();
+        DisplayName = _buf.ReadString();
+        Description = _buf.ReadString();
+        IconLocation = _buf.ReadString();
+        Recyclable = _buf.ReadBool();
+        RecycleGoldPerFragment = _buf.ReadInt();
     }
 
     public static Weapon DeserializeWeapon(ByteBuf _buf)
@@ -51,6 +59,38 @@ public sealed partial class Weapon : Luban.BeanBase
     /// 武器处理器键，启用武器必填，当前基础武器为 Basic
     /// </summary>
     public readonly string HandlerKey;
+    /// <summary>
+    /// 品级：0白/1绿/2蓝/3紫/4橙
+    /// </summary>
+    public readonly int Rarity;
+    /// <summary>
+    /// 合成一件完整武器所需累计碎片
+    /// </summary>
+    public readonly int FragmentNum;
+    /// <summary>
+    /// 是否进入武器奖励候选池
+    /// </summary>
+    public readonly bool Obtainable;
+    /// <summary>
+    /// 展示名称
+    /// </summary>
+    public readonly string DisplayName;
+    /// <summary>
+    /// 武器说明
+    /// </summary>
+    public readonly string Description;
+    /// <summary>
+    /// 图标资源地址，空表示使用占位图
+    /// </summary>
+    public readonly string IconLocation;
+    /// <summary>
+    /// 是否允许回收
+    /// </summary>
+    public readonly bool Recyclable;
+    /// <summary>
+    /// 每个碎片的回收金币
+    /// </summary>
+    public readonly int RecycleGoldPerFragment;
    
     public const int __ID__ = 94848050;
     public override int GetTypeId() => __ID__;
@@ -67,6 +107,14 @@ public sealed partial class Weapon : Luban.BeanBase
         + "addAttPower:" + AddAttPower + ","
         + "enabled:" + Enabled + ","
         + "handlerKey:" + HandlerKey + ","
+        + "rarity:" + Rarity + ","
+        + "fragmentNum:" + FragmentNum + ","
+        + "obtainable:" + Obtainable + ","
+        + "displayName:" + DisplayName + ","
+        + "description:" + Description + ","
+        + "iconLocation:" + IconLocation + ","
+        + "recyclable:" + Recyclable + ","
+        + "recycleGoldPerFragment:" + RecycleGoldPerFragment + ","
         + "}";
     }
 }

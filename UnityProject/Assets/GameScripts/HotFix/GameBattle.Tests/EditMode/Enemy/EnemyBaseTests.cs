@@ -209,15 +209,19 @@ namespace GameBattle.Tests.EditMode.Enemy
             /// <summary>上次血量变化回调的变化量。</summary>
             public int LastHealthChangedDelta;
 
+            /// <summary>上次血量变化回调携带的原始显示伤害。</summary>
+            public int LastDisplayDamage;
+
             /// <summary>暴露 SetHealthChangedCallback 供测试注入记录回调。</summary>
             internal void SetHealthChangedForTest(Action<int, int, int, int> callback)
             {
-                SetHealthChangedCallback((changedId, current, max, delta) =>
+                SetHealthChangedCallback((changedId, current, max, delta, displayDamage) =>
                 {
                     HealthChangedCount++;
                     LastHealthChangedCurrent = current;
                     LastHealthChangedMax = max;
                     LastHealthChangedDelta = delta;
+                    LastDisplayDamage = displayDamage;
                     callback?.Invoke(changedId, current, max, delta);
                 });
             }
@@ -626,6 +630,36 @@ namespace GameBattle.Tests.EditMode.Enemy
             Assert.AreEqual(70, enemy.LastHealthChangedCurrent, "回调当前血量=70。");
             Assert.AreEqual(100, enemy.LastHealthChangedMax, "回调最大血量=100。");
             Assert.AreEqual(-30, enemy.LastHealthChangedDelta, "回调变化量=-30。");
+            Assert.AreEqual(30, enemy.LastDisplayDamage, "表现值必须保留 Hit 原始伤害。");
+        }
+
+        [Test]
+        public void Hit_Overkill_PreservesRawDisplayDamage()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = CreateMovingEnemy(map, id: 70, isPlayerLane: true, maxHealth: 3);
+            enemy.SetHealthChangedForTest(null);
+
+            enemy.Hit(10, attackerId: 10);
+
+            Assert.AreEqual(-3, enemy.LastHealthChangedDelta, "生命变化只扣除剩余生命。");
+            Assert.AreEqual(10, enemy.LastDisplayDamage, "飘字必须显示过量伤害的原始值。");
+        }
+
+        [Test]
+        public void BuffHealthChange_DoesNotCarryDisplayDamage()
+        {
+            MapData map = BuildLinearPathMapData();
+            var enemy = CreateMovingEnemy(map, id: 71, isPlayerLane: true, maxHealth: 100);
+            enemy.SetHealthChangedForTest(null);
+
+            ((IBuffTarget)enemy).CommitNumericAggregate(
+                BuffNumericChannel.CurrentHealth,
+                -20d,
+                new BuffSourceHandle(1, 10));
+
+            Assert.AreEqual(1, enemy.HealthChangedCount, "Buff 生命变化仍应刷新血条。");
+            Assert.AreEqual(0, enemy.LastDisplayDamage, "Buff 生命变化不得触发普通命中飘字。");
         }
 
         [Test]

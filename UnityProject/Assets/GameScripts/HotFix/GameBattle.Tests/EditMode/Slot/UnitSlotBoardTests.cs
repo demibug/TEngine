@@ -1067,5 +1067,51 @@ namespace GameBattle.Tests.EditMode.Slot
                 "未点击格对应的战场士兵保持不动");
             board.GameOver();
         }
+
+        [Test]
+        public void TryCommitShovelUse_ConsumesReserveAndAppendsEmptyBattleSlot()
+        {
+            var board = new UnitSlotBoard(MaxLevel);
+            board.Initialize(BuildTestMap(), 5);
+            UnitSlot source = board.GetSlots(true, SlotZone.Reserve)[0];
+            Assert.IsTrue(board.ReplaceReserve(true, new BattleUnit[]
+            {
+                BattleUnit.CreateShovel(100, true),
+                MakeKnife(2, 1), MakeKnife(3, 1), MakeKnife(4, 1), MakeKnife(5, 1),
+            }));
+            int highestInitialSlotId = board.GetAllSlots()[board.GetAllSlots().Count - 1].SlotId.Id;
+
+            bool committed = board.TryCommitShovelUse(
+                source.SlotId.Id,
+                new GridPosition(2, 2),
+                out ShovelBoardChange change);
+
+            Assert.IsTrue(committed);
+            Assert.IsTrue(board.GetSlot(source.SlotId).IsEmpty, "铲子源槽应被消费");
+            Assert.Greater(change.AddedBattleSlotId.Id, highestInitialSlotId, "动态槽 ID 必须追加且不碰撞");
+            Assert.AreEqual(new GridPosition(2, 2), change.AddedBattleSlotId.GridPosition);
+            Assert.IsTrue(board.GetSlot(change.AddedBattleSlotId).IsEmpty, "新开格应生成空战场槽");
+            board.GameOver();
+        }
+
+        [Test]
+        public void TryRollbackShovelUse_RestoresShovelButDoesNotReuseSlotId()
+        {
+            var board = new UnitSlotBoard(MaxLevel);
+            board.Initialize(BuildTestMap(), 5);
+            UnitSlot source = board.GetSlots(true, SlotZone.Reserve)[0];
+            Assert.IsTrue(board.ReplaceReserve(true, new BattleUnit[]
+            {
+                BattleUnit.CreateShovel(100, true),
+                MakeKnife(2, 1), MakeKnife(3, 1), MakeKnife(4, 1), MakeKnife(5, 1),
+            }));
+            Assert.IsTrue(board.TryCommitShovelUse(source.SlotId.Id, new GridPosition(2, 2), out ShovelBoardChange first));
+            Assert.IsTrue(board.TryRollbackShovelUse(first));
+            Assert.IsTrue(board.GetSlot(source.SlotId).Occupant.Value.IsShovel);
+
+            Assert.IsTrue(board.TryCommitShovelUse(source.SlotId.Id, new GridPosition(2, 1), out ShovelBoardChange second));
+            Assert.Greater(second.AddedBattleSlotId.Id, first.AddedBattleSlotId.Id, "回滚后不得复用动态槽 ID");
+            board.GameOver();
+        }
     }
 }

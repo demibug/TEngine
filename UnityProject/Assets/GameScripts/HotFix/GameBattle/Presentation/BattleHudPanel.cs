@@ -241,7 +241,10 @@ namespace GameBattle
                 {
                     AddIdentityBadge(card, unit.Value.GeneralName);
                 }
-                AddLevelBadge(card, level);
+                if (!unit.HasValue || unit.Value.Kind != UnitKind.Prop)
+                {
+                    AddLevelBadge(card, level);
+                }
                 return;
             }
 
@@ -267,7 +270,10 @@ namespace GameBattle
             {
                 AddIdentityBadge(card, unit.Value.GeneralName);
             }
-            AddLevelBadge(card, level);
+            if (!unit.HasValue || unit.Value.Kind != UnitKind.Prop)
+            {
+                AddLevelBadge(card, level);
+            }
         }
 
         /// <summary>在待上场卡右下角叠加等级数字（空槽不显示）。</summary>
@@ -381,6 +387,14 @@ namespace GameBattle
                 && reserveSlotIndex < slots.Count
                 && slots[reserveSlotIndex].Occupant.HasValue
                 && slots[reserveSlotIndex].Occupant.Value.Kind == UnitKind.General;
+            bool isShovel = slots != null
+                && reserveSlotIndex >= 0
+                && reserveSlotIndex < slots.Count
+                && slots[reserveSlotIndex].Occupant.HasValue
+                && slots[reserveSlotIndex].Occupant.Value.IsShovel;
+            int sourceSlotId = slots != null && reserveSlotIndex >= 0 && reserveSlotIndex < slots.Count
+                ? slots[reserveSlotIndex].SlotId.Id
+                : -1;
 
             // 复位拖拽柄回到单位主体原位（未命中目标时表现弹回源槽；命中提交由刷新重建卡面）。
             if (reserveSlotIndex >= 0 && reserveSlotIndex < _cards.Count && _cards[reserveSlotIndex] != null)
@@ -403,6 +417,17 @@ namespace GameBattle
 
             int touchId = context.inputEvent?.touchId ?? -1;
             Vector2 stagePosition = Stage.inst.GetTouchPosition(touchId);
+            if (isShovel)
+            {
+                _dragController?.Cancel();
+                BattleInputResult shovelResult = _entryArgs.UseShovel(
+                    sourceSlotId,
+                    stagePosition.x,
+                    stagePosition.y);
+                TryDropUnit(shovelResult);
+                return;
+            }
+
             BattleInputResult? result = _dragController?.EndDrag(stagePosition.x, stagePosition.y, touchId);
             if (isGeneral)
             {
@@ -737,7 +762,7 @@ namespace GameBattle
             }
         }
 
-        /// <summary>提交 DropUnit 命令并刷新槽位表现。</summary>
+        /// <summary>处理拖放类命令结果并刷新槽位表现。</summary>
         private void TryDropUnit(BattleInputResult result)
         {
             if (result.IsSuccess)
@@ -747,7 +772,7 @@ namespace GameBattle
             else
             {
                 Log.Info(
-                    $"[BattleDiagnostic] 换槽结果 rejected={result.RejectReason} " +
+                    $"[BattleDiagnostic] 拖放结果 rejected={result.RejectReason} " +
                     $"message={result.DiagnosticMessage}");
             }
         }
@@ -862,6 +887,7 @@ namespace GameBattle
         internal Func<UniTask<BattleOperationResult>> ExitAsync { get; }
         internal Func<BattleInputResult> Recruit { get; }
         internal Func<int, int, BattleInputResult> DropUnit { get; }
+        internal Func<int, float, float, BattleInputResult> UseShovel { get; }
         internal Func<IReadOnlyList<UnitSlot>> GetPlayerReserveSlots { get; }
         internal ResolveBattleSlotDelegate ResolveBattleSlotForStage { get; }
         internal ResolveBattleSourceDelegate ResolveBattleSourceForStage { get; }
@@ -873,6 +899,7 @@ namespace GameBattle
             Func<UniTask<BattleOperationResult>> exitAsync,
             Func<BattleInputResult> recruit,
             Func<int, int, BattleInputResult> dropUnit,
+            Func<int, float, float, BattleInputResult> useShovel,
             Func<IReadOnlyList<UnitSlot>> getPlayerReserveSlots,
             ResolveBattleSlotDelegate resolveBattleSlotForStage,
             ResolveBattleSourceDelegate resolveBattleSourceForStage,
@@ -883,6 +910,7 @@ namespace GameBattle
             ExitAsync = exitAsync ?? throw new ArgumentNullException(nameof(exitAsync));
             Recruit = recruit ?? throw new ArgumentNullException(nameof(recruit));
             DropUnit = dropUnit ?? throw new ArgumentNullException(nameof(dropUnit));
+            UseShovel = useShovel ?? throw new ArgumentNullException(nameof(useShovel));
             GetPlayerReserveSlots = getPlayerReserveSlots
                 ?? throw new ArgumentNullException(nameof(getPlayerReserveSlots));
             ResolveBattleSlotForStage = resolveBattleSlotForStage

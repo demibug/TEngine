@@ -45,6 +45,9 @@ namespace GameBattle
         /// <para>内部根据目标槽是否为空决定执行换槽还是合并；全程不访问经济模块。</para>
         /// </summary>
         DropUnit = 1,
+
+        /// <summary>消费待上场槽中的铲子并开垦一个地图格。</summary>
+        UseShovel = 2,
     }
 
     /// <summary>
@@ -108,6 +111,21 @@ namespace GameBattle
             => $"DropUnit(SourceSlotId={SourceSlotId}, TargetSlotId={TargetSlotId})";
     }
 
+    public readonly struct UseShovelPayload
+    {
+        public readonly int SourceReserveSlotId;
+        public readonly GridPosition Target;
+
+        public UseShovelPayload(int sourceReserveSlotId, GridPosition target)
+        {
+            SourceReserveSlotId = sourceReserveSlotId;
+            Target = target;
+        }
+
+        public override string ToString()
+            => $"UseShovel(SourceReserveSlotId={SourceReserveSlotId}, Target={Target})";
+    }
+
     /// <summary>
     /// 不可变战斗输入命令。携带单局 <see cref="CommandId"/> 与强类型值载荷。
     /// </summary>
@@ -152,16 +170,21 @@ namespace GameBattle
         /// </summary>
         public readonly DropUnitPayload DropUnitPayload;
 
+        /// <summary>使用铲子载荷。仅当 CommandType=UseShovel 时有效。</summary>
+        public readonly UseShovelPayload UseShovelPayload;
+
         private BattleInputCommand(
             int commandId,
             BattleInputCommandType commandType,
             RecruitPayload recruitPayload,
-            DropUnitPayload dropUnitPayload)
+            DropUnitPayload dropUnitPayload,
+            UseShovelPayload useShovelPayload)
         {
             CommandId = commandId;
             CommandType = commandType;
             RecruitPayload = recruitPayload;
             DropUnitPayload = dropUnitPayload;
+            UseShovelPayload = useShovelPayload;
         }
 
         /// <summary>
@@ -175,6 +198,7 @@ namespace GameBattle
                 commandId,
                 BattleInputCommandType.Recruit,
                 new RecruitPayload(playerSide),
+                default,
                 default);
 
         /// <summary>
@@ -189,7 +213,19 @@ namespace GameBattle
                 commandId,
                 BattleInputCommandType.DropUnit,
                 default,
-                new DropUnitPayload(sourceSlotId, targetSlotId));
+                new DropUnitPayload(sourceSlotId, targetSlotId),
+                default);
+
+        public static BattleInputCommand CreateUseShovel(
+            int commandId,
+            int sourceReserveSlotId,
+            GridPosition target)
+            => new BattleInputCommand(
+                commandId,
+                BattleInputCommandType.UseShovel,
+                default,
+                default,
+                new UseShovelPayload(sourceReserveSlotId, target));
 
         /// <summary>
         /// 判断两个命令是否相等。CommandId 与 CommandType 与全部载荷字段均相同才相等。
@@ -198,7 +234,8 @@ namespace GameBattle
             => CommandId == other.CommandId
                && CommandType == other.CommandType
                && RecruitPayload.Equals(other.RecruitPayload)
-               && DropUnitPayload.Equals(other.DropUnitPayload);
+               && DropUnitPayload.Equals(other.DropUnitPayload)
+               && UseShovelPayload.Equals(other.UseShovelPayload);
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => obj is BattleInputCommand other && Equals(other);
@@ -212,6 +249,7 @@ namespace GameBattle
                 hash = (hash * 397) ^ (int)CommandType;
                 hash = (hash * 397) ^ RecruitPayload.GetHashCode();
                 hash = (hash * 397) ^ DropUnitPayload.GetHashCode();
+                hash = (hash * 397) ^ UseShovelPayload.GetHashCode();
                 return hash;
             }
         }
@@ -231,6 +269,8 @@ namespace GameBattle
                     return $"[BattleInputCommand Id={CommandId} Type=Recruit {RecruitPayload}]";
                 case BattleInputCommandType.DropUnit:
                     return $"[BattleInputCommand Id={CommandId} Type=DropUnit {DropUnitPayload}]";
+                case BattleInputCommandType.UseShovel:
+                    return $"[BattleInputCommand Id={CommandId} Type=UseShovel {UseShovelPayload}]";
                 default:
                     return $"[BattleInputCommand Id={CommandId} Type={CommandType}]";
             }

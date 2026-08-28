@@ -443,9 +443,13 @@ namespace GameBattle
                     BattleFailureStage.RuntimeCreate);
             }
 
+            await _worldHost.PreloadTilePresentationAsync(assembly.ConfigSnapshot.Map);
             _worldHost.ShowPlacementSlots(
-                assembly.ConfigSnapshot.Map,
+                assembly.InputController.MapState,
                 playerSide: true);
+
+            assembly.SignalHub.TileOpened.Subscribe(fact =>
+                _worldHost.ShowPlacementSlots(assembly.InputController.MapState, playerSide: true));
 
             IBattleViewPort viewPort = assembly.ViewPort;
             IBattleAudioPort audioPort = assembly.AudioPort;
@@ -507,6 +511,7 @@ namespace GameBattle
             {
                 runtime.BattleManager.StartGame(startNowMs: 0, spawnStrategyIndex: 0);
                 runtime.InputController.StartGame();
+                runtime.OpponentAI?.StartGame();
                 runtime.Presenter?.NotifyBattleStarted(
                     runtime.BattleState.MaxRounds,
                     runtime.BattleState.PlayerMaxHealth,
@@ -532,6 +537,9 @@ namespace GameBattle
                               ?? BattleInputResult.Fail(0, BattleInputRejectReason.Unknown, "战斗表现层不可用"),
                         (sourceSlotId, targetSlotId) =>
                             runtime.Presenter?.HandleDropUnit(sourceSlotId, targetSlotId)
+                            ?? BattleInputResult.Fail(0, BattleInputRejectReason.Unknown, "战斗表现层不可用"),
+                        (sourceSlotId, stageX, stageY) =>
+                            runtime.Presenter?.HandleUseShovel(sourceSlotId, stageX, stageY)
                             ?? BattleInputResult.Fail(0, BattleInputRejectReason.Unknown, "战斗表现层不可用"),
                         () => runtime.Presenter?.GetSlotSnapshot().GetSlots(isPlayerSide: true, SlotZone.Reserve)
                               ?? (IReadOnlyList<UnitSlot>)Array.Empty<UnitSlot>(),

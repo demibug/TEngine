@@ -4,10 +4,10 @@ namespace GameBattle
     // 任务 3.6：GridCell —— 规范化格子属性值对象
     // ----------------------------------------------------------------------------
     // 职责（design.md 第 1 节）：
-    //   表示规范化格子属性，不保存 Unity GameObject。封装格子类型（通道/可建造/阻挡）
-    //   与可建造阵营等业务语义，供 MapData.GetCell 返回。
+    //   表示规范化格子属性，不保存 Unity GameObject。封装格子类型（通道/可建造/可开垦）
+    //   与格子阵营等业务语义，供 MapData.GetCell 返回。
     //
-    //   还原工程 grid[x][y] 元素为字符串 "kind_lane"（kind: 0=通道, 1=可建造, 2=阻挡；
+    //   还原工程 grid[x][y] 元素为字符串 "kind_lane"（kind: 0=通道, 1=可建造, 2=可开垦；
     //   lane 表示地图半场）。适配层按当前竖屏本机视角把下半场归玩家，业务层不再接触
     //   嵌套数组或字符串编码。
     //
@@ -18,14 +18,14 @@ namespace GameBattle
     // ============================================================================
 
     /// <summary>
-    /// 地图格子类型：通道、可建造、阻挡。
+    /// 地图格子类型：通道、可建造、可开垦。
     /// </summary>
     /// <remarks>
     /// <para>对应还原工程 <c>grid[x][y]</c> 元素字符串 "kind_lane" 的 kind 维度：</para>
     /// <list type="bullet">
     /// <item><c>Passage</c>：kind=0，通道（可行走，不可建造）。</item>
     /// <item><c>Buildable</c>：kind=1，可建造格。</item>
-    /// <item><c>Blocked</c>：kind=2，阻挡格（不可行走、不可建造）。</item>
+    /// <item><c>Cultivable</c>：kind=2，未开垦草地（不可行走、不可建造，可被同阵营铲子开垦）。</item>
     /// </list>
     /// </remarks>
     public enum GridCellKind
@@ -36,23 +36,27 @@ namespace GameBattle
         /// <summary>可建造格。对应 kind=1。</summary>
         Buildable = 1,
 
-        /// <summary>阻挡格（不可行走、不可建造）。对应 kind=2。</summary>
-        Blocked = 2,
+        /// <summary>未开垦草地（不可行走、不可建造）。对应 kind=2。</summary>
+        Cultivable = 2,
+
+        /// <summary>兼容旧调用；kind=2 的领域语义为 <see cref="Cultivable"/>。</summary>
+        Blocked = Cultivable,
     }
 
     /// <summary>
-    /// 可建造格所属阵营。
+    /// 可建造格或可开垦草地所属阵营。
     /// </summary>
     /// <remarks>
     /// <para>对应还原工程 <c>grid[x][y]</c> 元素字符串 "kind_lane" 的 lane 维度；
-    /// 适配层已把下半场规范化为玩家方。只有 <see cref="GridCellKind.Buildable"/> 格才有阵营归属。</para>
+    /// 适配层已把 lane=0 规范化为玩家方、lane=1 规范化为对手方。
+    /// <see cref="GridCellKind.Buildable"/> 与 <see cref="GridCellKind.Cultivable"/> 保留阵营归属。</para>
     /// </remarks>
     public enum BuildableSide
     {
-        /// <summary>对手方可建造格（lane=0）。</summary>
+        /// <summary>对手方格子（lane=1）。</summary>
         Opponent = 0,
 
-        /// <summary>玩家方可建造格（lane=1）。</summary>
+        /// <summary>玩家方格子（lane=0）。</summary>
         Player = 1,
 
         /// <summary>无阵营归属（非可建造格使用）。</summary>
@@ -75,7 +79,7 @@ namespace GameBattle
         public readonly GridCellKind Kind;
 
         /// <summary>
-        /// 可建造格所属阵营；非可建造格为 <see cref="BuildableSide.None"/>。
+        /// 可建造格或可开垦草地所属阵营；通道为 <see cref="BuildableSide.None"/>。
         /// </summary>
         public readonly BuildableSide Side;
 
@@ -83,11 +87,13 @@ namespace GameBattle
         /// 构造一个格子属性。
         /// </summary>
         /// <param name="kind">格子类型。</param>
-        /// <param name="side">可建造格所属阵营；非可建造格应传 <see cref="BuildableSide.None"/>。</param>
+        /// <param name="side">可建造格或可开垦草地所属阵营；通道应传 <see cref="BuildableSide.None"/>。</param>
         public GridCell(GridCellKind kind, BuildableSide side)
         {
             Kind = kind;
-            Side = kind == GridCellKind.Buildable ? side : BuildableSide.None;
+            Side = kind == GridCellKind.Buildable || kind == GridCellKind.Cultivable
+                ? side
+                : BuildableSide.None;
         }
 
         /// <summary>
@@ -101,9 +107,20 @@ namespace GameBattle
         public bool IsBuildable => Kind == GridCellKind.Buildable;
 
         /// <summary>
+        /// 是否为未开垦草地。
+        /// </summary>
+        public bool IsCultivable => Kind == GridCellKind.Cultivable;
+
+        /// <summary>
         /// 是否为阻挡格。
         /// </summary>
-        public bool IsBlocked => Kind == GridCellKind.Blocked;
+        public bool IsBlocked => Kind == GridCellKind.Cultivable;
+
+        /// <summary>指定阵营是否拥有本格。</summary>
+        public bool BelongsToSide(bool playerSide)
+        {
+            return playerSide ? Side == BuildableSide.Player : Side == BuildableSide.Opponent;
+        }
 
         /// <summary>
         /// 指定阵营是否可在本格建造。
@@ -117,7 +134,7 @@ namespace GameBattle
                 return false;
             }
 
-            return playerSide ? Side == BuildableSide.Player : Side == BuildableSide.Opponent;
+            return BelongsToSide(playerSide);
         }
 
         /// <summary>

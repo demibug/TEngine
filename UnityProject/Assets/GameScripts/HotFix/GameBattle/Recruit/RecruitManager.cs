@@ -50,7 +50,10 @@ namespace GameBattle
         // ====================================================================
 
         /// <summary>确定性随机源（非 null）。从 RecruitDefinitions.BaseSoldierTexts 均匀抽取。</summary>
-        private readonly IRandomSource _randomSource;
+        private readonly IRandomSource _playerRandomSource;
+
+        /// <summary>对手征兵独占随机流，避免 AI 行为改变玩家征兵序列。</summary>
+        private readonly IRandomSource _opponentRandomSource;
 
         /// <summary>槽位面板（非 null）。征兵批次单位 ID 由它分配。</summary>
         private readonly UnitSlotBoard _slotBoard;
@@ -60,6 +63,10 @@ namespace GameBattle
 
         /// <summary>仅玩家侧参与加权抽取的武将字条目。</summary>
         private readonly IReadOnlyList<GeneralPartRecruitEntry> _partRecruitEntries;
+
+        /// <summary>是否在玩家本局首批征兵中固定注入一把铲子。</summary>
+        private readonly bool _includeInitialPlayerShovel;
+        private bool _initialPlayerShovelIssued;
 
         // ====================================================================
         // 构造
@@ -75,12 +82,35 @@ namespace GameBattle
             IRandomSource randomSource,
             UnitSlotBoard slotBoard,
             int reserveSlotCount,
-            IReadOnlyList<GeneralPartRecruitEntry> partRecruitEntries = null)
+            IReadOnlyList<GeneralPartRecruitEntry> partRecruitEntries = null,
+            bool includeInitialPlayerShovel = false)
+            : this(
+                randomSource,
+                randomSource,
+                slotBoard,
+                reserveSlotCount,
+                partRecruitEntries,
+                includeInitialPlayerShovel)
         {
-            _randomSource = randomSource ?? throw new ArgumentNullException(nameof(randomSource));
+        }
+
+        /// <summary>构造使用双方独立随机流的生产征兵服务。</summary>
+        internal RecruitManager(
+            IRandomSource playerRandomSource,
+            IRandomSource opponentRandomSource,
+            UnitSlotBoard slotBoard,
+            int reserveSlotCount,
+            IReadOnlyList<GeneralPartRecruitEntry> partRecruitEntries = null,
+            bool includeInitialPlayerShovel = false)
+        {
+            _playerRandomSource = playerRandomSource
+                ?? throw new ArgumentNullException(nameof(playerRandomSource));
+            _opponentRandomSource = opponentRandomSource
+                ?? throw new ArgumentNullException(nameof(opponentRandomSource));
             _slotBoard = slotBoard ?? throw new ArgumentNullException(nameof(slotBoard));
             _reserveSlotCount = reserveSlotCount > 0 ? reserveSlotCount : RecruitDefinitions.ReserveSlotCount;
             _partRecruitEntries = partRecruitEntries ?? Array.Empty<GeneralPartRecruitEntry>();
+            _includeInitialPlayerShovel = includeInitialPlayerShovel;
         }
 
         // ====================================================================
@@ -103,6 +133,16 @@ namespace GameBattle
             var batch = new List<BattleUnit>(_reserveSlotCount);
             for (int i = 0; i < _reserveSlotCount; i++)
             {
+                if (i == 0
+                    && isPlayerSide
+                    && _includeInitialPlayerShovel
+                    && !_initialPlayerShovelIssued)
+                {
+                    batch.Add(BattleUnit.CreateShovel(_slotBoard.AllocateUnitId(), side: true));
+                    _initialPlayerShovelIssued = true;
+                    continue;
+                }
+
                 batch.Add(GenerateSingle(isPlayerSide));
             }
 
@@ -124,7 +164,10 @@ namespace GameBattle
                 }
             }
 
-            float r = _randomSource.NextUnit();
+            IRandomSource randomSource = isPlayerSide
+                ? _playerRandomSource
+                : _opponentRandomSource;
+            float r = randomSource.NextUnit();
             int selected = (int)Math.Floor(r * totalWeight);
             if (selected < 0)
             {

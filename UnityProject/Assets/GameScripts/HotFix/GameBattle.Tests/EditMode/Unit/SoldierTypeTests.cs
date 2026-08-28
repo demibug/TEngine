@@ -910,7 +910,7 @@ namespace GameBattle.Tests.EditMode.Unit
         // ====================================================================
 
         [Test]
-        [Description("弓兵释放前原目标死亡且存在替代目标 → 只发射一支箭。")]
+        [Description("弓兵释放前原目标死亡且小角度锥形内存在替代目标 → 只发射一支箭且保持开弓朝向。")]
         public void BowRelease_PreferredDead_HasAlternative_FiresOneArrow()
         {
             ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
@@ -926,14 +926,73 @@ namespace GameBattle.Tests.EditMode.Unit
 
             // 初始目标为 first，释放前 first 死亡。
             soldier.Attack(InitialTarget(first));
+            float lockedAimAngle = soldier.BodyRotationDegrees;
             first.GameOver();
 
             // 0.8s × 17 / 30 ≈ 454ms。
             effectManager.Update(454);
 
             Assert.AreEqual(1, projManager.ActiveCount, "释放点应只创建 1 支箭（回退到替代目标）");
+            Assert.AreEqual(lockedAimAngle, soldier.BodyRotationDegrees, 0.0001f,
+                "释放点小角度换靶不应改变本轮攻击动画的锁定朝向");
             Assert.AreEqual(1, effectManager.ActiveCount,
                 "ReleaseEffect 完成后管理器中应只剩新建箭矢对应的 ProjectileAttackEffect");
+        }
+
+        [Test]
+        [Description("原目标死亡且替代目标位于锁定方向锥形外 → 本轮不发箭且角色不转身。")]
+        public void BowRelease_PreferredDead_AlternativeOutsideAimCone_NoArrowAndKeepsRotation()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy first = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+            CreateAndRegisterEnemy(enemyManager, id: 2, x: 200f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            soldier.Attack(InitialTarget(first));
+            float lockedAimAngle = soldier.BodyRotationDegrees;
+            first.GameOver();
+
+            effectManager.Update(454);
+
+            Assert.AreEqual(0, projManager.ActiveCount, "锥形外目标不应触发中途转身发箭");
+            Assert.AreEqual(0, effectManager.ActiveCount, "空射后 ReleaseEffect 应正常完成");
+            Assert.AreEqual(lockedAimAngle, soldier.BodyRotationDegrees, 0.0001f,
+                "拒绝锥形外目标时应保持开弓朝向");
+        }
+
+        [Test]
+        [Description("稳定顺序首个替代目标在锥形外时，应继续查找后续锥形内目标。")]
+        public void BowRelease_PreferredDead_SkipsOutsideConeAndUsesLaterCompatibleTarget()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy first = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+            CreateAndRegisterEnemy(enemyManager, id: 2, x: 200f, y: 300f);
+            CreateAndRegisterEnemy(enemyManager, id: 3, x: 620f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            soldier.Attack(InitialTarget(first));
+            float lockedAimAngle = soldier.BodyRotationDegrees;
+            first.GameOver();
+
+            effectManager.Update(454);
+
+            Assert.AreEqual(1, projManager.ActiveCount, "应找到后续锥形内目标并只发射一箭");
+            ProjectileBase arrow = projManager.GetProjectilesSnapshot()[0];
+            Assert.AreEqual(3, arrow.TargetId, "应跳过锥形外的稳定首候选并选择锥形内目标");
+            Assert.AreEqual(lockedAimAngle, soldier.BodyRotationDegrees, 0.0001f,
+                "释放点换靶后角色朝向仍应保持锁定");
         }
 
         [Test]
@@ -979,6 +1038,64 @@ namespace GameBattle.Tests.EditMode.Unit
             effectManager.Update(454);
 
             Assert.AreEqual(1, projManager.ActiveCount, "首选有效时应只发射 1 支箭");
+        }
+
+        [Test]
+        [Description("首选目标释放前移动到不同方向仍保持锁定动画朝向，箭矢继续追踪首选目标。")]
+        public void BowRelease_PreferredValidMoved_FiresAndKeepsLockedAnimationAim()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy first = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+
+            soldier.Attack(InitialTarget(first));
+            float lockedAimAngle = soldier.BodyRotationDegrees;
+            first.XValue = 200f;
+
+            effectManager.Update(454);
+
+            Assert.AreEqual(1, projManager.ActiveCount, "首选仍有效时应正常发射");
+            ProjectileBase arrow = projManager.GetProjectilesSnapshot()[0];
+            Assert.AreEqual(1, arrow.TargetId, "首选仍有效时不应切换目标");
+            Assert.AreEqual(lockedAimAngle, soldier.BodyRotationDegrees, 0.0001f,
+                "首选移动不应让完整 2D 攻击序列在释放帧突然转身");
+        }
+
+        [Test]
+        [Description("远程攻击参数选择 UpdateAtRelease 时，释放点按最终目标刷新人物朝向。")]
+        public void BowLaunch_VisualAimPolicyUpdateAtRelease_RefreshesBodyRotation()
+        {
+            ProjectileFactory factory = CreateFactory(out _, out var enemyManager);
+            var projManager = new ProjectileManager(factory);
+            var resolver = new AttackResolver();
+            var effectManager = new AttackEffectManager();
+            TestEnemy first = CreateAndRegisterEnemy(enemyManager, id: 1, x: 600f, y: 300f);
+            TestEnemy second = CreateAndRegisterEnemy(enemyManager, id: 2, x: 200f, y: 300f);
+
+            BowSoldier soldier = SetupBowSoldier(
+                enemyManager, resolver, effectManager, factory, projManager,
+                attackIntervalSeconds: 0.8f);
+            soldier.Attack(InitialTarget(first));
+            float initialAimAngle = soldier.BodyRotationDegrees;
+            var parameters = new RangedAttackParameters(
+                animationFrameCount: 30,
+                releaseFrameIndex: 17,
+                lostTargetPolicy: RangedLostTargetPolicy.RetargetAnyInRange,
+                retargetConeDegrees: 180f,
+                visualAimPolicy: RangedVisualAimPolicy.UpdateAtRelease,
+                projectileCurveHeight: 120f,
+                defaultProjectileSpeedScale: 1.75f);
+
+            soldier.LaunchArrow(InitialTarget(second), soldier.CenterX, soldier.CenterY, parameters);
+
+            Assert.AreNotEqual(initialAimAngle, soldier.BodyRotationDegrees,
+                "UpdateAtRelease 应允许需要持续瞄准的远程攻击在释放点刷新朝向");
         }
 
         [Test]

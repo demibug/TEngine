@@ -179,6 +179,25 @@ namespace GameBattle.Tests.EditMode.Recruit
             }
         }
 
+        [Test]
+        public void GenerateBatch_InitialPlayerShovel_IsIssuedExactlyOnceAndNeverToOpponent()
+        {
+            var recruit = new RecruitManager(
+                new SeededRandomSource(11),
+                _slotBoard,
+                reserveSlotCount: 5,
+                includeInitialPlayerShovel: true);
+
+            IReadOnlyList<BattleUnit> opponent = recruit.GenerateBatch(isPlayerSide: false);
+            IReadOnlyList<BattleUnit> firstPlayer = recruit.GenerateBatch(isPlayerSide: true);
+            IReadOnlyList<BattleUnit> secondPlayer = recruit.GenerateBatch(isPlayerSide: true);
+
+            Assert.IsFalse(opponent[0].IsShovel);
+            Assert.IsTrue(firstPlayer[0].IsShovel);
+            Assert.AreEqual(UnitKind.Prop, firstPlayer[0].Kind);
+            Assert.IsFalse(secondPlayer[0].IsShovel);
+        }
+
         private sealed class FixedRandomSource : IRandomSource
         {
             private readonly float _value;

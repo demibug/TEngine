@@ -41,15 +41,15 @@ namespace GameBattle.Tests.EditMode.Map
         /// </summary>
         /// <remarks>
         /// <para>使用与还原工程一致的 "kind_lane" 字符串编码：
-        /// kind: 0=通道, 1=可建造, 2=阻挡；lane: 1=玩家, 0=对手。</para>
+        /// kind: 0=通道, 1=可建造, 2=可开垦；lane: 0=玩家, 1=对手。</para>
         /// <para>本测试地图故意在特定坐标放置可辨识的格子，用于断言 GetCell(x, y)
         /// 严格按 x=列、y=行 索引，不发生转置。</para>
         /// <para>布局概要（x=列 0..7，y=行 0..9）：</para>
         /// <list type="bullet">
         /// <item>(0, 0) = "0_1" 通道（玩家 lane）</item>
-        /// <item>(1, 0) = "1_1" 玩家可建造</item>
-        /// <item>(0, 1) = "1_0" 对手可建造</item>
-        /// <item>(7, 9) = "2_0" 阻挡</item>
+        /// <item>(1, 0) = "1_1" 对手可建造</item>
+        /// <item>(0, 1) = "1_0" 玩家可建造</item>
+        /// <item>(7, 9) = "2_0" 玩家可开垦</item>
         /// <item>(7, 0) = "0_0" 通道（对手 lane）</item>
         /// <item>(0, 9) = "0_0" 通道</item>
         /// <item>其余默认 "0_1" 通道或 "2_0" 阻挡</item>
@@ -73,14 +73,14 @@ namespace GameBattle.Tests.EditMode.Map
 
             // 标记点（与 GetCell 转置断言配合）。
             grid[0][0] = "0_1"; // 通道，玩家 lane
-            grid[1][0] = "1_1"; // 玩家可建造（列 1, 行 0）
-            grid[0][1] = "1_0"; // 对手可建造（列 0, 行 1）
+            grid[1][0] = "1_1"; // 对手可建造（列 1, 行 0）
+            grid[0][1] = "1_0"; // 玩家可建造（列 0, 行 1）
             grid[7][0] = "0_0"; // 通道，对手 lane
             grid[0][9] = "0_0"; // 通道
-            grid[7][9] = "2_0"; // 阻挡
+            grid[7][9] = "2_0"; // 玩家可开垦
             // 中间留若干通道
             grid[4][5] = "0_1";
-            grid[5][5] = "1_1"; // 玩家可建造（列 5, 行 5）
+            grid[5][5] = "1_1"; // 对手可建造（列 5, 行 5）
 
             var readonlyGrid = new List<IReadOnlyList<string>>(grid.Count);
             for (int i = 0; i < grid.Count; i++)
@@ -98,26 +98,27 @@ namespace GameBattle.Tests.EditMode.Map
         {
             if (string.IsNullOrEmpty(code))
             {
-                return new GridCell(GridCellKind.Blocked, BuildableSide.None);
+                return new GridCell(GridCellKind.Cultivable, BuildableSide.None);
             }
 
             string[] parts = code.Split('_');
             if (parts.Length != 2 || !int.TryParse(parts[0], out int kind) || !int.TryParse(parts[1], out int lane))
             {
-                return new GridCell(GridCellKind.Blocked, BuildableSide.None);
+                return new GridCell(GridCellKind.Cultivable, BuildableSide.None);
             }
 
             GridCellKind cellKind = kind switch
             {
                 0 => GridCellKind.Passage,
                 1 => GridCellKind.Buildable,
-                _ => GridCellKind.Blocked,
+                2 => GridCellKind.Cultivable,
+                _ => GridCellKind.Cultivable,
             };
 
             BuildableSide side = lane switch
             {
-                1 => BuildableSide.Player,
-                0 => BuildableSide.Opponent,
+                0 => BuildableSide.Player,
+                1 => BuildableSide.Opponent,
                 _ => BuildableSide.None,
             };
 
@@ -203,23 +204,25 @@ namespace GameBattle.Tests.EditMode.Map
             Assert.IsTrue(opponentBuildable.IsBuildableForSide(false), "对手可建造格对对手方应可建造。");
             Assert.IsFalse(opponentBuildable.IsBuildableForSide(true), "对手可建造格对玩家方不可建造。");
 
-            var blocked = new GridCell(GridCellKind.Blocked, BuildableSide.None);
-            Assert.IsTrue(blocked.IsBlocked, "Blocked 类型 IsBlocked=true。");
-            Assert.IsFalse(blocked.IsWalkable, "阻挡格不可行走。");
-            Assert.IsFalse(blocked.IsBuildable, "阻挡格不可建造。");
+            var cultivable = new GridCell(GridCellKind.Cultivable, BuildableSide.Player);
+            Assert.IsTrue(cultivable.IsCultivable, "Cultivable 类型 IsCultivable=true。");
+            Assert.IsTrue(cultivable.IsBlocked, "可开垦草地兼容 IsBlocked=true。");
+            Assert.AreEqual(BuildableSide.Player, cultivable.Side, "可开垦草地应保留阵营。");
+            Assert.IsFalse(cultivable.IsWalkable, "可开垦草地不可行走。");
+            Assert.IsFalse(cultivable.IsBuildable, "开垦前不可建造。");
         }
 
         [Test]
-        [Description("GridCell 非 Buildable 类型强制 Side=None，避免误用阵营。")]
-        public void GridCell_NonBuildable_ForcesNoneSide()
+        [Description("GridCell 通道强制 Side=None，可开垦草地保留阵营。")]
+        public void GridCell_SideNormalization_MatchesCellKind()
         {
             // 构造时传 Player，但 kind 非 Buildable，应被强制为 None。
             var passage = new GridCell(GridCellKind.Passage, BuildableSide.Player);
             Assert.AreEqual(BuildableSide.None, passage.Side, "非 Buildable 格 Side 应为 None。");
             Assert.IsFalse(passage.IsBuildableForSide(true), "通道格不应可建造。");
 
-            var blocked = new GridCell(GridCellKind.Blocked, BuildableSide.Opponent);
-            Assert.AreEqual(BuildableSide.None, blocked.Side, "非 Buildable 格 Side 应为 None。");
+            var cultivable = new GridCell(GridCellKind.Cultivable, BuildableSide.Opponent);
+            Assert.AreEqual(BuildableSide.Opponent, cultivable.Side, "Cultivable 格应保留阵营。");
         }
 
         // ====================================================================
@@ -302,16 +305,15 @@ namespace GameBattle.Tests.EditMode.Map
         {
             MapData map = BuildAsymmetricMapData();
 
-            // 关键转置证明：源 grid[1][0] = "1_1"（玩家可建造），grid[0][1] = "1_0"（对手可建造）。
-            // 若发生转置，GetCell(1, 0) 会错误返回对手可建造，GetCell(0, 1) 会错误返回玩家可建造。
+            // 关键转置证明：源 grid[1][0] = "1_1"（对手可建造），grid[0][1] = "1_0"（玩家可建造）。
             GridCell cell10 = map.GetCell(1, 0);
             GridCell cell01 = map.GetCell(0, 1);
 
             Assert.AreEqual(GridCellKind.Buildable, cell10.Kind, "GetCell(1,0) 应为可建造（源 grid[1][0]='1_1'）。");
-            Assert.AreEqual(BuildableSide.Player, cell10.Side, "GetCell(1,0) 应为玩家方（源 grid[1][0]='1_1' lane=1）。");
+            Assert.AreEqual(BuildableSide.Opponent, cell10.Side, "GetCell(1,0) 应为对手方（源 grid[1][0]='1_1' lane=1）。");
 
             Assert.AreEqual(GridCellKind.Buildable, cell01.Kind, "GetCell(0,1) 应为可建造（源 grid[0][1]='1_0'）。");
-            Assert.AreEqual(BuildableSide.Opponent, cell01.Side, "GetCell(0,1) 应为对手方（源 grid[0][1]='1_0' lane=0）。");
+            Assert.AreEqual(BuildableSide.Player, cell01.Side, "GetCell(0,1) 应为玩家方（源 grid[0][1]='1_0' lane=0）。");
 
             // 交叉断言：两者不等，证明 (1,0) 与 (0,1) 未被互换。
             Assert.AreNotEqual(cell10, cell01, "(1,0) 与 (0,1) 格子属性应不同——若相同说明发生转置。");
@@ -322,13 +324,14 @@ namespace GameBattle.Tests.EditMode.Map
             Assert.IsTrue(map.GetCell(7, 0).IsPassage, "GetCell(7,0) 应为通道（源 grid[7][0]='0_0'）。");
             Assert.IsTrue(map.GetCell(0, 9).IsPassage, "GetCell(0,9) 应为通道（源 grid[0][9]='0_0'）。");
 
-            // 源 grid[7][9] = "2_0"（阻挡）。
-            Assert.IsTrue(map.GetCell(7, 9).IsBlocked, "GetCell(7,9) 应为阻挡（源 grid[7][9]='2_0'）。");
+            // 源 grid[7][9] = "2_0"（玩家可开垦）。
+            Assert.IsTrue(map.GetCell(7, 9).IsCultivable, "GetCell(7,9) 应为可开垦草地。");
+            Assert.AreEqual(BuildableSide.Player, map.GetCell(7, 9).Side);
 
-            // 源 grid[5][5] = "1_1"（玩家可建造）。
+            // 源 grid[5][5] = "1_1"（对手可建造）。
             GridCell cell55 = map.GetCell(5, 5);
             Assert.AreEqual(GridCellKind.Buildable, cell55.Kind, "GetCell(5,5) 应为可建造。");
-            Assert.AreEqual(BuildableSide.Player, cell55.Side, "GetCell(5,5) 应为玩家方。");
+            Assert.AreEqual(BuildableSide.Opponent, cell55.Side, "GetCell(5,5) 应为对手方。");
 
             // 源 grid[4][5] = "0_1"（通道，玩家 lane）。
             Assert.IsTrue(map.GetCell(4, 5).IsPassage, "GetCell(4,5) 应为通道。");
@@ -382,15 +385,15 @@ namespace GameBattle.Tests.EditMode.Map
             MapData map = BuildAsymmetricMapData();
 
             // (1,0) 玩家可建造
-            Assert.IsTrue(map.IsBuildableForSide(true, 1, 0), "(1,0) 玩家可建造。");
-            Assert.IsFalse(map.IsBuildableForSide(false, 1, 0), "(1,0) 对手不可建造。");
+            Assert.IsFalse(map.IsBuildableForSide(true, 1, 0), "(1,0) 玩家不可建造。");
+            Assert.IsTrue(map.IsBuildableForSide(false, 1, 0), "(1,0) 对手可建造。");
 
             // (0,1) 对手可建造
-            Assert.IsFalse(map.IsBuildableForSide(true, 0, 1), "(0,1) 玩家不可建造。");
-            Assert.IsTrue(map.IsBuildableForSide(false, 0, 1), "(0,1) 对手可建造。");
+            Assert.IsTrue(map.IsBuildableForSide(true, 0, 1), "(0,1) 玩家可建造。");
+            Assert.IsFalse(map.IsBuildableForSide(false, 0, 1), "(0,1) 对手不可建造。");
 
             // (5,5) 玩家可建造
-            Assert.IsTrue(map.IsBuildableForSide(true, 5, 5), "(5,5) 玩家可建造。");
+            Assert.IsTrue(map.IsBuildableForSide(false, 5, 5), "(5,5) 对手可建造。");
 
             // 通道与阻挡格对任一阵营均不可建造
             Assert.IsFalse(map.IsBuildableForSide(true, 0, 0), "(0,0) 通道不可建造。");

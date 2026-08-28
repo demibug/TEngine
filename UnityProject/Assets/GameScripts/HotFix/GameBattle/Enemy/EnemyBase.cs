@@ -324,10 +324,11 @@ namespace GameBattle
 
         /// <summary>
         /// 血量变化回调（受击扣血成功后触发，供 EnemyManager 转发低频表现事实）。
-        /// <para>参数依次为：运行时 ID / 当前血量 / 最大血量 / 变化量（负=受伤）。
+        /// <para>参数依次为：运行时 ID / 当前血量 / 最大血量 / 变化量（负=受伤）/
+        /// 显示伤害（本次 Hit 原始伤害，非 Hit 路径如 Buff 生命变化时为 0）。
         /// 由 <see cref="SetHealthChangedCallback"/> 注入，避免本类型直接引用 EnemyManager。</para>
         /// </summary>
-        private Action<int, int, int, int> _onHealthChanged;
+        private Action<int, int, int, int, int> _onHealthChanged;
 
         // ====================================================================
         // IEnemyEntity 只读属性（供 EnemyManager 访问）
@@ -649,14 +650,14 @@ namespace GameBattle
         /// 注入血量变化回调。由 EnemyManager 在登记敌人后调用，受击扣血成功后触发。
         /// </summary>
         /// <param name="onHealthChanged">
-        /// 血量变化回调（参数：运行时 ID / 当前血量 / 最大血量 / 变化量）。
+        /// 血量变化回调（参数：运行时 ID / 当前血量 / 最大血量 / 变化量 / 显示伤害）。
         /// 传 null 表示清除回调（池回收时）。</param>
         /// <remarks>
         /// <para>不并入 <see cref="Configure"/>：Configure 在 spawn 时由外部反射调用，
         /// 而本回调在登记阶段（EnemyManager.Register）注入，二者职责分离。
         /// 回调只读血量值，不回写规则状态（design 决策 4：一致性操作使用直接调用）。</para>
         /// </remarks>
-        internal void SetHealthChangedCallback(Action<int, int, int, int> onHealthChanged)
+        internal void SetHealthChangedCallback(Action<int, int, int, int, int> onHealthChanged)
         {
             _onHealthChanged = onHealthChanged;
         }
@@ -775,7 +776,7 @@ namespace GameBattle
             _currentHealth = previousHealth <= 0
                 ? 0
                 : Math.Max(0, _maxHealth - missingHealth);
-            CommitHealthChange(previousHealth, attackerId);
+            CommitHealthChange(previousHealth, attackerId, 0);
         }
 
         private void CommitCurrentHealthModifier(int modifier, int attackerId)
@@ -788,7 +789,7 @@ namespace GameBattle
                 _currentHealth = ClampHealth((long)previousHealth + delta);
             }
 
-            CommitHealthChange(previousHealth, attackerId);
+            CommitHealthChange(previousHealth, attackerId, 0);
         }
 
         private int ClampHealth(long value)
@@ -1263,9 +1264,10 @@ namespace GameBattle
             }
 
             // 扣血，不低于 0（EnemyBase.js:460-461）。
+            // displayDamage=damage：飘字显示 Hit 原始伤害（含过量伤害），而非实际生命 delta。
             int previousHealth = _currentHealth;
             _currentHealth = Math.Max(0, _currentHealth - damage);
-            CommitHealthChange(previousHealth, attackerId);
+            CommitHealthChange(previousHealth, attackerId, damage);
 
             return true;
         }
@@ -1275,7 +1277,7 @@ namespace GameBattle
         /// </summary>
         internal bool TakeDamage(int damage, int attackerId) => Hit(damage, attackerId);
 
-        private void CommitHealthChange(int previousHealth, int attackerId)
+        private void CommitHealthChange(int previousHealth, int attackerId, int displayDamage)
         {
             if (_currentHealth < previousHealth
                 && attackerId > 0
@@ -1284,11 +1286,14 @@ namespace GameBattle
                 _damageContributors.Add(attackerId);
             }
 
+            // 顺序契约：HealthChanged（含显示伤害）→ 死亡/击杀/移除。
+            // displayDamage=0 表示非 Hit 路径（Buff 生命变化），表现层据此不飘字。
             _onHealthChanged?.Invoke(
                 _id,
                 _currentHealth,
                 _maxHealth,
-                _currentHealth - previousHealth);
+                _currentHealth - previousHealth,
+                displayDamage);
 
             if (previousHealth <= 0 || _currentHealth > 0)
             {

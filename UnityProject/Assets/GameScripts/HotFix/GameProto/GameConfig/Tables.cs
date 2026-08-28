@@ -474,6 +474,48 @@ public partial class Tables
             m_TbWavePlan.ResolveRef(this);
         }
     }
+    /// <summary>
+    /// 对手AI难度配置
+    /// </summary>
+    private battle.TbOpponentAiDifficulty m_TbOpponentAiDifficulty;
+    public battle.TbOpponentAiDifficulty TbOpponentAiDifficulty 
+    {
+        get
+        {
+            if (m_TbOpponentAiDifficulty == null)
+            {
+                m_TbOpponentAiDifficulty = new battle.TbOpponentAiDifficulty(defaultLoader("battle_tbopponentaidifficulty"));
+                m_TbOpponentAiDifficulty.ResolveRef(this);
+            }
+            return m_TbOpponentAiDifficulty;
+        }
+        set
+        {
+            m_TbOpponentAiDifficulty = value;
+            m_TbOpponentAiDifficulty.ResolveRef(this);
+        }
+    }
+    /// <summary>
+    /// 武器碎片战斗结算奖励候选
+    /// </summary>
+    private battle.TbWeaponReward m_TbWeaponReward;
+    public battle.TbWeaponReward TbWeaponReward 
+    {
+        get
+        {
+            if (m_TbWeaponReward == null)
+            {
+                m_TbWeaponReward = new battle.TbWeaponReward(defaultLoader("battle_tbweaponreward"));
+                m_TbWeaponReward.ResolveRef(this);
+            }
+            return m_TbWeaponReward;
+        }
+        set
+        {
+            m_TbWeaponReward = value;
+            m_TbWeaponReward.ResolveRef(this);
+        }
+    }
 
     #endregion
 

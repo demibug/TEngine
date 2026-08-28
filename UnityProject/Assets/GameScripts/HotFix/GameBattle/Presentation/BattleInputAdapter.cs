@@ -104,7 +104,7 @@ namespace GameBattle
         /// 保证单局内唯一。0 保留为"未分配"哨兵值，不作为合法 CommandId。</para>
         /// <para>线程安全：所有输入在 Unity 主线程串行执行（design.md:206），无需同步。</para>
         /// </summary>
-        private int _nextCommandId = 1;
+        private readonly BattleCommandIdAllocator _commandIdAllocator;
 
         // ====================================================================
         // 构造
@@ -118,12 +118,15 @@ namespace GameBattle
         /// <exception cref="ArgumentNullException">任一参数为 null。</exception>
         internal BattleInputAdapter(
             BattleInputController inputController,
-            ICoordinateConverter coordinateConverter)
+            ICoordinateConverter coordinateConverter,
+            BattleCommandIdAllocator commandIdAllocator)
         {
             _inputController = inputController
                 ?? throw new ArgumentNullException(nameof(inputController));
             _coordinateConverter = coordinateConverter
                 ?? throw new ArgumentNullException(nameof(coordinateConverter));
+            _commandIdAllocator = commandIdAllocator
+                ?? throw new ArgumentNullException(nameof(commandIdAllocator));
         }
 
         // ====================================================================
@@ -165,6 +168,25 @@ namespace GameBattle
             return _inputController.Execute(command);
         }
 
+        /// <summary>处理铲子拖放：先把 Stage 坐标转换为地图格，再提交强类型命令。</summary>
+        internal BattleInputResult HandleUseShovel(int sourceReserveSlotId, float screenX, float screenY)
+        {
+            int commandId = AllocateCommandId();
+            if (!_coordinateConverter.TryConvertToGrid(screenX, screenY, out GridPosition position))
+            {
+                return BattleInputResult.Fail(
+                    commandId,
+                    BattleInputRejectReason.InvalidShovelTarget,
+                    $"铲子未命中有效地图格 stage=({screenX:F1},{screenY:F1})");
+            }
+
+            BattleInputCommand command = BattleInputCommand.CreateUseShovel(
+                commandId,
+                sourceReserveSlotId,
+                position);
+            return _inputController.Execute(command);
+        }
+
         /// <summary>
         /// 尝试把 UI 屏幕坐标转换成逻辑格子坐标（最终方案：屏幕坐标只负责识别 SlotId）。
         /// </summary>
@@ -194,9 +216,7 @@ namespace GameBattle
         /// </remarks>
         private int AllocateCommandId()
         {
-            int id = _nextCommandId;
-            _nextCommandId++;
-            return id;
+            return _commandIdAllocator.Allocate();
         }
     }
 }

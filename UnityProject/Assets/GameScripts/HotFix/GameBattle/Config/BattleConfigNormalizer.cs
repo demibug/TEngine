@@ -43,37 +43,39 @@ namespace GameBattle
         /// <summary>
         /// 把还原工程字符串编码 "kind_lane" 解析为 <see cref="GridCell"/>。
         /// </summary>
-        /// <param name="code">格子编码，如 "1_0"=本机玩家可建造, "1_1"=对手可建造, "0_*"=通道, "2_*"=阻挡。</param>
+        /// <param name="code">格子编码，如 "1_0"=本机玩家可建造, "1_1"=对手可建造, "0_*"=通道, "2_*"=可开垦草地。</param>
         /// <returns>规范化格子属性。</returns>
         /// <remarks>
         /// <para>编码格式来自 <c>MapData.js</c> MAP_BLOCKS 和 <c>golden-battle-bundle.json</c>
         /// cellKindLaneFormat："字符串 'kind_lane'"。源数据的 lane 表示地图半场，
         /// 当前竖屏本机视角下 lane=0 位于下半场，归本机玩家；lane=1 位于上半场，归对手。
-        /// '0_*'=路径、'2_*'=装饰"。</para>
-        /// <para>kind: 0=通道(Passage), 1=可建造(Buildable), 2=阻挡(Blocked)。
-        /// 只有 Buildable 格有阵营归属。</para>
+        /// '0_*'=路径、'2_*'=可开垦草地。</para>
+        /// <para>kind: 0=通道(Passage), 1=可建造(Buildable), 2=可开垦(Cultivable)。
+        /// Buildable 与 Cultivable 格都保留阵营归属。</para>
         /// </remarks>
         internal static GridCell DecodeCell(string code)
         {
             if (string.IsNullOrEmpty(code))
             {
-                return new GridCell(GridCellKind.Blocked, BuildableSide.None);
+                return new GridCell(GridCellKind.Cultivable, BuildableSide.None);
             }
 
             string[] parts = code.Split('_');
             if (parts.Length < 2 || !int.TryParse(parts[0], out int kind) || !int.TryParse(parts[1], out int lane))
             {
-                return new GridCell(GridCellKind.Blocked, BuildableSide.None);
+                return new GridCell(GridCellKind.Cultivable, BuildableSide.None);
             }
 
             GridCellKind cellKind = kind switch
             {
                 0 => GridCellKind.Passage,
                 1 => GridCellKind.Buildable,
-                _ => GridCellKind.Blocked,
+                2 => GridCellKind.Cultivable,
+                _ => GridCellKind.Cultivable,
             };
 
-            BuildableSide side = cellKind == GridCellKind.Buildable
+            bool preservesSide = kind == 1 || kind == 2;
+            BuildableSide side = preservesSide && (lane == 0 || lane == 1)
                 ? (lane == 0 ? BuildableSide.Player : BuildableSide.Opponent)
                 : BuildableSide.None;
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using GameCommon.Battle;
 
 namespace GameBattle
 {
@@ -219,6 +220,14 @@ namespace GameBattle
         /// <exception cref="ArgumentNullException"><paramref name="catalog"/> 为 null。</exception>
         /// <exception cref="InvalidOperationException">启用行不满足首期四条 Basic +1 契约。</exception>
         internal BasicWeaponResolver(WeaponCatalogSnapshot catalog)
+            : this(catalog, BattleWeaponLoadoutDto.CreateBasicDefault())
+        {
+        }
+
+        /// <summary>从本局四槽装载构建 resolver；槽位与武器类型必须严格匹配。</summary>
+        internal BasicWeaponResolver(
+            WeaponCatalogSnapshot catalog,
+            BattleWeaponLoadoutDto loadout)
         {
             if (catalog == null)
             {
@@ -244,10 +253,17 @@ namespace GameBattle
                     "（必须恰好 id ∈ {1,11,21,32} 四条启用，禁止隐式 fallback）");
             }
 
-            var mapping = new Dictionary<SoldierType, WeaponDefinitionSnapshot>(ExpectedDefaults.Length);
-            for (int i = 0; i < ExpectedDefaults.Length; i++)
+            var selected = new[]
             {
-                (int id, SoldierType soldierType, WeaponType weaponType) = ExpectedDefaults[i];
+                (loadout.BowWeaponId, SoldierType.Bow, WeaponType.Bow),
+                (loadout.SpearWeaponId, SoldierType.Spear, WeaponType.Spear),
+                (loadout.KnifeWeaponId, SoldierType.Knife, WeaponType.Knife),
+                (loadout.SwordWeaponId, SoldierType.Cavalry, WeaponType.Sword),
+            };
+            var mapping = new Dictionary<SoldierType, WeaponDefinitionSnapshot>(selected.Length);
+            for (int i = 0; i < selected.Length; i++)
+            {
+                (int id, SoldierType soldierType, WeaponType weaponType) = selected[i];
                 if (!enabledById.TryGetValue(id, out WeaponDefinitionSnapshot def))
                 {
                     throw new InvalidOperationException(

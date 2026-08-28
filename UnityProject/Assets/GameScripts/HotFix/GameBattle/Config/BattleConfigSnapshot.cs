@@ -133,6 +133,9 @@ namespace GameBattle
         /// <summary>本局启用武将、有序配方索引与玩家武将字招募项。</summary>
         public GeneralCatalogSnapshot GeneralCatalog { get; }
 
+        /// <summary>对手 AI 四档难度目录；旧测试快照和未启用 AI 的装载可为空。</summary>
+        internal OpponentAiProfileCatalogSnapshot OpponentAiProfiles { get; }
+
         // ====================================================================
         // 波次配置（legacy）
         // ====================================================================
@@ -257,7 +260,8 @@ namespace GameBattle
             SkillCatalogSnapshot skillCatalog = null,
             BossCatalogSnapshot bossCatalog = null,
             WeaponCatalogSnapshot weaponCatalog = null,
-            GeneralCatalogSnapshot generalCatalog = null)
+            GeneralCatalogSnapshot generalCatalog = null,
+            OpponentAiProfileCatalogSnapshot opponentAiProfiles = null)
         {
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Enemy = enemy ?? throw new ArgumentNullException(nameof(enemy));
@@ -276,6 +280,7 @@ namespace GameBattle
             BossCatalog = bossCatalog;
             WeaponCatalog = weaponCatalog;
             GeneralCatalog = generalCatalog ?? new GeneralCatalogSnapshot(Array.Empty<GeneralConfigSnapshot>());
+            OpponentAiProfiles = opponentAiProfiles;
         }
     }
 

@@ -67,7 +67,11 @@ namespace GameBattle
         /// </summary>
         public readonly int GeneralPartUnitId;
 
+        /// <summary>道具类型；仅当 <see cref="Kind"/> 为 <see cref="UnitKind.Prop"/> 时有效。</summary>
+        public readonly PropType PropType;
+
         public bool IsGeneralPrimaryCell => Kind == UnitKind.General && GeneralCellIndex == 0;
+        public bool IsShovel => Kind == UnitKind.Prop && PropType == PropType.Shovel;
 
         /// <summary>
         /// 构造局内单位权威数据。
@@ -91,7 +95,8 @@ namespace GameBattle
             string generalName = "",
             string generalPartText = "",
             int generalCellIndex = -1,
-            int generalPartUnitId = -1)
+            int generalPartUnitId = -1,
+            PropType propType = PropType.None)
         {
             UnitId = unitId;
             Side = side;
@@ -107,7 +112,18 @@ namespace GameBattle
             GeneralPartUnitId = kind == UnitKind.GeneralPart
                 ? unitId
                 : kind == UnitKind.General ? generalPartUnitId : -1;
+            PropType = kind == UnitKind.Prop ? propType : PropType.None;
         }
+
+        internal static BattleUnit CreateShovel(int unitId, bool side)
+            => new BattleUnit(
+                unitId,
+                side,
+                UnitKind.Prop,
+                default,
+                "铲",
+                level: 1,
+                propType: PropType.Shovel);
 
         internal static BattleUnit CreateGeneralPart(
             int unitId,
@@ -161,7 +177,7 @@ namespace GameBattle
         /// </remarks>
         internal BattleUnit WithLevel(int newLevel)
             => new BattleUnit(UnitId, Side, Kind, SoldierType, SoldierText, newLevel, LastAttackTimeMs,
-                GeneralIndex, GeneralName, GeneralPartText, GeneralCellIndex, GeneralPartUnitId);
+                GeneralIndex, GeneralName, GeneralPartText, GeneralCellIndex, GeneralPartUnitId, PropType);
 
         /// <summary>
         /// 返回同单位但攻击冷却为 <paramref name="lastAttackTimeMs"/> 的新副本。
@@ -173,7 +189,7 @@ namespace GameBattle
         /// </remarks>
         internal BattleUnit WithAttackCooldown(long lastAttackTimeMs)
             => new BattleUnit(UnitId, Side, Kind, SoldierType, SoldierText, Level, lastAttackTimeMs,
-                GeneralIndex, GeneralName, GeneralPartText, GeneralCellIndex, GeneralPartUnitId);
+                GeneralIndex, GeneralName, GeneralPartText, GeneralCellIndex, GeneralPartUnitId, PropType);
 
         /// <inheritdoc/>
         public override string ToString()

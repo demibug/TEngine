@@ -141,6 +141,9 @@ namespace GameBattle
         /// </summary>
         public readonly BattleInputController InputController;
 
+        /// <summary>本局可选的本地对手 AI；OpponentMode=None 时为 null。</summary>
+        public readonly OpponentAI OpponentAI;
+
         // ====================================================================
         // task 6.10 新增：闭环必需的 Manager / 状态 / 服务
         // --------------------------------------------------------------------
@@ -341,6 +344,7 @@ namespace GameBattle
             UnitFactory unitFactory,
             UnitRegistry unitRegistry,
             BattleInputController inputController,
+            OpponentAI opponentAI,
             BattleState battleState,
             BattleManager battleManager,
             WaveManager waveManager,
@@ -373,6 +377,7 @@ namespace GameBattle
             UnitFactory = unitFactory;
             UnitRegistry = unitRegistry;
             InputController = inputController;
+            OpponentAI = opponentAI;
             BattleState = battleState;
             BattleManager = battleManager;
             WaveManager = waveManager;
@@ -408,6 +413,7 @@ namespace GameBattle
             UnitFactory unitFactory,
             UnitRegistry unitRegistry,
             BattleInputController inputController,
+            OpponentAI opponentAI,
             BattleState battleState,
             BattleManager battleManager,
             WaveManager waveManager,
@@ -440,6 +446,7 @@ namespace GameBattle
                 unitFactory,
                 unitRegistry,
                 inputController,
+                opponentAI,
                 battleState,
                 battleManager,
                 waveManager,
@@ -480,6 +487,7 @@ namespace GameBattle
                 unitFactory: null,
                 unitRegistry: null,
                 inputController: null,
+                opponentAI: null,
                 battleState: null,
                 battleManager: null,
                 waveManager: null,
@@ -643,6 +651,10 @@ namespace GameBattle
             UnitFactory unitFactory = null;
             UnitRegistry unitRegistry = null;
             BattleInputController inputController = null;
+            OpponentAI opponentAI = null;
+            OpponentAiProfileSnapshot opponentAiProfile = null;
+            BattleCommandIdAllocator commandIdAllocator = null;
+            BattleRandomStreams randomStreams = null;
 
             // task 6.10 闭环新增的 Manager / 状态 / 服务
             BattleState battleState = null;
@@ -776,6 +788,22 @@ namespace GameBattle
                         scope);
                 }
 
+                if (loadout.OpponentMode == BattleOpponentMode.LocalAI)
+                {
+                    int difficulty = (int)loadout.OpponentAiDifficulty;
+                    if (configSnapshot.OpponentAiProfiles == null
+                        || !configSnapshot.OpponentAiProfiles.TryGet(
+                            difficulty, out opponentAiProfile))
+                    {
+                        Log.Warning($"{LogTag} 对手 AI 难度配置缺失 difficulty={difficulty}");
+                        scope.Rollback();
+                        return BattleRuntimeAssembly.Fail(
+                            BattleErrorCode.ConfigMissing,
+                            $"对手 AI 难度配置缺失 difficulty={difficulty}",
+                            scope);
+                    }
+                }
+
                 bool hasSelectedBoss = false;
                 foreach (WavePlanEntry row in configSnapshot.OrderedWavePlan.Rows)
                 {
@@ -879,15 +907,18 @@ namespace GameBattle
                 BattleObjectPool<CavalrySoldier> cavalryPool =
                     effectivePoolScope.GetPool(() => new CavalrySoldier());
 
-                var randomSource = new SeededRandomSource(loadout.RandomSeed);
+                randomStreams = new BattleRandomStreams(loadout.RandomSeed);
+                commandIdAllocator = new BattleCommandIdAllocator();
 
                 // 最终方案：征兵服务，随机生成 1 级四兵批次。
                 // levelService / slotBoard / reserveSlotCount 已在步骤 7 构造，此处复用。
                 recruitManager = new RecruitManager(
-                    randomSource,
+                    randomStreams.PlayerRecruit,
+                    randomStreams.OpponentRecruit,
                     slotBoard,
                     reserveSlotCount,
-                    configSnapshot.GeneralCatalog.PartRecruitEntries);
+                    configSnapshot.GeneralCatalog.PartRecruitEntries,
+                    includeInitialPlayerShovel: true);
 
                 // 最终方案：开局免费生成第一批待上场单位，填满待上场槽。
                 // 此后只有点击征兵扣馒头（扣费由 BattleInputController.ExecuteRecruit 完成）。
@@ -920,7 +951,7 @@ namespace GameBattle
                 // resolver 构造在启用集合非法时抛错，落入外层 catch 终止组装。
                 // 旧兼容快照 WeaponCatalog 为 null 时不装配（保持旧测试行为）。
                 BasicWeaponResolver weaponResolver = configSnapshot.WeaponCatalog != null
-                    ? new BasicWeaponResolver(configSnapshot.WeaponCatalog)
+                    ? new BasicWeaponResolver(configSnapshot.WeaponCatalog, loadout.Weapons)
                     : null;
 
                 unitRegistry = new UnitRegistry(unitFactory, cellSize, buffManager, weaponResolver);
@@ -1045,7 +1076,7 @@ namespace GameBattle
                                                 projectileFactory,
                                                 projectileManager,
                                                 attackEffectManager,
-                                                randomSource,
+                                                randomStreams.CombatAndSkills,
                                                 cellSize));
                                         fireArrowBarrageRegistered = true;
                                     }
@@ -1175,6 +1206,20 @@ namespace GameBattle
                 battleManager = new BattleManager(
                     configSnapshot, battleState, waveManager, battleEconomy, resultBuilder);
 
+                if (loadout.OpponentMode == BattleOpponentMode.LocalAI)
+                {
+                    opponentAI = new OpponentAI(
+                        opponentAiProfile,
+                        slotBoard,
+                        inputController,
+                        commandIdAllocator,
+                        battleEconomy,
+                        waveManager,
+                        configSnapshot.Map,
+                        randomStreams.OpponentStrategy,
+                        levelService);
+                }
+
                 // task 6.10 闭环返工：构造 BattleTarget 并绑定到 BattleState/BattleManager/ResultBuilder，
                 // 使敌人抵达终点时能通过 IEnemyEndPointAttackTarget.ReceiveEndPointAttack →
                 // BattleTarget.ApplyDamage → BattleState.ApplyDamage → BattleManager.CheckHealthFreeze
@@ -1245,6 +1290,10 @@ namespace GameBattle
                 phaseHandlers[(int)BattleUpdatePhase.UnitAttack] =
                     (frameNow, step, phase) =>
                     {
+                        // 原 GameLoop 注册顺序映射：BattleManager/Wave 先于 AI，AI 新放置的
+                        // 单位随后可在同一子步进入单位攻击调度。
+                        opponentAI?.Update(step);
+
                         // 获取活动单位只读列表（稳定有序，按放置顺序）。
                         // AttackScheduler.Update 内部有冻结守卫，冻结后不调度。
                         IReadOnlyList<SoldierBase> units = unitRegistry.GetActiveUnits();
@@ -1313,7 +1362,8 @@ namespace GameBattle
                     unitRegistry,
                     projectileManager,
                     bindings,
-                    signalHub);
+                    signalHub,
+                    commandIdAllocator);
                 scope.TrackDisposable(presenter, "BattlePresenter");
 
                 // 组装成功：记录完成日志，返回成功产物。
@@ -1330,6 +1380,7 @@ namespace GameBattle
                     unitFactory,
                     unitRegistry,
                     inputController,
+                    opponentAI,
                     battleState,
                     battleManager,
                     waveManager,
@@ -1398,6 +1449,32 @@ namespace GameBattle
             {
                 errorCode = BattleErrorCode.ConfigInvalid;
                 diagnosticMessage = $"不支持的牌组预设 preset={loadout.DeckPreset}，本期只支持 Normal";
+                return false;
+            }
+
+            if (loadout.OpponentMode != BattleOpponentMode.None
+                && loadout.OpponentMode != BattleOpponentMode.LocalAI)
+            {
+                errorCode = BattleErrorCode.ConfigInvalid;
+                diagnosticMessage = $"不支持的对手模式 mode={loadout.OpponentMode}";
+                return false;
+            }
+
+            if (loadout.Weapons.BowWeaponId <= 0
+                || loadout.Weapons.SpearWeaponId <= 0
+                || loadout.Weapons.KnifeWeaponId <= 0
+                || loadout.Weapons.SwordWeaponId <= 0)
+            {
+                errorCode = BattleErrorCode.ConfigInvalid;
+                diagnosticMessage = "四个武器槽位都必须提供有效的正整数武器 id";
+                return false;
+            }
+
+            int aiDifficulty = (int)loadout.OpponentAiDifficulty;
+            if (aiDifficulty < 0 || aiDifficulty > 3)
+            {
+                errorCode = BattleErrorCode.ConfigInvalid;
+                diagnosticMessage = $"对手 AI 难度越界 difficulty={aiDifficulty}";
                 return false;
             }
 

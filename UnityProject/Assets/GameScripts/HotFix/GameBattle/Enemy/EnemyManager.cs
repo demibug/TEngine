@@ -403,6 +403,21 @@ namespace GameBattle
         internal event Action<int, int, int, int> EnemyHealthChanged;
 
         /// <summary>
+        /// 敌人受击伤害低频表现事实：仅在 <see cref="EnemyBase.Hit"/> 有效正伤害路径触发。
+        /// </summary>
+        /// <remarks>
+        /// <para><b>局部强类型事实：</b>由 <see cref="EnemyBase"/> 经血量回调携带显示伤害
+        /// 转发，本管理器在显示伤害 &gt; 0 时构造
+        /// <see cref="EnemyDamageViewData"/>（RuntimeId + 原始伤害）并发布。
+        /// <see cref="BattlePresenter"/> 订阅后原样转发到 <see cref="IBattleViewPort.OnEnemyDamaged"/>。
+        /// displayDamage=0 的路径（Buff 最大生命/当前生命变化）不构造、不发布，飘字不误触发。</para>
+        /// <para><b>顺序契约：</b>EnemyHealthChanged（血条）→ EnemyDamaged（飘字）→
+        /// Dead/Killed/DeathRequested（死亡与移除）依次发生：受击回调在
+        /// <see cref="EnemyBase.CommitHealthChange"/> 内先于死亡状态切换触发。</para>
+        /// </remarks>
+        internal event Action<EnemyDamageViewData> EnemyDamaged;
+
+        /// <summary>
         /// 敌军归还对象池回调：由 BattleRuntimeFactory 装配时桥接到 EnemyFactory.Release。
         /// <para>在敌军从活动集合注销后调用，保证每次 Acquire 恰好对应一次 Release
         /// （池租借对称契约）。同一 ID 由 <see cref="ProcessRemoveQueue"/> / <see cref="GameOver"/>
@@ -521,10 +536,17 @@ namespace GameBattle
             _leaseById[id] = GetCurrentLease(enemy, id);
 
             // 注入血量变化回调：受击扣血后经本管理器统一转发低频表现事实。
+            // 回调携带显示伤害（Hit 原始伤害；Buff 生命变化为 0），>0 时发布强类型飘字事实。
             if (enemy is EnemyBase enemyBase)
             {
-                enemyBase.SetHealthChangedCallback((changedId, current, max, delta) =>
-                    EnemyHealthChanged?.Invoke(changedId, current, max, delta));
+                enemyBase.SetHealthChangedCallback((changedId, current, max, delta, displayDamage) =>
+                {
+                    EnemyHealthChanged?.Invoke(changedId, current, max, delta);
+                    if (displayDamage > 0)
+                    {
+                        EnemyDamaged?.Invoke(new EnemyDamageViewData(changedId, displayDamage));
+                    }
+                });
             }
 
             if (enemy is BossBase registeredBoss)

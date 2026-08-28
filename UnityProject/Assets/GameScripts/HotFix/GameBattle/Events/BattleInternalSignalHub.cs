@@ -158,6 +158,9 @@ namespace GameBattle
         /// </remarks>
         public Signal<RecruitCompletedFact> RecruitCompleted { get; } = new Signal<RecruitCompletedFact>();
 
+        /// <summary>铲子成功开垦地块事实。</summary>
+        public Signal<TileOpenedFact> TileOpened { get; } = new Signal<TileOpenedFact>();
+
         // ====================================================================
         // 批量解除订阅
         // ====================================================================
@@ -194,6 +197,7 @@ namespace GameBattle
             TryClearSignal(UnitMerged, nameof(UnitMerged));
             TryClearSignal(GeneralSynthesized, nameof(GeneralSynthesized));
             TryClearSignal(RecruitCompleted, nameof(RecruitCompleted));
+            TryClearSignal(TileOpened, nameof(TileOpened));
         }
 
         /// <summary>
@@ -519,6 +523,26 @@ namespace GameBattle
             IsPlayerSide = isPlayerSide;
             Cost = cost;
             NextCost = nextCost;
+        }
+    }
+
+    internal readonly struct TileOpenedFact
+    {
+        public readonly bool IsPlayerSide;
+        public readonly GridPosition Position;
+        public readonly UnitSlotId SourceReserveSlotId;
+        public readonly UnitSlotId AddedBattleSlotId;
+
+        public TileOpenedFact(
+            bool isPlayerSide,
+            GridPosition position,
+            UnitSlotId sourceReserveSlotId,
+            UnitSlotId addedBattleSlotId)
+        {
+            IsPlayerSide = isPlayerSide;
+            Position = position;
+            SourceReserveSlotId = sourceReserveSlotId;
+            AddedBattleSlotId = addedBattleSlotId;
         }
     }
 }

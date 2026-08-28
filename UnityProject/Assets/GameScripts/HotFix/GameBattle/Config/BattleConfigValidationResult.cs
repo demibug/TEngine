@@ -266,6 +266,9 @@ namespace GameBattle
 
         /// <summary>武将引用的技能缺少其 handler 专用的 effect 配置字段（如 BattleShout 的 range/buffType/duration、FireArrowBarrage 的 range/damageMultiplier）。</summary>
         GeneralSkillEffectConfigMissing = 87,
+
+        /// <summary>对手 AI 难度目录缺行、重复或字段非法。</summary>
+        OpponentAiConfigInvalid = 88,
     }
 
     /// <summary>

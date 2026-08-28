@@ -11,8 +11,8 @@ namespace GameBattle
     /// 每子步推进，累计 elapsed 达到释放延迟后解析最终目标并调用
     /// <see cref="BowSoldier.LaunchArrow"/> 创建箭矢。</para>
     ///
-    /// <para><b>释放点有限重选（design 决策 4.2/4.3）：</b>到达释放点时对初始目标做首选验证；
-    /// 首选失效时按当前攻击范围稳定回退一次。回退成功按最终目标重算发射角并只发射一支箭；
+    /// <para><b>参数化释放规则：</b>到达释放点时对初始目标做首选验证；首选失效时由
+    /// <see cref="RangedAttackParameters.LostTargetPolicy"/> 决定取消、锥形换靶或射程内任意换靶；
     /// 失败则不创建箭矢，Release Effect 正常完成。不再次更新冷却时间戳、不重新触发攻击动画、
     /// 不创建第二个 Release Effect。</para>
     ///
@@ -30,18 +30,6 @@ namespace GameBattle
     /// </remarks>
     internal sealed class BowReleaseEffect : IAttackEffect
     {
-        /// <summary>
-        /// 弓兵攻击动画总帧数。
-        /// TODO：后续从单位攻击动画时序配置读取。
-        /// </summary>
-        private const int AttackFrameCount = 30;
-
-        /// <summary>
-        /// 弓兵攻击动画的出箭帧索引（从 0 开始）。
-        /// TODO：后续从单位攻击动画时序配置读取。
-        /// </summary>
-        private const int ReleaseFrameIndex = 17;
-
         private BowSoldier _owner;
         private AttackResolver _resolver;
         private EnemyManager _enemyManager;
@@ -50,6 +38,9 @@ namespace GameBattle
         private float _startY;
         private float _attackRange;
         private float _cellSize;
+        private float _lockedAimPointX;
+        private float _lockedAimPointY;
+        private RangedAttackParameters _parameters;
         private long _releaseDelayMs;
         private long _elapsed;
         private bool _active;
@@ -67,32 +58,37 @@ namespace GameBattle
         /// <param name="owner">弓兵所有者（提供 LaunchArrow 实现）。不可为 null。</param>
         /// <param name="resolver">攻击解析服务（非 null），释放点首选/回退解析。</param>
         /// <param name="enemyManager">敌人管理器（非 null），释放点按 ID 查找与稳定查询。</param>
-        /// <param name="targetId">初始目标敌人运行时 ID（调度器单次选择并传入）。</param>
+        /// <param name="initialTarget">调度器单次选择的初始目标。</param>
         /// <param name="startX">发射起点逻辑 X。</param>
         /// <param name="startY">发射起点逻辑 Y。</param>
         /// <param name="attackRange">攻击范围（释放点回退查询半径，design 决策 4.2）。</param>
         /// <param name="cellSize">敌人格子尺寸（回退查询透传给 AttackResolver）。</param>
         /// <param name="attackIntervalSeconds">本次攻击的有效攻击间隔（秒）。</param>
+        /// <param name="parameters">本次远程攻击参数快照。</param>
         internal void Launch(
             BowSoldier owner,
             AttackResolver resolver,
             EnemyManager enemyManager,
-            int targetId,
+            EnemyTargetDto initialTarget,
             float startX,
             float startY,
             float attackRange,
             float cellSize,
-            float attackIntervalSeconds)
+            float attackIntervalSeconds,
+            RangedAttackParameters parameters)
         {
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
             _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
             _enemyManager = enemyManager ?? throw new ArgumentNullException(nameof(enemyManager));
-            _targetId = targetId;
+            _targetId = initialTarget.Id;
             _startX = startX;
             _startY = startY;
             _attackRange = attackRange;
             _cellSize = cellSize;
-            _releaseDelayMs = CalculateReleaseDelayMs(attackIntervalSeconds);
+            _lockedAimPointX = initialTarget.X + cellSize / 2f;
+            _lockedAimPointY = initialTarget.Y + cellSize / 2f;
+            _parameters = parameters;
+            _releaseDelayMs = parameters.CalculateReleaseDelayMs(attackIntervalSeconds);
             _elapsed = 0L;
             _released = false;
             _active = true;
@@ -126,16 +122,8 @@ namespace GameBattle
                 return;
             }
 
-            // 释放点首选目标验证与稳定回退（design 决策 4.2）。
-            // 首选有效 → 命中首选；首选失效 → 稳定回退一次；无替代 → 不创建箭矢并正常完成。
-            if (!_resolver.TryResolvePreferredOrFallback(
-                    _enemyManager,
-                    _targetId,
-                    _startX, _startY,
-                    _attackRange,
-                    _owner.Side,
-                    _cellSize, _cellSize,
-                    out EnemyTargetDto finalTarget))
+            // 首选有效时继续攻击首选；首选失效时按远程攻击参数决定是否及如何稳定换靶。
+            if (!TryResolveReleaseTarget(out EnemyTargetDto finalTarget))
             {
                 // 无替代目标：本次攻击不创建箭矢并完成（spec "无替代目标时攻击无伤害完成"）。
                 // 不回滚冷却，不重新触发攻击动画——动画由表现层自然结束。
@@ -143,9 +131,9 @@ namespace GameBattle
             }
 
             // 解析成功：按最终目标创建一支箭矢（design 决策 4.3）。
-            // LaunchArrow 内部按 finalTarget 重算发射角与终点，只创建一支箭。
+            // LaunchArrow 按 VisualAimPolicy 决定是否刷新人物朝向，并只创建一支箭。
             // 不再次更新时间戳、不重新触发攻击动画、不创建第二个 Release Effect。
-            _owner.LaunchArrow(finalTarget, _startX, _startY);
+            _owner.LaunchArrow(finalTarget, _startX, _startY, _parameters);
         }
 
         /// <inheritdoc/>
@@ -170,18 +158,35 @@ namespace GameBattle
             _startY = 0f;
             _attackRange = 0f;
             _cellSize = 0f;
+            _lockedAimPointX = 0f;
+            _lockedAimPointY = 0f;
+            _parameters = default;
             _releaseDelayMs = 0L;
             _elapsed = 0L;
             _active = false;
             _released = false;
         }
 
-        /// <summary>计算第 17 帧开始时的释放延迟，并向上取整到毫秒避免提前出箭。</summary>
-        private static long CalculateReleaseDelayMs(float attackIntervalSeconds)
+        /// <summary>
+        /// 解析释放点最终目标：首选仍有效则保留；否则委托通用远程目标解析模块执行参数策略。
+        /// </summary>
+        private bool TryResolveReleaseTarget(out EnemyTargetDto finalTarget)
         {
-            float effectiveInterval = attackIntervalSeconds > 0f ? attackIntervalSeconds : 1f;
-            return (long)Math.Ceiling(
-                effectiveInterval * 1000d * ReleaseFrameIndex / AttackFrameCount);
+            bool resolved = RangedReleaseTargetResolver.TryResolve(
+                _resolver,
+                _enemyManager,
+                _targetId,
+                _startX,
+                _startY,
+                _lockedAimPointX,
+                _lockedAimPointY,
+                _attackRange,
+                _owner.Side,
+                _cellSize,
+                _cellSize,
+                _parameters,
+                out finalTarget);
+            return resolved;
         }
     }
 }

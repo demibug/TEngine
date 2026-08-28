@@ -60,8 +60,23 @@ namespace GameCommon.Battle
         /// </summary>
         public readonly BattleDeckPreset DeckPreset;
 
+        /// <summary>本局对手控制模式。</summary>
+        public readonly BattleOpponentMode OpponentMode;
+
+        /// <summary>本地对手 AI 难度，只有 LocalAI 模式时生效。</summary>
+        public readonly OpponentAiDifficulty OpponentAiDifficulty;
+
+        /// <summary>
+        /// 四槽武器装载（弓/枪/刀/剑）。未显式传入时规范化为
+        /// <see cref="BattleWeaponLoadoutDto.CreateBasicDefault"/>；显式传入的部分零值
+        /// 原样保留，不做静默修复。存在性/类型/enabled 校验由 GameBattle 负责。
+        /// </summary>
+        public readonly BattleWeaponLoadoutDto Weapons;
+
         /// <summary>
         /// 构造不可变装载信息。字符串参数为 null 时强制使用空串，枚举使用明确值。
+        /// 最后一个可选参数 <paramref name="weapons"/> 仅在全零（default）时规范化为
+        /// <see cref="BattleWeaponLoadoutDto.CreateBasicDefault"/>，部分零值原样保留。
         /// </summary>
         /// <param name="mapId">地图标识。</param>
         /// <param name="round">局外回合。</param>
@@ -69,13 +84,19 @@ namespace GameCommon.Battle
         /// <param name="configVersion">配置版本占位（本期 0）。</param>
         /// <param name="configHash">配置 hash 占位（本期空串，null 被规范化为空串）。</param>
         /// <param name="deckPreset">牌组预设，默认 <see cref="BattleDeckPreset.Normal"/>。</param>
+        /// <param name="opponentMode">对手控制模式。</param>
+        /// <param name="opponentAiDifficulty">本地对手 AI 难度。</param>
+        /// <param name="weapons">四槽武器装载，默认全零并规范化为 Basic 默认。</param>
         public BattleLoadoutDto(
             int mapId,
             int round,
             int randomSeed,
             int configVersion,
             string configHash,
-            BattleDeckPreset deckPreset = BattleDeckPreset.Normal)
+            BattleDeckPreset deckPreset = BattleDeckPreset.Normal,
+            BattleOpponentMode opponentMode = BattleOpponentMode.None,
+            OpponentAiDifficulty opponentAiDifficulty = OpponentAiDifficulty.Easy,
+            BattleWeaponLoadoutDto weapons = default)
         {
             MapId = mapId;
             Round = round;
@@ -84,6 +105,12 @@ namespace GameCommon.Battle
             // 明确拒绝 null：未启用字段用空串而非 null，避免接收方判空歧义。
             ConfigHash = configHash ?? string.Empty;
             DeckPreset = deckPreset;
+            OpponentMode = opponentMode;
+            OpponentAiDifficulty = opponentAiDifficulty;
+            // 仅全零（未显式指定）时规范化为 Basic 默认；部分零值不得静默修复。
+            Weapons = weapons.IsEmpty
+                ? BattleWeaponLoadoutDto.CreateBasicDefault()
+                : weapons;
         }
 
         /// <summary>
@@ -97,7 +124,23 @@ namespace GameCommon.Battle
                 randomSeed: 0,
                 configVersion: 0,
                 configHash: string.Empty,
-                deckPreset: BattleDeckPreset.Normal);
+                deckPreset: BattleDeckPreset.Normal,
+                weapons: BattleWeaponLoadoutDto.CreateBasicDefault());
+
+        /// <summary>供当前单机入口使用的本地 AI 默认装载。</summary>
+        public static BattleLoadoutDto CreateLocalAiDefault(
+            OpponentAiDifficulty difficulty = OpponentAiDifficulty.Easy,
+            BattleWeaponLoadoutDto weapons = default)
+            => new BattleLoadoutDto(
+                mapId: 0,
+                round: 0,
+                randomSeed: 0,
+                configVersion: 0,
+                configHash: string.Empty,
+                deckPreset: BattleDeckPreset.Normal,
+                opponentMode: BattleOpponentMode.LocalAI,
+                opponentAiDifficulty: difficulty,
+                weapons: weapons.IsEmpty ? BattleWeaponLoadoutDto.CreateBasicDefault() : weapons);
     }
 
     /// <summary>
@@ -109,5 +152,21 @@ namespace GameCommon.Battle
         /// 均匀四兵最简牌组（刀/弓/枪/骑），对应 spec 6.5 与 DeckDefinitions minimalMode。
         /// </summary>
         Normal = 0,
+    }
+
+    /// <summary>对手控制模式。当前只实现关闭和单机本地 AI。</summary>
+    public enum BattleOpponentMode
+    {
+        None = 0,
+        LocalAI = 1,
+    }
+
+    /// <summary>原工程钳制为 0..3 的四档对手 AI 难度。</summary>
+    public enum OpponentAiDifficulty
+    {
+        Easy = 0,
+        Normal = 1,
+        Hard = 2,
+        Expert = 3,
     }
 }

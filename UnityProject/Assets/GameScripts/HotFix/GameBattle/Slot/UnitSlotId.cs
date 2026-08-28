@@ -42,6 +42,15 @@ namespace GameBattle
 
         /// <summary>已合成武将，可进入战场并复用配置指定的战斗原型。</summary>
         General = 2,
+
+        /// <summary>一次性道具，只能停留在待上场槽。</summary>
+        Prop = 3,
+    }
+
+    internal enum PropType
+    {
+        None = 0,
+        Shovel = 1,
     }
 
     /// <summary>

@@ -162,6 +162,12 @@ namespace GameBattle
             GeneralCatalogSnapshot generalCatalog = BuildGeneralCatalogFromLuban(_tables.TbGeneral);
 
             // ----------------------------------------------------------------
+            // 对手 AI 难度目录：四档配置一次性复制为本局不可变快照。
+            // ----------------------------------------------------------------
+            OpponentAiProfileCatalogSnapshot opponentAiProfiles =
+                BuildOpponentAiProfilesFromLuban(_tables.TbOpponentAiDifficulty);
+
+            // ----------------------------------------------------------------
             // 【legacy】单敌人快照：由目录按地图 EnemyTypeIndex 派生（兼容 WaveManager）。
             // ----------------------------------------------------------------
             EnemyConfigSnapshot enemy = BuildLegacyEnemyFromCatalog(catalog, ToZeroBasedIndex(mapRow.EnemyId));
@@ -213,7 +219,93 @@ namespace GameBattle
                 skillCatalog: skillCatalog,
                 bossCatalog: bossCatalog,
                 weaponCatalog: weaponCatalog,
-                generalCatalog: generalCatalog);
+                generalCatalog: generalCatalog,
+                opponentAiProfiles: opponentAiProfiles);
+        }
+
+        internal static OpponentAiProfileCatalogSnapshot BuildOpponentAiProfilesFromLuban(
+            TbOpponentAiDifficulty table)
+        {
+            if (table == null)
+            {
+                throw new BattleConfigDataException(
+                    BattleConfigErrorCategory.OpponentAiConfigInvalid,
+                    "TbOpponentAiDifficulty 缺失",
+                    "OpponentAI");
+            }
+
+            var profiles = new List<OpponentAiProfileSnapshot>(4);
+            var ids = new HashSet<int>();
+            foreach (GameConfig.battle.OpponentAiDifficulty row in table.DataList)
+            {
+                string path = $"OpponentAI.{row.Id}";
+                if (row.Id < 0 || row.Id > 3 || !ids.Add(row.Id))
+                {
+                    throw new BattleConfigDataException(
+                        BattleConfigErrorCategory.OpponentAiConfigInvalid,
+                        $"难度 id={row.Id} 越界或重复",
+                        path);
+                }
+
+                if (row.DecisionIntervalMs <= 0 || row.InitialBonusGold < 0)
+                {
+                    throw new BattleConfigDataException(
+                        BattleConfigErrorCategory.OpponentAiConfigInvalid,
+                        "决策间隔必须为正，初始奖励不能为负",
+                        path);
+                }
+
+                if (row.IncomeWaveOrders == null || row.IncomeGoldValues == null
+                    || row.IncomeWaveOrders.Count != row.IncomeGoldValues.Count)
+                {
+                    throw new BattleConfigDataException(
+                        BattleConfigErrorCategory.OpponentAiConfigInvalid,
+                        "收入波次与收入值数量不一致",
+                        path);
+                }
+
+                int previousWave = 0;
+                for (int i = 0; i < row.IncomeWaveOrders.Count; i++)
+                {
+                    if (row.IncomeWaveOrders[i] <= previousWave || row.IncomeGoldValues[i] < 0)
+                    {
+                        throw new BattleConfigDataException(
+                            BattleConfigErrorCategory.OpponentAiConfigInvalid,
+                            "收入波次必须严格递增且收入不能为负",
+                            path);
+                    }
+
+                    previousWave = row.IncomeWaveOrders[i];
+                }
+
+                if (row.PlacementPolicy < 0 || row.PlacementPolicy > 1
+                    || row.CandidateTopN < 0)
+                {
+                    throw new BattleConfigDataException(
+                        BattleConfigErrorCategory.OpponentAiConfigInvalid,
+                        "布阵策略或候选窗口非法",
+                        path);
+                }
+
+                profiles.Add(new OpponentAiProfileSnapshot(
+                    row.Id,
+                    row.DecisionIntervalMs,
+                    row.InitialBonusGold,
+                    row.IncomeWaveOrders,
+                    row.IncomeGoldValues,
+                    (OpponentAiPlacementPolicy)row.PlacementPolicy,
+                    row.CandidateTopN));
+            }
+
+            if (ids.Count != 4)
+            {
+                throw new BattleConfigDataException(
+                    BattleConfigErrorCategory.OpponentAiConfigInvalid,
+                    $"必须配置难度 0..3 四行，当前有效行数={ids.Count}",
+                    "OpponentAI");
+            }
+
+            return new OpponentAiProfileCatalogSnapshot(profiles);
         }
 
         internal static GeneralCatalogSnapshot BuildGeneralCatalogFromLuban(TbGeneral table)

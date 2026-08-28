@@ -1,5 +1,6 @@
 using GameBattle;
 using GameFUI;
+using GameWeapon;
 using TEngine;
 
 // ============================================================================
@@ -55,6 +56,7 @@ public static class HotFixModules
     /// 已登记到 ModuleSystem 的 GameFUI 模块。
     /// </summary>
     private static IFUIModule _fuiModule;
+    private static IWeaponModule _weaponModule;
 
     /// <summary>
     /// 显式注册一次 BattleModule（task 2.7 唯一注册入口）。
@@ -98,6 +100,9 @@ public static class HotFixModules
             ScreenMatchMode = FUIScreenMatchMode.MatchWidthOrHeight,
         });
         _fuiModule = ModuleSystem.RegisterModule<IFUIModule>((Module)FUI.Module);
+
+        // 武器进度必须先于 BattleModule 监听战斗事件，确保开局装载与结算奖励闭环。
+        _weaponModule = ModuleSystem.RegisterModule<IWeaponModule>(new WeaponModule());
 
         // 创建 BattleModule 实例。OnInit 由唯一 BattleModule 注册
         // UIBattle Binder、最终 Widget 与最终 Window。

@@ -69,6 +69,38 @@ namespace GameBattle.Tests.EditMode.Presentation
         }
 
         [Test]
+        public async Task EnemyDamaged_UsesHitPointAndSurvivesEnemyRemoval()
+        {
+            await _viewPort.PreloadAsync(
+                new[] { "Mob0" }, Array.Empty<string>(), Array.Empty<string>());
+            CollectionAssert.Contains(
+                _loader.LoadedLocations,
+                "Sprites/Extracted/GameObject/bitmapFont/number1");
+
+            _viewPort.OnEnemySpawned(new EnemySpawnViewData(201, "Mob0", "Mob0", true, 0f, 0f));
+            GameObject enemy = FindActiveEnemy("Mob0(Clone)");
+            Transform hitPoint = enemy.transform.Find("VisualRoot/HitEffectPoint");
+
+            _viewPort.OnEnemyDamaged(new EnemyDamageViewData(201, 25));
+
+            DamageNumberSystem system = _viewPort.DamageNumberSystemForTest;
+            Assert.IsNotNull(system);
+            Assert.AreEqual(1, system.ActiveCount);
+            Transform number = _bindings.EffectRoot.Find("DamageNumber");
+            Assert.IsNotNull(number);
+            Assert.AreEqual(hitPoint.position, number.position);
+
+            _viewPort.OnEnemyRemoved(201, true);
+            Assert.IsFalse(enemy.activeSelf);
+            Assert.AreEqual(1, system.ActiveCount,
+                "敌人回池后，最后一击伤害数字必须继续独立播放。");
+
+            number.GetComponent<DamageNumberView>().Tick(DamageNumberView.DurationSeconds);
+            Assert.AreEqual(0, system.ActiveCount);
+            Assert.AreEqual(1, system.PooledCount);
+        }
+
+        [Test]
         public async Task Preload_InvalidLease_ReleasesPartialBatchAndCanRetry()
         {
             _loader.InvalidAtCall = 2;
@@ -241,9 +273,9 @@ namespace GameBattle.Tests.EditMode.Presentation
 
             internal FakeAssetLoader()
             {
-                _texture = new Texture2D(2, 2);
+                _texture = new Texture2D(140, 23);
                 _sprite = Sprite.Create(
-                    _texture, new Rect(0f, 0f, 2f, 2f), new Vector2(0.5f, 0.5f), 100f);
+                    _texture, new Rect(0f, 0f, 140f, 23f), new Vector2(0.5f, 0.5f), 100f);
             }
 
             internal List<FakeLease> Leases { get; } = new List<FakeLease>();
@@ -319,6 +351,9 @@ namespace GameBattle.Tests.EditMode.Presentation
 
                 Transform visualRoot = new GameObject("VisualRoot").transform;
                 visualRoot.SetParent(prefab.transform, false);
+                Transform hitEffectPoint = new GameObject("HitEffectPoint").transform;
+                hitEffectPoint.SetParent(visualRoot, false);
+                hitEffectPoint.localPosition = new Vector3(0f, 0.5f, 0f);
                 Transform healthRoot = new GameObject("hpBgImg").transform;
                 healthRoot.SetParent(visualRoot, false);
                 healthRoot.gameObject.AddComponent<SpriteRenderer>().sprite = _sprite;

@@ -192,7 +192,8 @@ namespace GameBattle
             UnitRegistry unitRegistry = null,
             ProjectileManager projectileManager = null,
             BattleMapBindings bindings = null,
-            BattleInternalSignalHub signalHub = null)
+            BattleInternalSignalHub signalHub = null,
+            BattleCommandIdAllocator commandIdAllocator = null)
         {
             _readModel = readModel ?? throw new ArgumentNullException(nameof(readModel));
             _viewPort = viewPort ?? throw new ArgumentNullException(nameof(viewPort));
@@ -244,7 +245,10 @@ namespace GameBattle
             ICoordinateConverter coordinateConverter = bindings == null
                 ? new NullCoordinateConverter()
                 : new UnityCoordinateConverter(bindings);
-            InputAdapter = new BattleInputAdapter(inputController, coordinateConverter);
+            BattleCommandIdAllocator effectiveCommandIdAllocator = commandIdAllocator
+                ?? new BattleCommandIdAllocator();
+            InputAdapter = new BattleInputAdapter(
+                inputController, coordinateConverter, effectiveCommandIdAllocator);
 
             SubscribeLifecycleFacts();
             if (signalHub != null)
@@ -450,6 +454,14 @@ namespace GameBattle
                 : InputAdapter.HandleDropUnit(sourceSlotId, targetSlotId);
         }
 
+        /// <summary>接收 HUD 的铲子拖放并提交开垦命令。</summary>
+        internal BattleInputResult HandleUseShovel(int sourceReserveSlotId, float screenX, float screenY)
+        {
+            return IsDisposed
+                ? BattleInputResult.Fail(0, BattleInputRejectReason.Unknown, "战斗表现层已释放")
+                : InputAdapter.HandleUseShovel(sourceReserveSlotId, screenX, screenY);
+        }
+
         /// <summary>获取槽位只读快照，供 HUD 渲染待上场槽与战场槽（最终方案）。</summary>
         internal UnitSlotSnapshot GetSlotSnapshot()
         {
@@ -500,6 +512,7 @@ namespace GameBattle
                 _enemyManager.EnemySpawned += OnEnemySpawned;
                 _enemyManager.EnemyRemoved += OnEnemyRemoved;
                 _enemyManager.EnemyHealthChanged += OnEnemyHealthChanged;
+                _enemyManager.EnemyDamaged += OnEnemyDamaged;
                 _enemyManager.BossSkillIntentChanged += OnBossSkillIntentChanged;
             }
 
@@ -525,6 +538,7 @@ namespace GameBattle
                 _enemyManager.EnemySpawned -= OnEnemySpawned;
                 _enemyManager.EnemyRemoved -= OnEnemyRemoved;
                 _enemyManager.EnemyHealthChanged -= OnEnemyHealthChanged;
+                _enemyManager.EnemyDamaged -= OnEnemyDamaged;
                 _enemyManager.BossSkillIntentChanged -= OnBossSkillIntentChanged;
             }
 
@@ -553,6 +567,12 @@ namespace GameBattle
         {
             try { _viewPort.OnEnemyRemoved(runtimeId, playDeathEffect); }
             catch (Exception ex) { Log.Error($"{LogTag} 移除敌人表现异常: {ex}"); }
+        }
+
+        private void OnEnemyDamaged(EnemyDamageViewData dto)
+        {
+            try { _viewPort.OnEnemyDamaged(dto); }
+            catch (Exception ex) { Log.Error($"{LogTag} 敌人伤害飘字表现异常: {ex}"); }
         }
 
         private void OnBossSkillIntentChanged(int runtimeId, string animationKey, bool active)

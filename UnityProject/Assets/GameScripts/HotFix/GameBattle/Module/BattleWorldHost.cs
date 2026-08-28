@@ -2,6 +2,7 @@ using System;
 using Cysharp.Threading.Tasks;
 using TEngine;
 using UnityEngine;
+using YooAsset;
 
 namespace GameBattle
 {
@@ -23,6 +24,9 @@ namespace GameBattle
         private string _currentResourceAddress;
         private Texture2D _placementTexture;
         private Sprite _placementSprite;
+        private AssetHandle _spaceTileHandle;
+        private Sprite _spaceTileSprite;
+        private int _spaceTileMapIndex = -1;
         private CameraSnapshot _cameraSnapshot;
         private bool _hasCameraSnapshot;
 
@@ -290,8 +294,9 @@ namespace GameBattle
         /// <summary>
         /// 在原生战斗场景中显示当前阵营可放置的棋盘格。
         /// </summary>
-        internal void ShowPlacementSlots(MapData map, bool playerSide)
+        internal void ShowPlacementSlots(BattleMapState mapState, bool playerSide)
         {
+            MapData map = mapState?.Template;
             if (_bindings == null || map == null)
             {
                 return;
@@ -304,9 +309,23 @@ namespace GameBattle
             {
                 for (int y = 0; y < map.Height; y++)
                 {
-                    if (!map.IsBuildableForSide(playerSide, x, y))
+                    GridPosition position = new GridPosition(x, y);
+                    if (!mapState.IsBuildableForSide(playerSide, position))
                     {
                         continue;
+                    }
+
+                    if (mapState.IsOpened(position) && _spaceTileSprite != null)
+                    {
+                        GameObject openedTile = new GameObject($"OpenedTile_{x}_{y}")
+                        {
+                            hideFlags = HideFlags.DontSave,
+                        };
+                        openedTile.transform.SetParent(_bindings.UnitSlotRoot, false);
+                        openedTile.transform.position = _bindings.CellToWorld(x, y, 0.01f);
+                        SpriteRenderer tileRenderer = openedTile.AddComponent<SpriteRenderer>();
+                        tileRenderer.sprite = _spaceTileSprite;
+                        tileRenderer.sortingOrder = 7;
                     }
 
                     GameObject slot = new GameObject($"PlayerSlot_{x}_{y}")
@@ -322,6 +341,55 @@ namespace GameBattle
                     renderer.color = new Color(0.12f, 0.85f, 0.95f, 0.32f);
                     renderer.sortingOrder = 8;
                 }
+            }
+        }
+
+        /// <summary>预加载当前地图的已开垦地块贴图，句柄由世界宿主统一持有和释放。</summary>
+        internal async UniTask PreloadTilePresentationAsync(MapData map)
+        {
+            if (map == null || _spaceTileMapIndex == map.MapIndex && _spaceTileSprite != null)
+            {
+                return;
+            }
+
+            _spaceTileHandle?.Release();
+            _spaceTileHandle = null;
+            _spaceTileSprite = null;
+            _spaceTileMapIndex = -1;
+
+            if (_resourceModule == null)
+            {
+                _resourceModule = ModuleSystem.GetModule<IResourceModule>();
+            }
+
+            string address = $"Sprites/Extracted/Map/space_{map.MapIndex}";
+            if (_resourceModule == null || !_resourceModule.CheckLocationValid(address))
+            {
+                Log.Warning($"[BattleWorldHost] 开垦地块贴图不可用：{address}");
+                return;
+            }
+
+            AssetHandle handle = null;
+            try
+            {
+                handle = _resourceModule.LoadAssetAsyncHandle<Sprite>(address);
+                await handle.Task.AsUniTask();
+                Sprite sprite = handle.AssetObject as Sprite;
+                if (sprite == null)
+                {
+                    handle.Release();
+                    Log.Warning($"[BattleWorldHost] 开垦地块贴图加载结果不是 Sprite：{address}");
+                    return;
+                }
+
+                _spaceTileHandle = handle;
+                _spaceTileSprite = sprite;
+                _spaceTileMapIndex = map.MapIndex;
+            }
+            catch (Exception ex)
+            {
+                handle?.Release();
+                Log.Warning($"[BattleWorldHost] 开垦地块贴图加载失败：{address}, {ex.Message}");
             }
         }
 
@@ -347,6 +415,11 @@ namespace GameBattle
             _worldLoadTask = null;
             _currentResourceAddress = null;
             _resourceModule = null;
+
+            _spaceTileHandle?.Release();
+            _spaceTileHandle = null;
+            _spaceTileSprite = null;
+            _spaceTileMapIndex = -1;
 
             DestroyUnityObject(_placementSprite, destroyImmediate);
             DestroyUnityObject(_placementTexture, destroyImmediate);

@@ -167,6 +167,21 @@ namespace GameBattle
         /// <summary>武将字尝试进入战场或离开同阵营待上场区域。</summary>
         UnitZoneRestricted = 31,
 
+        /// <summary>来源槽不是合法的待上场铲子。</summary>
+        InvalidShovelSource = 40,
+
+        /// <summary>目标格越界或不是可开垦草地。</summary>
+        InvalidShovelTarget = 41,
+
+        /// <summary>目标草地不属于铲子来源阵营。</summary>
+        ShovelTargetWrongSide = 42,
+
+        /// <summary>目标草地已经开垦。</summary>
+        ShovelTargetAlreadyOpened = 43,
+
+        /// <summary>地图状态与槽位面板提交不一致，事务已补偿。</summary>
+        ShovelTransactionFailed = 44,
+
         /// <summary>
         /// 未知/非预期错误。实现层捕获非预期异常后包装为此拒绝原因。
         /// </summary>

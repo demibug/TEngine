@@ -71,13 +71,10 @@ namespace GameBattle
     /// </remarks>
     internal sealed class BowSoldier : SoldierBase
     {
-        /// <summary>箭矢贝塞尔曲线向上的控制点偏移（像素，对应原工程固定值 120）。</summary>
-        private const float ArrowCurveHeight = 120f;
+        /// <summary>当前弓兵远程攻击硬编码预设；后续由单位配置映射提供。</summary>
+        private static readonly RangedAttackParameters AttackParameters = RangedAttackPresets.Bow;
 
-        /// <summary>箭矢飞行速度缩放（对应原工程固定值 1.75）。</summary>
-        private const float ArrowSpeedScale = 1.75f;
-
-        private float _arrowSpeedScale = ArrowSpeedScale;
+        private float _arrowSpeedScale = AttackParameters.DefaultProjectileSpeedScale;
 
         internal float ArrowSpeedScaleForDiagnostics => _arrowSpeedScale;
 
@@ -152,7 +149,7 @@ namespace GameBattle
             // 配置表使用整数速度（如 200）；既有投射物移动器消费 scale，适配为 100=1.0。
             _arrowSpeedScale = config != null && config.ProjectileSpeed > 0
                 ? config.ProjectileSpeed / 100f
-                : ArrowSpeedScale;
+                : AttackParameters.DefaultProjectileSpeedScale;
         }
 
         // ====================================================================
@@ -174,8 +171,8 @@ namespace GameBattle
         /// 兵种不再独立二次查询。释放点目标失效时由 <see cref="BowReleaseEffect"/> 经
         /// <see cref="AttackResolver"/> 执行有限稳定重选（design 决策 4）。</para>
         ///
-        /// <para><b>前摇朝向：</b>按初始目标位置计算角色本体旋转角（仅表现状态）。
-        /// 若释放点回退更换目标，<see cref="LaunchArrow"/> 会按最终目标重算发射角。</para>
+        /// <para><b>本轮锁定朝向：</b>按初始目标位置计算角色本体旋转角（仅表现状态）。
+        /// 释放点即使在小角度锥形内更换目标也不再旋转人物，避免完整 2D 序列帧中途跳向。</para>
         ///
         /// <para><b>新箭下一子步才移动（spec "Projectile is launched after projectile phase"）：</b>
         /// 箭矢在释放点创建后，下一子步才首次移动。</para>
@@ -184,32 +181,31 @@ namespace GameBattle
         {
             // 使用调度器为本次攻击选定的初始目标（design 决策 2：一次攻击只选择一次初始目标）。
             // 不再在 PerformAttack 开头重复 QueryTargets——初始目标由 AttackScheduler 单次选择并传入。
-            int targetId = initialTarget.Id;
-
             // 原工程以箭矢初始切线角旋转整个人物，不能使用 XScale 镜像。
             // 目标取矩形中心，与原 BowSoldier._targetCenter 的 gridWidth/gridHeight/2 语义一致。
-            float targetCenterX = initialTarget.X + CellSize / 2f;
-            float targetCenterY = initialTarget.Y + CellSize / 2f;
-            float controlX = CenterX + (targetCenterX - CenterX) / 2f;
-            float controlY = CenterY + (targetCenterY - CenterY) / 2f - ArrowCurveHeight;
-            float angleDegrees = (float)(ProjectileMath.QuadraticTangentDegrees(
-                CenterX, CenterY, controlX, controlY, targetCenterX, targetCenterY, 0d) + 90d);
-            SetBodyRotation(angleDegrees);
+            float lockedAimAngleDegrees = CalculateLaunchAngleDegrees(
+                CenterX,
+                CenterY,
+                initialTarget,
+                CellSize,
+                AttackParameters.ProjectileCurveHeight);
+            SetBodyRotation(lockedAimAngleDegrees);
 
             // 登记延迟释放效果：攻击动画到第 17 帧开始时触发射箭。
             // 箭矢不在此刻创建，由 BowReleaseEffect 在释放延迟后调用 LaunchArrow 实际发射。
-            // 释放点会对初始目标做首选验证与稳定回退（design 决策 4），回退成功按最终目标重算发射角。
+            // 释放点会验证首选目标并在锁定方向锥形内稳定回退，但不会改变本轮人物朝向。
             var releaseEffect = new BowReleaseEffect();
             releaseEffect.Launch(
                 this,
                 AttackResolver,
                 EnemyManager,
-                targetId,
+                initialTarget,
                 CenterX,
                 CenterY,
                 AttackRange,
                 CellSize,
-                AttackIntervalSeconds);
+                AttackIntervalSeconds,
+                AttackParameters);
 
             // 登记到攻击效果管理器（对应 JS attackEffectManager.add(effect)）。
             AttackEffectManager.Add(releaseEffect);
@@ -218,31 +214,38 @@ namespace GameBattle
         /// <summary>
         /// 创建并发射箭矢（对应 JS <c>launchArrow</c>）。
         /// </summary>
-        /// <param name="finalTarget">最终目标 DTO（释放点首选/回退解析后的目标，含位置用于重算发射角）。</param>
+        /// <param name="finalTarget">释放点首选/回退解析后的最终目标 DTO。</param>
         /// <param name="centerX">发射起点逻辑 X（本单位中心）。</param>
         /// <param name="centerY">发射起点逻辑 Y（本单位中心）。</param>
+        /// <param name="parameters">本次远程攻击参数快照。</param>
         /// <remarks>
         /// <para>由 <see cref="BowReleaseEffect"/> 在释放延迟到达且目标解析成功后调用
-        /// （对齐原工程 STOPPED 事件 → launchArrow）。目标可能经稳定回退更换，故发射角与
-        /// 箭矢终点按最终目标重算，保证朝向与弹道一致（design 决策 4.3）。</para>
+        /// （对齐原工程 STOPPED 事件 → launchArrow）。本方法根据远程攻击参数决定是否在
+        /// 释放点刷新人物朝向，然后创建箭矢；当前弓兵预设使用整轮锁定朝向。</para>
         /// <para>箭矢一旦创建，其目标 ID 固定，飞行中目标死亡不重定向（spec
         /// "已释放普通投射物不得重定向"）。</para>
         /// </remarks>
-        internal void LaunchArrow(EnemyTargetDto finalTarget, float centerX, float centerY)
+        internal void LaunchArrow(
+            EnemyTargetDto finalTarget,
+            float centerX,
+            float centerY,
+            RangedAttackParameters parameters)
         {
             int targetId = finalTarget.Id;
 
-            // 按最终目标重算发射角与控制点（回退换目标后朝向仍正确）。
-            float targetCenterX = finalTarget.X + CellSize / 2f;
-            float targetCenterY = finalTarget.Y + CellSize / 2f;
-            float controlX = centerX + (targetCenterX - centerX) / 2f;
-            float controlY = centerY + (targetCenterY - centerY) / 2f - ArrowCurveHeight;
-            float angleDegrees = (float)(ProjectileMath.QuadraticTangentDegrees(
-                centerX, centerY, controlX, controlY, targetCenterX, targetCenterY, 0d) + 90d);
-            SetBodyRotation(angleDegrees);
+            if (parameters.VisualAimPolicy == RangedVisualAimPolicy.UpdateAtRelease)
+            {
+                float finalAimAngleDegrees = CalculateLaunchAngleDegrees(
+                    centerX,
+                    centerY,
+                    finalTarget,
+                    CellSize,
+                    parameters.ProjectileCurveHeight);
+                SetBodyRotation(finalAimAngleDegrees);
+            }
 
             // 创建箭矢（对应 JS projectileManager.create → ProjectileFactory.Acquire）。
-            // speedScale=1.75, curveHeight=120 对应 BowSoldier 默认值。
+            // 弧高与默认速度来自当前远程攻击参数预设，速度可继续被单位配置覆盖。
             SimpleDynamicArrow arrow = _projectileFactory.Acquire(
                 targetId,
                 Id,
@@ -250,7 +253,7 @@ namespace GameBattle
                 explicitDamage: true,
                 damage: AttackDamage,
                 speedScale: _arrowSpeedScale,
-                curveHeight: ArrowCurveHeight);
+                curveHeight: parameters.ProjectileCurveHeight);
 
             // 从本单位逻辑中心发射箭矢（对应 JS projectile.fire(startX, startY)）。
             arrow.Fire(centerX, centerY);
@@ -261,6 +264,25 @@ namespace GameBattle
 
             // 登记到攻击效果管理器（对应 JS attackEffectManager.add(effect)）。
             AttackEffectManager.Add(effect);
+        }
+
+        /// <summary>
+        /// 按现有二次贝塞尔初始切线计算一轮攻击的锁定表现角度。
+        /// </summary>
+        internal static float CalculateLaunchAngleDegrees(
+            float startX,
+            float startY,
+            EnemyTargetDto target,
+            float cellSize,
+            float projectileCurveHeight)
+        {
+            float targetCenterX = target.X + cellSize / 2f;
+            float targetCenterY = target.Y + cellSize / 2f;
+            float controlX = startX + (targetCenterX - startX) / 2f;
+            float controlY = startY + (targetCenterY - startY) / 2f - projectileCurveHeight;
+            float angleDegrees = (float)(ProjectileMath.QuadraticTangentDegrees(
+                startX, startY, controlX, controlY, targetCenterX, targetCenterY, 0d) + 90d);
+            return angleDegrees;
         }
 
         // ====================================================================
@@ -282,7 +304,7 @@ namespace GameBattle
         {
             _projectileFactory = null;
             _projectileManager = null;
-            _arrowSpeedScale = ArrowSpeedScale;
+            _arrowSpeedScale = AttackParameters.DefaultProjectileSpeedScale;
             base.ResetState();
         }
     }

@@ -47,6 +47,8 @@ namespace GameBattle
         private const string ArrowAddress = "Arrow";
         private const int MaxLevelNumber = 8;
         private const string LevelNumberAddressPrefix = "Sprites/LevelBadge/level_number_";
+        private const string DamageNumberSpriteAddress =
+            "Sprites/Extracted/GameObject/bitmapFont/number1";
 
         private readonly BattleMapBindings _bindings;
         private readonly Dictionary<int, string> _unitAddresses = new Dictionary<int, string>
@@ -70,6 +72,9 @@ namespace GameBattle
         private SpriteRenderer[] _playerHealthPoints;
         private SpriteRenderer[] _opponentHealthPoints;
         private Sprite[] _levelNumberSprites;
+        private Sprite[] _damageDigitSprites;
+        private DamageNumberSystem _damageNumberSystem;
+        private readonly bool _showDamageNumbers;
         private readonly Dictionary<string, Sprite> _generalPartSprites = new Dictionary<string, Sprite>();
         private readonly Dictionary<int, GameObject> _generalPartGlyphs = new Dictionary<int, GameObject>();
 
@@ -80,7 +85,7 @@ namespace GameBattle
         private IBattleViewAssetLoader _loader;
 
         internal UnityBattleViewPort(BattleMapBindings bindings)
-            : this(bindings, null)
+            : this(bindings, null, true)
         {
         }
 
@@ -90,10 +95,21 @@ namespace GameBattle
         /// <param name="bindings">地图节点绑定（非 null）。</param>
         /// <param name="loader">资源加载接缝；null 时在预加载时惰性创建生产实现。</param>
         internal UnityBattleViewPort(BattleMapBindings bindings, IBattleViewAssetLoader loader)
+            : this(bindings, loader, true)
+        {
+        }
+
+        internal UnityBattleViewPort(
+            BattleMapBindings bindings,
+            IBattleViewAssetLoader loader,
+            bool showDamageNumbers)
         {
             _bindings = bindings ?? throw new ArgumentNullException(nameof(bindings));
             _loader = loader;
+            _showDamageNumbers = showDamageNumbers;
         }
+
+        internal DamageNumberSystem DamageNumberSystemForTest => _damageNumberSystem;
 
         internal void ConfigureRegistry(BattleViewRegistry registry)
         {
@@ -404,6 +420,7 @@ namespace GameBattle
                 await LoadUnitAnimationsAsync(loader);
                 await LoadLevelNumberSpritesAsync(loader);
                 await LoadGeneralPartSpritesAsync(loader, generalPartWords);
+                await LoadDamageNumberSpritesAsync(loader);
 
                 _preloaded = true;
             }
@@ -494,6 +511,24 @@ namespace GameBattle
         public void OnEnemyRemoved(int runtimeId, bool playDeathEffect)
         {
             DespawnInstance(runtimeId);
+        }
+
+        public void OnEnemyDamaged(EnemyDamageViewData dto)
+        {
+            if (_damageNumberSystem == null
+                || dto.RawDamage <= 0
+                || !_activeInstances.TryGetValue(dto.RuntimeId, out ActiveInstance active)
+                || active.Category != ViewObjectCategory.Enemy
+                || active.GameObject == null)
+            {
+                return;
+            }
+
+            Transform anchor = active.GameObject.transform.Find("VisualRoot/HitEffectPoint");
+            Vector3 startPosition = anchor == null
+                ? active.GameObject.transform.position
+                : anchor.position;
+            _damageNumberSystem.Show(dto.RuntimeId, dto.RawDamage, startPosition);
         }
 
         public void OnBossSkillIntent(int runtimeId, string animationKey, bool active)
@@ -614,6 +649,8 @@ namespace GameBattle
 
         public void Clear()
         {
+            ResetDamageNumberPresentation();
+
             foreach (ActiveInstance active in _activeInstances.Values)
             {
                 Destroy(active.GameObject);
@@ -1100,6 +1137,77 @@ namespace GameBattle
             }
         }
 
+        private async UniTask LoadDamageNumberSpritesAsync(IBattleViewAssetLoader loader)
+        {
+            IBattleAssetLease lease;
+            try
+            {
+                lease = loader.LoadAsync<Sprite>(DamageNumberSpriteAddress);
+                if (lease == null)
+                {
+                    throw new InvalidOperationException("资源加载接缝返回空租约");
+                }
+
+                _assetLeases.Add(lease);
+                await UniTask.WaitUntil(() => lease.IsDone);
+            }
+            catch (BattlePresentationLoadException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new BattlePresentationLoadException(
+                    "load-damage-number", DamageNumberSpriteAddress, ex);
+            }
+
+            if (!lease.IsValid || !(lease.AssetObject is Sprite sourceSprite) || sourceSprite == null)
+            {
+                throw new BattlePresentationLoadException(
+                    "validate-damage-number",
+                    DamageNumberSpriteAddress,
+                    new InvalidOperationException("伤害数字源 Sprite 无效"));
+            }
+
+            Rect sourceRect = sourceSprite.rect;
+            if (sourceRect.width <= 0f
+                || sourceRect.height <= 0f
+                || Mathf.RoundToInt(sourceRect.width) % 10 != 0)
+            {
+                throw new BattlePresentationLoadException(
+                    "validate-damage-number-layout",
+                    DamageNumberSpriteAddress,
+                    new InvalidOperationException(
+                        $"伤害数字源图必须为十等分横条，实际尺寸={sourceRect.width}x{sourceRect.height}"));
+            }
+
+            float glyphWidth = sourceRect.width / 10f;
+            _damageDigitSprites = new Sprite[10];
+            for (int digit = 0; digit < _damageDigitSprites.Length; digit++)
+            {
+                Rect glyphRect = new Rect(
+                    sourceRect.x + glyphWidth * digit,
+                    sourceRect.y,
+                    glyphWidth,
+                    sourceRect.height);
+                Sprite glyph = Sprite.Create(
+                    sourceSprite.texture,
+                    glyphRect,
+                    new Vector2(0.5f, 0.5f),
+                    100f,
+                    0,
+                    SpriteMeshType.FullRect);
+                glyph.name = $"damage_digit_{digit}";
+                _damageDigitSprites[digit] = glyph;
+            }
+
+            _damageNumberSystem = new DamageNumberSystem(
+                _bindings.EffectRoot,
+                _bindings.MapRoot,
+                _damageDigitSprites,
+                _showDamageNumbers);
+        }
+
         private void ConfigureUnitAnimation(GameObject instance, string assetKey)
         {
             int soldierType = assetKey == "unit_KnifeSoldier" ? 0
@@ -1149,6 +1257,7 @@ namespace GameBattle
 
         private void ResetPreload()
         {
+            ResetDamageNumberPresentation();
             _levelNumberSprites = null;
             _generalPartSprites.Clear();
 
@@ -1166,6 +1275,37 @@ namespace GameBattle
             _prefabs.Clear();
             _unitAnimations.Clear();
             _preloaded = false;
+        }
+
+        private void ResetDamageNumberPresentation()
+        {
+            _damageNumberSystem?.Clear();
+            _damageNumberSystem = null;
+
+            if (_damageDigitSprites == null)
+            {
+                return;
+            }
+
+            for (int index = 0; index < _damageDigitSprites.Length; index++)
+            {
+                Sprite sprite = _damageDigitSprites[index];
+                if (sprite == null)
+                {
+                    continue;
+                }
+
+                if (Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(sprite);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(sprite);
+                }
+            }
+
+            _damageDigitSprites = null;
         }
 
         private string GetAddress(string assetKey)

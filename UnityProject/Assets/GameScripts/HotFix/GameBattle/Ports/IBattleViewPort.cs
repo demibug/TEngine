@@ -163,6 +163,21 @@ namespace GameBattle
         /// <param name="playDeathEffect">是否播放死亡表现（true=正常死亡；false=战斗结束清理回收）。</param>
         void OnEnemyRemoved(int runtimeId, bool playDeathEffect);
 
+        /// <summary>
+        /// 通知表现层：一个敌人受击造成有效正伤害，需显示伤害飘字。
+        /// </summary>
+        /// <param name="dto">受击伤害表现 DTO：runtimeId + Hit 原始伤害。</param>
+        /// <remarks>
+        /// <para>仅在 <see cref="EnemyBase.Hit"/> 有效正伤害路径触发（低频事实）：
+        /// 0/负数伤害不触发、死亡后伤害不触发、Buff 生命变化（最大生命/当前生命修饰）不触发。
+        /// 显示 <see cref="EnemyDamageViewData.RawDamage"/> 原始伤害而非实际生命 delta，
+        /// 过量伤害显示原始数值。本事实在 EnemyHealthChanged 之后、死亡/移除事实之前发布。</para>
+        /// <para>由 <see cref="EnemyManager.EnemyDamaged"/> 经 <see cref="BattlePresenter"/>
+        /// 原样转发。Null 实现为空操作；<see cref="UnityBattleViewPort"/> 交给
+        /// <see cref="DamageNumberSystem"/> 在世界空间表现。</para>
+        /// </remarks>
+        void OnEnemyDamaged(EnemyDamageViewData dto);
+
         /// <summary>通知表现层播放 Boss 技能动画或恢复待机动画。</summary>
         void OnBossSkillIntent(int runtimeId, string animationKey, bool active);
 

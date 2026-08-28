@@ -48,6 +48,17 @@ namespace GameBattle.Tests.EditMode.Input
         }
 
         [Test]
+        public void CreateUseShovel_ConstructsCorrectTypeAndPayload()
+        {
+            var target = new GridPosition(4, 6);
+            BattleInputCommand command = BattleInputCommand.CreateUseShovel(8, 12, target);
+
+            Assert.AreEqual(BattleInputCommandType.UseShovel, command.CommandType);
+            Assert.AreEqual(12, command.UseShovelPayload.SourceReserveSlotId);
+            Assert.AreEqual(target, command.UseShovelPayload.Target);
+        }
+
+        [Test]
         [Description("Recruit 命令的 DropUnitPayload 为默认值，DropUnit 命令的 RecruitPayload 为默认值。")]
         public void CreateRecruit_DropUnitPayloadIsDefault_AndViceVersa()
         {
