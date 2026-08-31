@@ -68,6 +68,12 @@ namespace GameBattle
         private readonly bool _includeInitialPlayerShovel;
         private bool _initialPlayerShovelIssued;
 
+        /// <summary>对手独立牌库；为空时保留旧版均匀四兵兼容路径。</summary>
+        private readonly OpponentDeckManager _opponentDeck;
+
+        /// <summary>对手逻辑手牌；为空时不维护手牌状态。</summary>
+        private readonly OpponentHand _opponentHand;
+
         // ====================================================================
         // 构造
         // ====================================================================
@@ -90,7 +96,9 @@ namespace GameBattle
                 slotBoard,
                 reserveSlotCount,
                 partRecruitEntries,
-                includeInitialPlayerShovel)
+                includeInitialPlayerShovel,
+                opponentDeck: null,
+                opponentHand: null)
         {
         }
 
@@ -102,6 +110,28 @@ namespace GameBattle
             int reserveSlotCount,
             IReadOnlyList<GeneralPartRecruitEntry> partRecruitEntries = null,
             bool includeInitialPlayerShovel = false)
+            : this(
+                playerRandomSource,
+                opponentRandomSource,
+                slotBoard,
+                reserveSlotCount,
+                partRecruitEntries,
+                includeInitialPlayerShovel,
+                opponentDeck: null,
+                opponentHand: null)
+        {
+        }
+
+        /// <summary>构造同时维护敌方独立牌库与固定容量手牌的征兵工厂。</summary>
+        internal RecruitManager(
+            IRandomSource playerRandomSource,
+            IRandomSource opponentRandomSource,
+            UnitSlotBoard slotBoard,
+            int reserveSlotCount,
+            IReadOnlyList<GeneralPartRecruitEntry> partRecruitEntries,
+            bool includeInitialPlayerShovel,
+            OpponentDeckManager opponentDeck,
+            OpponentHand opponentHand)
         {
             _playerRandomSource = playerRandomSource
                 ?? throw new ArgumentNullException(nameof(playerRandomSource));
@@ -111,6 +141,8 @@ namespace GameBattle
             _reserveSlotCount = reserveSlotCount > 0 ? reserveSlotCount : RecruitDefinitions.ReserveSlotCount;
             _partRecruitEntries = partRecruitEntries ?? Array.Empty<GeneralPartRecruitEntry>();
             _includeInitialPlayerShovel = includeInitialPlayerShovel;
+            _opponentDeck = opponentDeck;
+            _opponentHand = opponentHand;
         }
 
         // ====================================================================
@@ -130,6 +162,11 @@ namespace GameBattle
         /// </remarks>
         internal IReadOnlyList<BattleUnit> GenerateBatch(bool isPlayerSide)
         {
+            if (!isPlayerSide && _opponentDeck != null && _opponentHand != null)
+            {
+                return GenerateOpponentHandBatch();
+            }
+
             var batch = new List<BattleUnit>(_reserveSlotCount);
             for (int i = 0; i < _reserveSlotCount; i++)
             {
@@ -147,6 +184,66 @@ namespace GameBattle
             }
 
             return batch;
+        }
+
+        /// <summary>
+        /// 将敌方逻辑手牌刷新为 Reserve 投影。手牌替换发生在牌库/手牌层，
+        /// 单位实例只在这里创建，棋盘仍由调用方通过 ReplaceReserve 提交。
+        /// </summary>
+        private IReadOnlyList<BattleUnit> GenerateOpponentHandBatch()
+        {
+            _opponentHand.Refill(_opponentDeck);
+            IReadOnlyList<OpponentHandSlot> handSlots = _opponentHand.Slots;
+            var batch = new List<BattleUnit>(handSlots.Count);
+            for (int i = 0; i < handSlots.Count; i++)
+            {
+                OpponentDeckCard card = handSlots[i].Card;
+                batch.Add(CreateUnitFromCard(card));
+            }
+
+            _opponentHand.BindUnitIds(batch);
+            return batch;
+        }
+
+        /// <summary>把牌面转换成局内单位；不写 Reserve/战场状态。</summary>
+        internal BattleUnit CreateUnitFromCard(OpponentDeckCard card)
+        {
+            if (card == null)
+            {
+                return new BattleUnit(
+                    _slotBoard.AllocateUnitId(),
+                    side: false,
+                    kind: UnitKind.Soldier,
+                    soldierType: SoldierType.Knife,
+                    soldierText: "刀",
+                    level: RecruitDefinitions.DefaultLevel);
+            }
+
+            switch (card.Kind)
+            {
+                case OpponentCardKind.GeneralPart:
+                    return BattleUnit.CreateGeneralPart(
+                        _slotBoard.AllocateUnitId(),
+                        side: false,
+                        card.Text,
+                        card.Level);
+                case OpponentCardKind.Farmer:
+                    return BattleUnit.CreateFarmer(
+                        _slotBoard.AllocateUnitId(),
+                        side: false);
+                case OpponentCardKind.Shovel:
+                    return BattleUnit.CreateShovel(
+                        _slotBoard.AllocateUnitId(),
+                        side: false);
+                default:
+                    return new BattleUnit(
+                        _slotBoard.AllocateUnitId(),
+                        side: false,
+                        kind: UnitKind.Soldier,
+                        soldierType: TextToSoldierType(card.Text),
+                        soldierText: card.Text,
+                        level: card.Level);
+            }
         }
 
         /// <summary>

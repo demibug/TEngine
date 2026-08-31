@@ -1,4 +1,5 @@
 using System;
+using GameBattle.Weapon;
 using NUnit.Framework;
 
 namespace GameBattle.Tests.EditMode.Unit
@@ -9,8 +10,8 @@ namespace GameBattle.Tests.EditMode.Unit
     // 验证内容（design.md 决策 3/4 / specs/player-weapon-runtime/spec.md
     //   "Player Soldiers receive one default weapon value" /
     //   "Pool reset removes weapon state"）：
-    //   1. 四类玩家兵种经 UnitRegistry 创建后各获得映射武器 id（Knife→20、
-    //      Bow→0、Spear→10、Cavalry→31）且 WeaponAttackPower=1，攻击力 = 基础 + 1。
+    //   1. 四类玩家兵种经 UnitRegistry 创建后各获得映射武器 id（Knife→21、
+    //      Bow→1、Spear→11、Cavalry→32）且 WeaponAttackPower=1，攻击力 = 基础 + 1。
     //   2. 对手 Soldier 不装备：WeaponId=-1、WeaponAttackPower=0、HasWeapon=false。
     //   3. ResetState 无条件清除武器状态（普通移除、池复用）。
     //   4. 解析失败（映射缺失）沿创建事务回滚：士兵归还池、无半初始化残留，
@@ -88,10 +89,10 @@ namespace GameBattle.Tests.EditMode.Unit
         {
             return new WeaponCatalogSnapshot(new[]
             {
-                new WeaponDefinitionSnapshot(0, WeaponType.Bow, 1, true, "Basic"),
-                new WeaponDefinitionSnapshot(10, WeaponType.Spear, 1, true, "Basic"),
-                new WeaponDefinitionSnapshot(20, WeaponType.Knife, 1, true, "Basic"),
-                new WeaponDefinitionSnapshot(31, WeaponType.Sword, 1, true, "Basic"),
+                new WeaponDefinitionSnapshot(1, WeaponType.Bow, 1, true, "Basic"),
+                new WeaponDefinitionSnapshot(11, WeaponType.Spear, 1, true, "Basic"),
+                new WeaponDefinitionSnapshot(21, WeaponType.Knife, 1, true, "Basic"),
+                new WeaponDefinitionSnapshot(32, WeaponType.Sword, 1, true, "Basic"),
             });
         }
 
@@ -114,13 +115,13 @@ namespace GameBattle.Tests.EditMode.Unit
         private static UnitConfigSnapshot SpearConfig => MakeConfig(2, "枪", "pike");
         private static UnitConfigSnapshot CavalryConfig => MakeConfig(3, "骑", "cavalry");
 
-        /// <summary>四类玩家兵种及其期望武器 id（显式映射：Knife→20/Bow→0/Spear→10/Cavalry→31）。</summary>
+        /// <summary>四类玩家兵种及其期望武器 id（显式映射：Knife→21/Bow→1/Spear→11/Cavalry→32）。</summary>
         private static readonly (SoldierType Type, UnitConfigSnapshot Config, int ExpectedId)[] PlayerCases =
         {
-            (SoldierType.Knife, KnifeConfig, 20),
-            (SoldierType.Bow, BowConfig, 0),
-            (SoldierType.Spear, SpearConfig, 10),
-            (SoldierType.Cavalry, CavalryConfig, 31),
+            (SoldierType.Knife, KnifeConfig, 21),
+            (SoldierType.Bow, BowConfig, 1),
+            (SoldierType.Spear, SpearConfig, 11),
+            (SoldierType.Cavalry, CavalryConfig, 32),
         };
 
         // ====================================================================
@@ -213,14 +214,14 @@ namespace GameBattle.Tests.EditMode.Unit
         {
             SoldierBase first = _registry.CreateAndPlace(
                 SoldierType.Cavalry, CavalryConfig, side: true, 0, 0, UnitWidth, UnitHeight);
-            Assert.AreEqual(31, first.WeaponId, "骑兵首次应解析到 id=31");
+            Assert.AreEqual(32, first.WeaponId, "骑兵首次应解析到 id=32");
 
             Assert.IsTrue(_registry.Remove(first.Id), "移除骑兵并归还池");
 
             SoldierBase reused = _registry.CreateAndPlace(
                 SoldierType.Cavalry, CavalryConfig, side: true, 1, 1, UnitWidth, UnitHeight);
             Assert.IsTrue(reused.HasWeapon, "复用玩家骑兵应重新装备武器");
-            Assert.AreEqual(31, reused.WeaponId, "复用后仍应解析到 id=31");
+            Assert.AreEqual(32, reused.WeaponId, "复用后仍应解析到 id=32");
             Assert.AreEqual(1, reused.WeaponAttackPower, "复用后附加攻击力应为 1");
             Assert.AreEqual(21, reused.AttackDamageForTest, "复用后攻击力=基础 20 + 武器 1");
         }
@@ -309,7 +310,7 @@ namespace GameBattle.Tests.EditMode.Unit
             SoldierBase knife = failing.CreateAndPlace(
                 SoldierType.Knife, KnifeConfig, side: true, 0, 0, UnitWidth, UnitHeight);
             Assert.IsTrue(knife.HasWeapon, "刀兵映射不受弓兵缺失影响");
-            Assert.AreEqual(20, knife.WeaponId, "刀兵应解析到 id=20");
+            Assert.AreEqual(21, knife.WeaponId, "刀兵应解析到 id=21");
         }
     }
 }

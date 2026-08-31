@@ -142,7 +142,8 @@ namespace GameBattle
                     card,
                     occupant,
                     _entryArgs.GetUnitIcon,
-                    _entryArgs.GetGeneralPartIcon);
+                    _entryArgs.GetGeneralPartIcon,
+                    _entryArgs.GetPropIcon);
 
                 // 统一拖放规则：根卡不 draggable，起拖只允许发生在非空单位主体的拖拽柄上
                 // （底框/空槽/等级数字不能起拖）。空槽无拖拽柄，无拖拽。
@@ -186,7 +187,8 @@ namespace GameBattle
             UI_BattleCardItem card,
             BattleUnit? unit,
             Func<int, Sprite> getUnitIcon,
-            Func<string, Sprite> getGeneralPartIcon)
+            Func<string, Sprite> getGeneralPartIcon,
+            Func<PropType, Sprite> getPropIcon)
         {
             bool hasUnit = unit.HasValue;
             string displayText = !unit.HasValue ? null
@@ -220,6 +222,10 @@ namespace GameBattle
                 && (unit.Value.Kind == UnitKind.GeneralPart || unit.Value.Kind == UnitKind.General))
             {
                 sprite = getGeneralPartIcon?.Invoke(unit.Value.GeneralPartText);
+            }
+            if (sprite == null && unit.HasValue && unit.Value.Kind == UnitKind.Prop)
+            {
+                sprite = getPropIcon?.Invoke(unit.Value.PropType);
             }
 
             if (sprite != null)
@@ -471,7 +477,8 @@ namespace GameBattle
                 return;
             }
 
-            // 识别场上源槽：源只从单位主体起拖（先锁定玩家战场槽，再检查活动单位 Body 命中）。
+            // 识别场上源槽：从外层战场槽位框架起拖，不依赖单位内部动画 Renderer。
+            // 先锁定玩家战场槽，再检查该槽是否有单位。
             if (_entryArgs.ResolveBattleSourceForStage?.Invoke(
                     stagePosition.x, stagePosition.y, out int battleSlotId) != true
                 || battleSlotId < 0)
@@ -894,6 +901,7 @@ namespace GameBattle
         internal Func<int, UnitSlot> GetSlotById { get; }
         internal Func<int, Sprite> GetUnitIcon { get; }
         internal Func<string, Sprite> GetGeneralPartIcon { get; }
+        internal Func<PropType, Sprite> GetPropIcon { get; }
 
         internal BattleHudEntryArgs(
             Func<UniTask<BattleOperationResult>> exitAsync,
@@ -905,7 +913,8 @@ namespace GameBattle
             ResolveBattleSourceDelegate resolveBattleSourceForStage,
             Func<int, UnitSlot> getSlotById,
             Func<int, Sprite> getUnitIcon,
-            Func<string, Sprite> getGeneralPartIcon)
+            Func<string, Sprite> getGeneralPartIcon,
+            Func<PropType, Sprite> getPropIcon)
         {
             ExitAsync = exitAsync ?? throw new ArgumentNullException(nameof(exitAsync));
             Recruit = recruit ?? throw new ArgumentNullException(nameof(recruit));
@@ -920,6 +929,7 @@ namespace GameBattle
             GetSlotById = getSlotById ?? throw new ArgumentNullException(nameof(getSlotById));
             GetUnitIcon = getUnitIcon ?? throw new ArgumentNullException(nameof(getUnitIcon));
             GetGeneralPartIcon = getGeneralPartIcon ?? throw new ArgumentNullException(nameof(getGeneralPartIcon));
+            GetPropIcon = getPropIcon ?? throw new ArgumentNullException(nameof(getPropIcon));
         }
     }
 
@@ -936,16 +946,16 @@ namespace GameBattle
         out int targetSlotId);
 
     /// <summary>
-    /// 把 Stage 坐标解析为可起拖的玩家战场源槽位标识的委托（统一拖放规则：源只从单位主体起拖）。
+    /// 把 Stage 坐标解析为可起拖的玩家战场源槽位标识的委托（统一拖放规则：源命中外层槽位框架）。
     /// </summary>
     /// <param name="screenX">Stage X 坐标。</param>
     /// <param name="screenY">Stage Y 坐标。</param>
     /// <param name="battleSlotId">解析出的玩家战场源槽位固定标识；未命中为 -1。</param>
-    /// <returns>解析成功、命中战场槽且该槽活动单位 Body 命中屏幕点返回 true。</returns>
+    /// <returns>解析成功、命中非空玩家战场槽位框架返回 true。</returns>
     /// <remarks>
-    /// <para>先锁定玩家战场槽（完整槽位命中），再检查 <see cref="UnityBattleViewPort"/>
-    /// 中对应活动单位 Body SpriteRenderer 的屏幕/世界 bounds。战场格子底框不能起拖，
-    /// 投放目标仍使用完整的 <see cref="ResolveBattleSlotForStage"/> 命中。</para>
+    /// <para>先锁定玩家战场槽（完整槽位命中），再检查该槽是否有单位。起拖不依赖
+    /// 活动单位内部的 Body/Spine Renderer，投放目标仍使用完整的
+    /// <see cref="ResolveBattleSlotForStage"/> 命中。</para>
     /// </remarks>
     internal delegate bool ResolveBattleSourceDelegate(
         float screenX,

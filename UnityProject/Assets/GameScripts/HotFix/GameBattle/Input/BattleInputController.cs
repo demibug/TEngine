@@ -253,6 +253,9 @@ namespace GameBattle
                 case BattleInputCommandType.UseShovel:
                     return ExecuteUseShovel(command);
 
+                case BattleInputCommandType.UseFarmer:
+                    return ExecuteUseFarmer(command);
+
                 default:
                     return BattleInputResult.Fail(
                         command.CommandId,
@@ -330,19 +333,100 @@ namespace GameBattle
         private static BattleInputResult MapOpenTileRejection(
             int commandId,
             OpenTileRejectReason rejectReason,
-            GridPosition target)
+            GridPosition target,
+            bool farmer = false)
         {
             BattleInputRejectReason inputReason = rejectReason switch
             {
-                OpenTileRejectReason.WrongSide => BattleInputRejectReason.ShovelTargetWrongSide,
-                OpenTileRejectReason.AlreadyOpened => BattleInputRejectReason.ShovelTargetAlreadyOpened,
-                _ => BattleInputRejectReason.InvalidShovelTarget,
+                OpenTileRejectReason.WrongSide => farmer
+                    ? BattleInputRejectReason.FarmerTargetWrongSide
+                    : BattleInputRejectReason.ShovelTargetWrongSide,
+                OpenTileRejectReason.AlreadyOpened => farmer
+                    ? BattleInputRejectReason.FarmerTargetAlreadyOpened
+                    : BattleInputRejectReason.ShovelTargetAlreadyOpened,
+                _ => farmer
+                    ? BattleInputRejectReason.InvalidFarmerTarget
+                    : BattleInputRejectReason.InvalidShovelTarget,
             };
 
             return BattleInputResult.Fail(
                 commandId,
                 inputReason,
-                $"铲子目标 {target} 非法：{rejectReason}");
+                $"{(farmer ? "农民" : "铲子")}目标 {target} 非法：{rejectReason}");
+        }
+
+        private BattleInputResult ExecuteUseFarmer(BattleInputCommand command)
+        {
+            UseFarmerPayload payload = command.UseFarmerPayload;
+            if (!_slotBoard.ContainsSlotId(payload.SourceReserveSlotId))
+            {
+                return BattleInputResult.Fail(
+                    command.CommandId,
+                    BattleInputRejectReason.InvalidFarmerSource,
+                    $"农民来源槽 {payload.SourceReserveSlotId} 不存在");
+            }
+
+            UnitSlot source = _slotBoard.GetSlotById(payload.SourceReserveSlotId);
+            if (source.SlotId.Zone != SlotZone.Reserve
+                || !source.Occupant.HasValue
+                || source.Occupant.Value.Kind != UnitKind.Farmer)
+            {
+                return BattleInputResult.Fail(
+                    command.CommandId,
+                    BattleInputRejectReason.InvalidFarmerSource,
+                    $"来源槽 {payload.SourceReserveSlotId} 不是待上场农民");
+            }
+
+            bool playerSide = source.SlotId.Side;
+            OpenTileRejectReason openReject = _mapState.CanOpenTile(playerSide, payload.Target);
+            if (openReject != OpenTileRejectReason.None)
+            {
+                return MapOpenTileRejection(
+                    command.CommandId,
+                    openReject,
+                    payload.Target,
+                    farmer: true);
+            }
+
+            OpenTileResult openResult = _mapState.TryOpenTile(playerSide, payload.Target);
+            if (!openResult.IsSuccess)
+            {
+                return MapOpenTileRejection(
+                    command.CommandId,
+                    openResult.RejectReason,
+                    payload.Target,
+                    farmer: true);
+            }
+
+            if (!_slotBoard.TryCommitFarmerUse(
+                    payload.SourceReserveSlotId,
+                    payload.Target,
+                    out UnitSlotId addedBattleSlotId))
+            {
+                bool rolledBack = _mapState.TryRollback(openResult.Change);
+                if (!rolledBack)
+                {
+                    Log.Error($"{LogTag} 农民槽位提交失败且地图回滚失败，target={payload.Target}");
+                }
+
+                return BattleInputResult.Fail(
+                    command.CommandId,
+                    BattleInputRejectReason.FarmerTransactionFailed,
+                    $"农民槽位事务提交失败，target={payload.Target}");
+            }
+
+            _signalHub?.SlotChanged.Publish(
+                new SlotChangedFact(source.SlotId, occupant: null));
+            _signalHub?.SlotChanged.Publish(
+                new SlotChangedFact(addedBattleSlotId, occupant: null));
+            _signalHub?.TileOpened.Publish(
+                new TileOpenedFact(
+                    playerSide,
+                    payload.Target,
+                    source.SlotId,
+                    addedBattleSlotId));
+
+            return BattleInputResult.Ok(command.CommandId);
         }
 
         // ====================================================================
@@ -490,13 +574,14 @@ namespace GameBattle
 
             UnitSlot sourceSlot = _slotBoard.GetSlotById(payload.SourceSlotId);
             if (sourceSlot.Occupant.HasValue
-                && sourceSlot.Occupant.Value.Kind == UnitKind.Prop
+                && (sourceSlot.Occupant.Value.Kind == UnitKind.Prop
+                    || sourceSlot.Occupant.Value.Kind == UnitKind.Farmer)
                 && targetSlotId.Zone == SlotZone.Battle)
             {
                 return BattleInputResult.Fail(
                     commandId,
                     BattleInputRejectReason.UnitZoneRestricted,
-                    "道具不能通过普通换槽命令放入战场，请拖到可开垦地图格");
+                    "道具或农民不能通过普通换槽命令放入战场，请使用专用命令");
             }
 
             // 阶段 0：战斗内冷却同步（修复 P0）。

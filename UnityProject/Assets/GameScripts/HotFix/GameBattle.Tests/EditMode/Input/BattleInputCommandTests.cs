@@ -59,6 +59,17 @@ namespace GameBattle.Tests.EditMode.Input
         }
 
         [Test]
+        public void CreateUseFarmer_ConstructsCorrectTypeAndPayload()
+        {
+            var target = new GridPosition(2, 1);
+            BattleInputCommand command = BattleInputCommand.CreateUseFarmer(9, 13, target);
+
+            Assert.AreEqual(BattleInputCommandType.UseFarmer, command.CommandType);
+            Assert.AreEqual(13, command.UseFarmerPayload.SourceReserveSlotId);
+            Assert.AreEqual(target, command.UseFarmerPayload.Target);
+        }
+
+        [Test]
         [Description("Recruit 命令的 DropUnitPayload 为默认值，DropUnit 命令的 RecruitPayload 为默认值。")]
         public void CreateRecruit_DropUnitPayloadIsDefault_AndViceVersa()
         {

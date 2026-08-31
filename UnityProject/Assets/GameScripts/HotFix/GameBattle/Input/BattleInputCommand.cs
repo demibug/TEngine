@@ -48,6 +48,9 @@ namespace GameBattle
 
         /// <summary>消费待上场槽中的铲子并开垦一个地图格。</summary>
         UseShovel = 2,
+
+        /// <summary>消费待上场槽中的农民并开垦一个地图格。</summary>
+        UseFarmer = 3,
     }
 
     /// <summary>
@@ -126,6 +129,21 @@ namespace GameBattle
             => $"UseShovel(SourceReserveSlotId={SourceReserveSlotId}, Target={Target})";
     }
 
+    public readonly struct UseFarmerPayload
+    {
+        public readonly int SourceReserveSlotId;
+        public readonly GridPosition Target;
+
+        public UseFarmerPayload(int sourceReserveSlotId, GridPosition target)
+        {
+            SourceReserveSlotId = sourceReserveSlotId;
+            Target = target;
+        }
+
+        public override string ToString()
+            => $"UseFarmer(SourceReserveSlotId={SourceReserveSlotId}, Target={Target})";
+    }
+
     /// <summary>
     /// 不可变战斗输入命令。携带单局 <see cref="CommandId"/> 与强类型值载荷。
     /// </summary>
@@ -173,18 +191,23 @@ namespace GameBattle
         /// <summary>使用铲子载荷。仅当 CommandType=UseShovel 时有效。</summary>
         public readonly UseShovelPayload UseShovelPayload;
 
+        /// <summary>使用农民载荷。仅当 CommandType=UseFarmer 时有效。</summary>
+        public readonly UseFarmerPayload UseFarmerPayload;
+
         private BattleInputCommand(
             int commandId,
             BattleInputCommandType commandType,
             RecruitPayload recruitPayload,
             DropUnitPayload dropUnitPayload,
-            UseShovelPayload useShovelPayload)
+            UseShovelPayload useShovelPayload,
+            UseFarmerPayload useFarmerPayload)
         {
             CommandId = commandId;
             CommandType = commandType;
             RecruitPayload = recruitPayload;
             DropUnitPayload = dropUnitPayload;
             UseShovelPayload = useShovelPayload;
+            UseFarmerPayload = useFarmerPayload;
         }
 
         /// <summary>
@@ -198,6 +221,7 @@ namespace GameBattle
                 commandId,
                 BattleInputCommandType.Recruit,
                 new RecruitPayload(playerSide),
+                default,
                 default,
                 default);
 
@@ -214,6 +238,7 @@ namespace GameBattle
                 BattleInputCommandType.DropUnit,
                 default,
                 new DropUnitPayload(sourceSlotId, targetSlotId),
+                default,
                 default);
 
         public static BattleInputCommand CreateUseShovel(
@@ -225,7 +250,20 @@ namespace GameBattle
                 BattleInputCommandType.UseShovel,
                 default,
                 default,
-                new UseShovelPayload(sourceReserveSlotId, target));
+                new UseShovelPayload(sourceReserveSlotId, target),
+                default);
+
+        public static BattleInputCommand CreateUseFarmer(
+            int commandId,
+            int sourceReserveSlotId,
+            GridPosition target)
+            => new BattleInputCommand(
+                commandId,
+                BattleInputCommandType.UseFarmer,
+                default,
+                default,
+                default,
+                new UseFarmerPayload(sourceReserveSlotId, target));
 
         /// <summary>
         /// 判断两个命令是否相等。CommandId 与 CommandType 与全部载荷字段均相同才相等。
@@ -235,7 +273,8 @@ namespace GameBattle
                && CommandType == other.CommandType
                && RecruitPayload.Equals(other.RecruitPayload)
                && DropUnitPayload.Equals(other.DropUnitPayload)
-               && UseShovelPayload.Equals(other.UseShovelPayload);
+               && UseShovelPayload.Equals(other.UseShovelPayload)
+               && UseFarmerPayload.Equals(other.UseFarmerPayload);
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => obj is BattleInputCommand other && Equals(other);
@@ -250,6 +289,7 @@ namespace GameBattle
                 hash = (hash * 397) ^ RecruitPayload.GetHashCode();
                 hash = (hash * 397) ^ DropUnitPayload.GetHashCode();
                 hash = (hash * 397) ^ UseShovelPayload.GetHashCode();
+                hash = (hash * 397) ^ UseFarmerPayload.GetHashCode();
                 return hash;
             }
         }
@@ -271,6 +311,8 @@ namespace GameBattle
                     return $"[BattleInputCommand Id={CommandId} Type=DropUnit {DropUnitPayload}]";
                 case BattleInputCommandType.UseShovel:
                     return $"[BattleInputCommand Id={CommandId} Type=UseShovel {UseShovelPayload}]";
+                case BattleInputCommandType.UseFarmer:
+                    return $"[BattleInputCommand Id={CommandId} Type=UseFarmer {UseFarmerPayload}]";
                 default:
                     return $"[BattleInputCommand Id={CommandId} Type={CommandType}]";
             }

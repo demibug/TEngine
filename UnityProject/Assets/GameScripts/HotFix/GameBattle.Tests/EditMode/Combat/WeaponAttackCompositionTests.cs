@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GameBattle.Weapon;
 using NUnit.Framework;
 
 namespace GameBattle.Tests.EditMode.Combat
@@ -108,10 +109,10 @@ namespace GameBattle.Tests.EditMode.Combat
         {
             return new WeaponCatalogSnapshot(new[]
             {
-                new WeaponDefinitionSnapshot(0, WeaponType.Bow, 1, true, "Basic"),
-                new WeaponDefinitionSnapshot(10, WeaponType.Spear, 1, true, "Basic"),
-                new WeaponDefinitionSnapshot(20, WeaponType.Knife, 1, true, "Basic"),
-                new WeaponDefinitionSnapshot(31, WeaponType.Sword, 1, true, "Basic"),
+                new WeaponDefinitionSnapshot(1, WeaponType.Bow, 1, true, "Basic"),
+                new WeaponDefinitionSnapshot(11, WeaponType.Spear, 1, true, "Basic"),
+                new WeaponDefinitionSnapshot(21, WeaponType.Knife, 1, true, "Basic"),
+                new WeaponDefinitionSnapshot(32, WeaponType.Sword, 1, true, "Basic"),
             });
         }
 
@@ -163,7 +164,7 @@ namespace GameBattle.Tests.EditMode.Combat
             SoldierBase soldier = ActivateKnife(level: 1);
 
             Assert.IsTrue(soldier.HasWeapon, "玩家刀兵应装备默认武器");
-            Assert.AreEqual(20, soldier.WeaponId, "刀兵应解析到 id=20");
+            Assert.AreEqual(21, soldier.WeaponId, "刀兵应解析到 id=21");
             Assert.AreEqual(1, soldier.WeaponAttackPower, "武器附加攻击力应为 1");
             Assert.AreEqual(21, soldier.AttackDamageForTest,
                 "等级基础 20 + 武器 1 = 21");

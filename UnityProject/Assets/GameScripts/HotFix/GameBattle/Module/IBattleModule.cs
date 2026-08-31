@@ -1,6 +1,7 @@
 using System;
 using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
+using GameBattle.Weapon;
 
 namespace GameBattle
 {
@@ -111,6 +112,9 @@ namespace GameBattle
     /// </remarks>
     public interface IBattleModule
     {
+        /// <summary>与本模块同生命周期的局外武器业务对象。</summary>
+        WeaponManager Weapon { get; }
+
         /// <summary>
         /// 当前模块生命周期状态（只读查询）。
         /// </summary>

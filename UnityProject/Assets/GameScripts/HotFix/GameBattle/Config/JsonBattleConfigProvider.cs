@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GameBattle.Weapon;
 
 namespace GameBattle
 {
@@ -209,9 +210,54 @@ namespace GameBattle
         };
 
         private static readonly UnitLevelConfigSnapshot GoldenUnitLevel = new UnitLevelConfigSnapshot(
-            maxLevel: 3,
+            maxLevel: 5,
             damageLevelMultipliers: new float[] { 1, 1.5f, 2.1f, 2.73f, 3.4125f },
             attackSpeedLevelMultipliers: new float[] { 1, 1.5f, 2.1f, 2.73f, 3.4125f });
+
+        // ====================================================================
+        // 黄金武将数据（general.xlsx 中当前启用的张飞、黄忠）
+        // ====================================================================
+
+        private static GeneralCatalogSnapshot BuildGoldenGeneralCatalog()
+        {
+            return new GeneralCatalogSnapshot(new[]
+            {
+                new GeneralConfigSnapshot(
+                    index: 1,
+                    name: "张飞",
+                    family: "张",
+                    partWords: new[] { "张", "飞" },
+                    combatArchetype: GeneralCombatArchetype.Pike,
+                    rangeCells: 2.5f,
+                    attackDamage: 15,
+                    attackIntervalSeconds: 1f,
+                    damageMode: "近战枪击",
+                    targetPolicy: "nearest",
+                    prefabAddress: "ZhangFei",
+                    animationKey: "zhan1",
+                    projectileType: null,
+                    projectileSpeed: 0,
+                    partRecruitWeight: 1,
+                    skillId: 3),
+                new GeneralConfigSnapshot(
+                    index: 4,
+                    name: "黄忠",
+                    family: "黄",
+                    partWords: new[] { "黄", "忠" },
+                    combatArchetype: GeneralCombatArchetype.Bow,
+                    rangeCells: 3.5f,
+                    attackDamage: 13,
+                    attackIntervalSeconds: 0.8f,
+                    damageMode: "单体",
+                    targetPolicy: "nearest",
+                    prefabAddress: "HuangZhong",
+                    animationKey: "zhan1",
+                    projectileType: "SimpleDynamicArrow",
+                    projectileSpeed: 200,
+                    partRecruitWeight: 1,
+                    skillId: 6),
+            });
+        }
 
         // ====================================================================
         // 黄金经济数据（battle-economy.json + BattleState.js）
@@ -325,10 +371,10 @@ namespace GameBattle
             {
                 GoldenSkill("LeapSlash", SkillCategory.Active, 0, null, null, null),
                 GoldenSkill("SevenInSevenOut", SkillCategory.Active, 0, null, null, null),
-                GoldenSkill("BattleShout", SkillCategory.Active, 0, null, null, null),
+                GoldenSkill("BattleShout", SkillCategory.Active, 0, 9, 2000, 3.5f, 3, null),
                 GoldenSkill("HolySword", SkillCategory.Active, 0, null, null, null),
                 GoldenSkill("ArrowRain", SkillCategory.Active, 0, null, null, null),
-                GoldenSkill("FireArrowBarrage", SkillCategory.Active, 0, null, null, null),
+                GoldenSkill("FireArrowBarrage", SkillCategory.Active, 0, null, null, 5.5f, 3, 2f),
                 GoldenSkill("StunPassive", SkillCategory.Passive, 0, null, null, null),
                 GoldenSkill("SoulCapture", SkillCategory.Boss, 8000, 14, 2000, 2f),
                 GoldenSkill("SoulSummon", SkillCategory.Boss, 8000, null, null, 3f),
@@ -348,7 +394,7 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 构造单条黄金 Skill 定义（handlerKey 与 key 相同，EffectBuffType/EffectDurationMs 显式透传）。
+        /// 构造单条黄金 Skill 定义（handlerKey 与 key 相同，专用 effect 字段显式透传）。
         /// </summary>
         private static SkillDefinitionSnapshot GoldenSkill(
             string key,
@@ -356,10 +402,13 @@ namespace GameBattle
             long cooldownMs,
             int? effectBuffType,
             int? effectDurationMs,
-            float? rangeTiles)
+            float? rangeTiles,
+            int? triggerAttackCount = null,
+            float? effectDamageMultiplier = null)
         {
             return new SkillDefinitionSnapshot(
-                SkillId(key), key, category, cooldownMs, key, effectBuffType, effectDurationMs, rangeTiles);
+                SkillId(key), key, category, cooldownMs, key, effectBuffType, effectDurationMs, rangeTiles,
+                triggerAttackCount, effectDamageMultiplier);
         }
 
         private static int SkillId(string resName)
@@ -538,14 +587,86 @@ namespace GameBattle
             int[] incomeWaves = { 3, 5, 8, 11, 14, 17 };
             return new OpponentAiProfileCatalogSnapshot(new[]
             {
-                new OpponentAiProfileSnapshot(0, 2000, 10, incomeWaves,
-                    new[] { 0, 0, 0, 0, 0, 0 }, OpponentAiPlacementPolicy.Random, 0),
-                new OpponentAiProfileSnapshot(1, 1500, 10, incomeWaves,
-                    new[] { 0, 0, 0, 0, 0, 0 }, OpponentAiPlacementPolicy.Random, 0),
-                new OpponentAiProfileSnapshot(2, 1000, 10, incomeWaves,
-                    new[] { 10, 10, 10, 10, 10, 10 }, OpponentAiPlacementPolicy.RouteAware, 5),
-                new OpponentAiProfileSnapshot(3, 500, 10, incomeWaves,
-                    new[] { 20, 20, 20, 20, 20, 20 }, OpponentAiPlacementPolicy.RouteAware, 5),
+                new OpponentAiProfileSnapshot(
+                    id: 0,
+                    decisionIntervalMs: 2000,
+                    initialBonusGold: 10,
+                    incomeWaveOrders: incomeWaves,
+                    incomeGoldValues: new[] { 0, 0, 0, 0, 0, 0 },
+                    placementPolicy: OpponentAiPlacementPolicy.Random,
+                    candidateTopN: 0,
+                    handSize: 5,
+                    refreshBaseCost: 10,
+                    refreshCostIncrement: 2,
+                    itemCooldownMs: 5000,
+                    allowGeneralParts: false,
+                    allowFarmer: false,
+                    allowActiveMerge: false,
+                    allowTemplatePlacement: false,
+                    allowDangerResponse: false,
+                    allowFastDeploy: false,
+                    enableValueEvaluation: false,
+                    enableReclaim: false),
+                new OpponentAiProfileSnapshot(
+                    id: 1,
+                    decisionIntervalMs: 1500,
+                    initialBonusGold: 10,
+                    incomeWaveOrders: incomeWaves,
+                    incomeGoldValues: new[] { 0, 0, 0, 0, 0, 0 },
+                    placementPolicy: OpponentAiPlacementPolicy.Random,
+                    candidateTopN: 0,
+                    handSize: 5,
+                    refreshBaseCost: 10,
+                    refreshCostIncrement: 2,
+                    itemCooldownMs: 4000,
+                    allowGeneralParts: false,
+                    allowFarmer: false,
+                    allowActiveMerge: false,
+                    allowTemplatePlacement: false,
+                    allowDangerResponse: false,
+                    allowFastDeploy: false,
+                    enableValueEvaluation: false,
+                    enableReclaim: false),
+                new OpponentAiProfileSnapshot(
+                    id: 2,
+                    decisionIntervalMs: 1000,
+                    initialBonusGold: 10,
+                    incomeWaveOrders: incomeWaves,
+                    incomeGoldValues: new[] { 10, 10, 10, 10, 10, 10 },
+                    placementPolicy: OpponentAiPlacementPolicy.RouteAware,
+                    candidateTopN: 5,
+                    handSize: 5,
+                    refreshBaseCost: 10,
+                    refreshCostIncrement: 2,
+                    itemCooldownMs: 2500,
+                    allowGeneralParts: true,
+                    allowFarmer: false,
+                    allowActiveMerge: true,
+                    allowTemplatePlacement: false,
+                    allowDangerResponse: false,
+                    allowFastDeploy: false,
+                    enableValueEvaluation: true,
+                    enableReclaim: false),
+                new OpponentAiProfileSnapshot(
+                    id: 3,
+                    decisionIntervalMs: 500,
+                    initialBonusGold: 10,
+                    incomeWaveOrders: incomeWaves,
+                    incomeGoldValues: new[] { 20, 20, 20, 20, 20, 20 },
+                    placementPolicy: OpponentAiPlacementPolicy.RouteAware,
+                    candidateTopN: 5,
+                    handSize: 5,
+                    refreshBaseCost: 10,
+                    refreshCostIncrement: 2,
+                    itemCooldownMs: 1000,
+                    allowGeneralParts: true,
+                    allowFarmer: true,
+                    allowActiveMerge: true,
+                    allowTemplatePlacement: true,
+                    allowDangerResponse: true,
+                    allowFastDeploy: true,
+                    enableValueEvaluation: true,
+                    enableReclaim: true),
             });
         }
 
@@ -633,6 +754,7 @@ namespace GameBattle
 
             // 本 change 权威：武器目录（与 weapon.xlsx 全量行等价）。
             WeaponCatalogSnapshot weaponCatalog = BuildGoldenWeaponCatalog();
+            GeneralCatalogSnapshot generalCatalog = BuildGoldenGeneralCatalog();
 
             return new BattleConfigSnapshot(
                 map: map,
@@ -651,6 +773,7 @@ namespace GameBattle
                 skillCatalog: skillCatalog,
                 bossCatalog: bossCatalog,
                 weaponCatalog: weaponCatalog,
+                generalCatalog: generalCatalog,
                 opponentAiProfiles: BuildGoldenOpponentAiProfiles());
         }
     }

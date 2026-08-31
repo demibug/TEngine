@@ -63,7 +63,7 @@ public partial class GameApp
     {
         try
         {
-            BattleWeaponLoadoutDto weapons = GameModule.Weapon.CreateBattleWeaponLoadout();
+            BattleWeaponLoadoutDto weapons = GameModule.Battle.Weapon.CreateBattleLoadout();
             await GameModule.Battle.ShowEntryAsync(
                 BattleLoadoutDto.CreateLocalAiDefault(weapons: weapons));
         }

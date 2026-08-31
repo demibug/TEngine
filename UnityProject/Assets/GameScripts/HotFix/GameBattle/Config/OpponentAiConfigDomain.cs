@@ -19,6 +19,18 @@ namespace GameBattle
         internal int InitialBonusGold { get; }
         internal OpponentAiPlacementPolicy PlacementPolicy { get; }
         internal int CandidateTopN { get; }
+        internal int HandSize { get; }
+        internal int RefreshBaseCost { get; }
+        internal int RefreshCostIncrement { get; }
+        internal int ItemCooldownMs { get; }
+        internal bool AllowGeneralParts { get; }
+        internal bool AllowFarmer { get; }
+        internal bool AllowActiveMerge { get; }
+        internal bool AllowTemplatePlacement { get; }
+        internal bool AllowDangerResponse { get; }
+        internal bool AllowFastDeploy { get; }
+        internal bool EnableValueEvaluation { get; }
+        internal bool EnableReclaim { get; }
 
         internal OpponentAiProfileSnapshot(
             int id,
@@ -28,12 +40,67 @@ namespace GameBattle
             IReadOnlyList<int> incomeGoldValues,
             OpponentAiPlacementPolicy placementPolicy,
             int candidateTopN)
+            : this(
+                id,
+                decisionIntervalMs,
+                initialBonusGold,
+                incomeWaveOrders,
+                incomeGoldValues,
+                placementPolicy,
+                candidateTopN,
+                handSize: 5,
+                refreshBaseCost: 10,
+                refreshCostIncrement: 2,
+                itemCooldownMs: 5000,
+                allowGeneralParts: false,
+                allowFarmer: false,
+                allowActiveMerge: false,
+                allowTemplatePlacement: false,
+                allowDangerResponse: false,
+                allowFastDeploy: false,
+                enableValueEvaluation: false,
+                enableReclaim: false)
+        {
+        }
+
+        internal OpponentAiProfileSnapshot(
+            int id,
+            int decisionIntervalMs,
+            int initialBonusGold,
+            IReadOnlyList<int> incomeWaveOrders,
+            IReadOnlyList<int> incomeGoldValues,
+            OpponentAiPlacementPolicy placementPolicy,
+            int candidateTopN,
+            int handSize,
+            int refreshBaseCost,
+            int refreshCostIncrement,
+            int itemCooldownMs,
+            bool allowGeneralParts,
+            bool allowFarmer,
+            bool allowActiveMerge,
+            bool allowTemplatePlacement,
+            bool allowDangerResponse,
+            bool allowFastDeploy,
+            bool enableValueEvaluation,
+            bool enableReclaim)
         {
             Id = id;
             DecisionIntervalMs = decisionIntervalMs;
             InitialBonusGold = initialBonusGold;
             PlacementPolicy = placementPolicy;
             CandidateTopN = candidateTopN;
+            HandSize = handSize;
+            RefreshBaseCost = refreshBaseCost;
+            RefreshCostIncrement = refreshCostIncrement;
+            ItemCooldownMs = itemCooldownMs;
+            AllowGeneralParts = allowGeneralParts;
+            AllowFarmer = allowFarmer;
+            AllowActiveMerge = allowActiveMerge;
+            AllowTemplatePlacement = allowTemplatePlacement;
+            AllowDangerResponse = allowDangerResponse;
+            AllowFastDeploy = allowFastDeploy;
+            EnableValueEvaluation = enableValueEvaluation;
+            EnableReclaim = enableReclaim;
             _incomeByWave = new Dictionary<int, int>();
 
             int count = incomeWaveOrders?.Count ?? 0;

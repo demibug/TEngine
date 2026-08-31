@@ -86,6 +86,9 @@ namespace GameBattle.Tests.EditMode.Enemy
             /// <summary>Update 调用次数（验证推进）。</summary>
             public int UpdateCount;
 
+            /// <summary>每次 Update 沿 X 轴移动的距离（验证跨格后索引刷新）。</summary>
+            public float MoveDeltaXPerUpdate;
+
             /// <summary>Hit 调用累计伤害（验证伤害提交）。</summary>
             public int TotalHitDamage;
 
@@ -98,6 +101,7 @@ namespace GameBattle.Tests.EditMode.Enemy
             public void Update(long deltaMs)
             {
                 UpdateCount++;
+                X += MoveDeltaXPerUpdate;
             }
 
             public bool Hit(int damage, int attackerId)
@@ -347,6 +351,45 @@ namespace GameBattle.Tests.EditMode.Enemy
             Assert.AreEqual(before, mgr.SpatialKeyFor(1), "同单元内移动不应更新键。");
         }
 
+        [Test]
+        [Description("Update 推进的敌人跨格后空间索引随 Update 同步刷新（回归：跨格后目标查询失效）。")]
+        public void Update_RefreshCellIndex_AfterEnemyMovesAcrossCells()
+        {
+            var mgr = new EnemyManager(GridSize);
+            // 敌人起始 X=20，centerX=40 → cell(0, y)。每次 Update 移动 80，
+            // 一次 Update 后 X=100，centerX=120 → cell(1, y)，跨一个单元。
+            var enemy = MakeEnemy(1, isPlayerLane: true, x: 20, y: 100);
+            enemy.MoveDeltaXPerUpdate = 80f;
+            mgr.Register(enemy);
+            Assert.AreEqual("0_1", mgr.SpatialKeyFor(1), "初始索引应为 0_1。");
+
+            mgr.Update(stepMs: 16);
+
+            Assert.AreEqual(1, enemy.UpdateCount, "敌人被推进一次。");
+            Assert.AreEqual("1_1", mgr.SpatialKeyFor(1), "跨格后索引应随 Update 同步刷新为 1_1。");
+        }
+
+        [Test]
+        [Description("Update 跳过 DEAD/SPAWNING 敌人时不移位也不刷新其索引。")]
+        public void Update_RefreshCellIndex_OnlyForActuallyUpdatedEnemies()
+        {
+            var mgr = new EnemyManager(GridSize);
+            // 两个敌人同一单元：一个可推进（MOVING），一个跳过（SPAWNING）。
+            FakeEnemy moving = MakeEnemy(1, isPlayerLane: true, x: 20, y: 20, state: 1);
+            FakeEnemy spawning = MakeEnemy(2, isPlayerLane: true, x: 20, y: 20, state: 0);
+            moving.MoveDeltaXPerUpdate = 80f;
+            spawning.MoveDeltaXPerUpdate = 80f;
+            mgr.Register(moving);
+            mgr.Register(spawning);
+            Assert.AreEqual("0_0", mgr.SpatialKeyFor(1));
+            Assert.AreEqual("0_0", mgr.SpatialKeyFor(2));
+
+            mgr.Update(stepMs: 16);
+
+            Assert.AreEqual("1_0", mgr.SpatialKeyFor(1), "被推进的敌人跨格后刷新索引。");
+            Assert.AreEqual("0_0", mgr.SpatialKeyFor(2), "被跳过的敌人保持原索引。");
+        }
+
         // ====================================================================
         // 目标查询测试
         // ====================================================================
@@ -382,6 +425,35 @@ namespace GameBattle.Tests.EditMode.Enemy
             List<EnemyTargetDto> result = mgr.QueryTargets(40, 40, 50, true, CellWidth, CellHeight);
             Assert.AreEqual(1, result.Count, "只返回同车道可攻击的敌人。");
             Assert.AreEqual(1, result[0].Id, "玩家攻击者只能攻击玩家车道敌人（敌人 1）。");
+        }
+
+        [Test]
+        [Description("回归：敌人经 Update 跨格后 QueryTargets 基于最新索引仍能命中目标。")]
+        public void QueryTargets_AfterUpdateMovesEnemyAcrossCells_FindsTarget()
+        {
+            var mgr = new EnemyManager(GridSize);
+            // 敌人起始 X=20，centerX=40 → cell(0, y)。每次 Update 移动 80，
+            // 一次 Update 后 X=100，centerX=120 → cell(1, y)，跨一个单元。
+            FakeEnemy enemy = MakeEnemy(1, isPlayerLane: true, x: 20, y: 20);
+            enemy.MoveDeltaXPerUpdate = 80f;
+            mgr.Register(enemy);
+
+            // Update 前：查询中心 (40, 40)，半径 50 → 敌人 1 在单元 (0, 0) 内被命中。
+            List<EnemyTargetDto> before = mgr.QueryTargets(40, 40, 50, true, CellWidth, CellHeight);
+            Assert.AreEqual(1, before.Count, "跨格前旧位置可命中。");
+            Assert.AreEqual(1, before[0].Id);
+
+            // Update 推进：敌人跨格到 cell(1, 0)。
+            mgr.Update(stepMs: 16);
+            Assert.AreEqual("1_0", mgr.SpatialKeyFor(1), "更新后索引已同步到新单元。");
+
+            // 回归断言：半径 10 的查询扫描范围只含 cell(1, 0)（x=floor((100±10)/80)=1），
+            // 不含旧单元 cell(0, 0)。若索引未随 Update 刷新，敌人仍登记在 cell(0, 0)，
+            // 候选扫描将漏掉它——正是"跨格后目标查询失效"的回归。
+            List<EnemyTargetDto> after = mgr.QueryTargets(100, 40, 10, true, CellWidth, CellHeight);
+            Assert.AreEqual(1, after.Count, "跨格后基于最新索引仍能找到目标（回归）。");
+            Assert.AreEqual(1, after[0].Id, "目标 ID 正确。");
+            Assert.AreEqual(100f, after[0].X, "目标位置为更新后的新位置。");
         }
 
         [Test]

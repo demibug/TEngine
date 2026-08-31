@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GameCommon.Battle;
+using GameBattle.Weapon;
 using GameConfig;
 using TEngine;
 
@@ -632,7 +633,8 @@ namespace GameBattle
             BattleLoadoutDto loadout,
             BattlePoolScope poolScope,
             BattleMapBindings bindings,
-            BattleConfigSnapshot configSnapshot)
+            BattleConfigSnapshot configSnapshot,
+            OpponentAiReplayLog opponentAiReplayLog = null)
         {
             // 步骤 1：创建本次组装的所有权作用域。这是本次 Create 取得全部所有权的根，
             // 失败时只回滚这个 Scope，不触碰调用方的外部对象。
@@ -688,6 +690,8 @@ namespace GameBattle
             UnitSlotBoard slotBoard = null;
             RecruitManager recruitManager = null;
             UnitLevelService levelService = null;
+            OpponentDeckManager opponentDeck = null;
+            OpponentHand opponentHand = null;
 
             try
             {
@@ -832,7 +836,11 @@ namespace GameBattle
                 // 最终方案：构造等级数值服务与槽位面板（在 readModel 之前，供其注入）。
                 // LevelService 无状态；SlotBoard 每局新建并初始化固定战场槽与待上场槽。
                 // 修复 P0：待上场槽数量统一读取配置（RecruitManager 与 SlotBoard 共用同一值）。
-                int reserveSlotCount = configSnapshot.Deck?.HandSize > 0
+                int reserveSlotCount = loadout.OpponentMode == BattleOpponentMode.LocalAI
+                    && opponentAiProfile != null
+                    && opponentAiProfile.HandSize > 0
+                    ? opponentAiProfile.HandSize
+                    : configSnapshot.Deck?.HandSize > 0
                     ? configSnapshot.Deck.HandSize
                     : RecruitDefinitions.ReserveSlotCount;
                 levelService = new UnitLevelService(configSnapshot.UnitLevel);
@@ -910,15 +918,37 @@ namespace GameBattle
                 randomStreams = new BattleRandomStreams(loadout.RandomSeed);
                 commandIdAllocator = new BattleCommandIdAllocator();
 
-                // 最终方案：征兵服务，随机生成 1 级四兵批次。
-                // levelService / slotBoard / reserveSlotCount 已在步骤 7 构造，此处复用。
-                recruitManager = new RecruitManager(
-                    randomStreams.PlayerRecruit,
-                    randomStreams.OpponentRecruit,
-                    slotBoard,
-                    reserveSlotCount,
-                    configSnapshot.GeneralCatalog.PartRecruitEntries,
-                    includeInitialPlayerShovel: true);
+                // 玩家仍使用兼容的四兵随机征兵；对手使用独立牌库 + 手牌，
+                // 再由 RecruitManager 转换为 Reserve 投影。
+                if (loadout.OpponentMode == BattleOpponentMode.LocalAI)
+                {
+                    opponentDeck = new OpponentDeckManager(
+                        randomStreams.OpponentRecruit,
+                        allowGeneralParts: opponentAiProfile.AllowGeneralParts,
+                        allowFarmer: opponentAiProfile.AllowFarmer,
+                        includeShovels: opponentAiProfile.AllowDangerResponse,
+                        allowGeneralPartDuplicates: opponentAiProfile.EnableValueEvaluation);
+                    opponentHand = new OpponentHand(opponentAiProfile.HandSize);
+                    recruitManager = new RecruitManager(
+                        randomStreams.PlayerRecruit,
+                        randomStreams.OpponentRecruit,
+                        slotBoard,
+                        reserveSlotCount,
+                        configSnapshot.GeneralCatalog.PartRecruitEntries,
+                        includeInitialPlayerShovel: true,
+                        opponentDeck,
+                        opponentHand);
+                }
+                else
+                {
+                    recruitManager = new RecruitManager(
+                        randomStreams.PlayerRecruit,
+                        randomStreams.OpponentRecruit,
+                        slotBoard,
+                        reserveSlotCount,
+                        configSnapshot.GeneralCatalog.PartRecruitEntries,
+                        includeInitialPlayerShovel: true);
+                }
 
                 // 最终方案：开局免费生成第一批待上场单位，填满待上场槽。
                 // 此后只有点击征兵扣馒头（扣费由 BattleInputController.ExecuteRecruit 完成）。
@@ -1217,7 +1247,10 @@ namespace GameBattle
                         waveManager,
                         configSnapshot.Map,
                         randomStreams.OpponentStrategy,
-                        levelService);
+                        levelService,
+                        opponentHand,
+                        configSnapshot.GeneralCatalog,
+                        opponentAiReplayLog);
                 }
 
                 // task 6.10 闭环返工：构造 BattleTarget 并绑定到 BattleState/BattleManager/ResultBuilder，

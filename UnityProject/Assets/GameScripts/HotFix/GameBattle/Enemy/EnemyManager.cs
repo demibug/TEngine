@@ -327,6 +327,13 @@ namespace GameBattle
         private readonly Dictionary<int, string> _enemyIdToCell =
             new Dictionary<int, string>();
 
+        /// <summary>
+        /// 敌人 ID→当前空间单元坐标缓存。
+        /// <para>跨格检查时复用数值坐标，避免每帧为未跨格敌人创建临时键字符串。</para>
+        /// </summary>
+        private readonly Dictionary<int, (int cellX, int cellY)> _enemyIdToCellCoordinates =
+            new Dictionary<int, (int cellX, int cellY)>();
+
         // ====================================================================
         // 租借身份索引（design.md 决策 5 / task 3.6/3.7）
         // ====================================================================
@@ -678,6 +685,12 @@ namespace GameBattle
         /// <para><b>冻结中止（决策 0.4）：</b>
         /// 若 <see cref="IsFrozen"/> 为 true，直接返回不推进。遍历中若检测到冻结，
         /// 停止剩余迭代。对应 spec "Freeze occurs inside a manager update"。</para>
+        ///
+        /// <para><b>空间索引按需刷新（跨格回归修复）：</b>
+        /// 每个实际执行 <c>enemy.Update(stepMs)</c> 的敌人更新完成后立即调用
+        /// <see cref="RefreshCellIndex"/>，仅刷新本次更新的 ID，不做全量重建，
+        /// 保证敌人跨格移动后空间索引与最新位置同步，目标查询不会因旧单元登记失效。
+        /// RefreshCellIndex 对已排队移除/无效对象安全（空操作）。</para>
         /// </remarks>
         internal void Update(long stepMs)
         {
@@ -713,6 +726,9 @@ namespace GameBattle
                 if (state != StateDead && state != StateSpawning)
                 {
                     enemy.Update(stepMs);
+                    // 空间索引按需刷新：敌人移动后可能跨格，刷新本 ID 的索引，
+                    // 保证目标查询（QueryTargets 等）基于最新单元登记找到目标。
+                    RefreshCellIndex(id);
                 }
             }
 
@@ -761,9 +777,17 @@ namespace GameBattle
         /// </remarks>
         private void IndexEnemy(int id, IEnemyEntity enemy)
         {
+            (int cellX, int cellY) = CellCoordinates(enemy);
+            IndexEnemy(id, enemy, cellX, cellY);
+        }
+
+        /// <summary>
+        /// 使用已计算的空间单元坐标登记敌人，避免刷新路径重复计算。
+        /// </summary>
+        private void IndexEnemy(int id, IEnemyEntity enemy, int cellX, int cellY)
+        {
             UnindexEnemy(id);
 
-            (int cellX, int cellY) = CellCoordinates(enemy);
             string key = CellKey(cellX, cellY);
 
             if (!_cellToEnemyIds.TryGetValue(key, out List<int> ids))
@@ -773,6 +797,7 @@ namespace GameBattle
             }
             ids.Add(id);
             _enemyIdToCell[id] = key;
+            _enemyIdToCellCoordinates[id] = (cellX, cellY);
         }
 
         /// <summary>
@@ -783,6 +808,7 @@ namespace GameBattle
         {
             if (!_enemyIdToCell.TryGetValue(id, out string key))
             {
+                _enemyIdToCellCoordinates.Remove(id);
                 return;
             }
 
@@ -795,6 +821,7 @@ namespace GameBattle
                 }
             }
             _enemyIdToCell.Remove(id);
+            _enemyIdToCellCoordinates.Remove(id);
         }
 
         /// <summary>
@@ -802,8 +829,9 @@ namespace GameBattle
         /// </summary>
         /// <param name="id">敌人 ID。</param>
         /// <remarks>
-        /// 敌人移动后调用：若所在单元变化，重新索引。由 EnemyBase 在路径索引变化时调用，
-        /// 或由 EnemyManager 在 Update 后批量刷新（本实现采用按需刷新）。
+        /// 敌人移动后调用：若所在单元变化，重新索引。<see cref="Update"/> 在每个成功推进
+        /// 的敌人更新完成后对本 ID 调用本方法（按需刷新，不做全量重建）；EnemyBase 也可
+        /// 在路径索引变化时显式调用。
         /// </remarks>
         internal void RefreshCellIndex(int id)
         {
@@ -813,13 +841,14 @@ namespace GameBattle
             }
 
             (int cellX, int cellY) = CellCoordinates(enemy);
-            string newKey = CellKey(cellX, cellY);
-            if (_enemyIdToCell.TryGetValue(id, out string oldKey) && oldKey == newKey)
+            if (_enemyIdToCellCoordinates.TryGetValue(id, out (int cellX, int cellY) oldCell)
+                && oldCell.cellX == cellX
+                && oldCell.cellY == cellY)
             {
                 return;
             }
 
-            IndexEnemy(id, enemy);
+            IndexEnemy(id, enemy, cellX, cellY);
         }
 
         // ====================================================================
@@ -1425,6 +1454,7 @@ namespace GameBattle
             _updateBuffer.Clear();
             _cellToEnemyIds.Clear();
             _enemyIdToCell.Clear();
+            _enemyIdToCellCoordinates.Clear();
             _leaseById.Clear();
             _removeQueue.Clear();
             IsCleared = true;

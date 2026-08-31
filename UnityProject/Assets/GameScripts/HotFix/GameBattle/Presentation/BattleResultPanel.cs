@@ -2,6 +2,7 @@ using System;
 using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
 using GameFUI;
+using GameBattle.Weapon;
 using TEngine;
 using UIBattle;
 
@@ -151,14 +152,19 @@ namespace GameBattle
         /// <summary>已冻结的不可变战斗结果 DTO。</summary>
         internal BattleResultDto Result { get; }
 
+        /// <summary>已成功保存的武器奖励；保存失败时为空奖励。</summary>
+        internal WeaponRewardGrant WeaponReward { get; }
+
         /// <summary>退出当前战斗的异步命令。</summary>
         internal Func<UniTask<BattleOperationResult>> ExitAsync { get; }
 
         internal BattleResultEntryArgs(
             BattleResultDto result,
+            WeaponRewardGrant weaponReward,
             Func<UniTask<BattleOperationResult>> exitAsync)
         {
             Result = result;
+            WeaponReward = weaponReward;
             ExitAsync = exitAsync ?? throw new ArgumentNullException(nameof(exitAsync));
         }
     }

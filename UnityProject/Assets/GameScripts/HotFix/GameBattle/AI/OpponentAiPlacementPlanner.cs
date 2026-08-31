@@ -80,6 +80,8 @@ namespace GameBattle
             return true;
         }
 
+        internal MapData Map => _map;
+
         private int CompareRouteScore(UnitSlot left, UnitSlot right)
         {
             GetRouteScore(left.SlotId.GridPosition, out int leftAdjacency, out int leftDistance);

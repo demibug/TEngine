@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using GameCommon.Battle;
 using GameFUI;
+using GameBattle.Weapon;
 using TEngine;
 
 namespace GameBattle
@@ -142,6 +143,13 @@ namespace GameBattle
 
         /// <summary>最近一次入口装载，用于退出后重新显示入口。</summary>
         private BattleLoadoutDto _lastLoadout;
+
+        /// <summary>与 BattleModule 同生命周期的局外武器业务对象。</summary>
+        private WeaponManager _weapon;
+
+        /// <summary>访问局外武器数据和操作。</summary>
+        public WeaponManager Weapon =>
+            _weapon ?? throw new InvalidOperationException("武器系统尚未初始化");
 
         /// <summary>
         /// 进入战斗的加载步骤委托。
@@ -443,7 +451,6 @@ namespace GameBattle
                     BattleFailureStage.RuntimeCreate);
             }
 
-            await _worldHost.PreloadTilePresentationAsync(assembly.ConfigSnapshot.Map);
             _worldHost.ShowPlacementSlots(
                 assembly.InputController.MapState,
                 playerSide: true);
@@ -545,12 +552,13 @@ namespace GameBattle
                               ?? (IReadOnlyList<UnitSlot>)Array.Empty<UnitSlot>(),
                         ResolvePlayerBattleSlotForStage,
                         (float stageX, float stageY, out int sourceSlotId) =>
-                            ResolvePlayerBattleSourceForStage(viewPort, stageX, stageY, out sourceSlotId),
+                            ResolvePlayerBattleSourceForStage(stageX, stageY, out sourceSlotId),
                         slotId => runtime.Presenter != null
                             ? runtime.Presenter.GetSlotSnapshot().GetSlotById(slotId)
                             : default,
                         soldierType => (viewPort as UnityBattleViewPort)?.GetUnitIcon(soldierType),
-                        partWord => (viewPort as UnityBattleViewPort)?.GetGeneralPartIcon(partWord)));
+                        partWord => (viewPort as UnityBattleViewPort)?.GetGeneralPartIcon(partWord),
+                        propType => (viewPort as UnityBattleViewPort)?.GetPropIcon(propType)));
             }
             catch (Exception ex)
             {
@@ -726,6 +734,7 @@ namespace GameBattle
             _state = BattleModuleState.Idle;
             _isShutdown = false;
             _isOpeningEntry = false;
+            _weapon = new WeaponManager(ConfigSystem.Instance.Tables);
             _worldHost.EnsureRoot();
 
             // 由唯一 BattleModule 拥有 UIBattle 注册；GameLogic 组合根只负责
@@ -806,18 +815,24 @@ namespace GameBattle
                 TransitionTo(BattleModuleState.Settling);
                 runtime.EnterSettling();
 
-                // EnterSettling 完成静默清理并冻结最终结果后，由 FUI owner 直接打开结算窗口。
-                // 不依赖跨程序集生成的事件 ID，且该分支每局只会进入一次。
-                ShowBattleResultPanelAsync(runtime.ResultBuilder.GetFrozenResult()).Forget();
+                // EnterSettling 完成静默清理并冻结最终结果后，由 BattleModule 直接提交
+                // 局外武器奖励，再打开结算窗口。Update 已经迁移到 Settling，因此后续
+                // 多帧不会重复提交同一局奖励。
+                BattleResultDto result = runtime.ResultBuilder.GetFrozenResult();
+                WeaponRewardGrant weaponReward =
+                    _weapon.ApplyBattleResult(_lastLoadout, result);
+                ShowBattleResultPanelAsync(result, weaponReward).Forget();
             }
         }
 
-        private async UniTaskVoid ShowBattleResultPanelAsync(BattleResultDto result)
+        private async UniTaskVoid ShowBattleResultPanelAsync(
+            BattleResultDto result,
+            WeaponRewardGrant weaponReward)
         {
             try
             {
                 await FUI.ShowAsync<BattleResultPanel>(
-                    new BattleResultEntryArgs(result, ExitAsync));
+                    new BattleResultEntryArgs(result, weaponReward, ExitAsync));
 
                 // 异步加载期间可能已从其他入口退出；旧局结算窗不得带到开始界面。
                 if (_isShutdown || _state != BattleModuleState.Settling)
@@ -839,6 +854,8 @@ namespace GameBattle
         {
             _isShutdown = true;
             _isOpeningEntry = false;
+            _weapon?.SaveIfDirty();
+            _weapon = null;
             ForceCleanupInternal();
 
             try
@@ -1544,23 +1561,22 @@ namespace GameBattle
         }
 
         /// <summary>
-        /// 解析玩家战场可起拖的源槽（统一拖放规则：源只从单位主体起拖）。
+        /// 解析玩家战场可起拖的源槽（统一拖放规则：源命中外层槽位框架）。
         /// </summary>
-        /// <param name="viewPort">当前战斗表现端口（非 Null 端口时带活动单位表现）。</param>
         /// <param name="screenX">Stage X 坐标。</param>
         /// <param name="screenY">Stage Y 坐标。</param>
         /// <param name="battleSlotId">解析出的玩家战场源槽位固定标识；未命中为 -1。</param>
         /// <returns>
-        /// 解析成功、命中战场槽且该槽活动单位 Body 命中屏幕点返回 true。
-        /// 战场格子底框不能起拖；投放目标仍使用 <see cref="ResolvePlayerBattleSlotForStage"/> 完整槽位命中。
+        /// 解析成功且命中非空玩家战场槽的外层框架返回 true。
+        /// 起拖不依赖单位内部的 Spine/序列帧 Renderer；投放目标仍使用
+        /// <see cref="ResolvePlayerBattleSlotForStage"/> 完整槽位命中。
         /// </returns>
         /// <remarks>
-        /// 先经 Presenter 锁定玩家战场槽，再检查 <see cref="UnityBattleViewPort"/> 中
-        /// 对应活动单位（按 BattleUnit.UnitId → 活动 SoldierBase → 运行时表现）Body
-        /// SpriteRenderer 的屏幕/世界 bounds。无活动单位或非 Unity 端口时返回 false。
+        /// 先经 Presenter 按屏幕坐标锁定玩家战场槽，再检查槽位快照是否有单位。
+        /// 槽位是输入命中层，单位 Prefab 只是表现层；这样普通兵、无 Spine 武将、
+        /// Spine 武将和未合成武将字都共享相同的起拖规则。
         /// </remarks>
         private bool ResolvePlayerBattleSourceForStage(
-            IBattleViewPort viewPort,
             float screenX,
             float screenY,
             out int battleSlotId)
@@ -1585,26 +1601,10 @@ namespace GameBattle
                 return false;
             }
 
-            if (!(viewPort is UnityBattleViewPort unityViewPort))
-            {
-                return false;
-            }
-
-            BattleUnit occupant = slot.Occupant.Value;
-            if (occupant.Kind == UnitKind.GeneralPart)
-            {
-                // 未合成武将字：不注册战斗运行时，经字形对象命中（可再次起拖）。
-                return unityViewPort.TryHitGeneralPartGlyph(battleSlotId, screenX, screenY);
-            }
-
-            // 战斗单位（士兵/已合成武将）：按共享 UnitId 查找活动实例 Body 命中。
-            SoldierBase active = runtime.UnitRegistry.GetActiveByUnitId(occupant.UnitId);
-            if (active == null)
-            {
-                return false;
-            }
-
-            return unityViewPort.TryHitActiveUnitBody(active.Id, screenX, screenY);
+            // 源命中到的是外层槽位框架，而不是单位 Prefab 内部的动画 Renderer。
+            // 规则层的 SlotId 才是拖拽身份；无论表现是序列帧、Spine 还是单字，
+            // 都不能因为内部 Renderer bounds 缺失/偏移而阻断起拖。
+            return true;
         }
 
         /// <summary>

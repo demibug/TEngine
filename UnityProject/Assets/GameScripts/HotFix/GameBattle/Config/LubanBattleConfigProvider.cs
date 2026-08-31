@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using GameBattle.Weapon;
 using GameConfig;
 using GameConfig.battle;
+using LubanWeaponRow = GameConfig.battle.Weapon;
 using UnityEngine;
 
 namespace GameBattle
@@ -279,11 +281,15 @@ namespace GameBattle
                 }
 
                 if (row.PlacementPolicy < 0 || row.PlacementPolicy > 1
-                    || row.CandidateTopN < 0)
+                    || row.CandidateTopN < 0
+                    || row.HandSize <= 0
+                    || row.RefreshBaseCost < 0
+                    || row.RefreshCostIncrement < 0
+                    || row.ItemCooldownMs < 0)
                 {
                     throw new BattleConfigDataException(
                         BattleConfigErrorCategory.OpponentAiConfigInvalid,
-                        "布阵策略或候选窗口非法",
+                        "布阵策略、候选窗口、手牌或经济参数非法",
                         path);
                 }
 
@@ -294,7 +300,19 @@ namespace GameBattle
                     row.IncomeWaveOrders,
                     row.IncomeGoldValues,
                     (OpponentAiPlacementPolicy)row.PlacementPolicy,
-                    row.CandidateTopN));
+                    row.CandidateTopN,
+                    row.HandSize,
+                    row.RefreshBaseCost,
+                    row.RefreshCostIncrement,
+                    row.ItemCooldownMs,
+                    row.AllowGeneralParts,
+                    row.AllowFarmer,
+                    row.AllowActiveMerge,
+                    row.AllowTemplatePlacement,
+                    row.AllowDangerResponse,
+                    row.AllowFastDeploy,
+                    row.EnableValueEvaluation,
+                    row.EnableReclaim));
             }
 
             if (ids.Count != 4)
@@ -1069,10 +1087,10 @@ namespace GameBattle
             }
 
             var definitions = new List<WeaponDefinitionSnapshot>(tbWeapon.DataList.Count);
-            IReadOnlyList<Weapon> rows = tbWeapon.DataList;
+            IReadOnlyList<LubanWeaponRow> rows = tbWeapon.DataList;
             for (int i = 0; i < rows.Count; i++)
             {
-                Weapon row = rows[i];
+                LubanWeaponRow row = rows[i];
                 definitions.Add(new WeaponDefinitionSnapshot(
                     id: row.Id,
                     type: MapWeaponType(row.Type, row.Id),

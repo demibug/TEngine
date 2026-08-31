@@ -25,7 +25,7 @@ namespace GameBattle.Tests.EditMode.Slot
     [TestFixture]
     internal class UnitSlotBoardTests
     {
-        private const int MaxLevel = 3;
+        private const int MaxLevel = 5;
 
         private UnitSlotBoard _board;
 
@@ -311,8 +311,8 @@ namespace GameBattle.Tests.EditMode.Slot
             UnitSlot source = reserves[0];
             UnitSlot target = reserves[1];
 
-            // 源与目标都是 3 级 = 最大等级，不可合并 → 互换。
-            FillReserve(source, MakeKnife(100, 3), target, MakeKnife(200, 3));
+            // 源与目标都是 5 级 = 最大等级，不可合并 → 互换。
+            FillReserve(source, MakeKnife(100, 5), target, MakeKnife(200, 5));
 
             SlotDropResult result = _board.DropUnit(source.SlotId, target.SlotId);
 
@@ -320,7 +320,31 @@ namespace GameBattle.Tests.EditMode.Slot
             Assert.IsTrue(result.IsSwap, "应判定为互换");
             Assert.AreEqual(200, _board.GetSlot(source.SlotId).OccupantUnitId, "源槽换入目标单位");
             Assert.AreEqual(100, _board.GetSlot(target.SlotId).OccupantUnitId, "目标槽换入源单位");
-            Assert.AreEqual(3, _board.GetSlot(target.SlotId).Occupant.Value.Level, "互换不改变等级");
+            Assert.AreEqual(5, _board.GetSlot(target.SlotId).Occupant.Value.Level, "互换不改变等级");
+        }
+
+        [Test]
+        [Description("连续合并可从 1 级推进到原始行为的 5 级上限。")]
+        public void DropUnit_Merge_ChainReachesFiveLevel()
+        {
+            IReadOnlyList<UnitSlot> reserves = _board.GetSlots(true, SlotZone.Reserve);
+            Assert.IsTrue(_board.ReplaceReserve(true, new BattleUnit[]
+            {
+                MakeKnife(100, 1),
+                MakeKnife(101, 1),
+                MakeKnife(102, 2),
+                MakeKnife(103, 3),
+                MakeKnife(104, 4),
+            }));
+
+            Assert.IsTrue(_board.DropUnit(reserves[0].SlotId, reserves[1].SlotId).IsMerge);
+            Assert.AreEqual(2, _board.GetSlot(reserves[1].SlotId).Occupant.Value.Level);
+            Assert.IsTrue(_board.DropUnit(reserves[2].SlotId, reserves[1].SlotId).IsMerge);
+            Assert.AreEqual(3, _board.GetSlot(reserves[1].SlotId).Occupant.Value.Level);
+            Assert.IsTrue(_board.DropUnit(reserves[3].SlotId, reserves[1].SlotId).IsMerge);
+            Assert.AreEqual(4, _board.GetSlot(reserves[1].SlotId).Occupant.Value.Level);
+            Assert.IsTrue(_board.DropUnit(reserves[4].SlotId, reserves[1].SlotId).IsMerge);
+            Assert.AreEqual(5, _board.GetSlot(reserves[1].SlotId).Occupant.Value.Level);
         }
 
         [Test]
@@ -1111,6 +1135,32 @@ namespace GameBattle.Tests.EditMode.Slot
 
             Assert.IsTrue(board.TryCommitShovelUse(source.SlotId.Id, new GridPosition(2, 1), out ShovelBoardChange second));
             Assert.Greater(second.AddedBattleSlotId.Id, first.AddedBattleSlotId.Id, "回滚后不得复用动态槽 ID");
+            board.GameOver();
+        }
+
+        [Test]
+        public void TryCommitFarmerUse_ConsumesReserveAndAppendsEmptyBattleSlot()
+        {
+            var board = new UnitSlotBoard(MaxLevel);
+            board.Initialize(BuildTestMap(), 5);
+            UnitSlot source = board.GetSlots(false, SlotZone.Reserve)[0];
+            Assert.IsTrue(board.ReplaceReserve(false, new BattleUnit[]
+            {
+                BattleUnit.CreateFarmer(100, false),
+                MakeKnife(2, 1), MakeKnife(3, 1), MakeKnife(4, 1), MakeKnife(5, 1),
+            }));
+
+            int highestInitialSlotId = board.GetAllSlots()[board.GetAllSlots().Count - 1].SlotId.Id;
+            bool committed = board.TryCommitFarmerUse(
+                source.SlotId.Id,
+                new GridPosition(2, 1),
+                out UnitSlotId addedBattleSlotId);
+
+            Assert.IsTrue(committed);
+            Assert.IsTrue(board.GetSlot(source.SlotId).IsEmpty, "农民源槽应被消费");
+            Assert.Greater(addedBattleSlotId.Id, highestInitialSlotId, "动态槽 ID 必须追加且不碰撞");
+            Assert.AreEqual(new GridPosition(2, 1), addedBattleSlotId.GridPosition);
+            Assert.IsTrue(board.GetSlot(addedBattleSlotId).IsEmpty, "新开格应生成空战场槽");
             board.GameOver();
         }
     }

@@ -26,6 +26,18 @@ public sealed partial class OpponentAiDifficulty : Luban.BeanBase
         {int n0 = _buf.ReadSize(); IncomeGoldValues = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); IncomeGoldValues.Add(_e0);}}
         PlacementPolicy = _buf.ReadInt();
         CandidateTopN = _buf.ReadInt();
+        HandSize = _buf.ReadInt();
+        RefreshBaseCost = _buf.ReadInt();
+        RefreshCostIncrement = _buf.ReadInt();
+        ItemCooldownMs = _buf.ReadInt();
+        AllowGeneralParts = _buf.ReadBool();
+        AllowFarmer = _buf.ReadBool();
+        AllowActiveMerge = _buf.ReadBool();
+        AllowTemplatePlacement = _buf.ReadBool();
+        AllowDangerResponse = _buf.ReadBool();
+        AllowFastDeploy = _buf.ReadBool();
+        EnableValueEvaluation = _buf.ReadBool();
+        EnableReclaim = _buf.ReadBool();
     }
 
     public static OpponentAiDifficulty DeserializeOpponentAiDifficulty(ByteBuf _buf)
@@ -61,6 +73,54 @@ public sealed partial class OpponentAiDifficulty : Luban.BeanBase
     /// 高分候选随机窗口
     /// </summary>
     public readonly int CandidateTopN;
+    /// <summary>
+    /// 手牌槽数量
+    /// </summary>
+    public readonly int HandSize;
+    /// <summary>
+    /// 刷新基础费用
+    /// </summary>
+    public readonly int RefreshBaseCost;
+    /// <summary>
+    /// 刷新费用递增
+    /// </summary>
+    public readonly int RefreshCostIncrement;
+    /// <summary>
+    /// 道具使用冷却毫秒
+    /// </summary>
+    public readonly int ItemCooldownMs;
+    /// <summary>
+    /// 是否允许武将字部件
+    /// </summary>
+    public readonly bool AllowGeneralParts;
+    /// <summary>
+    /// 是否允许农民
+    /// </summary>
+    public readonly bool AllowFarmer;
+    /// <summary>
+    /// 是否主动合并
+    /// </summary>
+    public readonly bool AllowActiveMerge;
+    /// <summary>
+    /// 是否使用模板布阵
+    /// </summary>
+    public readonly bool AllowTemplatePlacement;
+    /// <summary>
+    /// 是否响应危险位置
+    /// </summary>
+    public readonly bool AllowDangerResponse;
+    /// <summary>
+    /// 是否允许快速部署
+    /// </summary>
+    public readonly bool AllowFastDeploy;
+    /// <summary>
+    /// 是否启用价值评估
+    /// </summary>
+    public readonly bool EnableValueEvaluation;
+    /// <summary>
+    /// 是否允许回收低价值单位
+    /// </summary>
+    public readonly bool EnableReclaim;
    
     public const int __ID__ = 935986070;
     public override int GetTypeId() => __ID__;
@@ -79,6 +139,18 @@ public sealed partial class OpponentAiDifficulty : Luban.BeanBase
         + "incomeGoldValues:" + Luban.StringUtil.CollectionToString(IncomeGoldValues) + ","
         + "placementPolicy:" + PlacementPolicy + ","
         + "candidateTopN:" + CandidateTopN + ","
+        + "handSize:" + HandSize + ","
+        + "refreshBaseCost:" + RefreshBaseCost + ","
+        + "refreshCostIncrement:" + RefreshCostIncrement + ","
+        + "itemCooldownMs:" + ItemCooldownMs + ","
+        + "allowGeneralParts:" + AllowGeneralParts + ","
+        + "allowFarmer:" + AllowFarmer + ","
+        + "allowActiveMerge:" + AllowActiveMerge + ","
+        + "allowTemplatePlacement:" + AllowTemplatePlacement + ","
+        + "allowDangerResponse:" + AllowDangerResponse + ","
+        + "allowFastDeploy:" + AllowFastDeploy + ","
+        + "enableValueEvaluation:" + EnableValueEvaluation + ","
+        + "enableReclaim:" + EnableReclaim + ","
         + "}";
     }
 }

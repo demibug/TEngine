@@ -40,6 +40,6 @@ namespace GameBattle
         internal const int DefaultLevel = 1;
 
         /// <summary>最大等级（合并上限，fallback = 3）。</summary>
-        internal const int MaxLevel = 3;
+        internal const int MaxLevel = 5;
     }
 }

@@ -400,6 +400,40 @@ namespace GameBattle
             return true;
         }
 
+        /// <summary>
+        /// 消费待上场农民并为其开垦目标格。农民不是战斗单位，成功后只新增空战场槽。
+        /// </summary>
+        internal bool TryCommitFarmerUse(
+            int sourceSlotId,
+            GridPosition target,
+            out UnitSlotId addedBattleSlotId)
+        {
+            addedBattleSlotId = UnitSlotId.Invalid;
+            if (!_initialized
+                || !_slotsById.TryGetValue(sourceSlotId, out UnitSlot source)
+                || source.SlotId.Zone != SlotZone.Reserve
+                || !source.Occupant.HasValue
+                || source.Occupant.Value.Kind != UnitKind.Farmer
+                || TryFindBattleSlot(source.SlotId.Side, target, out _))
+            {
+                return false;
+            }
+
+            int slotIdValue = _nextSlotId;
+            _nextSlotId++;
+            var battleSlotId = new UnitSlotId(
+                slotIdValue,
+                source.SlotId.Side,
+                SlotZone.Battle,
+                target);
+
+            _slotsById[sourceSlotId] = new UnitSlot(source.SlotId, occupant: null);
+            _slotsById.Add(slotIdValue, new UnitSlot(battleSlotId, occupant: null));
+            _revision++;
+            addedBattleSlotId = battleSlotId;
+            return true;
+        }
+
         internal bool TryRollbackShovelUse(ShovelBoardChange change)
         {
             if (!change.IsValid

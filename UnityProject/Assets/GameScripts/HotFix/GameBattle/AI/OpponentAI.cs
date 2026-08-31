@@ -25,11 +25,18 @@ namespace GameBattle
         private readonly BattleEconomy _economy;
         private readonly WaveManager _waveManager;
         private readonly OpponentAiPlacementPlanner _placementPlanner;
+        private readonly OpponentAiDecisionEngine _decisionEngine;
+        private readonly OpponentEconomyService _economyService;
+        private readonly OpponentAiItemController _itemController;
         private readonly UnitLevelService _levelService;
+        private readonly OpponentHand _opponentHand;
+        private readonly OpponentAiReplayLog _replayLog;
+        private readonly Queue<OpponentAiAction> _actionQueue = new Queue<OpponentAiAction>();
         private readonly List<int> _scannedUnitIds = new List<int>();
 
         private OpponentAiState _state = OpponentAiState.DeployReserve;
         private long _elapsedMs;
+        private long _decisionTick;
         private int _scanIndex;
         private int _plannedSourceUnitId = UnitSlot.InvalidUnitId;
         private int _plannedTargetUnitId = UnitSlot.InvalidUnitId;
@@ -46,7 +53,10 @@ namespace GameBattle
             WaveManager waveManager,
             MapData map,
             IRandomSource strategyRandom,
-            UnitLevelService levelService)
+            UnitLevelService levelService,
+            OpponentHand opponentHand = null,
+            GeneralCatalogSnapshot generalCatalog = null,
+            OpponentAiReplayLog replayLog = null)
         {
             _profile = profile ?? throw new ArgumentNullException(nameof(profile));
             _slotBoard = slotBoard ?? throw new ArgumentNullException(nameof(slotBoard));
@@ -56,7 +66,22 @@ namespace GameBattle
             _economy = economy ?? throw new ArgumentNullException(nameof(economy));
             _waveManager = waveManager ?? throw new ArgumentNullException(nameof(waveManager));
             _levelService = levelService ?? throw new ArgumentNullException(nameof(levelService));
+            _opponentHand = opponentHand;
+            _replayLog = replayLog;
             _placementPlanner = new OpponentAiPlacementPlanner(map, strategyRandom, levelService);
+            _decisionEngine = new OpponentAiDecisionEngine(
+                map,
+                strategyRandom,
+                levelService,
+                generalCatalog);
+            _economyService = new OpponentEconomyService(
+                _profile,
+                _economy,
+                _inputController,
+                _commandIdAllocator);
+            _itemController = new OpponentAiItemController(
+                _inputController.MapState,
+                map);
         }
 
         internal void StartGame()
@@ -68,10 +93,14 @@ namespace GameBattle
 
             _started = true;
             _elapsedMs = 0;
+            _decisionTick = 0;
             _state = OpponentAiState.DeployReserve;
             ResetPlanningState();
+            _actionQueue.Clear();
+            _replayLog?.Clear();
+            _itemController.StartGame();
             _waveManager.WaveStarted += OnWaveStarted;
-            _economy.Award(false, _profile.InitialBonusGold, "opponent-ai-initial");
+            _economyService.StartGame();
         }
 
         internal void Stop()
@@ -84,6 +113,8 @@ namespace GameBattle
             _started = false;
             _waveManager.WaveStarted -= OnWaveStarted;
             ResetPlanningState();
+            _actionQueue.Clear();
+            _itemController.Stop();
         }
 
         internal void Update(long stepMs)
@@ -93,6 +124,7 @@ namespace GameBattle
                 return;
             }
 
+            _itemController.Update(stepMs);
             _elapsedMs += stepMs;
             if (_elapsedMs < _profile.DecisionIntervalMs)
             {
@@ -105,25 +137,179 @@ namespace GameBattle
 
         private void AdvanceDecision()
         {
-            switch (_state)
+            _decisionTick++;
+            if (TryPrioritizeReadyItem())
             {
-                case OpponentAiState.DeployReserve:
-                    DeployOneReserveUnit();
-                    break;
-                case OpponentAiState.ScanBoard:
-                    ScanOneBoardSlot();
-                    break;
-                case OpponentAiState.BuildPlan:
-                    BuildMergePlan();
-                    _state = OpponentAiState.ExecutePlan;
-                    break;
-                case OpponentAiState.ExecutePlan:
-                    ExecutePlan();
-                    _state = OpponentAiState.RecruitOrIdle;
-                    break;
-                case OpponentAiState.RecruitOrIdle:
-                    RecruitOrIdle();
-                    break;
+                _state = OpponentAiState.ExecutePlan;
+                ExecuteNextAction();
+                return;
+            }
+
+            if (_actionQueue.Count == 0)
+            {
+                BuildActionQueue();
+            }
+
+            if (_actionQueue.Count > 0)
+            {
+                _state = OpponentAiState.ExecutePlan;
+                ExecuteNextAction();
+                return;
+            }
+
+            _state = OpponentAiState.RecruitOrIdle;
+            RecruitOrIdle();
+        }
+
+        private bool TryPrioritizeReadyItem()
+        {
+            if (!_itemController.IsReady(_profile))
+            {
+                return false;
+            }
+
+            OpponentAiBoardSnapshot snapshot = new OpponentAiBoardSnapshot(
+                _slotBoard.Snapshot(),
+                _placementPlanner.Map,
+                _levelService.MaxLevel);
+            if (!_itemController.TryBuildAction(snapshot, _profile, out OpponentAiAction itemAction))
+            {
+                return false;
+            }
+
+            _actionQueue.Clear();
+            _actionQueue.Enqueue(itemAction);
+            return true;
+        }
+
+        private void BuildActionQueue()
+        {
+            OpponentAiBoardSnapshot snapshot = new OpponentAiBoardSnapshot(
+                _slotBoard.Snapshot(),
+                _placementPlanner.Map,
+                _levelService.MaxLevel);
+            if (_itemController.TryBuildAction(snapshot, _profile, out OpponentAiAction itemAction))
+            {
+                _actionQueue.Enqueue(itemAction);
+                return;
+            }
+
+            IReadOnlyList<OpponentAiAction> actions =
+                _decisionEngine.BuildPlan(snapshot, _profile);
+            for (int i = 0; i < actions.Count; i++)
+            {
+                if (actions[i].Type != OpponentAiActionType.Wait)
+                {
+                    _actionQueue.Enqueue(actions[i]);
+                }
+            }
+        }
+
+        private void ExecuteNextAction()
+        {
+            if (_actionQueue.Count == 0)
+            {
+                return;
+            }
+
+            OpponentAiAction action = _actionQueue.Dequeue();
+            if (action.Type == OpponentAiActionType.Recruit)
+            {
+                RecruitOrIdle();
+                if (_state != OpponentAiState.DeployReserve)
+                {
+                    _actionQueue.Clear();
+                }
+
+                return;
+            }
+
+            if (action.Type == OpponentAiActionType.UseShovel
+                || action.Type == OpponentAiActionType.UseFarmer)
+            {
+                UnitSlot sourceItem = _slotBoard.GetSlotById(action.SourceSlotId);
+                if (!sourceItem.Occupant.HasValue
+                    || sourceItem.SlotId.Side
+                    || sourceItem.SlotId.Zone != SlotZone.Reserve
+                    || sourceItem.Occupant.Value.UnitId != action.ExpectedUnitId
+                    || (action.Type == OpponentAiActionType.UseShovel
+                        ? !sourceItem.Occupant.Value.IsShovel
+                        : sourceItem.Occupant.Value.Kind != UnitKind.Farmer))
+                {
+                    _actionQueue.Clear();
+                    return;
+                }
+
+                int itemCommandId = _commandIdAllocator.Allocate();
+                BattleInputCommand itemCommand = action.Type == OpponentAiActionType.UseShovel
+                    ? BattleInputCommand.CreateUseShovel(
+                        itemCommandId,
+                        sourceItem.SlotId.Id,
+                        action.TargetPosition)
+                    : BattleInputCommand.CreateUseFarmer(
+                        itemCommandId,
+                        sourceItem.SlotId.Id,
+                        action.TargetPosition);
+                BattleInputResult itemResult = _inputController.Execute(itemCommand);
+                if (!itemResult.IsSuccess)
+                {
+                    _actionQueue.Clear();
+                    return;
+                }
+
+                _replayLog?.Record(_decisionTick, action, itemResult);
+                _opponentHand?.TryRemoveByUnitId(
+                    sourceItem.Occupant.Value.UnitId,
+                    out _);
+                _itemController.MarkUsed();
+                _state = OpponentAiState.DeployReserve;
+                return;
+            }
+
+            if (action.Type != OpponentAiActionType.Deploy
+                && action.Type != OpponentAiActionType.Merge
+                && action.Type != OpponentAiActionType.FastDeploy
+                && action.Type != OpponentAiActionType.SynthesizeGeneral)
+            {
+                _actionQueue.Clear();
+                return;
+            }
+
+            UnitSlot source = _slotBoard.GetSlotById(action.SourceSlotId);
+            UnitSlot target = _slotBoard.GetSlotById(action.TargetSlotId);
+            if (!source.Occupant.HasValue
+                || source.Occupant.Value.UnitId != action.ExpectedUnitId
+                || source.SlotId.Side
+                || target.SlotId.Side
+                || target.SlotId.Zone != SlotZone.Battle)
+            {
+                _actionQueue.Clear();
+                return;
+            }
+
+            int commandId = _commandIdAllocator.Allocate();
+            BattleInputCommand command = BattleInputCommand.CreateDropUnit(
+                commandId,
+                source.SlotId.Id,
+                target.SlotId.Id);
+            BattleInputResult result = _inputController.Execute(command);
+            if (!result.IsSuccess)
+            {
+                _actionQueue.Clear();
+                return;
+            }
+
+            _replayLog?.Record(_decisionTick, action, result);
+            if (source.SlotId.Zone == SlotZone.Reserve)
+            {
+                _opponentHand?.TryRemoveByUnitId(
+                    source.Occupant.Value.UnitId,
+                    out _);
+            }
+
+            if (_actionQueue.Count == 0)
+            {
+                _state = OpponentAiState.DeployReserve;
             }
         }
 
@@ -165,6 +351,12 @@ namespace GameBattle
             if (!result.IsSuccess)
             {
                 BeginScan();
+            }
+            else
+            {
+                _opponentHand?.TryRemoveByUnitId(
+                    source.Occupant.HasValue ? source.Occupant.Value.UnitId : UnitSlot.InvalidUnitId,
+                    out _);
             }
         }
 
@@ -271,17 +463,20 @@ namespace GameBattle
                 }
             }
 
-            int cost = _economy.GetRefreshCost(false);
-            if (!_economy.CanAfford(false, cost))
+            if (!_economyService.CanRefresh())
             {
                 return;
             }
 
-            int commandId = _commandIdAllocator.Allocate();
-            BattleInputCommand command = BattleInputCommand.CreateRecruit(commandId, false);
-            BattleInputResult result = _inputController.Execute(command);
+            BattleInputResult result = _economyService.TryRefresh();
             if (result.IsSuccess)
             {
+                _replayLog?.Record(
+                    _decisionTick,
+                    new OpponentAiAction(
+                        OpponentAiActionType.Recruit,
+                        reason: "refresh_hand"),
+                    result);
                 _state = OpponentAiState.DeployReserve;
             }
         }
@@ -293,8 +488,7 @@ namespace GameBattle
                 return;
             }
 
-            int income = _profile.GetIncomeForWave(waveOrder);
-            _economy.Award(false, income, "opponent-ai-wave");
+            _economyService.OnWaveStarted(waveOrder);
         }
 
         private static bool TryFindUnitSlot(

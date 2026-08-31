@@ -45,6 +45,9 @@ namespace GameBattle
 
         /// <summary>一次性道具，只能停留在待上场槽。</summary>
         Prop = 3,
+
+        /// <summary>农民特殊单位；由 AI 用于扩展地图，不作为战斗单位落子。</summary>
+        Farmer = 4,
     }
 
     internal enum PropType

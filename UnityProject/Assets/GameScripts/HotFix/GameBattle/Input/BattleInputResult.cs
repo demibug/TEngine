@@ -186,6 +186,21 @@ namespace GameBattle
         /// 未知/非预期错误。实现层捕获非预期异常后包装为此拒绝原因。
         /// </summary>
         Unknown = 99,
+
+        /// <summary>来源槽不是合法的待上场农民。</summary>
+        InvalidFarmerSource = 45,
+
+        /// <summary>目标格越界或不是可开垦草地。</summary>
+        InvalidFarmerTarget = 46,
+
+        /// <summary>目标草地不属于农民来源阵营。</summary>
+        FarmerTargetWrongSide = 47,
+
+        /// <summary>目标草地已经开垦。</summary>
+        FarmerTargetAlreadyOpened = 48,
+
+        /// <summary>地图状态与农民槽位提交不一致，事务已补偿。</summary>
+        FarmerTransactionFailed = 49,
     }
 
     /// <summary>

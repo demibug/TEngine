@@ -49,6 +49,7 @@ namespace GameBattle
         private const string LevelNumberAddressPrefix = "Sprites/LevelBadge/level_number_";
         private const string DamageNumberSpriteAddress =
             "Sprites/Extracted/GameObject/bitmapFont/number1";
+        private const string ShovelSpriteAddress = "Sprites/Extracted/Props/shovel_1";
 
         private readonly BattleMapBindings _bindings;
         private readonly Dictionary<int, string> _unitAddresses = new Dictionary<int, string>
@@ -74,6 +75,7 @@ namespace GameBattle
         private Sprite[] _levelNumberSprites;
         private Sprite[] _damageDigitSprites;
         private DamageNumberSystem _damageNumberSystem;
+        private Sprite _shovelSprite;
         private readonly bool _showDamageNumbers;
         private readonly Dictionary<string, Sprite> _generalPartSprites = new Dictionary<string, Sprite>();
         private readonly Dictionary<int, GameObject> _generalPartGlyphs = new Dictionary<int, GameObject>();
@@ -148,6 +150,14 @@ namespace GameBattle
         }
 
         /// <summary>
+        /// 获取已预加载的道具贴图；未知道具返回 null。
+        /// </summary>
+        internal Sprite GetPropIcon(PropType propType)
+        {
+            return propType == PropType.Shovel ? _shovelSprite : null;
+        }
+
+        /// <summary>
         /// 判断 Stage 屏幕点是否命中活动单位可见主体 Renderer 的世界 AABB 屏幕投影。
         /// </summary>
         /// <param name="runtimeId">活动单位运行时 ID（对应 <see cref="SoldierBase.Id"/>）。</param>
@@ -155,7 +165,8 @@ namespace GameBattle
         /// <param name="stageY">FairyGUI Stage Y 坐标（左上角原点）。</param>
         /// <returns>命中返回 true；单位无活动表现、无可见主体 Renderer 或无相机时返回 false。</returns>
         /// <remarks>
-        /// <para>供战场起拖源命中使用（统一拖放规则：战场只能从单位 Body 起拖，格子底框不能起拖）。</para>
+        /// <para>保留为表现诊断/兼容辅助；战场实际起拖源由 BattleModule 按外层槽位框架解析，
+        /// 不再依赖此 Renderer 命中结果。</para>
         /// <para>把 Body SpriteRenderer 世界包围盒的 8 个角投影到屏幕矩形（左下角原点），
         /// 再把 Stage 点（左上角原点，Y 翻转）与之比较。投放目标仍使用完整槽位命中。</para>
         /// <para>普通士兵优先使用名为 Body 的 Renderer；Spine 武将 Prefab 没有 Body，
@@ -217,7 +228,8 @@ namespace GameBattle
         /// <param name="stageY">FairyGUI Stage Y 坐标（左上角原点）。</param>
         /// <returns>命中返回 true；该槽无字形、无 SpriteRenderer 或无相机时返回 false。</returns>
         /// <remarks>
-        /// 供战场起拖源命中使用：未合成武将字在战场以单格字形显示并可再次起拖。
+        /// 作为字形表现的命中辅助：未合成武将字在战场以单格字形显示；
+        /// 战场实际起拖源由外层槽位框架解析，不依赖该字形 Renderer。
         /// 复用 <see cref="HitBodyInStage"/> 的 SpriteRenderer bounds 屏幕投影，与活动单位 Body 命中一致。
         /// </remarks>
         internal bool TryHitGeneralPartGlyph(int slotId, float stageX, float stageY)
@@ -420,6 +432,7 @@ namespace GameBattle
                 await LoadUnitAnimationsAsync(loader);
                 await LoadLevelNumberSpritesAsync(loader);
                 await LoadGeneralPartSpritesAsync(loader, generalPartWords);
+                await LoadShovelSpriteAsync(loader);
                 await LoadDamageNumberSpritesAsync(loader);
 
                 _preloaded = true;
@@ -606,6 +619,9 @@ namespace GameBattle
             }
 
             active.GameObject.transform.position = _bindings.UnitCellToWorld(gridX, gridY);
+            // B→B 拖动不会经过回池/重新取出，不能依赖 Attack→Idle 的帧采样来清理残留攻击表现。
+            // 这里只复位表现，不取消逻辑侧待结算攻击或已发射投射物。
+            ResetUnitPresentation(active.GameObject, resetRootRotation: true);
         }
 
         public void OnUnitLevelChanged(int runtimeId, int newLevel)
@@ -947,9 +963,9 @@ namespace GameBattle
             }
 
             instance.SetActive(true);
-            instance.GetComponent<SoldierSpriteAnimator>()?.ResetToIdle();
-            instance.GetComponent<SpearWeaponView>()?.ResetView();
-            instance.GetComponent<GeneralSpineAnimator>()?.ResetToIdle();
+            ResetUnitPresentation(
+                instance,
+                resetRootRotation: assetKey.StartsWith("unit_", StringComparison.Ordinal));
 
             return instance;
         }
@@ -968,11 +984,46 @@ namespace GameBattle
             }
 
             instance.transform.SetParent(parent, false);
+            ResetUnitPresentation(
+                instance,
+                resetRootRotation: assetKey.StartsWith("unit_", StringComparison.Ordinal));
+            instance.SetActive(false);
+            pool.Push(instance);
+        }
+
+        /// <summary>
+        /// 清理单位攻击相关的表现状态。
+        /// </summary>
+        /// <param name="instance">单位或其他可复用表现实例。</param>
+        /// <param name="resetRootRotation">是否同时将单位根节点及正在进行的回正复位到默认朝向。</param>
+        /// <remarks>
+        /// 逻辑侧攻击状态、待结算攻击以及已发射投射物不由此方法修改；这里只清理下一次复用前必须一致的 Unity 表现状态。
+        /// </remarks>
+        private static void ResetUnitPresentation(GameObject instance, bool resetRootRotation)
+        {
+            if (instance == null)
+            {
+                return;
+            }
+
+            if (resetRootRotation)
+            {
+                BattlePresenter.SoldierBodyRotationReturn bodyRotationReturn =
+                    instance.GetComponent<BattlePresenter.SoldierBodyRotationReturn>();
+                if (bodyRotationReturn != null)
+                {
+                    // 同时取消可能尚未完成的平滑回正，避免下一次拖动/攻击被旧 Update 覆盖。
+                    bodyRotationReturn.SetImmediate(Quaternion.identity);
+                }
+                else
+                {
+                    instance.transform.localRotation = Quaternion.identity;
+                }
+            }
+
             instance.GetComponent<SoldierSpriteAnimator>()?.ResetToIdle();
             instance.GetComponent<SpearWeaponView>()?.ResetView();
             instance.GetComponent<GeneralSpineAnimator>()?.ResetToIdle();
-            instance.SetActive(false);
-            pool.Push(instance);
         }
 
         private async UniTask LoadUnitAnimationsAsync(IBattleViewAssetLoader loader)
@@ -1137,6 +1188,42 @@ namespace GameBattle
             }
         }
 
+        /// <summary>
+        /// 预加载待上场区铲子卡牌贴图。
+        /// </summary>
+        private async UniTask LoadShovelSpriteAsync(IBattleViewAssetLoader loader)
+        {
+            IBattleAssetLease lease;
+            try
+            {
+                lease = loader.LoadAsync<Sprite>(ShovelSpriteAddress);
+                if (lease == null)
+                {
+                    throw new InvalidOperationException("资源加载接缝返回空租约");
+                }
+
+                _assetLeases.Add(lease);
+                await UniTask.WaitUntil(() => lease.IsDone);
+            }
+            catch (BattlePresentationLoadException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new BattlePresentationLoadException("load-shovel", ShovelSpriteAddress, ex);
+            }
+
+            if (!lease.IsValid || !(lease.AssetObject is Sprite sprite) || sprite == null)
+            {
+                throw new BattlePresentationLoadException(
+                    "validate-shovel", ShovelSpriteAddress,
+                    new InvalidOperationException("铲子 Sprite 无效"));
+            }
+
+            _shovelSprite = sprite;
+        }
+
         private async UniTask LoadDamageNumberSpritesAsync(IBattleViewAssetLoader loader)
         {
             IBattleAssetLease lease;
@@ -1259,6 +1346,7 @@ namespace GameBattle
         {
             ResetDamageNumberPresentation();
             _levelNumberSprites = null;
+            _shovelSprite = null;
             _generalPartSprites.Clear();
 
             // 对称释放至今取得的所有资源租约（生产租约内部 Release 对应 AssetHandle）。

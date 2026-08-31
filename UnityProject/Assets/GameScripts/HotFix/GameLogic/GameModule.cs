@@ -1,6 +1,5 @@
 ﻿using GameBattle;
 using GameLogic;
-using GameWeapon;
 using TEngine;
 using Object = UnityEngine.Object;
 
@@ -103,9 +102,6 @@ public class GameModule
 
     private static IBattleModule _battle;
 
-    public static IWeaponModule Weapon => _weapon ??= Get<IWeaponModule>();
-
-    private static IWeaponModule _weapon;
     #endregion
     
     /// <summary>
@@ -140,6 +136,5 @@ public class GameModule
         // ModuleSystem.Shutdown 会逆序调用各模块 Shutdown（含 BattleModule.Shutdown），
         // 此处只清空缓存访问引用，不重复释放模块内部资源。
         _battle = null;
-        _weapon = null;
     }
 }

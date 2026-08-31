@@ -125,6 +125,15 @@ namespace GameBattle
                 level: 1,
                 propType: PropType.Shovel);
 
+        internal static BattleUnit CreateFarmer(int unitId, bool side)
+            => new BattleUnit(
+                unitId,
+                side,
+                UnitKind.Farmer,
+                default,
+                string.Empty,
+                level: 1);
+
         internal static BattleUnit CreateGeneralPart(
             int unitId,
             bool side,
