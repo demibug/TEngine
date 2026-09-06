@@ -39,6 +39,13 @@ namespace GameBattle.Weapon
                     continue;
                 }
 
+                if (!_catalog.TryGet(rule.WeaponId, out WeaponDefinition weapon)
+                    || !weapon.Enabled
+                    || !weapon.Obtainable)
+                {
+                    continue;
+                }
+
                 candidates.Add(rule);
                 totalWeight = checked(totalWeight + rule.Weight);
             }

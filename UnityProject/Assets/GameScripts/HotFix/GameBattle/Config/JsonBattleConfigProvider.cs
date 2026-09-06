@@ -606,7 +606,10 @@ namespace GameBattle
                     allowDangerResponse: false,
                     allowFastDeploy: false,
                     enableValueEvaluation: false,
-                    enableReclaim: false),
+                    enableReclaim: false,
+                    fastDeployProbability: OpponentAiPolicyDefaults.GetFastDeployProbability(0),
+                    dangerResponseProbability: OpponentAiPolicyDefaults.GetDangerResponseProbability(0),
+                    generalPartCopyProbability: OpponentAiPolicyDefaults.GeneralPartCopyProbability),
                 new OpponentAiProfileSnapshot(
                     id: 1,
                     decisionIntervalMs: 1500,
@@ -626,7 +629,10 @@ namespace GameBattle
                     allowDangerResponse: false,
                     allowFastDeploy: false,
                     enableValueEvaluation: false,
-                    enableReclaim: false),
+                    enableReclaim: false,
+                    fastDeployProbability: OpponentAiPolicyDefaults.GetFastDeployProbability(1),
+                    dangerResponseProbability: OpponentAiPolicyDefaults.GetDangerResponseProbability(1),
+                    generalPartCopyProbability: OpponentAiPolicyDefaults.GeneralPartCopyProbability),
                 new OpponentAiProfileSnapshot(
                     id: 2,
                     decisionIntervalMs: 1000,
@@ -646,7 +652,10 @@ namespace GameBattle
                     allowDangerResponse: false,
                     allowFastDeploy: false,
                     enableValueEvaluation: true,
-                    enableReclaim: false),
+                    enableReclaim: false,
+                    fastDeployProbability: OpponentAiPolicyDefaults.GetFastDeployProbability(2),
+                    dangerResponseProbability: OpponentAiPolicyDefaults.GetDangerResponseProbability(2),
+                    generalPartCopyProbability: OpponentAiPolicyDefaults.GeneralPartCopyProbability),
                 new OpponentAiProfileSnapshot(
                     id: 3,
                     decisionIntervalMs: 500,
@@ -666,7 +675,10 @@ namespace GameBattle
                     allowDangerResponse: true,
                     allowFastDeploy: true,
                     enableValueEvaluation: true,
-                    enableReclaim: true),
+                    enableReclaim: true,
+                    fastDeployProbability: OpponentAiPolicyDefaults.GetFastDeployProbability(3),
+                    dangerResponseProbability: OpponentAiPolicyDefaults.GetDangerResponseProbability(3),
+                    generalPartCopyProbability: OpponentAiPolicyDefaults.GeneralPartCopyProbability),
             });
         }
 

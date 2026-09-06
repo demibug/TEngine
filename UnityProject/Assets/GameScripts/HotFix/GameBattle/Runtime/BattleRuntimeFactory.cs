@@ -926,8 +926,30 @@ namespace GameBattle
                         randomStreams.OpponentRecruit,
                         allowGeneralParts: opponentAiProfile.AllowGeneralParts,
                         allowFarmer: opponentAiProfile.AllowFarmer,
-                        includeShovels: opponentAiProfile.AllowDangerResponse,
-                        allowGeneralPartDuplicates: opponentAiProfile.EnableValueEvaluation);
+                        // The original 108-card pool always contains its shovel cards.
+                        // DangerResponse controls the strategy, not the base-pool shape.
+                        includeShovels: true,
+                        // EnableValueEvaluation is an AI scoring switch. It must not
+                        // alter the deck's copyGeneralChars/duplicate state. The deck
+                        // owns that state; false is the explicit safe fallback until
+                        // the raw copy event is wired in.
+                        allowGeneralPartDuplicates: false);
+
+                    // DeckManager.startGame resets the mutable pools before injecting
+                    // extra shovels and drawing the initial hand. Keep that lifecycle
+                    // explicit at the per-runtime boundary. Reset is non-random, so
+                    // the independent OpponentRecruit stream remains unchanged.
+                    opponentDeck.Reset();
+
+                    // The raw injectShovel count is floor(playerShovelCount / 5), but
+                    // this assembly currently has no safe account-day/player-shovel
+                    // snapshot. Do not infer it from loadout.Round (combat wave !=
+                    // player roundDay); use the documented zero-injection fallback.
+                    const int defaultInjectedOpponentShovels = 0;
+                    opponentDeck.InjectShovels(defaultInjectedOpponentShovels);
+                    Log.Warning(
+                        $"{LogTag} 对手牌库未获得玩家 roundDay/shovelCount 快照，" +
+                        "按原始生命周期使用额外铲子注入默认值 0；待 BattleStartupContext 提供账户快照后接入 floor(count/5)");
                     opponentHand = new OpponentHand(opponentAiProfile.HandSize);
                     recruitManager = new RecruitManager(
                         randomStreams.PlayerRecruit,

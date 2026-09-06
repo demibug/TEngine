@@ -454,6 +454,104 @@ namespace GameBattle
         }
 
         /// <summary>
+        /// 原子移除一个对手战场单位，供 raw QX/ReclaimUnit 使用。
+        /// </summary>
+        /// <remarks>
+        /// 完整武将占用两个战场格但共享一个 UnitId，因此回收时一并清除两格；
+        /// 普通士兵只清除命中的战场槽。调用方必须在成功后完成运行时实例回收，
+        /// 失败时可用 <see cref="TryRollbackReclaim"/> 恢复本次板变更。
+        /// </remarks>
+        internal bool TryCommitReclaim(
+            int sourceSlotId,
+            int expectedUnitId,
+            out ReclaimBoardChange change)
+        {
+            change = default;
+            if (!_initialized
+                || !_slotsById.TryGetValue(sourceSlotId, out UnitSlot source)
+                || source.SlotId.Zone != SlotZone.Battle
+                || source.SlotId.Side
+                || !source.Occupant.HasValue
+                || source.Occupant.Value.UnitId != expectedUnitId
+                || source.Occupant.Value.Kind == UnitKind.GeneralPart
+                || source.Occupant.Value.Kind == UnitKind.Prop
+                || source.Occupant.Value.Kind == UnitKind.Farmer)
+            {
+                return false;
+            }
+
+            BattleUnit reclaimedUnit = source.Occupant.Value;
+            var mutations = new List<ReclaimSlotMutation>();
+            foreach (UnitSlot slot in _slotsById.Values)
+            {
+                if (!slot.Occupant.HasValue
+                    || slot.SlotId.Zone != SlotZone.Battle
+                    || slot.SlotId.Side
+                    || slot.Occupant.Value.UnitId != reclaimedUnit.UnitId)
+                {
+                    continue;
+                }
+
+                // A General is represented by two cells with the same UnitId.
+                // A soldier should normally have one cell; matching by UnitId
+                // keeps the board invariant defensive if a malformed snapshot
+                // contains a duplicate representation.
+                mutations.Add(new ReclaimSlotMutation(slot.SlotId, slot.Occupant));
+            }
+
+            if (mutations.Count == 0)
+            {
+                return false;
+            }
+
+            int revisionBefore = _revision;
+            for (int i = 0; i < mutations.Count; i++)
+            {
+                ReclaimSlotMutation mutation = mutations[i];
+                _slotsById[mutation.SlotId.Id] =
+                    new UnitSlot(mutation.SlotId, occupant: null);
+            }
+
+            _revision++;
+            change = new ReclaimBoardChange(
+                reclaimedUnit,
+                mutations,
+                revisionBefore,
+                _revision);
+            return true;
+        }
+
+        /// <summary>回滚一次尚未被其他板事务打断的回收提交。</summary>
+        internal bool TryRollbackReclaim(ReclaimBoardChange change)
+        {
+            if (!change.IsValid || _revision != change.RevisionAfter)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < change.Mutations.Count; i++)
+            {
+                ReclaimSlotMutation mutation = change.Mutations[i];
+                if (!_slotsById.TryGetValue(mutation.SlotId.Id, out UnitSlot slot)
+                    || slot.SlotId != mutation.SlotId
+                    || slot.Occupant.HasValue)
+                {
+                    return false;
+                }
+            }
+
+            for (int i = 0; i < change.Mutations.Count; i++)
+            {
+                ReclaimSlotMutation mutation = change.Mutations[i];
+                _slotsById[mutation.SlotId.Id] =
+                    new UnitSlot(mutation.SlotId, mutation.Before);
+            }
+
+            _revision++;
+            return true;
+        }
+
+        /// <summary>
         /// 更新指定槽位占用单位的攻击冷却（修复 P0：下场时写回 BattleUnit）。
         /// </summary>
         /// <param name="slotId">固定槽位 ID。</param>
@@ -1101,6 +1199,43 @@ namespace GameBattle
             SourceSlotId = sourceSlotId;
             Shovel = shovel;
             AddedBattleSlotId = addedBattleSlotId;
+            RevisionBefore = revisionBefore;
+            RevisionAfter = revisionAfter;
+        }
+    }
+
+    internal readonly struct ReclaimSlotMutation
+    {
+        internal readonly UnitSlotId SlotId;
+        internal readonly BattleUnit? Before;
+
+        internal ReclaimSlotMutation(UnitSlotId slotId, BattleUnit? before)
+        {
+            SlotId = slotId;
+            Before = before;
+        }
+    }
+
+    internal readonly struct ReclaimBoardChange
+    {
+        internal readonly BattleUnit ReclaimedUnit;
+        internal readonly IReadOnlyList<ReclaimSlotMutation> Mutations;
+        internal readonly int RevisionBefore;
+        internal readonly int RevisionAfter;
+
+        internal bool IsValid => ReclaimedUnit.UnitId != UnitSlot.InvalidUnitId
+                                 && Mutations != null
+                                 && Mutations.Count > 0
+                                 && RevisionAfter > RevisionBefore;
+
+        internal ReclaimBoardChange(
+            BattleUnit reclaimedUnit,
+            IReadOnlyList<ReclaimSlotMutation> mutations,
+            int revisionBefore,
+            int revisionAfter)
+        {
+            ReclaimedUnit = reclaimedUnit;
+            Mutations = mutations;
             RevisionBefore = revisionBefore;
             RevisionAfter = revisionAfter;
         }

@@ -4,6 +4,7 @@ using Cysharp.Threading.Tasks;
 using Spine.Unity;
 using TEngine;
 using UnityEngine;
+using UnityEngine.Rendering;
 using YooAsset;
 
 namespace GameBattle
@@ -485,6 +486,19 @@ namespace GameBattle
 
             if (dto.Kind == EnemyPresentationKind.Boss)
             {
+                // Boss 主体可能被 BattleMap0 的 Divide（Default/Order 7）遮挡。
+                // 根节点 SortingGroup 把整个 Boss 表现整体抬高到 Default/Order 10 之上；
+                // 只在根节点添加，避免压平血条等子表现自身的内部层级。
+                // AddComponent 幂等：池复用重复出生不会叠加组件。
+                SortingGroup bossGroup = instance.GetComponent<SortingGroup>();
+                if (bossGroup == null)
+                {
+                    bossGroup = instance.AddComponent<SortingGroup>();
+                }
+
+                bossGroup.sortingLayerID = 0;
+                bossGroup.sortingOrder = 10;
+
                 SkeletonAnimation spine = instance.GetComponentInChildren<SkeletonAnimation>(true);
                 if (spine == null || spine.AnimationState == null)
                 {

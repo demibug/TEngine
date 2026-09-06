@@ -84,6 +84,18 @@ namespace GameBattle
             }
         }
 
+        /// <summary>以原始 drawHand 语义发放初始手牌；初始抽牌不消费牌库。</summary>
+        internal void DealInitial(OpponentDeckManager deck)
+        {
+            if (deck == null)
+            {
+                throw new ArgumentNullException(nameof(deck));
+            }
+
+            ReplaceAll(deck.DrawInitialHand(Capacity));
+        }
+
+        /// <summary>以原始 drawCardNoRepeat 语义刷新手牌。</summary>
         internal void Refill(OpponentDeckManager deck)
         {
             if (deck == null)
@@ -91,7 +103,7 @@ namespace GameBattle
                 throw new ArgumentNullException(nameof(deck));
             }
 
-            ReplaceAll(deck.DrawHand(Capacity));
+            ReplaceAll(deck.DrawRefreshHand(Capacity));
         }
 
         /// <summary>将手牌槽绑定到 Reserve 投影生成的单位 ID。</summary>

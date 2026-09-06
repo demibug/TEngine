@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GameBattle.Weapon;
 using NUnit.Framework;
 
 namespace GameBattle.Tests.EditMode.Combat
@@ -150,10 +151,10 @@ namespace GameBattle.Tests.EditMode.Combat
         {
             switch (type)
             {
-                case SoldierType.Knife: return 20;
-                case SoldierType.Bow: return 0;
-                case SoldierType.Spear: return 10;
-                case SoldierType.Cavalry: return 31;
+                case SoldierType.Knife: return BasicWeaponResolver.KnifeWeaponId;
+                case SoldierType.Bow: return BasicWeaponResolver.BowWeaponId;
+                case SoldierType.Spear: return BasicWeaponResolver.SpearWeaponId;
+                case SoldierType.Cavalry: return BasicWeaponResolver.CavalryWeaponId;
                 default: throw new ArgumentOutOfRangeException(nameof(type));
             }
         }
@@ -480,7 +481,9 @@ namespace GameBattle.Tests.EditMode.Combat
                 factory, projManager, out _);
             if (withWeapon)
             {
-                soldier.ApplyBasicWeapon(20, 1);
+                soldier.ApplyBasicWeapon(
+                    BasicWeaponResolver.KnifeWeaponId,
+                    BasicWeaponResolver.BasicAttackPower);
             }
 
             enemyManager.Register(new TestEnemy

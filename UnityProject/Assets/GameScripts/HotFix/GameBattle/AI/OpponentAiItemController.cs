@@ -62,17 +62,6 @@ namespace GameBattle
                 return false;
             }
 
-            if (profile.AllowDangerResponse
-                && TryBuildExpansionAction(
-                    snapshot,
-                    profile,
-                    UnitKind.Prop,
-                    OpponentAiActionType.UseShovel,
-                    out action))
-            {
-                return true;
-            }
-
             if (profile.AllowFarmer
                 && TryBuildExpansionAction(
                     snapshot,
@@ -85,6 +74,45 @@ namespace GameBattle
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// 仅为显式 OnPlayerDanger 事件构造危险响应道具动作。
+        /// </summary>
+        internal bool TryBuildDangerAction(
+            OpponentAiBoardSnapshot snapshot,
+            OpponentAiProfileSnapshot profile,
+            out OpponentAiAction action)
+        {
+            action = null;
+            if (snapshot == null
+                || profile == null
+                || !profile.AllowDangerResponse
+                || !IsReady(profile))
+            {
+                return false;
+            }
+
+            if (TryBuildExpansionAction(
+                    snapshot,
+                    profile,
+                    UnitKind.Prop,
+                    OpponentAiActionType.UseShovel,
+                    out action))
+            {
+                return true;
+            }
+
+            // 原工程危险槽位承载的是“危险响应类道具”。在当前规则层农民也是
+            // 一次性输入道具，铲子缺失时允许同一显式事件使用农民兜底；
+            // 普通决策 tick 仍不会因此自动消耗铲子。
+            return profile.AllowFarmer
+                && TryBuildExpansionAction(
+                    snapshot,
+                    profile,
+                    UnitKind.Farmer,
+                    OpponentAiActionType.UseFarmer,
+                    out action);
         }
 
         private bool TryBuildExpansionAction(

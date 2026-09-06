@@ -698,6 +698,46 @@ namespace GameBattle
         }
 
         /// <summary>
+        /// 按活动实例反查注册表使用的运行时 ID。
+        /// </summary>
+        /// <remarks>
+        /// ResetState 会把 SoldierBase.Id 清为 -1，但测试/回滚路径可能在对象仍
+        /// 位于注册表时调用它。移除时必须以注册表映射为准，不能再读取已重置的 Id。
+        /// </remarks>
+        private int FindRegistryIdBySoldier(SoldierBase soldier)
+        {
+            for (int index = 0; index < _soldiers.Count; index++)
+            {
+                if (ReferenceEquals(_soldiers[index], soldier))
+                {
+                    foreach (KeyValuePair<int, int> pair in _idToIndex)
+                    {
+                        if (pair.Value == index)
+                        {
+                            return pair.Key;
+                        }
+                    }
+                }
+            }
+
+            return soldier.Id;
+        }
+
+        /// <summary>按列表索引反查注册表 ID，供末尾交换移除同步映射。</summary>
+        private int FindRegistryIdByIndex(int index)
+        {
+            foreach (KeyValuePair<int, int> pair in _idToIndex)
+            {
+                if (pair.Value == index)
+                {
+                    return pair.Key;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
         /// 解除指定局内单位的战斗实例（最终方案"下场时解除战斗实例，但保留 BattleUnit"）。
         /// </summary>
         /// <param name="unitId">局内单位权威 ID（BattleUnit.UnitId）。</param>
@@ -876,17 +916,25 @@ namespace GameBattle
             unit.GameOver();
 
             // 末尾交换法移除（保持剩余元素顺序稳定）。
-            int index = _idToIndex[unit.Id];
+            // unit.Id 可能已由 ResetState 清成 -1，使用移除前反查到的稳定注册键。
+            int registryId = FindRegistryIdBySoldier(unit);
+            int index = _idToIndex[registryId];
             int lastIndex = _soldiers.Count - 1;
             if (index != lastIndex)
             {
                 SoldierBase lastUnit = _soldiers[lastIndex];
+                int lastRegistryId = FindRegistryIdByIndex(lastIndex);
+                if (lastRegistryId < 0)
+                {
+                    lastRegistryId = lastUnit.Id;
+                }
+
                 _soldiers[index] = lastUnit;
-                _idToIndex[lastUnit.Id] = index;
+                _idToIndex[lastRegistryId] = index;
             }
 
             _soldiers.RemoveAt(lastIndex);
-            _idToIndex.Remove(unit.Id);
+            _idToIndex.Remove(registryId);
         }
 
         // ====================================================================

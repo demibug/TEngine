@@ -12,7 +12,7 @@ namespace GameBattle.Tests.EditMode.Config
     // ----------------------------------------------------------------------------
     // 验证内容（design.md 决策 1 / specs/combat-buff-lifecycle/spec.md
     //   "Buff definitions form a validated immutable catalog"）：
-    //   1. 黄金全目录（type 0～19）可加载且通过校验；type 12/14 的 state channel 4/5
+    //   1. 黄金全目录（type 1～20）可加载且通过校验；type 13/15 的 state channel 5/4
     //      保持合法（原表既有行，4/5 的一次性语义在目标申请阶段处理）。
     //   2. 目录对外不可变：Channels 深拷贝、按 type 升序稳定排序、集合只读。
     //   3. 重复 type 在目录构造即被拒绝（Provider 转 BuffTypeDuplicate）。
@@ -30,7 +30,7 @@ namespace GameBattle.Tests.EditMode.Config
         // ====================================================================
 
         [Test]
-        [Description("黄金全目录（type 0～19）可加载且通过启动校验，type 12/14 的原表通道保持合法。")]
+        [Description("黄金全目录（type 1～20）可加载且通过启动校验，type 13/15 的原表通道保持合法。")]
         public void GoldenCatalog_ValidFullCatalog_PassesValidation()
         {
             BattleConfigSnapshot snapshot = GoldenSnapshot();
@@ -43,22 +43,22 @@ namespace GameBattle.Tests.EditMode.Config
             // 按 type 升序稳定排序。
             for (int i = 0; i < snapshot.BuffCatalog.Types.Count; i++)
             {
-                Assert.AreEqual(i, snapshot.BuffCatalog.Types[i], "Types 应按 type 升序");
+                Assert.AreEqual(i + 1, snapshot.BuffCatalog.Types[i], "Types 应按 type 升序");
             }
 
             // 关键类型抽查。
-            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(7, out BuffDefinitionSnapshot custom));
-            Assert.AreEqual(BuffKind.Custom, custom.Kind, "type 7 应为 Custom");
+            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(8, out BuffDefinitionSnapshot custom));
+            Assert.AreEqual(BuffKind.Custom, custom.Kind, "type 8 应为 Custom");
             Assert.AreEqual(0, custom.Channels.Count, "Custom 允许空通道");
 
-            // type 12/14 来自原表：state channel 5/4 是合法目录通道（申请阶段处理 4/5 语义）。
-            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(12, out BuffDefinitionSnapshot knockback));
+            // type 13/15 来自原表：state channel 5/4 是合法目录通道（申请阶段处理 4/5 语义）。
+            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(13, out BuffDefinitionSnapshot knockback));
             Assert.AreEqual(BuffKind.State, knockback.Kind);
             Assert.IsTrue(knockback.HasChannel((int)BuffStateChannel.KnockbackImpulse),
-                "type 12 knockback 应保留原表 state channel 5");
-            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(14, out BuffDefinitionSnapshot burnStatic));
+                "type 13 knockback 应保留原表 state channel 5");
+            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(15, out BuffDefinitionSnapshot burnStatic));
             Assert.IsTrue(burnStatic.HasChannel((int)BuffStateChannel.DamageImpulse),
-                "type 14 burnStatic 应保留原表 state channel 4");
+                "type 15 burnStatic 应保留原表 state channel 4");
 
             // 本测试只验证 Buff 子域。黄金 JSON 的地图/波次基线可能被其他 change
             // 独立调整，不应让非 Buff 错误遮蔽合法 Buff 目录。
@@ -67,17 +67,17 @@ namespace GameBattle.Tests.EditMode.Config
         }
 
         [Test]
-        [Description("黄金目录与生产 TbBuff 等价：type 8/18 的中文标签被保留。")]
+        [Description("黄金目录与生产 TbBuff 等价：type 9/19 的中文标签被保留。")]
         public void GoldenCatalog_PreservesLabelsAndStackFields()
         {
             BattleConfigSnapshot snapshot = GoldenSnapshot();
 
-            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(8, out BuffDefinitionSnapshot stun));
+            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(9, out BuffDefinitionSnapshot stun));
             Assert.AreEqual("stun", stun.Name);
-            Assert.AreEqual("晕眩", stun.Label, "type 8 标签应为 晕眩");
+            Assert.AreEqual("晕眩", stun.Label, "type 9 标签应为 晕眩");
 
-            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(18, out BuffDefinitionSnapshot suppression));
-            Assert.AreEqual("压制", suppression.Label, "type 18 标签应为 压制");
+            Assert.IsTrue(snapshot.BuffCatalog.TryGetByType(19, out BuffDefinitionSnapshot suppression));
+            Assert.AreEqual("压制", suppression.Label, "type 19 标签应为 压制");
 
             // 新字段显式写入：全部 Add / maxStacks=1 / conflictKey 空。
             foreach (BuffDefinitionSnapshot def in snapshot.BuffCatalog.Definitions)

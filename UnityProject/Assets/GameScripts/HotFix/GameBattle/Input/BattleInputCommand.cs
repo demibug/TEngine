@@ -51,6 +51,9 @@ namespace GameBattle
 
         /// <summary>消费待上场槽中的农民并开垦一个地图格。</summary>
         UseFarmer = 3,
+
+        /// <summary>回收对手战场单位并按等级返还金币。</summary>
+        ReclaimUnit = 4,
     }
 
     /// <summary>
@@ -144,6 +147,22 @@ namespace GameBattle
             => $"UseFarmer(SourceReserveSlotId={SourceReserveSlotId}, Target={Target})";
     }
 
+    /// <summary>不可变对手战场单位回收载荷。</summary>
+    public readonly struct ReclaimUnitPayload
+    {
+        public readonly int SourceBattleSlotId;
+        public readonly int ExpectedUnitId;
+
+        public ReclaimUnitPayload(int sourceBattleSlotId, int expectedUnitId)
+        {
+            SourceBattleSlotId = sourceBattleSlotId;
+            ExpectedUnitId = expectedUnitId;
+        }
+
+        public override string ToString()
+            => $"ReclaimUnit(SourceBattleSlotId={SourceBattleSlotId}, ExpectedUnitId={ExpectedUnitId})";
+    }
+
     /// <summary>
     /// 不可变战斗输入命令。携带单局 <see cref="CommandId"/> 与强类型值载荷。
     /// </summary>
@@ -194,13 +213,17 @@ namespace GameBattle
         /// <summary>使用农民载荷。仅当 CommandType=UseFarmer 时有效。</summary>
         public readonly UseFarmerPayload UseFarmerPayload;
 
+        /// <summary>回收载荷。仅当 CommandType=ReclaimUnit 时有效。</summary>
+        public readonly ReclaimUnitPayload ReclaimUnitPayload;
+
         private BattleInputCommand(
             int commandId,
             BattleInputCommandType commandType,
             RecruitPayload recruitPayload,
             DropUnitPayload dropUnitPayload,
             UseShovelPayload useShovelPayload,
-            UseFarmerPayload useFarmerPayload)
+            UseFarmerPayload useFarmerPayload,
+            ReclaimUnitPayload reclaimUnitPayload)
         {
             CommandId = commandId;
             CommandType = commandType;
@@ -208,6 +231,7 @@ namespace GameBattle
             DropUnitPayload = dropUnitPayload;
             UseShovelPayload = useShovelPayload;
             UseFarmerPayload = useFarmerPayload;
+            ReclaimUnitPayload = reclaimUnitPayload;
         }
 
         /// <summary>
@@ -221,6 +245,7 @@ namespace GameBattle
                 commandId,
                 BattleInputCommandType.Recruit,
                 new RecruitPayload(playerSide),
+                default,
                 default,
                 default,
                 default);
@@ -239,6 +264,7 @@ namespace GameBattle
                 default,
                 new DropUnitPayload(sourceSlotId, targetSlotId),
                 default,
+                default,
                 default);
 
         public static BattleInputCommand CreateUseShovel(
@@ -251,6 +277,7 @@ namespace GameBattle
                 default,
                 default,
                 new UseShovelPayload(sourceReserveSlotId, target),
+                default,
                 default);
 
         public static BattleInputCommand CreateUseFarmer(
@@ -263,7 +290,22 @@ namespace GameBattle
                 default,
                 default,
                 default,
-                new UseFarmerPayload(sourceReserveSlotId, target));
+                new UseFarmerPayload(sourceReserveSlotId, target),
+                default);
+
+        /// <summary>构造对手战场单位回收命令。</summary>
+        public static BattleInputCommand CreateReclaimUnit(
+            int commandId,
+            int sourceBattleSlotId,
+            int expectedUnitId)
+            => new BattleInputCommand(
+                commandId,
+                BattleInputCommandType.ReclaimUnit,
+                default,
+                default,
+                default,
+                default,
+                new ReclaimUnitPayload(sourceBattleSlotId, expectedUnitId));
 
         /// <summary>
         /// 判断两个命令是否相等。CommandId 与 CommandType 与全部载荷字段均相同才相等。
@@ -274,7 +316,8 @@ namespace GameBattle
                && RecruitPayload.Equals(other.RecruitPayload)
                && DropUnitPayload.Equals(other.DropUnitPayload)
                && UseShovelPayload.Equals(other.UseShovelPayload)
-               && UseFarmerPayload.Equals(other.UseFarmerPayload);
+               && UseFarmerPayload.Equals(other.UseFarmerPayload)
+               && ReclaimUnitPayload.Equals(other.ReclaimUnitPayload);
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => obj is BattleInputCommand other && Equals(other);
@@ -290,6 +333,7 @@ namespace GameBattle
                 hash = (hash * 397) ^ DropUnitPayload.GetHashCode();
                 hash = (hash * 397) ^ UseShovelPayload.GetHashCode();
                 hash = (hash * 397) ^ UseFarmerPayload.GetHashCode();
+                hash = (hash * 397) ^ ReclaimUnitPayload.GetHashCode();
                 return hash;
             }
         }
@@ -313,6 +357,8 @@ namespace GameBattle
                     return $"[BattleInputCommand Id={CommandId} Type=UseShovel {UseShovelPayload}]";
                 case BattleInputCommandType.UseFarmer:
                     return $"[BattleInputCommand Id={CommandId} Type=UseFarmer {UseFarmerPayload}]";
+                case BattleInputCommandType.ReclaimUnit:
+                    return $"[BattleInputCommand Id={CommandId} Type=ReclaimUnit {ReclaimUnitPayload}]";
                 default:
                     return $"[BattleInputCommand Id={CommandId} Type={CommandType}]";
             }

@@ -247,11 +247,15 @@ namespace GameBattle.Tests.EditMode.Combat
             Assert.AreEqual(35, soldier.AttackDamageForTest, "应用 Buff 后为 35");
 
             // 模拟重复初始化写入同一武器（池复用路径不会发生，但防御幂等）。
-            soldier.ApplyBasicWeapon(20, 1);
+            soldier.ApplyBasicWeapon(
+                BasicWeaponResolver.KnifeWeaponId,
+                BasicWeaponResolver.BasicAttackPower);
 
             Assert.AreEqual(35, soldier.AttackDamageForTest,
                 "重复写入同武器不得重复计入 Buff/武器贡献");
             Assert.AreEqual(1, soldier.WeaponAttackPower, "武器附加攻击力仍为 1");
+            Assert.AreEqual(BasicWeaponResolver.KnifeWeaponId, soldier.WeaponId,
+                "重复写入后仍应保持刀兵的同一武器身份");
         }
     }
 }

@@ -256,6 +256,9 @@ namespace GameBattle
                 case BattleInputCommandType.UseFarmer:
                     return ExecuteUseFarmer(command);
 
+                case BattleInputCommandType.ReclaimUnit:
+                    return ExecuteReclaimUnit(command);
+
                 default:
                     return BattleInputResult.Fail(
                         command.CommandId,
@@ -427,6 +430,113 @@ namespace GameBattle
                     addedBattleSlotId));
 
             return BattleInputResult.Ok(command.CommandId);
+        }
+
+        /// <summary>
+        /// 执行 raw QX 对应的 ReclaimUnit：只回收对手战场单位，并按单位等级返还金币。
+        /// </summary>
+        private BattleInputResult ExecuteReclaimUnit(BattleInputCommand command)
+        {
+            ReclaimUnitPayload payload = command.ReclaimUnitPayload;
+            int commandId = command.CommandId;
+
+            if (!_slotBoard.ContainsSlotId(payload.SourceBattleSlotId))
+            {
+                return BattleInputResult.Fail(
+                    commandId,
+                    BattleInputRejectReason.InvalidReclaimSource,
+                    $"回收来源槽 {payload.SourceBattleSlotId} 不存在");
+            }
+
+            UnitSlot source = _slotBoard.GetSlotById(payload.SourceBattleSlotId);
+            if (source.SlotId.Zone != SlotZone.Battle
+                || source.SlotId.Side
+                || !source.Occupant.HasValue
+                || source.Occupant.Value.UnitId != payload.ExpectedUnitId
+                || (source.Occupant.Value.Kind != UnitKind.Soldier
+                    && source.Occupant.Value.Kind != UnitKind.General))
+            {
+                return BattleInputResult.Fail(
+                    commandId,
+                    BattleInputRejectReason.InvalidReclaimSource,
+                    $"回收来源槽 {payload.SourceBattleSlotId} 不是期望的对手战场单位");
+            }
+
+            // 先导入活动实例的实时冷却，避免任何下游读取到过期板状态。
+            SyncSlotLiveCooldown(source.SlotId);
+            source = _slotBoard.GetSlotById(payload.SourceBattleSlotId);
+            if (!source.Occupant.HasValue
+                || source.Occupant.Value.UnitId != payload.ExpectedUnitId)
+            {
+                return BattleInputResult.Fail(
+                    commandId,
+                    BattleInputRejectReason.InvalidReclaimSource,
+                    $"回收来源槽 {payload.SourceBattleSlotId} 在冷却同步后已变化");
+            }
+
+            if (_unitRegistry.GetActiveByUnitId(payload.ExpectedUnitId) == null)
+            {
+                return BattleInputResult.Fail(
+                    commandId,
+                    BattleInputRejectReason.InvalidReclaimSource,
+                    $"单位 {payload.ExpectedUnitId} 没有活动战斗实例");
+            }
+
+            if (!_slotBoard.TryCommitReclaim(
+                    payload.SourceBattleSlotId,
+                    payload.ExpectedUnitId,
+                    out ReclaimBoardChange boardChange))
+            {
+                return BattleInputResult.Fail(
+                    commandId,
+                    BattleInputRejectReason.ReclaimTransactionFailed,
+                    $"回收槽位提交失败，source={payload.SourceBattleSlotId}");
+            }
+
+            try
+            {
+                long cooldown = _unitRegistry.DeactivateBattleUnit(
+                    boardChange.ReclaimedUnit.UnitId);
+                if (cooldown < 0L)
+                {
+                    _slotBoard.TryRollbackReclaim(boardChange);
+                    return BattleInputResult.Fail(
+                        commandId,
+                        BattleInputRejectReason.ReclaimTransactionFailed,
+                        $"单位 {boardChange.ReclaimedUnit.UnitId} 战斗实例回收失败");
+                }
+
+                _economy.Award(
+                    isPlayerSide: false,
+                    amount: boardChange.ReclaimedUnit.Level,
+                    reason: "reclaim");
+            }
+            catch (Exception ex)
+            {
+                bool rolledBack = _slotBoard.TryRollbackReclaim(boardChange);
+                if (!rolledBack)
+                {
+                    Log.Error(
+                        $"{LogTag} ReclaimUnit 失败且槽位回滚失败，unit={boardChange.ReclaimedUnit.UnitId}");
+                }
+
+                return BattleInputResult.Fail(
+                    commandId,
+                    BattleInputRejectReason.ReclaimTransactionFailed,
+                    $"回收事务失败：{ex.GetType().Name}");
+            }
+
+            if (_signalHub != null)
+            {
+                for (int i = 0; i < boardChange.Mutations.Count; i++)
+                {
+                    ReclaimSlotMutation mutation = boardChange.Mutations[i];
+                    _signalHub.SlotChanged.Publish(
+                        new SlotChangedFact(mutation.SlotId, occupant: null));
+                }
+            }
+
+            return BattleInputResult.Ok(commandId);
         }
 
         // ====================================================================

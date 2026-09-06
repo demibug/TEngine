@@ -201,6 +201,12 @@ namespace GameBattle
 
         /// <summary>地图状态与农民槽位提交不一致，事务已补偿。</summary>
         FarmerTransactionFailed = 49,
+
+        /// <summary>来源不是可回收的对手战场单位，或 expectedUnitId 已失效。</summary>
+        InvalidReclaimSource = 50,
+
+        /// <summary>回收板状态、战斗实例或金币事务提交失败。</summary>
+        ReclaimTransactionFailed = 51,
     }
 
     /// <summary>

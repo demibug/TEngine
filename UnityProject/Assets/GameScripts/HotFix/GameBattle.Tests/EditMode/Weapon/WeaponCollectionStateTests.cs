@@ -153,6 +153,22 @@ namespace GameBattle.Tests.EditMode.Weapon
         }
 
         [Test]
+        public void BattleLoadout_IsSnapshotAfterStateChanges()
+        {
+            WeaponCollectionState state = CreateState();
+            BattleWeaponLoadoutDto loadout = state.CreateBattleLoadout();
+
+            Assert.That(state.ChangeFragments(2, 3).IsSuccess, Is.True);
+            Assert.That(state.TryEquip(WeaponEquipSlot.Bow, 2, out _), Is.True);
+
+            Assert.That(loadout.BowWeaponId, Is.EqualTo(1));
+            Assert.That(loadout.SpearWeaponId, Is.EqualTo(11));
+            Assert.That(loadout.KnifeWeaponId, Is.EqualTo(21));
+            Assert.That(loadout.SwordWeaponId, Is.EqualTo(32));
+            Assert.That(state.CreateBattleLoadout().BowWeaponId, Is.EqualTo(2));
+        }
+
+        [Test]
         public void AcknowledgeNewWeapons_ClearsPendingWithoutChangingFragments()
         {
             WeaponCollectionState state = CreateState();

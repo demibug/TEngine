@@ -9,6 +9,37 @@ namespace GameBattle
         RouteAware = 1,
     }
 
+    /// <summary>Raw bundle constants not represented by the generated difficulty row.</summary>
+    internal static class OpponentAiPolicyDefaults
+    {
+        internal const float GeneralPartCopyProbability = 0.5f;
+        internal const int FastDeployMaxUnits = 2;
+        internal const int FastDeployMaxUses = 1;
+        internal const int DangerResponseMaxUses = 1;
+
+        internal static float GetFastDeployProbability(int difficulty)
+        {
+            return 0.001f;
+        }
+
+        internal static float GetDangerResponseProbability(int difficulty)
+        {
+            switch (difficulty)
+            {
+                case 0:
+                    return 0.1f;
+                case 1:
+                    return 0.2f;
+                case 2:
+                    return 0.5f;
+                case 3:
+                    return 0.8f;
+                default:
+                    return 0.1f;
+            }
+        }
+    }
+
     /// <summary>单档对手 AI 的不可变本局配置。</summary>
     internal sealed class OpponentAiProfileSnapshot
     {
@@ -31,6 +62,12 @@ namespace GameBattle
         internal bool AllowFastDeploy { get; }
         internal bool EnableValueEvaluation { get; }
         internal bool EnableReclaim { get; }
+        internal float FastDeployProbability { get; }
+        internal float DangerResponseProbability { get; }
+        internal float GeneralPartCopyProbability { get; }
+        internal int FastDeployMaxUnits { get; }
+        internal int FastDeployMaxUses { get; }
+        internal int DangerResponseMaxUses { get; }
 
         internal OpponentAiProfileSnapshot(
             int id,
@@ -59,7 +96,13 @@ namespace GameBattle
                 allowDangerResponse: false,
                 allowFastDeploy: false,
                 enableValueEvaluation: false,
-                enableReclaim: false)
+                enableReclaim: false,
+                fastDeployProbability: OpponentAiPolicyDefaults.GetFastDeployProbability(id),
+                dangerResponseProbability: OpponentAiPolicyDefaults.GetDangerResponseProbability(id),
+                generalPartCopyProbability: OpponentAiPolicyDefaults.GeneralPartCopyProbability,
+                fastDeployMaxUnits: OpponentAiPolicyDefaults.FastDeployMaxUnits,
+                fastDeployMaxUses: OpponentAiPolicyDefaults.FastDeployMaxUses,
+                dangerResponseMaxUses: OpponentAiPolicyDefaults.DangerResponseMaxUses)
         {
         }
 
@@ -82,7 +125,13 @@ namespace GameBattle
             bool allowDangerResponse,
             bool allowFastDeploy,
             bool enableValueEvaluation,
-            bool enableReclaim)
+            bool enableReclaim,
+            float fastDeployProbability = 0.001f,
+            float dangerResponseProbability = 0.1f,
+            float generalPartCopyProbability = OpponentAiPolicyDefaults.GeneralPartCopyProbability,
+            int fastDeployMaxUnits = OpponentAiPolicyDefaults.FastDeployMaxUnits,
+            int fastDeployMaxUses = OpponentAiPolicyDefaults.FastDeployMaxUses,
+            int dangerResponseMaxUses = OpponentAiPolicyDefaults.DangerResponseMaxUses)
         {
             Id = id;
             DecisionIntervalMs = decisionIntervalMs;
@@ -101,13 +150,31 @@ namespace GameBattle
             AllowFastDeploy = allowFastDeploy;
             EnableValueEvaluation = enableValueEvaluation;
             EnableReclaim = enableReclaim;
+            FastDeployProbability = ClampProbability(fastDeployProbability);
+            DangerResponseProbability = ClampProbability(dangerResponseProbability);
+            GeneralPartCopyProbability = ClampProbability(generalPartCopyProbability);
+            FastDeployMaxUnits = Math.Max(0, fastDeployMaxUnits);
+            FastDeployMaxUses = Math.Max(0, fastDeployMaxUses);
+            DangerResponseMaxUses = Math.Max(0, dangerResponseMaxUses);
             _incomeByWave = new Dictionary<int, int>();
 
             int count = incomeWaveOrders?.Count ?? 0;
+            int valueCount = incomeGoldValues?.Count ?? 0;
+            if (valueCount != count)
+            {
+                throw new ArgumentException(
+                    "incomeWaveOrders and incomeGoldValues must have the same length.");
+            }
+
             for (int i = 0; i < count; i++)
             {
                 _incomeByWave.Add(incomeWaveOrders[i], incomeGoldValues[i]);
             }
+        }
+
+        private static float ClampProbability(float value)
+        {
+            return Math.Max(0f, Math.Min(1f, value));
         }
 
         internal int GetIncomeForWave(int waveOrder)

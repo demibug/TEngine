@@ -74,7 +74,9 @@ namespace GameBattle
                 if (generalPlan.FirstSource.SlotId.Zone == SlotZone.Reserve)
                 {
                     actions.Add(new OpponentAiAction(
-                        OpponentAiActionType.Deploy,
+                        generalPlan.SecondSource.SlotId.Zone == SlotZone.Battle
+                            ? OpponentAiActionType.SynthesizeGeneral
+                            : OpponentAiActionType.Deploy,
                         generalPlan.FirstSource.SlotId.Id,
                         generalPlan.FirstTarget.SlotId.Id,
                         secondarySourceSlotId: generalPlan.SecondSource.SlotId.Id,
@@ -85,9 +87,7 @@ namespace GameBattle
                 if (generalPlan.SecondSource.SlotId.Zone == SlotZone.Reserve)
                 {
                     actions.Add(new OpponentAiAction(
-                        generalPlan.FirstSource.SlotId.Zone == SlotZone.Reserve
-                            ? OpponentAiActionType.SynthesizeGeneral
-                            : OpponentAiActionType.Deploy,
+                        OpponentAiActionType.SynthesizeGeneral,
                         generalPlan.SecondSource.SlotId.Id,
                         generalPlan.SecondTarget.SlotId.Id,
                         reason: generalPlan.Reason,
@@ -103,12 +103,106 @@ namespace GameBattle
             }
 
             AddDeployActions(actions, snapshot, profile);
+            if (actions.Count == 0 && profile.EnableReclaim)
+            {
+                IReadOnlyList<OpponentAiAction> reclaimActions =
+                    BuildReclaimPlan(snapshot, profile);
+                for (int i = 0; i < reclaimActions.Count; i++)
+                {
+                    actions.Add(reclaimActions[i]);
+                }
+            }
+
             if (actions.Count == 0)
             {
                 actions.Add(OpponentAiAction.Wait());
             }
 
             return actions.AsReadOnly();
+        }
+
+        /// <summary>
+        /// 构造 raw UG/FastDeploy 的候选部署计划；调用方负责概率、金币和 one-shot guard。
+        /// </summary>
+        internal IReadOnlyList<OpponentAiAction> BuildFastDeployPlan(
+            OpponentAiBoardSnapshot snapshot,
+            OpponentAiProfileSnapshot profile)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (profile == null || !profile.AllowFastDeploy || profile.FastDeployMaxUnits <= 0)
+            {
+                return Array.Empty<OpponentAiAction>();
+            }
+
+            var actions = new List<OpponentAiAction>();
+            AddDeployActions(
+                actions,
+                snapshot,
+                profile,
+                OpponentAiActionType.FastDeploy,
+                profile.FastDeployMaxUnits);
+            return actions.AsReadOnly();
+        }
+
+        /// <summary>
+        /// 构造 raw QX/Reclaim 的稳定回收候选；只选择唯一的对手战斗实体。
+        /// </summary>
+        internal IReadOnlyList<OpponentAiAction> BuildReclaimPlan(
+            OpponentAiBoardSnapshot snapshot,
+            OpponentAiProfileSnapshot profile)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (profile == null || !profile.EnableReclaim)
+            {
+                return Array.Empty<OpponentAiAction>();
+            }
+
+            UnitSlot selected = default;
+            bool found = false;
+            for (int i = 0; i < snapshot.BattleSlots.Count; i++)
+            {
+                UnitSlot candidate = snapshot.BattleSlots[i];
+                if (!candidate.Occupant.HasValue
+                    || candidate.Occupant.Value.Side
+                    || (candidate.Occupant.Value.Kind == UnitKind.General
+                        && !candidate.Occupant.Value.IsGeneralPrimaryCell)
+                    || (candidate.Occupant.Value.Kind != UnitKind.Soldier
+                        && candidate.Occupant.Value.Kind != UnitKind.General))
+                {
+                    continue;
+                }
+
+                if (!found
+                    || candidate.Occupant.Value.Level < selected.Occupant.Value.Level
+                    || (candidate.Occupant.Value.Level == selected.Occupant.Value.Level
+                        && candidate.SlotId.Id < selected.SlotId.Id))
+                {
+                    selected = candidate;
+                    found = true;
+                }
+            }
+
+            if (!found)
+            {
+                return Array.Empty<OpponentAiAction>();
+            }
+
+            return new[]
+            {
+                new OpponentAiAction(
+                    OpponentAiActionType.Replace,
+                    sourceSlotId: selected.SlotId.Id,
+                    reason: "reclaim_lowest_level_battle_unit",
+                    expectedUnitId: selected.Occupant.Value.UnitId),
+            };
         }
 
         private void AddMergeActions(
@@ -151,7 +245,9 @@ namespace GameBattle
         private void AddDeployActions(
             List<OpponentAiAction> actions,
             OpponentAiBoardSnapshot snapshot,
-            OpponentAiProfileSnapshot profile)
+            OpponentAiProfileSnapshot profile,
+            OpponentAiActionType actionType = OpponentAiActionType.Deploy,
+            int maxActions = int.MaxValue)
         {
             var reservedTargets = new HashSet<int>();
             for (int i = 0; i < snapshot.ReserveSlots.Count; i++)
@@ -195,9 +291,7 @@ namespace GameBattle
                             : "route_candidate";
                 }
                 actions.Add(new OpponentAiAction(
-                    profile.AllowFastDeploy
-                        ? OpponentAiActionType.FastDeploy
-                        : OpponentAiActionType.Deploy,
+                    actionType,
                     sourceSlot.SlotId.Id,
                     target.Id,
                     reason: reason,
@@ -206,9 +300,15 @@ namespace GameBattle
 
                 // Preserve one-action-at-a-time ordinary behavior for low difficulty;
                 // high difficulty can safely queue the whole visible hand projection.
-                if (!profile.AllowActiveMerge
+                if (actionType == OpponentAiActionType.Deploy
+                    && !profile.AllowActiveMerge
                     && !profile.AllowTemplatePlacement
                     && actions.Count > 0)
+                {
+                    break;
+                }
+
+                if (actions.Count >= maxActions)
                 {
                     break;
                 }

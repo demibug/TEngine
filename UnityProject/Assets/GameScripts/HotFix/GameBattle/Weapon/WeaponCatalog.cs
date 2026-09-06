@@ -258,10 +258,11 @@ namespace GameBattle.Weapon
             }
 
             if (!byId.TryGetValue(row.WeaponId, out WeaponDefinition weapon)
+                || !weapon.Enabled
                 || !weapon.Obtainable)
             {
                 throw new InvalidOperationException(
-                    $"武器奖励 id={row.Id} 引用了不存在或不可掉落的 weaponId={row.WeaponId}");
+                    $"武器奖励 id={row.Id} 引用了不存在、未启用或不可掉落的 weaponId={row.WeaponId}");
             }
         }
     }

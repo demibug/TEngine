@@ -31,6 +31,7 @@ namespace GameBattle
         private readonly UnitLevelService _levelService;
         private readonly OpponentHand _opponentHand;
         private readonly OpponentAiReplayLog _replayLog;
+        private readonly IRandomSource _strategyRandom;
         private readonly Queue<OpponentAiAction> _actionQueue = new Queue<OpponentAiAction>();
         private readonly List<int> _scannedUnitIds = new List<int>();
 
@@ -40,6 +41,8 @@ namespace GameBattle
         private int _scanIndex;
         private int _plannedSourceUnitId = UnitSlot.InvalidUnitId;
         private int _plannedTargetUnitId = UnitSlot.InvalidUnitId;
+        private int _fastDeployUses;
+        private int _dangerResponseUses;
         private bool _started;
 
         internal OpponentAiState State => _state;
@@ -66,6 +69,7 @@ namespace GameBattle
             _economy = economy ?? throw new ArgumentNullException(nameof(economy));
             _waveManager = waveManager ?? throw new ArgumentNullException(nameof(waveManager));
             _levelService = levelService ?? throw new ArgumentNullException(nameof(levelService));
+            _strategyRandom = strategyRandom ?? throw new ArgumentNullException(nameof(strategyRandom));
             _opponentHand = opponentHand;
             _replayLog = replayLog;
             _placementPlanner = new OpponentAiPlacementPlanner(map, strategyRandom, levelService);
@@ -95,6 +99,8 @@ namespace GameBattle
             _elapsedMs = 0;
             _decisionTick = 0;
             _state = OpponentAiState.DeployReserve;
+            _fastDeployUses = 0;
+            _dangerResponseUses = 0;
             ResetPlanningState();
             _actionQueue.Clear();
             _replayLog?.Clear();
@@ -138,6 +144,15 @@ namespace GameBattle
         private void AdvanceDecision()
         {
             _decisionTick++;
+            // 事件触发动作优先于普通冷却策略；否则同一 tick 的道具检查可能
+            // 覆盖已经排队的危险响应。
+            if (_actionQueue.Count > 0)
+            {
+                _state = OpponentAiState.ExecutePlan;
+                ExecuteNextAction();
+                return;
+            }
+
             if (TryPrioritizeReadyItem())
             {
                 _state = OpponentAiState.ExecutePlan;
@@ -147,6 +162,13 @@ namespace GameBattle
 
             if (_actionQueue.Count == 0)
             {
+                if (TryPrioritizeFastDeploy())
+                {
+                    _state = OpponentAiState.ExecutePlan;
+                    ExecuteNextAction();
+                    return;
+                }
+
                 BuildActionQueue();
             }
 
@@ -160,6 +182,87 @@ namespace GameBattle
             _state = OpponentAiState.RecruitOrIdle;
             RecruitOrIdle();
         }
+
+        /// <summary>
+        /// raw TG/UG 触发：金币低于当前征兵成本且概率命中时，一次生成最多两个
+        /// FastDeploy 动作。没有合法候选时也消费本次 guard，避免每 tick 重抽。
+        /// </summary>
+        private bool TryPrioritizeFastDeploy()
+        {
+            if (!_profile.AllowFastDeploy
+                || _fastDeployUses >= _profile.FastDeployMaxUses
+                || _economy.GetBalance(isPlayerSide: false)
+                    >= _economyService.CurrentRefreshCost)
+            {
+                return false;
+            }
+
+            if (_strategyRandom.NextUnit() > _profile.FastDeployProbability)
+            {
+                return false;
+            }
+
+            _fastDeployUses++;
+            OpponentAiBoardSnapshot snapshot = new OpponentAiBoardSnapshot(
+                _slotBoard.Snapshot(),
+                _placementPlanner.Map,
+                _levelService.MaxLevel);
+            IReadOnlyList<OpponentAiAction> actions =
+                _decisionEngine.BuildFastDeployPlan(snapshot, _profile);
+            if (actions.Count == 0)
+            {
+                return false;
+            }
+
+            _actionQueue.Clear();
+            for (int i = 0; i < actions.Count; i++)
+            {
+                _actionQueue.Enqueue(actions[i]);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// raw onPlayerDanger 外部入口。概率判定只在显式事件发生时执行。
+        /// </summary>
+        internal bool OnPlayerDanger()
+        {
+            if (!_started
+                || !_profile.AllowDangerResponse
+                || _dangerResponseUses >= _profile.DangerResponseMaxUses)
+            {
+                return false;
+            }
+
+            // 与原工程 Rq guard 等价：即使概率未命中，也不重复消费同一次
+            // 危险提示事件，避免外部重复通知改变随机进度。
+            _dangerResponseUses++;
+            if (_strategyRandom.NextUnit() > _profile.DangerResponseProbability)
+            {
+                return false;
+            }
+
+            OpponentAiBoardSnapshot snapshot = new OpponentAiBoardSnapshot(
+                _slotBoard.Snapshot(),
+                _placementPlanner.Map,
+                _levelService.MaxLevel);
+            if (!_itemController.TryBuildDangerAction(
+                    snapshot,
+                    _profile,
+                    out OpponentAiAction dangerAction))
+            {
+                return false;
+            }
+
+            _actionQueue.Clear();
+            _actionQueue.Enqueue(dangerAction);
+            _state = OpponentAiState.ExecutePlan;
+            return true;
+        }
+
+        /// <summary>兼容危险提示系统使用的别名。</summary>
+        internal bool NotifyPlayerDanger() => OnPlayerDanger();
 
         private bool TryPrioritizeReadyItem()
         {
@@ -224,6 +327,34 @@ namespace GameBattle
                 return;
             }
 
+            if (action.Type == OpponentAiActionType.Replace)
+            {
+                if (!ValidateReclaimAction(action, out UnitSlot reclaimSource))
+                {
+                    _actionQueue.Clear();
+                    _state = OpponentAiState.DeployReserve;
+                    return;
+                }
+
+                int reclaimCommandId = _commandIdAllocator.Allocate();
+                BattleInputResult reclaimResult = _inputController.Execute(
+                    BattleInputCommand.CreateReclaimUnit(
+                        reclaimCommandId,
+                        reclaimSource.SlotId.Id,
+                        action.ExpectedUnitId));
+                if (!reclaimResult.IsSuccess)
+                {
+                    _replayLog?.Record(_decisionTick, action, reclaimResult);
+                    _actionQueue.Clear();
+                    _state = OpponentAiState.DeployReserve;
+                    return;
+                }
+
+                _replayLog?.Record(_decisionTick, action, reclaimResult);
+                _state = OpponentAiState.DeployReserve;
+                return;
+            }
+
             if (action.Type == OpponentAiActionType.UseShovel
                 || action.Type == OpponentAiActionType.UseFarmer)
             {
@@ -253,7 +384,9 @@ namespace GameBattle
                 BattleInputResult itemResult = _inputController.Execute(itemCommand);
                 if (!itemResult.IsSuccess)
                 {
+                    _replayLog?.Record(_decisionTick, action, itemResult);
                     _actionQueue.Clear();
+                    _state = OpponentAiState.DeployReserve;
                     return;
                 }
 
@@ -287,6 +420,13 @@ namespace GameBattle
                 return;
             }
 
+            if (!ValidateDropAction(action, source, target))
+            {
+                _actionQueue.Clear();
+                _state = OpponentAiState.DeployReserve;
+                return;
+            }
+
             int commandId = _commandIdAllocator.Allocate();
             BattleInputCommand command = BattleInputCommand.CreateDropUnit(
                 commandId,
@@ -295,7 +435,9 @@ namespace GameBattle
             BattleInputResult result = _inputController.Execute(command);
             if (!result.IsSuccess)
             {
+                _replayLog?.Record(_decisionTick, action, result);
                 _actionQueue.Clear();
+                _state = OpponentAiState.DeployReserve;
                 return;
             }
 
@@ -310,6 +452,64 @@ namespace GameBattle
             if (_actionQueue.Count == 0)
             {
                 _state = OpponentAiState.DeployReserve;
+            }
+        }
+
+        private bool ValidateReclaimAction(
+            OpponentAiAction action,
+            out UnitSlot source)
+        {
+            source = default;
+            if (!_profile.EnableReclaim
+                || !_slotBoard.ContainsSlotId(action.SourceSlotId))
+            {
+                return false;
+            }
+
+            source = _slotBoard.GetSlotById(action.SourceSlotId);
+            return source.SlotId.Zone == SlotZone.Battle
+                && !source.SlotId.Side
+                && source.Occupant.HasValue
+                && source.Occupant.Value.UnitId == action.ExpectedUnitId
+                && (source.Occupant.Value.Kind == UnitKind.Soldier
+                    || source.Occupant.Value.Kind == UnitKind.General);
+        }
+
+        private bool ValidateDropAction(
+            OpponentAiAction action,
+            UnitSlot source,
+            UnitSlot target)
+        {
+            if (action.Type == OpponentAiActionType.Deploy)
+            {
+                return true;
+            }
+
+            if (action.Type == OpponentAiActionType.FastDeploy
+                && (source.SlotId.Zone != SlotZone.Reserve || !target.IsEmpty))
+            {
+                return false;
+            }
+
+            SlotDropResult plan = _slotBoard.TryPlanDrop(
+                source.SlotId,
+                target.SlotId);
+            if (!plan.Success)
+            {
+                return false;
+            }
+
+            switch (action.Type)
+            {
+                case OpponentAiActionType.Merge:
+                    return plan.IsMerge;
+                case OpponentAiActionType.SynthesizeGeneral:
+                    return plan.Success && plan.Plan.IsSynthesize;
+                case OpponentAiActionType.FastDeploy:
+                    return plan.Plan.OperationType == SlotDropOperationType.Move
+                        || plan.Plan.OperationType == SlotDropOperationType.Synthesize;
+                default:
+                    return false;
             }
         }
 

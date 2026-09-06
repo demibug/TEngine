@@ -8,7 +8,9 @@ namespace GameBattle.Tests.EditMode.Weapon
     [TestFixture]
     internal sealed class WeaponBattleRewardPolicyTests
     {
-        private static WeaponCatalog CreateCatalog(bool winOnly)
+        private static WeaponCatalog CreateCatalog(
+            bool winOnly,
+            bool rewardEnabled = true)
         {
             var definitions = new List<WeaponDefinition>
             {
@@ -16,7 +18,12 @@ namespace GameBattle.Tests.EditMode.Weapon
                 new WeaponDefinition(11, WeaponEquipSlot.Spear, 1),
                 new WeaponDefinition(21, WeaponEquipSlot.Knife, 1),
                 new WeaponDefinition(32, WeaponEquipSlot.Sword, 1),
-                new WeaponDefinition(2, WeaponEquipSlot.Bow, 3),
+                new WeaponDefinition(
+                    2,
+                    WeaponEquipSlot.Bow,
+                    3,
+                    enabled: rewardEnabled,
+                    obtainable: true),
             };
             var rewards = new List<WeaponRewardDefinition>
             {
@@ -71,6 +78,22 @@ namespace GameBattle.Tests.EditMode.Weapon
                 new WeaponBattleRewardPolicy(CreateCatalog(winOnly: true));
 
             WeaponRewardGrant grant = policy.Select(mapId: 0, playerWon: false, seed: 123);
+
+            Assert.That(grant.HasReward, Is.False);
+        }
+
+        [Test]
+        public void DisabledWeapon_IsExcludedFromRewardPool()
+        {
+            WeaponBattleRewardPolicy policy =
+                new WeaponBattleRewardPolicy(CreateCatalog(
+                    winOnly: false,
+                    rewardEnabled: false));
+
+            WeaponRewardGrant grant = policy.Select(
+                mapId: 0,
+                playerWon: true,
+                seed: 123);
 
             Assert.That(grant.HasReward, Is.False);
         }

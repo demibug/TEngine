@@ -854,7 +854,7 @@ namespace GameBattle
         {
             _isShutdown = true;
             _isOpeningEntry = false;
-            _weapon?.SaveIfDirty();
+            _weapon?.Shutdown();
             _weapon = null;
             ForceCleanupInternal();
 

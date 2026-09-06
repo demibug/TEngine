@@ -73,6 +73,7 @@ namespace GameBattle
 
         /// <summary>对手逻辑手牌；为空时不维护手牌状态。</summary>
         private readonly OpponentHand _opponentHand;
+        private bool _opponentInitialHandIssued;
 
         // ====================================================================
         // 构造
@@ -192,7 +193,19 @@ namespace GameBattle
         /// </summary>
         private IReadOnlyList<BattleUnit> GenerateOpponentHandBatch()
         {
-            _opponentHand.Refill(_opponentDeck);
+            if (!_opponentInitialHandIssued)
+            {
+                // 生产链没有额外的 DeckManager.startGame 回调；把原始 dP
+                // 生命周期接在首次生成对手初始手牌之前，并只执行一次。
+                _opponentDeck.CopyGeneralParts();
+                _opponentHand.DealInitial(_opponentDeck);
+                _opponentInitialHandIssued = true;
+            }
+            else
+            {
+                _opponentHand.Refill(_opponentDeck);
+            }
+
             IReadOnlyList<OpponentHandSlot> handSlots = _opponentHand.Slots;
             var batch = new List<BattleUnit>(handSlots.Count);
             for (int i = 0; i < handSlots.Count; i++)

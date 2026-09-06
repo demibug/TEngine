@@ -58,8 +58,10 @@ namespace GameBattle.Tests.EditMode.Enemy
             string folder = GetFullPath(EnemyPrefabFolder);
             Assert.IsTrue(Directory.Exists(folder), $"缺少敌人 Prefab 目录：{EnemyPrefabFolder}");
 
+            // Boss 资源（例如 ZhangLiang.prefab）也位于该资源树下；本契约只约束 Mob0～Mob3。
             string[] existing = Directory.EnumerateFiles(folder, "*.prefab")
                 .Select(Path.GetFileNameWithoutExtension)
+                .Where(name => name.StartsWith("Mob", StringComparison.Ordinal))
                 .OrderBy(name => name, StringComparer.Ordinal)
                 .ToArray();
             string[] expected = ExpectedAddresses.OrderBy(name => name, StringComparer.Ordinal).ToArray();

@@ -312,7 +312,13 @@ namespace GameBattle
                     row.AllowDangerResponse,
                     row.AllowFastDeploy,
                     row.EnableValueEvaluation,
-                    row.EnableReclaim));
+                    row.EnableReclaim,
+                    fastDeployProbability: OpponentAiPolicyDefaults.GetFastDeployProbability(row.Id),
+                    dangerResponseProbability: OpponentAiPolicyDefaults.GetDangerResponseProbability(row.Id),
+                    generalPartCopyProbability: OpponentAiPolicyDefaults.GeneralPartCopyProbability,
+                    fastDeployMaxUnits: OpponentAiPolicyDefaults.FastDeployMaxUnits,
+                    fastDeployMaxUses: OpponentAiPolicyDefaults.FastDeployMaxUses,
+                    dangerResponseMaxUses: OpponentAiPolicyDefaults.DangerResponseMaxUses));
             }
 
             if (ids.Count != 4)
