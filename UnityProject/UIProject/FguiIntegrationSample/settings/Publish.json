@@ -1,0 +1,22 @@
+{
+  "atlasSetting": {
+    "allowRotation": true,
+    "paging": true,
+    "sizeOption": "pot",
+    "trimImage": true
+  },
+  "binaryFormat": true,
+  "codeGeneration": {
+    "classNamePrefix": "UI_",
+    "codePath": "../../Assets/GameScripts/HotFix/GameLogic/UI/FGUI/Gen",
+    "codeType": "CSharp",
+    "getMemberByName": false,
+    "ignoreNoname": true,
+    "memberNamePrefix": "m_",
+    "packageName": "GameLogic.UI.FGUI.Gen"
+  },
+  "compressDesc": true,
+  "includeHighResolution": 1,
+  "packageCount": 3,
+  "path": "../../Assets/AssetRaw/FGUI/Packages/{publish_file_name}"
+}

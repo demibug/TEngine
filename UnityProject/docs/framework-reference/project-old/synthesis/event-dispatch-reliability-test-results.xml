@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="36" result="Passed" total="36" passed="36" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.1294203">
+  <test-suite type="TestSuite" id="1052" name="Unity" fullname="Unity" runstate="Runnable" testcasecount="36" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.129420" total="36" passed="36" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties />
+    <test-suite type="Assembly" id="1065" name="GameLogic.FairyGUI.Tests.dll" fullname="E:/MyWork/MyFramework/TEngine/UnityProject/Library/ScriptAssemblies/GameLogic.FairyGUI.Tests.dll" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.098417" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="68988" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+      </properties>
+      <test-suite type="TestSuite" id="1066" name="GameLogic" fullname="GameLogic" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.098118" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1067" name="FairyGUI" fullname="GameLogic.FairyGUI" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.097987" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestSuite" id="1068" name="Tests" fullname="GameLogic.FairyGUI.Tests" runstate="Runnable" testcasecount="10" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.097818" total="10" passed="10" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-suite type="TestFixture" id="1053" name="FguiLifetimeScopeEventTests" fullname="GameLogic.FairyGUI.Tests.FguiLifetimeScopeEventTests" classname="GameLogic.FairyGUI.Tests.FguiLifetimeScopeEventTests" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.026465" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1054" name="Dispose_AfterRegistration_StopsReceiving" fullname="GameLogic.FairyGUI.Tests.FguiLifetimeScopeEventTests.Dispose_AfterRegistration_StopsReceiving" methodname="Dispose_AfterRegistration_StopsReceiving" classname="GameLogic.FairyGUI.Tests.FguiLifetimeScopeEventTests" runstate="Runnable" seed="797150071" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.014750" asserts="0">
+                <properties />
+              </test-case>
+              <test-case id="1055" name="Dispose_DuringDispatch_CurrentCallbackStillRuns_NextDoesNot" fullname="GameLogic.FairyGUI.Tests.FguiLifetimeScopeEventTests.Dispose_DuringDispatch_CurrentCallbackStillRuns_NextDoesNot" methodname="Dispose_DuringDispatch_CurrentCallbackStillRuns_NextDoesNot" classname="GameLogic.FairyGUI.Tests.FguiLifetimeScopeEventTests" runstate="Runnable" seed="194226143" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000531" asserts="0">
+                <properties />
+              </test-case>
+              <test-case id="1056" name="Dispose_Twice_NoException" fullname="GameLogic.FairyGUI.Tests.FguiLifetimeScopeEventTests.Dispose_Twice_NoException" methodname="Dispose_Twice_NoException" classname="GameLogic.FairyGUI.Tests.FguiLifetimeScopeEventTests" runstate="Runnable" seed="1148656182" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000739" asserts="0">
+                <properties />
+              </test-case>
+            </test-suite>
+            <test-suite type="TestFixture" id="1057" name="FguiPackageServiceTests" fullname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" classname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" runstate="Runnable" testcasecount="7" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.070413" total="7" passed="7" failed="0" inconclusive="0" skipped="0" asserts="0">
+              <properties />
+              <test-case id="1063" name="CancelingOneWaiter_DoesNotCancelSharedLoad" fullname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests.CancelingOneWaiter_DoesNotCancelSharedLoad" methodname="CancelingOneWaiter_DoesNotCancelSharedLoad" classname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" runstate="Runnable" seed="1255872230" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.035948" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                </properties>
+              </test-case>
+              <test-case id="1058" name="Catalog_IsCompleteAndAcyclic" fullname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests.Catalog_IsCompleteAndAcyclic" methodname="Catalog_IsCompleteAndAcyclic" classname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" runstate="Runnable" seed="632084862" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.002323" asserts="0">
+                <properties />
+              </test-case>
+              <test-case id="1059" name="Catalog_RejectsCyclesDuplicateIdentityAndDuplicateExternalKeys" fullname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests.Catalog_RejectsCyclesDuplicateIdentityAndDuplicateExternalKeys" methodname="Catalog_RejectsCyclesDuplicateIdentityAndDuplicateExternalKeys" classname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" runstate="Runnable" seed="1091987565" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.001328" asserts="0">
+                <properties />
+              </test-case>
+              <test-case id="1064" name="ExternalLoader_RejectsLateReplacement_AndReleasesAfterDispose" fullname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests.ExternalLoader_RejectsLateReplacement_AndReleasesAfterDispose" methodname="ExternalLoader_RejectsLateReplacement_AndReleasesAfterDispose" classname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" runstate="Runnable" seed="768374563" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.019322" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                </properties>
+              </test-case>
+              <test-case id="1062" name="FailedLoad_RollsBackAndCanRetry" fullname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests.FailedLoad_RollsBackAndCanRetry" methodname="FailedLoad_RollsBackAndCanRetry" classname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" runstate="Runnable" seed="1881653931" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.003050" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                </properties>
+              </test-case>
+              <test-case id="1061" name="SdkGlobalCleanup_BeforeLeaseRelease_IsIdempotent" fullname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests.SdkGlobalCleanup_BeforeLeaseRelease_IsIdempotent" methodname="SdkGlobalCleanup_BeforeLeaseRelease_IsIdempotent" classname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" runstate="Runnable" seed="855890364" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.003750" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                </properties>
+              </test-case>
+              <test-case id="1060" name="SharedDependency_IsReleasedOnlyAfterBothOwnersClose" fullname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests.SharedDependency_IsReleasedOnlyAfterBothOwnersClose" methodname="SharedDependency_IsReleasedOnlyAfterBothOwnersClose" classname="GameLogic.FairyGUI.Tests.FguiPackageServiceTests" runstate="Runnable" seed="1283992810" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.002528" asserts="0">
+                <properties>
+                  <property name="_JOINTYPE" value="UnityCombinatorial" />
+                </properties>
+              </test-case>
+            </test-suite>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+    <test-suite type="Assembly" id="1099" name="TEngine.GameEvent.Tests.dll" fullname="E:/MyWork/MyFramework/TEngine/UnityProject/Library/ScriptAssemblies/TEngine.GameEvent.Tests.dll" runstate="Runnable" testcasecount="26" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.021493" total="26" passed="26" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="68988" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="EditMode" />
+      </properties>
+      <test-suite type="TestSuite" id="1100" name="TEngine" fullname="TEngine" runstate="Runnable" testcasecount="26" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.021273" total="26" passed="26" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-suite type="TestSuite" id="1101" name="GameEventTests" fullname="TEngine.GameEventTests" runstate="Runnable" testcasecount="26" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.021091" total="26" passed="26" failed="0" inconclusive="0" skipped="0" asserts="0">
+          <properties />
+          <test-suite type="TestFixture" id="1071" name="EventDispatcherDispatchTests" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" testcasecount="20" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.016725" total="20" passed="20" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-case id="1082" name="AddDuplicateHandler_NonDispatch_SecondReturnsFalse_SingleInvocation" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.AddDuplicateHandler_NonDispatch_SecondReturnsFalse_SingleInvocation" methodname="AddDuplicateHandler_NonDispatch_SecondReturnsFalse_SingleInvocation" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="426143019" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000890" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1075" name="AddDuringDispatch_CurrentAndNestedDoNotSeePending_NextSendDoes" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.AddDuringDispatch_CurrentAndNestedDoNotSeePending_NextSendDoes" methodname="AddDuringDispatch_CurrentAndNestedDoNotSeePending_NextSendDoes" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1780995841" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.001784" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1077" name="AddPendingTwice_SecondReturnsFalse_OnlyOneInstanceCommitted" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.AddPendingTwice_SecondReturnsFalse_OnlyOneInstanceCommitted" methodname="AddPendingTwice_SecondReturnsFalse_OnlyOneInstanceCommitted" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1013132749" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000569" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1078" name="AddThenRemovePendingDuringDispatch_EndsUpAbsent" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.AddThenRemovePendingDuringDispatch_EndsUpAbsent" methodname="AddThenRemovePendingDuringDispatch_EndsUpAbsent" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="2009165070" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000377" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1080" name="CrossEventSend_IndependentDepthAndCommits" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.CrossEventSend_IndependentDepthAndCommits" methodname="CrossEventSend_IndependentDepthAndCommits" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="126848205" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000416" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1079" name="NestedThrowsCaughtByOuter_OuterMutates_PendingCommitOnlyAtOuterExit" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.NestedThrowsCaughtByOuter_OuterMutates_PendingCommitOnlyAtOuterExit" methodname="NestedThrowsCaughtByOuter_OuterMutates_PendingCommitOnlyAtOuterExit" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1295719748" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000504" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1074" name="RemoveDuringDispatch_CurrentStillInvoked_NextNot" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.RemoveDuringDispatch_CurrentStillInvoked_NextNot" methodname="RemoveDuringDispatch_CurrentStillInvoked_NextNot" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1545783759" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000360" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1081" name="RemoveMissingHandler_NonDispatch_NoThrowAndSystemUsable" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.RemoveMissingHandler_NonDispatch_NoThrowAndSystemUsable" methodname="RemoveMissingHandler_NonDispatch_NoThrowAndSystemUsable" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1293100210" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000489" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1076" name="RemoveThenAddDuringDispatch_CurrentUnchanged_NextReorderedToTail" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.RemoveThenAddDuringDispatch_CurrentUnchanged_NextReorderedToTail" methodname="RemoveThenAddDuringDispatch_CurrentUnchanged_NextReorderedToTail" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1664133345" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000430" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1072" name="Send_FirstListenerThrows_PropagatesSkipsRestAndRecovers" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_FirstListenerThrows_PropagatesSkipsRestAndRecovers" methodname="Send_FirstListenerThrows_PropagatesSkipsRestAndRecovers" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1448722821" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.001297" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1088" name="Send_FiveArgs_PassesValues_AndRecoversAfterThrow" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_FiveArgs_PassesValues_AndRecoversAfterThrow" methodname="Send_FiveArgs_PassesValues_AndRecoversAfterThrow" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1733418700" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.002047" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1087" name="Send_FourArgs_PassesValues_AndRecoversAfterThrow" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_FourArgs_PassesValues_AndRecoversAfterThrow" methodname="Send_FourArgs_PassesValues_AndRecoversAfterThrow" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="53053034" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000651" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1073" name="Send_ListenerAddsSameEventThenThrows_CommitsAddViaFinally" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_ListenerAddsSameEventThenThrows_CommitsAddViaFinally" methodname="Send_ListenerAddsSameEventThenThrows_CommitsAddViaFinally" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="998082932" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000443" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1084" name="Send_OneArg_PassesValue_AndRecoversAfterThrow" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_OneArg_PassesValue_AndRecoversAfterThrow" methodname="Send_OneArg_PassesValue_AndRecoversAfterThrow" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="689776090" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000803" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1090" name="Send_SixArgs_AllListenersFireInOrder_WithTypedSignatures" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_SixArgs_AllListenersFireInOrder_WithTypedSignatures" methodname="Send_SixArgs_AllListenersFireInOrder_WithTypedSignatures" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1083393436" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000518" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1089" name="Send_SixArgs_PassesValues_AndRecoversAfterThrow" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_SixArgs_PassesValues_AndRecoversAfterThrow" methodname="Send_SixArgs_PassesValues_AndRecoversAfterThrow" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="305246960" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000745" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1086" name="Send_ThreeArgs_PassesValues_AndRecoversAfterThrow" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_ThreeArgs_PassesValues_AndRecoversAfterThrow" methodname="Send_ThreeArgs_PassesValues_AndRecoversAfterThrow" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1924433935" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000577" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1085" name="Send_TwoArgs_PassesValues_AndRecoversAfterThrow" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_TwoArgs_PassesValues_AndRecoversAfterThrow" methodname="Send_TwoArgs_PassesValues_AndRecoversAfterThrow" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1007397801" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000600" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1091" name="Send_TypeMismatchedListener_SkippedWithoutBreaking" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_TypeMismatchedListener_SkippedWithoutBreaking" methodname="Send_TypeMismatchedListener_SkippedWithoutBreaking" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="1208213585" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000260" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1083" name="Send_ZeroArg_OverloadDispatch" fullname="TEngine.GameEventTests.EventDispatcherDispatchTests.Send_ZeroArg_OverloadDispatch" methodname="Send_ZeroArg_OverloadDispatch" classname="TEngine.GameEventTests.EventDispatcherDispatchTests" runstate="Runnable" seed="368814213" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000231" asserts="0">
+              <properties />
+            </test-case>
+          </test-suite>
+          <test-suite type="TestFixture" id="1092" name="GameEventGlobalTests" fullname="TEngine.GameEventTests.GameEventGlobalTests" classname="TEngine.GameEventTests.GameEventGlobalTests" runstate="Runnable" testcasecount="6" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.003962" total="6" passed="6" failed="0" inconclusive="0" skipped="0" asserts="0">
+            <properties />
+            <test-case id="1098" name="GameEvent_IntAndStringEntries_PassArguments" fullname="TEngine.GameEventTests.GameEventGlobalTests.GameEvent_IntAndStringEntries_PassArguments" methodname="GameEvent_IntAndStringEntries_PassArguments" classname="TEngine.GameEventTests.GameEventGlobalTests" runstate="Runnable" seed="996247916" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000790" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1097" name="GameEvent_ThrowThenContinue_Recovers" fullname="TEngine.GameEventTests.GameEventGlobalTests.GameEvent_ThrowThenContinue_Recovers" methodname="GameEvent_ThrowThenContinue_Recovers" classname="TEngine.GameEventTests.GameEventGlobalTests" runstate="Runnable" seed="938077744" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000510" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1093" name="GameEventMgr_ClearDuringDispatch_NoResidueAndRepeatClearSafe" fullname="TEngine.GameEventTests.GameEventGlobalTests.GameEventMgr_ClearDuringDispatch_NoResidueAndRepeatClearSafe" methodname="GameEventMgr_ClearDuringDispatch_NoResidueAndRepeatClearSafe" classname="TEngine.GameEventTests.GameEventGlobalTests" runstate="Runnable" seed="1136913302" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000433" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1094" name="GameEventMgr_ClearWithoutDispatch_StopsReceivingAndRepeatClearSafe" fullname="TEngine.GameEventTests.GameEventGlobalTests.GameEventMgr_ClearWithoutDispatch_StopsReceivingAndRepeatClearSafe" methodname="GameEventMgr_ClearWithoutDispatch_StopsReceivingAndRepeatClearSafe" classname="TEngine.GameEventTests.GameEventGlobalTests" runstate="Runnable" seed="1190091168" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000276" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1096" name="ShutdownDuringCallback_PendingChangeDoesNotRevive" fullname="TEngine.GameEventTests.GameEventGlobalTests.ShutdownDuringCallback_PendingChangeDoesNotRevive" methodname="ShutdownDuringCallback_PendingChangeDoesNotRevive" classname="TEngine.GameEventTests.GameEventGlobalTests" runstate="Runnable" seed="1261934634" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000433" asserts="0">
+              <properties />
+            </test-case>
+            <test-case id="1095" name="ShutdownDuringCallback_ReregisteredEventOnlyNewListenerFires" fullname="TEngine.GameEventTests.GameEventGlobalTests.ShutdownDuringCallback_ReregisteredEventOnlyNewListenerFires" methodname="ShutdownDuringCallback_ReregisteredEventOnlyNewListenerFires" classname="TEngine.GameEventTests.GameEventGlobalTests" runstate="Runnable" seed="689764759" result="Passed" start-time="2026-09-07 05:17:57Z" end-time="2026-09-07 05:17:57Z" duration="0.000324" asserts="0">
+              <properties />
+            </test-case>
+          </test-suite>
+        </test-suite>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>
