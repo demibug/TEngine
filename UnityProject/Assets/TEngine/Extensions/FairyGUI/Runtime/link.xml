@@ -1,0 +1,5 @@
+<linker>
+  <!-- GameLogic is a HybridCLR assembly, so its references alone cannot protect these AOT assemblies. -->
+  <assembly fullname="FairyGUI" preserve="all" />
+  <assembly fullname="TEngine.FairyGUI" preserve="all" />
+</linker>

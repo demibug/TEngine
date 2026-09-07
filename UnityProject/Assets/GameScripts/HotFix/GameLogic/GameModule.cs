@@ -65,6 +65,13 @@ public class GameModule
     private static UIModule _ui;
 
     /// <summary>
+    /// 获取独立的 FairyGUI 模块。现有 UGUI 继续通过 <see cref="UI"/> 使用。
+    /// </summary>
+    public static FguiModule FGUI => _fgui ??= FguiModule.Instance;
+
+    private static FguiModule _fgui;
+
+    /// <summary>
     /// 获取场景模块。
     /// </summary>
     public static ISceneModule Scene => _scene ??= Get<ISceneModule>();
@@ -103,7 +110,8 @@ public class GameModule
     public static void Shutdown()
     {
         Log.Info("GameModule Shutdown");
-            
+
+        _fgui?.Shutdown();
         _base = null;
         _debugger = null;
         _fsm = null;
@@ -111,6 +119,7 @@ public class GameModule
         _resource = null;
         _audio = null;
         _ui = null;
+        _fgui = null;
         _scene = null;
         _timer = null;
         _localization = null;

@@ -1,0 +1,18 @@
+{
+    "name": "TEngine.FairyGUI.Editor",
+    "rootNamespace": "TEngine.FairyGUIIntegration.Editor",
+    "references": [
+        "TEngine.FairyGUI",
+        "FairyGUI",
+        "YooAsset.Editor"
+    ],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

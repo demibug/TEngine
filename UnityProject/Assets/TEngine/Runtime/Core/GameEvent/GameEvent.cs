@@ -4,6 +4,8 @@ namespace TEngine
 {
     /// <summary>
     /// 游戏全局事件类。
+    /// <remarks>Send 同步分发；回调异常原样传播并在 finally 中恢复事件系统状态，异常后可继续注册、移除与分发；
+    /// 分发中的增删在本次（含嵌套）分发结束后按调用顺序生效；Shutdown 清表后旧监听不会复活。</remarks>
     /// </summary>
     public class GameEvent
     {

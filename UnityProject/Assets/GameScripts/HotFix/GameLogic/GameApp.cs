@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Reflection;
+using Cysharp.Threading.Tasks;
 using GameLogic;
+using GameLogic.UI.FGUI.Imp;
 #if ENABLE_OBFUZ
 using Obfuz;
 #endif
@@ -37,6 +39,23 @@ public partial class GameApp
     {
         // GameEvent.Get<ILoginUI>().ShowLoginUI();
         GameModule.UI.ShowUIAsync<BattleMainUI>();
+        InitializeFairyGuiAsync().Forget();
+    }
+
+    /// <summary>
+    /// Explicit FairyGUI initialization point. Failure is observed here so UGUI remains available.
+    /// </summary>
+    public static async UniTask InitializeFairyGuiAsync()
+    {
+        try
+        {
+            await FguiSampleRegistration.ShowCoexistenceSampleAsync();
+            Log.Info("FairyGUI integration initialized and coexistence sample opened.");
+        }
+        catch (System.Exception exception)
+        {
+            Log.Error("FairyGUI initialization or sample opening failed; UGUI remains active. {0}", exception);
+        }
     }
     
     private static void Release()

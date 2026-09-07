@@ -477,6 +477,7 @@ namespace TEngine
                 AddLog($"版本号为空，自动生成: {_config.PackageVersion}");
             }
 
+            BuildExecutionResult result = null;
             try
             {
                 // 注册日志回调
@@ -484,26 +485,42 @@ namespace TEngine
 
                 if (buildPlayer)
                 {
-                    ReleaseTools.BuildWithConfig(_config, buildPlayer: true);
+                    result = ReleaseTools.ExecuteBuildWithResult(_config, buildPlayer: true);
                 }
                 else
                 {
                     // 仅构建AB，不走Player
                     var configCopy = CloneConfig(_config);
                     configCopy.BuildPlayer = false;
-                    ReleaseTools.BuildWithConfig(configCopy, buildPlayer: false);
+                    result = ReleaseTools.ExecuteBuildWithResult(configCopy, buildPlayer: false);
                 }
-
-                AddLog($"========== 构建完成 ==========");
-            }
-            catch (Exception e)
-            {
-                AddLog($"[错误] {e.Message}");
-                Debug.LogException(e);
             }
             finally
             {
                 Application.logMessageReceived -= OnBuildLogReceived;
+            }
+
+            // 结果判定以阶段化结果为准，方法正常返回不代表成功
+            if (result == null)
+            {
+                AddLog("[错误] 构建核心返回空结果");
+            }
+            else if (result.Succeeded)
+            {
+                AddLog($"========== 构建成功 ==========");
+                AddLog($"阶段: 已全部完成 | AB输出: {result.OutputPackageDirectory ?? "无"}");
+                if (!string.IsNullOrEmpty(result.PlayerOutputPath))
+                    AddLog($"Player输出: {result.PlayerOutputPath}");
+            }
+            else if (result.Cancelled)
+            {
+                AddLog($"========== 构建被取消 [阶段: {result.Stage}] ==========");
+                AddLog($"[取消] {result.Error}");
+            }
+            else
+            {
+                AddLog($"========== 构建失败 [阶段: {result.Stage}] ==========");
+                AddLog($"[失败] {result.Error}");
             }
 
             // 自动滚动到底部并展开日志
@@ -514,27 +531,39 @@ namespace TEngine
         private void ExecuteBuildPlayerOnly()
         {
             _buildLogs.Clear();
-            AddLog($"========== 仅构建 Player ==========");
+            AddLog($"========== 仅构建 Player（独立模式） ==========");
             AddLog($"平台: {_config.PlayerPlatform} | 输出: {_config.PlayerOutputPath}");
 
+            BuildExecutionResult result = null;
             try
             {
                 Application.logMessageReceived += OnBuildLogReceived;
-                ReleaseTools.BuildImp(
-                    BuildConfig.GetBuildTargetGroup(_config.PlayerPlatform),
-                    _config.PlayerPlatform,
-                    _config.PlayerOutputPath
-                );
-                AddLog($"========== Player 构建完成 ==========");
-            }
-            catch (Exception e)
-            {
-                AddLog($"[错误] {e.Message}");
-                Debug.LogException(e);
+                result = ReleaseTools.ExecutePlayerOnlyWithResult(_config);
             }
             finally
             {
                 Application.logMessageReceived -= OnBuildLogReceived;
+            }
+
+            if (result == null)
+            {
+                AddLog("[错误] 构建核心返回空结果");
+            }
+            else if (result.Succeeded)
+            {
+                AddLog($"========== 仅 Player 构建完成 ==========");
+                AddLog($"Player输出: {result.PlayerOutputPath}");
+                AddLog("注意：仅 Player 模式不执行 DLL/AB/最小包流程，不代表完整发布成功。");
+            }
+            else if (result.Cancelled)
+            {
+                AddLog($"========== Player 构建被取消 [阶段: {result.Stage}] ==========");
+                AddLog($"[取消] {result.Error}");
+            }
+            else
+            {
+                AddLog($"========== Player 构建失败 [阶段: {result.Stage}] ==========");
+                AddLog($"[失败] {result.Error}");
             }
 
             _showBuildLog = true;

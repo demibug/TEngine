@@ -15,7 +15,13 @@ Example1:
                 set LOGFILE=./build.log
                 set BUILDROOT=G:/github/TEngine/UnityProject/Bundles
 
-                %UNITYEDITOR_PATH%/Unity.exe %WORKSPACE%/UnityProject -logFile %LOGFILE% -executeMethod TEngine.ReleaseTools.BuildPackage -quit -batchmode -CustomArgs:Language=en_US;Version=1.02;outputRoot=%BUILDROOT%
+                @REM 构建热更DLL（platform 参数必须与 -buildTarget 一致）
+                %UNITYEDITOR_PATH%/Unity.exe %WORKSPACE%/UnityProject -logFile %LOGFILE% -executeMethod TEngine.ReleaseTools.BuildDll -quit -batchmode -buildTarget Android -CustomArgs:platform=Android
+
+                @REM 构建 AssetBundle（packageVersion 必填，缺失或非法参数会以异常失败退出）
+                %UNITYEDITOR_PATH%/Unity.exe %WORKSPACE%/UnityProject -logFile %LOGFILE% -executeMethod TEngine.ReleaseTools.BuildAssetBundle -quit -batchmode -buildTarget Android -CustomArgs:platform=Android;packageVersion=1.02;outputRoot=%BUILDROOT%
+
+                @REM 注意：入口方法抛出异常（构建失败/参数缺失）时，batchmode 下 Unity 以非零退出码结束。
 
                 @REM for /f "delims=[" %%i in (%LOGFILE%) do echo %%i
 

@@ -5,6 +5,8 @@ namespace TEngine
 {
     /// <summary>
     /// 封装消息的底层分发和注册。
+    /// <remarks>分发契约：Send 为同步调用，监听回调抛出的异常原样向上传播并立即结束本次分发；
+    /// 分发期间对同一事件的增删在本次（含嵌套）分发结束后按调用顺序生效，已进入分发的监听会执行到本次结束。</remarks>
     /// </summary>
     public class EventDispatcher
     {

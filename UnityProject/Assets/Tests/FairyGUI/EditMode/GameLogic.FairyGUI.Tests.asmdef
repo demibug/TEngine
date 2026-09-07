@@ -1,0 +1,21 @@
+{
+    "name": "GameLogic.FairyGUI.Tests",
+    "rootNamespace": "GameLogic.FairyGUI.Tests",
+    "references": [
+        "GameLogic",
+        "TEngine.Runtime",
+        "TEngine.FairyGUI",
+        "FairyGUI",
+        "UniTask"
+    ],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": ["TestAssemblies"]
+}

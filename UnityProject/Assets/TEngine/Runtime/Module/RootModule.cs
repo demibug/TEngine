@@ -9,7 +9,14 @@ namespace TEngine
     [DisallowMultipleComponent]
     public sealed class RootModule : MonoBehaviour
     {
+        /// <summary>
+        /// Raised once per RootModule instance before framework modules (especially resources) shut down.
+        /// Subscribers are isolated so one failure cannot skip the remaining cleanup.
+        /// </summary>
+        public static event Action BeforeShutdown;
+
         private static RootModule _instance = null;
+        private bool _beforeShutdownDispatched;
 
         public static RootModule Instance
         {
@@ -161,9 +168,41 @@ namespace TEngine
 
         private void OnDestroy()
         {
+            DispatchBeforeShutdown();
 #if !UNITY_EDITOR
             ModuleSystem.Shutdown();
 #endif
+            if (_instance == this)
+            {
+                _instance = null;
+            }
+        }
+
+        private void DispatchBeforeShutdown()
+        {
+            if (_beforeShutdownDispatched)
+            {
+                return;
+            }
+
+            _beforeShutdownDispatched = true;
+            Delegate[] listeners = BeforeShutdown?.GetInvocationList();
+            if (listeners == null)
+            {
+                return;
+            }
+
+            foreach (Delegate listener in listeners)
+            {
+                try
+                {
+                    ((Action)listener).Invoke();
+                }
+                catch (Exception exception)
+                {
+                    Log.Error("BeforeShutdown listener failed: {0}", exception);
+                }
+            }
         }
 
         /// <summary>

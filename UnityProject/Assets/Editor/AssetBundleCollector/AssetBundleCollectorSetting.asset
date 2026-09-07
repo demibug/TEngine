@@ -141,6 +141,19 @@ MonoBehaviour:
         PackRuleName: PackSeparately
         FilterRuleName: CollectAll
         AssetTags: 
+        UserData:
+    - GroupName: FairyGUI
+      GroupDesc: FairyGUI packages, catalog, settings, and local external textures
+      AssetTags: fgui
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/FGUI
+        CollectorGUID: 6f38a04c093a4b219245e109a86b77bb
+        CollectorType: 0
+        AddressRuleName: FguiAddressByRelativePath
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: fgui
         UserData: 
     - GroupName: UIRaw
       GroupDesc: 
