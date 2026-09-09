@@ -7,8 +7,19 @@ namespace TEngine
     {
         private static IResourceModule _resourceManager;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetForNewSession()
+        {
+            _resourceManager = null;
+        }
+
         private static void CheckResourceManager()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("The module system is shutting down and cannot load assets.");
+            }
+
             if (_resourceManager == null)
             {
                 _resourceManager = ModuleSystem.GetModule<IResourceModule>();
@@ -36,9 +47,9 @@ namespace TEngine
             {
                 _resourceManager.LoadAsset<Material>(location, material =>
                 {
-                    if (image == null || image.gameObject == null)
+                    if (!ModuleSystem.IsRunning || image == null || image.gameObject == null)
                     {
-                        _resourceManager.UnloadAsset(material);
+                        _resourceManager?.UnloadAsset(material);
                         material = null;
                         return;
                     }
@@ -68,9 +79,9 @@ namespace TEngine
             {
                 _resourceManager.LoadAsset<Material>(location, material =>
                 {
-                    if (spriteRenderer == null || spriteRenderer.gameObject == null)
+                    if (!ModuleSystem.IsRunning || spriteRenderer == null || spriteRenderer.gameObject == null)
                     {
-                        _resourceManager.UnloadAsset(material);
+                        _resourceManager?.UnloadAsset(material);
                         material = null;
                         return;
                     }
@@ -100,9 +111,9 @@ namespace TEngine
             {
                 _resourceManager.LoadAsset<Material>(location, material =>
                 {
-                    if (meshRenderer == null || meshRenderer.gameObject == null)
+                    if (!ModuleSystem.IsRunning || meshRenderer == null || meshRenderer.gameObject == null)
                     {
-                        _resourceManager.UnloadAsset(material);
+                        _resourceManager?.UnloadAsset(material);
                         material = null;
                         return;
                     }
@@ -132,9 +143,9 @@ namespace TEngine
             {
                 _resourceManager.LoadAsset<Material>(location, material =>
                 {
-                    if (meshRenderer == null || meshRenderer.gameObject == null)
+                    if (!ModuleSystem.IsRunning || meshRenderer == null || meshRenderer.gameObject == null)
                     {
-                        _resourceManager.UnloadAsset(material);
+                        _resourceManager?.UnloadAsset(material);
                         material = null;
                         return;
                     }

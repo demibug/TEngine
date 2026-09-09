@@ -26,13 +26,23 @@ namespace TEngine
         /// </summary>
         public override void RecycleToPool()
         {
-            if (!InPool)
-            {
-                AssetHandle.Dispose();
-            }
-
-            InPool = false;
+            AssetHandle handle = AssetHandle;
+            bool inPool = InPool;
             AssetHandle = null;
+            InPool = false;
+
+            if (!inPool && handle != null)
+            {
+                try
+                {
+                    handle.Dispose();
+                }
+                catch (System.Exception exception)
+                {
+                    try { Log.Error("Audio data handle cleanup failed: {0}", exception); }
+                    catch { }
+                }
+            }
         }
 
         /// <summary>
@@ -58,8 +68,14 @@ namespace TEngine
         {
             if (audioData != null)
             {
-                MemoryPool.Release(audioData);
-                audioData.RecycleToPool();
+                try
+                {
+                    audioData.RecycleToPool();
+                }
+                finally
+                {
+                    MemoryPool.Release(audioData);
+                }
             }
         }
     }

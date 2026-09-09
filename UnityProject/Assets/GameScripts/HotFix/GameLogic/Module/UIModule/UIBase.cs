@@ -7,6 +7,8 @@ using UnityEngine;
 using Obfuz;
 #endif
 
+#nullable enable annotations
+
 namespace GameLogic
 {
     /// <summary>
@@ -188,6 +190,7 @@ namespace GameLogic
 
         internal void CallDestroy()
         {
+            BlockUIEvents();
             OnDestroy();
         }
 
@@ -282,11 +285,28 @@ namespace GameLogic
         #region UIEvent
 
         private GameEventMgr _eventMgr;
+        private bool _uiEventRegistrationBlocked;
+
+        /// <summary>
+        /// 关闭流程开始后禁止重新挂接 UI 事件或创建新的子项。
+        /// </summary>
+        internal bool IsLifecycleInvalid => _uiEventRegistrationBlocked;
+
+        internal void BlockUIEvents()
+        {
+            _uiEventRegistrationBlocked = true;
+        }
 
         protected GameEventMgr EventMgr
         {
             get
             {
+                if (_uiEventRegistrationBlocked)
+                {
+                    throw new ObjectDisposedException(GetType().Name,
+                        "The UI lifecycle is closing and cannot register new events.");
+                }
+
                 if (_eventMgr == null)
                 {
                     _eventMgr = MemoryPool.Acquire<GameEventMgr>();
@@ -323,10 +343,26 @@ namespace GameLogic
 
         protected void RemoveAllUIEvent()
         {
-            if (_eventMgr != null)
+            GameEventMgr eventMgr = _eventMgr;
+            _eventMgr = null;
+            if (eventMgr != null)
             {
-                MemoryPool.Release(_eventMgr);
+                MemoryPool.Release(eventMgr);
             }
+        }
+
+        internal void ResetUIEventLifecycle()
+        {
+            try
+            {
+                RemoveAllUIEvent();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning($"UI event manager reset failed for '{GetType().Name}': {exception}");
+            }
+
+            _uiEventRegistrationBlocked = false;
         }
 
         #endregion
@@ -403,8 +439,9 @@ namespace GameLogic
         /// <returns>UIWidget实例。</returns>
         public T CreateWidgetByPath<T>(Transform parentTrans, string assetLocation, bool visible = true) where T : UIWidget, new()
         {
+            ThrowIfWidgetOwnerInvalid();
             GameObject goInst = UIModule.Resource.LoadGameObject(assetLocation, parent: parentTrans);
-            return CreateWidget<T>(goInst, visible);
+            return CreateOwnedWidget<T>(goInst, visible);
         }
 
         /// <summary>
@@ -417,8 +454,34 @@ namespace GameLogic
         /// <returns>UIWidget实例。</returns>
         public async UniTask<T> CreateWidgetByPathAsync<T>(Transform parentTrans, string assetLocation, bool visible = true) where T : UIWidget, new()
         {
+            ThrowIfWidgetOwnerInvalid();
             GameObject goInst = await UIModule.Resource.LoadGameObjectAsync(assetLocation, parentTrans, gameObject.GetCancellationTokenOnDestroy());
-            return CreateWidget<T>(goInst, visible);
+            return CreateOwnedWidget<T>(goInst, visible);
+        }
+
+        internal void ThrowIfWidgetOwnerInvalid()
+        {
+            if (!ModuleSystem.IsRunning)
+                throw new ObjectDisposedException(GetType().Name, "The framework is shutting down and cannot create a widget.");
+
+            if (IsLifecycleInvalid)
+                throw new ObjectDisposedException(GetType().Name, "The UI owner is closing and cannot create a widget.");
+        }
+
+        private T CreateOwnedWidget<T>(GameObject instance, bool visible) where T : UIWidget, new()
+        {
+            bool created = false;
+            try
+            {
+                T widget = CreateWidget<T>(instance, visible);
+                created = widget != null;
+                return widget;
+            }
+            finally
+            {
+                if (!created && instance != null)
+                    UnityEngine.Object.Destroy(instance);
+            }
         }
 
         /// <summary>
@@ -593,13 +656,7 @@ namespace GameLogic
             {
                 var icon = removeIcon[index];
                 listIcon.Remove(icon);
-                icon.OnDestroy();
-                icon.OnDestroyWidget();
-                ListChild.Remove(icon);
-                if (icon.gameObject != null)
-                {
-                    UnityEngine.Object.Destroy(icon.gameObject);
-                }
+                icon.Destroy();
             }
         }
 

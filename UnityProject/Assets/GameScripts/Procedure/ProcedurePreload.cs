@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
+﻿using System.Collections.Generic;
 using Launcher;
 using TEngine;
-using UnityEngine;
 using YooAsset;
 using ProcedureOwner = TEngine.IFsm<TEngine.IProcedureModule>;
 
@@ -15,9 +11,10 @@ namespace Procedure
     /// </summary>
     public class ProcedurePreload : ProcedureBase
     {
-        private float _progress = 0f;
-
-        private readonly Dictionary<string, bool> _loadedFlag = new Dictionary<string, bool>();
+        /// <summary>
+        /// 预热执行器：代际隔离晚回调；成功后配对归还预加载引用；进度统计终态项。
+        /// </summary>
+        private PreloadRequestRunner _preloadRunner;
 
         public override bool UseNativeDialog => true;
 
@@ -25,24 +22,23 @@ namespace Procedure
 
         private ProcedureOwner _procedureOwner;
 
-        /// <summary>
-        /// 预加载回调。
-        /// </summary>
-        private LoadAssetCallbacks m_PreLoadAssetCallbacks;
-
         protected override void OnInit(ProcedureOwner procedureOwner)
         {
             base.OnInit(procedureOwner);
             _procedureOwner = procedureOwner;
-            m_PreLoadAssetCallbacks = new LoadAssetCallbacks(OnPreLoadAssetSuccess, OnPreLoadAssetFailure);
         }
-
 
         protected override void OnEnter(ProcedureOwner procedureOwner)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             base.OnEnter(procedureOwner);
 
-            _loadedFlag.Clear();
+            // 每次进入建立新代际：旧代际晚回调只归还资源，不更新新流程状态或触发跳转。
+            _preloadRunner = new PreloadRequestRunner(_resourceModule);
 
             LauncherMgr.ShowUI<LoadUpdateUI>(Utility.Text.Format(LoadText.Instance.Label_Load_Load_Progress, 0));
 
@@ -51,68 +47,46 @@ namespace Procedure
             PreloadResources();
         }
 
+        protected override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
+        {
+            try
+            {
+                base.OnLeave(procedureOwner, isShutdown);
+            }
+            finally
+            {
+                // 离开即失效当前代际；晚到的旧终态仍归还资源。
+                _preloadRunner?.Invalidate();
+                _preloadRunner = null;
+            }
+        }
+
         protected override void OnUpdate(ProcedureOwner procedureOwner, float elapseSeconds, float realElapseSeconds)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             base.OnUpdate(procedureOwner, elapseSeconds, realElapseSeconds);
 
-            var totalCount = _loadedFlag.Count <= 0 ? 1 : _loadedFlag.Count;
-
-            var loadCount = _loadedFlag.Count <= 0 ? 1 : 0;
-
-            foreach (KeyValuePair<string, bool> loadedFlag in _loadedFlag)
+            if (_preloadRunner == null || _preloadRunner.IsEmpty)
             {
-                if (!loadedFlag.Value)
-                {
-                    break;
-                }
-                else
-                {
-                    loadCount++;
-                }
+                // 无预热请求（如 EditorSimulate 跳过预热）：保持“预热尽力而为，全部终态后继续”。
+                LauncherMgr.ShowUI<LoadUpdateUI>(LoadText.Instance.Label_Load_Load_Complete);
+                ChangeProcedureToLoadAssembly();
+                return;
             }
 
-            if (_loadedFlag.Count != 0)
-            {
-                LauncherMgr.ShowUI<LoadUpdateUI>(Utility.Text.Format(LoadText.Instance.Label_Load_Load_Progress, (float)loadCount / totalCount * 100));
-            }
-            else
-            {
-                LauncherMgr.RefreshProgress(_progress);
+            // 进度统计终态项，不依赖字典遇到第一个未完成项就 break。
+            LauncherMgr.ShowUI<LoadUpdateUI>(Utility.Text.Format(LoadText.Instance.Label_Load_Load_Progress, _preloadRunner.Progress * 100));
 
-                string progressStr = $"{_progress * 100:f1}";
-
-                if (Math.Abs(_progress - 1f) < 0.001f)
-                {
-                    LauncherMgr.ShowUI<LoadUpdateUI>(LoadText.Instance.Label_Load_Load_Complete);
-                }
-                else
-                {
-                    LauncherMgr.ShowUI<LoadUpdateUI>(Utility.Text.Format(LoadText.Instance.Label_Load_Load_Progress, progressStr));
-                }
-            }
-
-            if (loadCount < totalCount)
+            if (!_preloadRunner.AllTerminal)
             {
                 return;
             }
 
             ChangeProcedureToLoadAssembly();
-        }
-
-
-        private async UniTaskVoid SmoothValue(float value, float duration, Action callback = null)
-        {
-            float time = 0f;
-            while (time < duration)
-            {
-                time += Time.deltaTime;
-                var result = Mathf.Lerp(0, value, time / duration);
-                _progress = result;
-                await UniTask.Yield();
-            }
-
-            _progress = value;
-            callback?.Invoke();
         }
 
         private void PreloadResources()
@@ -130,46 +104,35 @@ namespace Procedure
                 return;
             }
 
+            // 先建立去重请求清单，再发起加载；PRELOAD 与 WEBGL_PRELOAD 重叠地址只加载一次。
+            List<string> addresses = new List<string>();
             AssetInfo[] assetInfos = _resourceModule.GetAssetInfos("PRELOAD");
             foreach (var assetInfo in assetInfos)
             {
-                PreLoad(assetInfo.Address);
+                addresses.Add(assetInfo.Address);
             }
+
 #if UNITY_WEBGL
             AssetInfo[] webAssetInfos = _resourceModule.GetAssetInfos("WEBGL_PRELOAD");
             foreach (var assetInfo in webAssetInfos)
             {
-                PreLoad(assetInfo.Address);
+                addresses.Add(assetInfo.Address);
             }
 #endif
-            if (_loadedFlag.Count <= 0)
+            if (addresses.Count <= 0)
             {
-                // SmoothValue(1, 1f, ChangeProcedureToLoadAssembly).Forget();
                 return;
             }
-        }
 
-        private void PreLoad(string location)
-        {
-            _loadedFlag.Add(location, false);
-            _resourceModule.LoadAssetAsync(location, 100, m_PreLoadAssetCallbacks, null);
-        }
-
-        private void OnPreLoadAssetFailure(string assetName, LoadResourceStatus status, string errormessage, object userdata)
-        {
-            Log.Warning("Can not preload asset from '{0}' with error message '{1}'.", assetName, errormessage);
-            _loadedFlag[assetName] = true;
-        }
-
-        private void OnPreLoadAssetSuccess(string assetName, object asset, float duration, object userdata)
-        {
-            Log.Debug("Success preload asset from '{0}' duration '{1}'.", assetName, duration);
-            _loadedFlag[assetName] = true;
+            _preloadRunner.Begin(addresses);
         }
 
         private void ChangeProcedureToLoadAssembly()
         {
-            ChangeState<ProcedureLoadAssembly>(_procedureOwner);
+            if (ModuleSystem.IsRunning)
+            {
+                ChangeState<ProcedureLoadAssembly>(_procedureOwner);
+            }
         }
     }
 }

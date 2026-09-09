@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
+using System.Threading;
 using TEngine;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,6 +9,41 @@ using Object = UnityEngine.Object;
 
 namespace GameLogic
 {
+    public sealed class UIWindowLoadException : Exception
+    {
+        public string Stage { get; }
+        public string WindowName { get; }
+
+        public UIWindowLoadException(string stage, string windowName, string message,
+            Exception innerException = null) : base(message, innerException)
+        {
+            Stage = stage;
+            WindowName = windowName;
+        }
+
+        public override string ToString()
+        {
+            return $"{base.ToString()}\nUGUI stage={Stage}, window={WindowName}";
+        }
+    }
+
+    public sealed class UIWindowTimeoutException : TimeoutException
+    {
+        public UIWindowTimeoutException(string message, Exception innerException = null)
+            : base(message, innerException)
+        {
+        }
+    }
+
+    internal enum UIWindowLifecycleState
+    {
+        Loading,
+        Ready,
+        Closing,
+        Closed,
+        Failed
+    }
+
     public abstract class UIWindow : UIBase
     {
         #region Propreties
@@ -17,6 +53,12 @@ namespace GameLogic
         private System.Action<UIWindow> _prepareCallback;
 
         private bool _isCreate = false;
+        private CancellationTokenSource _lifecycleCancellation;
+        private UniTaskCompletionSource<UIWindow> _completion;
+        private UIWindowLifecycleState _lifecycleState = UIWindowLifecycleState.Loading;
+        private Exception _failure;
+        private bool _cleanupStarted;
+        private ITimerModule _hideTimerOwner;
 
         private GameObject _panel;
 
@@ -226,6 +268,16 @@ namespace GameLogic
         /// UI是否销毁。
         /// </summary>
         internal bool IsDestroyed = false;
+
+        internal bool IsLoading => _lifecycleState == UIWindowLifecycleState.Loading;
+        internal bool IsReady => _lifecycleState == UIWindowLifecycleState.Ready;
+        internal bool IsCreated => _isCreate;
+        internal bool IsClosingOrDestroyed => _lifecycleState == UIWindowLifecycleState.Closing ||
+                                               _lifecycleState == UIWindowLifecycleState.Closed || IsDestroyed;
+        internal bool IsLifecycleActive => _lifecycleState == UIWindowLifecycleState.Loading ||
+                                           _lifecycleState == UIWindowLifecycleState.Ready;
+        internal CancellationToken LifecycleToken => _lifecycleCancellation?.Token ?? CancellationToken.None;
+        internal UniTask<UIWindow> CompletionTask => _completion?.Task ?? UniTask.FromCanceled<UIWindow>();
         
         /// <summary>
         /// UI是否隐藏标志位。
@@ -236,6 +288,22 @@ namespace GameLogic
 
         public void Init(string name, int layer, bool fullScreen, string assetName, bool fromResources, int hideTimeToClose)
         {
+            ResetUIEventLifecycle();
+            CancelHideToCloseTimer();
+            _lifecycleCancellation?.Dispose();
+            _lifecycleCancellation = new CancellationTokenSource();
+            _completion = new UniTaskCompletionSource<UIWindow>();
+            _lifecycleState = UIWindowLifecycleState.Loading;
+            _failure = null;
+            _cleanupStarted = false;
+            _isCreate = false;
+            IsLoadDone = false;
+            IsDestroyed = false;
+            IsPrepare = false;
+            IsHide = false;
+            HideTimerId = 0;
+            _hideTimerOwner = null;
+
             WindowName = name;
             WindowLayer = layer;
             FullScreen = fullScreen;
@@ -301,42 +369,154 @@ namespace GameLogic
         {
             CancelHideToCloseTimer();
             base._userDatas = userDatas;
-            if (IsPrepare)
+            if (IsReady)
             {
                 prepareCallback?.Invoke(this);
             }
-            else
-            {
-                _prepareCallback = prepareCallback;
-            }
         }
 
-        internal async UniTaskVoid InternalLoad(string location, Action<UIWindow> prepareCallback, bool isAsync, System.Object[] userDatas)
+        internal void InternalSetUserDatas(System.Object[] userDatas)
+        {
+            CancelHideToCloseTimer();
+            this._userDatas = userDatas;
+        }
+
+        internal async UniTask InternalLoadAsync(string location, Action<UIWindow> prepareCallback)
         {
             _prepareCallback = prepareCallback;
-            this._userDatas = userDatas;
-            if (!FromResources)
+            CancellationToken lifecycleToken = LifecycleToken;
+            if (lifecycleToken.IsCancellationRequested)
             {
-                if (isAsync)
+                throw new OperationCanceledException(lifecycleToken);
+            }
+
+            using var timeoutCts = new CancellationTokenSource();
+            float timeoutSeconds = Math.Max(0.001f, UIModule.CreationTimeoutSeconds);
+            using IDisposable timeoutRegistration = timeoutCts.CancelAfterSlim(
+                TimeSpan.FromSeconds(timeoutSeconds), DelayType.UnscaledDeltaTime);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lifecycleToken, timeoutCts.Token);
+            CancellationToken loadToken = linkedCts.Token;
+
+            GameObject panel = null;
+            try
+            {
+                if (!FromResources)
                 {
-                    var uiInstance = await UIModule.Resource.LoadGameObjectAsync(location, parent: UIModule.UIRoot);
-                    Handle_Completed(uiInstance);
+                    UniTask<GameObject> resourceTask = UIModule.Resource.LoadGameObjectAsync(
+                        location, parent: UIModule.UIRoot, cancellationToken: loadToken);
+                    var relay = new ResourceLoadRelay(resourceTask);
+                    relay.Observe().Forget();
+                    try
+                    {
+                        panel = await relay.Completion.Task.AttachExternalCancellation(loadToken);
+                        relay.Claim(panel);
+                    }
+                    catch
+                    {
+                        relay.Abandon();
+                        throw;
+                    }
                 }
                 else
                 {
-                    var uiInstance = UIModule.Resource.LoadGameObject(location, parent: UIModule.UIRoot);
-                    Handle_Completed(uiInstance);
+                    panel = Object.Instantiate(Resources.Load<GameObject>(location), UIModule.UIRoot);
                 }
-            }
-            else
-            {
-                GameObject panel = Object.Instantiate(Resources.Load<GameObject>(location), UIModule.UIRoot);
+
+                loadToken.ThrowIfCancellationRequested();
+                if (timeoutCts.IsCancellationRequested)
+                {
+                    throw new UIWindowTimeoutException(
+                        $"UGUI window '{WindowName}' exceeded {timeoutSeconds:0.###} seconds while loading.");
+                }
+
                 Handle_Completed(panel);
+                loadToken.ThrowIfCancellationRequested();
+                if (timeoutCts.IsCancellationRequested)
+                {
+                    throw new UIWindowTimeoutException(
+                        $"UGUI window '{WindowName}' exceeded {timeoutSeconds:0.###} seconds while preparing.");
+                }
+
+                _completion?.TrySetResult(this);
+                panel = null;
+            }
+            catch (OperationCanceledException exception)
+            {
+                DestroyUnownedPanel(panel);
+                if (IsClosingOrDestroyed || lifecycleToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException(lifecycleToken);
+                }
+
+                if (timeoutCts.IsCancellationRequested)
+                {
+                    throw new UIWindowTimeoutException(
+                        $"UGUI window '{WindowName}' exceeded {timeoutSeconds:0.###} seconds while loading or preparing.",
+                        exception);
+                }
+
+                throw new UIWindowLoadException("resource-load", WindowName,
+                    $"UGUI window '{WindowName}' resource loading was canceled unexpectedly.", exception);
+            }
+            catch
+            {
+                DestroyUnownedPanel(panel);
+                throw;
+            }
+            finally
+            {
+                _prepareCallback = null;
+            }
+        }
+
+        internal void InternalLoadSync(string location, Action<UIWindow> prepareCallback)
+        {
+            _prepareCallback = prepareCallback;
+            GameObject panel = null;
+            try
+            {
+                if (LifecycleToken.IsCancellationRequested || IsClosingOrDestroyed)
+                {
+                    throw new OperationCanceledException(LifecycleToken);
+                }
+
+                panel = FromResources
+                    ? Object.Instantiate(Resources.Load<GameObject>(location), UIModule.UIRoot)
+                    : UIModule.Resource.LoadGameObject(location, parent: UIModule.UIRoot);
+                Handle_Completed(panel);
+                _completion?.TrySetResult(this);
+                panel = null;
+            }
+            catch
+            {
+                DestroyUnownedPanel(panel);
+                throw;
+            }
+            finally
+            {
+                _prepareCallback = null;
+            }
+        }
+
+        private void DestroyUnownedPanel(GameObject panel)
+        {
+            if (panel != null && !ReferenceEquals(_panel, panel))
+            {
+                try { Object.Destroy(panel); }
+                catch (Exception exception)
+                {
+                    Log.Warning($"UGUI window '{WindowName}' failed to destroy an unowned panel: {exception}");
+                }
             }
         }
 
         internal void InternalCreate()
         {
+            if (!IsLifecycleActive)
+            {
+                throw new OperationCanceledException(LifecycleToken);
+            }
+
             if (_isCreate == false)
             {
                 _isCreate = true;
@@ -350,6 +530,11 @@ namespace GameLogic
 
         internal void InternalRefresh()
         {
+            if (!IsLifecycleActive)
+            {
+                throw new OperationCanceledException(LifecycleToken);
+            }
+
             OnRefresh();
         }
 
@@ -424,36 +609,131 @@ namespace GameLogic
             return needUpdate;
         }
 
+        internal void RecordFailure(Exception exception)
+        {
+            if (exception == null || _lifecycleState == UIWindowLifecycleState.Closing ||
+                _lifecycleState == UIWindowLifecycleState.Closed)
+            {
+                return;
+            }
+
+            _failure ??= exception;
+            _lifecycleState = UIWindowLifecycleState.Failed;
+            IsPrepare = false;
+            IsLoadDone = false;
+        }
+
+        internal bool BeginClose()
+        {
+            if (_lifecycleState == UIWindowLifecycleState.Closing ||
+                _lifecycleState == UIWindowLifecycleState.Closed)
+            {
+                return false;
+            }
+
+            _lifecycleState = UIWindowLifecycleState.Closing;
+            IsDestroyed = true;
+            IsPrepare = false;
+            IsLoadDone = false;
+            BlockUIEvents();
+            _prepareCallback = null;
+            CancelHideToCloseTimer();
+
+            try
+            {
+                _lifecycleCancellation?.Cancel();
+            }
+            catch (Exception exception)
+            {
+                Log.Warning($"UI window '{WindowName}' lifecycle cancellation failed: {exception}");
+            }
+
+            return true;
+        }
+
         internal void InternalDestroy(bool isShutDown = false)
         {
+            if (_cleanupStarted)
+            {
+                return;
+            }
+
+            BeginClose();
+            _cleanupStarted = true;
             _isCreate = false;
 
-            RemoveAllUIEvent();
-
-            for (int i = 0; i < ListChild.Count; i++)
+            Exception firstException = null;
+            try
             {
-                var uiChild = ListChild[i];
-                uiChild.CallDestroy();
-                uiChild.OnDestroyWidget();
+                try
+                {
+                    RemoveAllUIEvent();
+                }
+                catch (Exception exception)
+                {
+                    firstException = exception;
+                }
+
+                List<UIWidget> children = new List<UIWidget>(ListChild);
+                ListChild.Clear();
+                for (int i = children.Count - 1; i >= 0; i--)
+                {
+                    try
+                    {
+                        children[i]?.InternalDestroy();
+                    }
+                    catch (Exception exception)
+                    {
+                        firstException ??= exception;
+                    }
+                }
+
+                try
+                {
+                    OnDestroy();
+                }
+                catch (Exception exception)
+                {
+                    firstException ??= exception;
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (_panel != null)
+                    {
+                        Object.Destroy(_panel);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    firstException ??= exception;
+                }
+                finally
+                {
+                    _panel = null;
+                    _canvas = null;
+                    _childCanvas = null;
+                    _raycaster = null;
+                    _childRaycaster = null;
+                    _lifecycleState = UIWindowLifecycleState.Closed;
+                    _lifecycleCancellation?.Dispose();
+                    _lifecycleCancellation = null;
+                    if (_failure != null)
+                    {
+                        _completion?.TrySetException(_failure);
+                    }
+                    else
+                    {
+                        _completion?.TrySetCanceled();
+                    }
+                }
             }
 
-            // 注销回调函数
-            _prepareCallback = null;
-
-            OnDestroy();
-
-            // 销毁面板对象
-            if (_panel != null)
+            if (firstException != null)
             {
-                Object.Destroy(_panel);
-                _panel = null;
-            }
-            
-            IsDestroyed = true;
-
-            if (!isShutDown)
-            {
-                CancelHideToCloseTimer();
+                Log.Warning($"UI window '{WindowName}' cleanup hook failed after complete cleanup: {firstException}");
             }
         }
 
@@ -465,15 +745,19 @@ namespace GameLogic
         {
             if (panel == null)
             {
-                return;
+                if (IsClosingOrDestroyed)
+                {
+                    throw new OperationCanceledException(LifecycleToken);
+                }
+
+                throw new UIWindowLoadException("resource-load", WindowName,
+                    $"UGUI window '{WindowName}' resource loader returned a null instance.");
             }
 
-            IsLoadDone = true;
-            
-            if (IsDestroyed)
+            if (!IsLifecycleActive)
             {
                 Object.Destroy(panel);
-                return;
+                throw new OperationCanceledException(LifecycleToken);
             }
             
             panel.name = GetType().Name;
@@ -497,8 +781,16 @@ namespace GameLogic
             _childRaycaster = _panel.GetComponentsInChildren<GraphicRaycaster>(true);
 
             // 通知UI管理器
-            IsPrepare = true;
             _prepareCallback?.Invoke(this);
+
+            if (!IsLifecycleActive)
+            {
+                throw new OperationCanceledException(LifecycleToken);
+            }
+
+            _lifecycleState = UIWindowLifecycleState.Ready;
+            IsPrepare = true;
+            IsLoadDone = true;
         }
         
         protected virtual void Hide()
@@ -516,8 +808,99 @@ namespace GameLogic
             IsHide = false;
             if (HideTimerId > 0)
             {
-                ModuleSystem.GetModule<ITimerModule>().RemoveTimer(HideTimerId);
+                try
+                {
+                    _hideTimerOwner?.RemoveTimer(HideTimerId);
+                }
+                catch (Exception exception)
+                {
+                    Log.Warning($"UI window '{WindowName}' hide timer cleanup failed: {exception}");
+                }
+
                 HideTimerId = 0;
+                _hideTimerOwner = null;
+            }
+        }
+
+        internal void SetHideTimer(ITimerModule timerModule, int timerId)
+        {
+            _hideTimerOwner = timerModule;
+            HideTimerId = timerId;
+        }
+
+        private sealed class ResourceLoadRelay
+        {
+            private readonly UniTask<GameObject> _resourceTask;
+            private bool _abandoned;
+            private bool _finished;
+            private bool _claimed;
+            private GameObject _result;
+
+            public ResourceLoadRelay(UniTask<GameObject> resourceTask)
+            {
+                _resourceTask = resourceTask;
+                Completion = new UniTaskCompletionSource<GameObject>();
+            }
+
+            public UniTaskCompletionSource<GameObject> Completion { get; }
+
+            public async UniTaskVoid Observe()
+            {
+                try
+                {
+                    GameObject panel = await _resourceTask;
+                    if (_abandoned)
+                    {
+                        DestroyLate(panel);
+                        return;
+                    }
+
+                    _result = panel;
+                    _finished = true;
+                    Completion.TrySetResult(panel);
+                }
+                catch (Exception exception)
+                {
+                    _finished = true;
+                    if (!_abandoned)
+                    {
+                        Completion.TrySetException(exception);
+                    }
+                }
+            }
+
+            public void Claim(GameObject panel)
+            {
+                if (_claimed)
+                {
+                    return;
+                }
+
+                _claimed = true;
+                if (ReferenceEquals(_result, panel))
+                {
+                    _result = null;
+                }
+            }
+
+            public void Abandon()
+            {
+                _abandoned = true;
+                if (_finished && !_claimed)
+                {
+                    _claimed = true;
+                    GameObject panel = _result;
+                    _result = null;
+                    DestroyLate(panel);
+                }
+            }
+
+            private static void DestroyLate(GameObject panel)
+            {
+                if (panel != null)
+                {
+                    Object.Destroy(panel);
+                }
             }
         }
     }

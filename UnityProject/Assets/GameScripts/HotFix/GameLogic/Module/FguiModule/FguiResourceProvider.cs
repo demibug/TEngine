@@ -43,9 +43,15 @@ namespace GameLogic
 
                 while (!handle.IsDone)
                 {
+                    if (!ModuleSystem.IsRunning)
+                        throw new OperationCanceledException("Framework shutdown interrupted FairyGUI resource loading.");
+
                     cancellationToken.ThrowIfCancellationRequested();
                     await UniTask.Yield(PlayerLoopTiming.Update, cancellationToken);
                 }
+                if (!ModuleSystem.IsRunning)
+                    throw new OperationCanceledException("Framework shutdown interrupted FairyGUI resource loading.");
+
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (handle.Status != EOperationStatus.Succeed || handle.AssetObject == null)

@@ -58,6 +58,9 @@ namespace TEngine.FairyGUIIntegration
 
         public static FguiRuntimeHost Create(FguiSettings settings, Action shutdownAction)
         {
+            if (!ModuleSystem.IsRunning)
+                throw new ObjectDisposedException(nameof(FguiRuntimeHost), "FairyGUI runtime host cannot be created while the module system is not running.");
+
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
 
@@ -88,6 +91,9 @@ namespace TEngine.FairyGUIIntegration
 
         public void SetModalActive(bool active)
         {
+            if (!ModuleSystem.IsRunning || _shutdown)
+                return;
+
             int previousCount = _modalCount;
             _modalCount = Mathf.Max(0, _modalCount + (active ? 1 : -1));
             if (previousCount == 0 && _modalCount > 0)
@@ -96,7 +102,7 @@ namespace TEngine.FairyGUIIntegration
 
         public IDisposable SuspendPresentation()
         {
-            if (_shutdown)
+            if (_shutdown || !ModuleSystem.IsRunning)
                 return FguiPresentationLease.Empty;
 
             _suspendCount++;
@@ -111,10 +117,19 @@ namespace TEngine.FairyGUIIntegration
             _shutdown = true;
 
             RootModule.BeforeShutdown -= HandleBeforeShutdown;
-            if (_shield != null)
-                _shield.Enabled = false;
+            try
+            {
+                if (_shield != null)
+                    _shield.Enabled = false;
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"Failed to disable FairyGUI input shield: {exception}");
+            }
 
-            foreach (GComponent layer in _layers.Values)
+            GComponent[] layerSnapshot = new List<GComponent>(_layers.Values).ToArray();
+            _layers.Clear();
+            foreach (GComponent layer in layerSnapshot)
             {
                 try
                 {
@@ -123,42 +138,70 @@ namespace TEngine.FairyGUIIntegration
                 }
                 catch (Exception exception)
                 {
-                    Debug.LogWarning($"Failed to dispose FairyGUI runtime layer: {exception}");
+                    LogWarningSafely($"Failed to dispose FairyGUI runtime layer: {exception}");
                 }
             }
-            _layers.Clear();
 
-            if (_shieldObject != null)
-                DestroyObject(_shieldObject);
+            try
+            {
+                if (_shieldObject != null)
+                    DestroyObject(_shieldObject);
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"Failed to destroy FairyGUI input shield: {exception}");
+            }
             _shieldObject = null;
             _shield = null;
 
-            if (_ownsStage && _stageReady)
+            try
             {
-                if (_stageEngine != null)
-                    _stageEngine.enabled = false;
-                if (StageCamera.main != null)
-                    StageCamera.main.enabled = false;
-                if (_stageCameraBehaviour != null)
-                    _stageCameraBehaviour.enabled = false;
-            }
-            else if (_stageReady)
-            {
-                Stage.inst.layer = _previousStageLayer;
-                if (StageCamera.main != null)
+                if (_ownsStage && _stageReady)
                 {
-                    StageCamera.main.cullingMask = _previousStageCullingMask;
-                    StageCamera.main.depth = _previousStageCameraDepth;
-                    StageCamera.main.enabled = _previousStageCameraEnabled;
+                    if (_stageEngine != null)
+                        _stageEngine.enabled = false;
+                    if (StageCamera.main != null)
+                        StageCamera.main.enabled = false;
+                    if (_stageCameraBehaviour != null)
+                        _stageCameraBehaviour.enabled = false;
                 }
-                if (_stageCameraBehaviour != null)
-                    _stageCameraBehaviour.enabled = _previousStageCameraBehaviourEnabled;
+                else if (_stageReady)
+                {
+                    Stage.inst.layer = _previousStageLayer;
+                    if (StageCamera.main != null)
+                    {
+                        StageCamera.main.cullingMask = _previousStageCullingMask;
+                        StageCamera.main.depth = _previousStageCameraDepth;
+                        StageCamera.main.enabled = _previousStageCameraEnabled;
+                    }
+                    if (_stageCameraBehaviour != null)
+                        _stageCameraBehaviour.enabled = _previousStageCameraBehaviourEnabled;
+                }
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"Failed to restore FairyGUI stage state: {exception}");
             }
 
             _shutdownAction = null;
             _initialized = false;
+            _stageReady = false;
+            _stageEngine = null;
+            _stageCameraBehaviour = null;
+            _settings = null;
+            _modalCount = 0;
+            _suspendCount = 0;
             if (!_destroying)
-                DestroyObject(gameObject);
+            {
+                try
+                {
+                    DestroyObject(gameObject);
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"Failed to destroy FairyGUI runtime host: {exception}");
+                }
+            }
         }
 
         private static void DestroyObject(GameObject target)
@@ -231,7 +274,7 @@ namespace TEngine.FairyGUIIntegration
 
         private void Update()
         {
-            if (_initialized && !_shutdown)
+            if (_initialized && !_shutdown && ModuleSystem.IsRunning)
                 UpdateSafeArea(false);
         }
 
@@ -280,7 +323,7 @@ namespace TEngine.FairyGUIIntegration
 
         private bool ShouldBlockUgui(Vector2 screenPoint)
         {
-            if (!_initialized || _shutdown || IsSuspended)
+            if (!_initialized || _shutdown || !ModuleSystem.IsRunning || IsSuspended)
                 return false;
             if (_modalCount > 0)
                 return true;
@@ -332,6 +375,12 @@ namespace TEngine.FairyGUIIntegration
                 StageCamera.main.enabled = visible;
             if (_stageEngine != null && _ownsStage)
                 _stageEngine.enabled = visible;
+        }
+
+        private static void LogWarningSafely(string message)
+        {
+            try { Debug.LogWarning(message); }
+            catch { }
         }
 
         private sealed class FguiPresentationLease : IDisposable

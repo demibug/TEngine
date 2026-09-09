@@ -15,6 +15,7 @@ namespace TEngine
         private readonly Dictionary<TypeNamePair, ObjectPoolBase> _objectPools;
         private readonly List<ObjectPoolBase> _cachedAllObjectPools;
         private readonly Comparison<ObjectPoolBase> _objectPoolComparer;
+        private bool _shutdown;
         
         /// <summary>
         /// 获取游戏框架模块优先级。
@@ -34,9 +35,26 @@ namespace TEngine
         /// <param name="realElapseSeconds">真实流逝时间，以秒为单位。</param>
         public void Update(float elapseSeconds, float realElapseSeconds)
         {
+            if (_shutdown || !ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             foreach (KeyValuePair<TypeNamePair, ObjectPoolBase> objectPool in _objectPools)
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    break;
+                }
+
                 objectPool.Value.Update(elapseSeconds, realElapseSeconds);
+
+                // 对象释放回调可能触发统一退出；Shutdown 会清空池字典，
+                // 不能再让当前 foreach 继续 MoveNext。
+                if (!ModuleSystem.IsRunning)
+                {
+                    break;
+                }
             }
         }
         
@@ -52,7 +70,16 @@ namespace TEngine
 
         public override void OnInit()
         {
+            _shutdown = false;
             Log.Info("Object pool system onInit.");
+        }
+
+        /// <summary>
+        /// 关闭第一阶段的闸门。对象池仍保留到统一的对象池阶段，供资源引用归还。
+        /// </summary>
+        internal void BeginShutdown()
+        {
+            _shutdown = true;
         }
 
         /// <summary>
@@ -60,13 +87,33 @@ namespace TEngine
         /// </summary>
         public override void Shutdown()
         {
-            foreach (KeyValuePair<TypeNamePair, ObjectPoolBase> objectPool in _objectPools)
+            if (_objectPools.Count <= 0 && _shutdown)
             {
-                objectPool.Value.Shutdown();
+                return;
             }
 
+            _shutdown = true;
+            var objectPoolSnapshot = new List<ObjectPoolBase>(_objectPools.Values);
             _objectPools.Clear();
             _cachedAllObjectPools.Clear();
+
+            foreach (ObjectPoolBase objectPool in objectPoolSnapshot)
+            {
+                try
+                {
+                    objectPool.Shutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Object pool shutdown failed: {0}", exception);
+                }
+            }
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
         }
 
         /// <summary>
@@ -1239,6 +1286,7 @@ namespace TEngine
         private IObjectPool<T> InternalCreateObjectPool<T>(string name, bool allowMultiSpawn, float autoReleaseInterval, int capacity, float expireTime,
             int priority) where T : ObjectBase
         {
+            EnsureCanCreatePool();
             TypeNamePair typeNamePair = new TypeNamePair(typeof(T), name);
             if (HasObjectPool<T>(name))
             {
@@ -1253,6 +1301,7 @@ namespace TEngine
         private ObjectPoolBase InternalCreateObjectPool(Type objectType, string name, bool allowMultiSpawn, float autoReleaseInterval, int capacity,
             float expireTime, int priority)
         {
+            EnsureCanCreatePool();
             if (objectType == null)
             {
                 throw new GameFrameworkException("Object type is invalid.");
@@ -1274,6 +1323,14 @@ namespace TEngine
                 (ObjectPoolBase)Activator.CreateInstance(objectPoolType, name, allowMultiSpawn, autoReleaseInterval, capacity, expireTime, priority);
             _objectPools.Add(typeNamePair, objectPool);
             return objectPool;
+        }
+
+        private void EnsureCanCreatePool()
+        {
+            if (_shutdown || !ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("Can not create an object pool while the module system is shutting down.");
+            }
         }
 
         private bool InternalDestroyObjectPool(TypeNamePair typeNamePair)

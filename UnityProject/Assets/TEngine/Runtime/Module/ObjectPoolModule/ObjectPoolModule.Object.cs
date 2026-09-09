@@ -181,8 +181,16 @@ namespace TEngine
             /// <param name="isShutdown">是否是关闭对象池时触发。</param>
             public void Release(bool isShutdown)
             {
-                _object.Release(isShutdown);
-                MemoryPool.Release(_object);
+                try
+                {
+                    _object.Release(isShutdown);
+                }
+                finally
+                {
+                    // 外部对象的 Release 即使失败，也必须把对象归还到 MemoryPool，避免
+                    // wrapper 被回收后仍持有一份不可达的业务对象。
+                    MemoryPool.Release(_object);
+                }
             }
         }
     }

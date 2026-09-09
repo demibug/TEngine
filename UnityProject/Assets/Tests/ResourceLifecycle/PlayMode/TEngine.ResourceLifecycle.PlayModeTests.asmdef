@@ -1,0 +1,23 @@
+{
+    "name": "TEngine.ResourceLifecycle.PlayModeTests",
+    "rootNamespace": "TEngine.ResourceLifecycleTests",
+    "references": [
+        "TEngine.Runtime",
+        "UniTask",
+        "YooAsset"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

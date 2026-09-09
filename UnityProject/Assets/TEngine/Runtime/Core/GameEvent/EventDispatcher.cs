@@ -33,6 +33,11 @@ namespace TEngine
         /// <returns>是否添加成功。</returns>
         public bool AddEventListener(int eventType, Delegate handler)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return false;
+            }
+
             if (!_eventTable.TryGetValue(eventType, out var data))
             {
                 data = new EventDelegateData(eventType);

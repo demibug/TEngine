@@ -42,6 +42,7 @@ namespace GameLogic
         public async UniTask InitializeAsync(string settingsAddress,
             CancellationToken cancellationToken = default, string yooAssetPackageName = "DefaultPackage")
         {
+            EnsureCanStartWork();
             if (string.IsNullOrWhiteSpace(settingsAddress))
                 throw new ArgumentException("Settings address cannot be empty.", nameof(settingsAddress));
             if (_initialized)
@@ -61,7 +62,14 @@ namespace GameLogic
             }
             finally
             {
-                lease?.Dispose();
+                try
+                {
+                    lease?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"FairyGUI settings lease cleanup failed after initialization attempt: {exception}");
+                }
             }
         }
 
@@ -73,6 +81,7 @@ namespace GameLogic
         public UniTask InitializeAsync(FguiSettings settings, CancellationToken cancellationToken = default,
             IFguiResourceProvider resourceProvider = null)
         {
+            EnsureCanStartWork();
             cancellationToken.ThrowIfCancellationRequested();
             if (_initialized)
             {
@@ -101,20 +110,55 @@ namespace GameLogic
             {
                 if (_externalLoaderConfigured)
                 {
-                    FguiExternalLoader.ResetConfiguration();
-                    _externalLoaderConfigured = false;
+                    try
+                    {
+                        FguiExternalLoader.ResetConfiguration();
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("FairyGUI external loader rollback failed: {0}", exception);
+                    }
+                    finally
+                    {
+                        _externalLoaderConfigured = false;
+                    }
                 }
-                _host?.Shutdown();
-                _host = null;
-                _packages?.Shutdown();
-                _packages = null;
+
+                try
+                {
+                    _host?.Shutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("FairyGUI host rollback failed: {0}", exception);
+                }
+                finally
+                {
+                    _host = null;
+                }
+
+                try
+                {
+                    _packages?.Shutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("FairyGUI package rollback failed: {0}", exception);
+                }
+                finally
+                {
+                    _packages = null;
+                }
+
                 _settings = null;
+                _initialized = false;
                 throw;
             }
         }
 
         public void Register<TWindow>(FguiWindowDescriptor descriptor) where TWindow : FguiWindow
         {
+            EnsureCanStartWork();
             if (descriptor == null)
                 throw new ArgumentNullException(nameof(descriptor));
             if (descriptor.WindowType != typeof(TWindow))
@@ -134,10 +178,29 @@ namespace GameLogic
 
             if (_windows.TryGetValue(type, out FguiWindow existing))
             {
-                ShowExisting(existing);
-                await existing.InternalRefreshAsync(userData, cancellationToken);
-                BringToFront(existing);
-                return (TWindow)existing;
+                try
+                {
+                    CancellationToken lifetimeToken = existing.LifecycleToken;
+                    ShowExisting(existing);
+                    await AwaitRefreshAsync(existing.EnqueueRefreshAsync(userData, cancellationToken,
+                        exception => HandleRefreshFailure(type, existing, exception)), lifetimeToken,
+                        cancellationToken);
+                    EnsureCurrentWindow(type, existing);
+                    BringToFront(existing);
+                    EnsureCurrentWindow(type, existing);
+                    return (TWindow)existing;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    Exception failure = NormalizeFguiException(existing, "window-refresh", exception);
+                    if (IsCurrentWindow(type, existing))
+                        CloseWindow(type, existing);
+                    throw failure;
+                }
             }
 
             if (!_creations.TryGetValue(type, out Creation creation))
@@ -149,25 +212,30 @@ namespace GameLogic
                     Descriptor = descriptor,
                     FirstUserData = userData,
                     Cts = new CancellationTokenSource(),
-                    Completion = new UniTaskCompletionSource<FguiWindow>()
+                    Completion = new UniTaskCompletionSource<FguiWindow>(),
+                    WaiterCount = 1
                 };
                 _creations.Add(type, creation);
                 CreateWindowAsync(creation).Forget();
             }
+            else
+            {
+                creation.WaiterCount++;
+            }
 
-            creation.WaiterCount++;
             UniTaskCompletionSource<FguiWindow> completion = creation.Completion;
             try
             {
                 FguiWindow result = await completion.Task.AttachExternalCancellation(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                EnsureCurrentWindow(type, result);
                 return (TWindow)result;
             }
             finally
             {
                 creation.WaiterCount--;
                 if (creation.WaiterCount == 0 && IsCurrentCreation(type, creation))
-                    creation.Cts.Cancel();
+                    CancelCreation(creation);
             }
         }
 
@@ -195,11 +263,29 @@ namespace GameLogic
             var creations = new List<Creation>(_creations.Values);
             _creations.Clear();
             foreach (Creation creation in creations)
-                creation.Cts.Cancel();
+            {
+                try
+                {
+                    CancelCreation(creation);
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"FairyGUI creation cleanup failed: {exception}");
+                }
+            }
 
             var types = new List<Type>(_windows.Keys);
             for (int i = types.Count - 1; i >= 0; i--)
-                Close(types[i]);
+            {
+                try
+                {
+                    Close(types[i]);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("FairyGUI window shutdown failed: {0}", exception);
+                }
+            }
         }
 
         public IDisposable SuspendPresentation()
@@ -224,20 +310,72 @@ namespace GameLogic
                 return;
             _shutdown = true;
 
-            CloseAll();
-            _packages?.Shutdown();
-            _packages = null;
-            if (_externalLoaderConfigured)
+            try
             {
-                FguiExternalLoader.ResetConfiguration();
+                CloseAll();
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("FairyGUI windows shutdown failed: {0}", exception);
+            }
+
+            try
+            {
+                _packages?.Shutdown();
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("FairyGUI package shutdown failed: {0}", exception);
+            }
+            finally
+            {
+                _packages = null;
+            }
+
+            try
+            {
+                if (_externalLoaderConfigured)
+                {
+                    FguiExternalLoader.ResetConfiguration();
+                    _externalLoaderConfigured = false;
+                }
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("FairyGUI external loader cleanup failed: {0}", exception);
+            }
+            finally
+            {
                 _externalLoaderConfigured = false;
             }
-            _host?.Shutdown();
-            _host = null;
-            _settingsLease?.Dispose();
-            _settingsLease = null;
-            _settings = null;
-            _initialized = false;
+
+            try
+            {
+                _host?.Shutdown();
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("FairyGUI host shutdown failed: {0}", exception);
+            }
+            finally
+            {
+                _host = null;
+            }
+
+            try
+            {
+                _settingsLease?.Dispose();
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("FairyGUI settings lease cleanup failed: {0}", exception);
+            }
+            finally
+            {
+                _settingsLease = null;
+                _settings = null;
+                _initialized = false;
+            }
         }
 
         protected override void OnRelease()
@@ -252,15 +390,19 @@ namespace GameLogic
             FguiPackageLease packageLease = null;
             FguiWindow window = null;
             GComponent view = null;
-            float timeoutSeconds = _settings.LoadTimeoutSeconds;
+            FguiSettings settings = _settings;
+            FguiPackageService packages = _packages;
+            IFguiRuntimeHost host = _host;
+            float timeoutSeconds = settings.LoadTimeoutSeconds;
             using var timeoutCts = new CancellationTokenSource();
             using IDisposable timeoutRegistration = timeoutCts.CancelAfterSlim(
                 TimeSpan.FromSeconds(timeoutSeconds), DelayType.UnscaledDeltaTime);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(creation.Cts.Token, timeoutCts.Token);
+            CancellationToken token = linkedCts.Token;
             try
             {
-                packageLease = await _packages.AcquireAsync(creation.Descriptor.PackageKey, linkedCts.Token);
-                linkedCts.Token.ThrowIfCancellationRequested();
+                packageLease = await AcquirePackageAsync(packages, creation.Descriptor.PackageKey, token);
+                EnsureCurrentCreation(windowType, creation, token);
 
                 GObject createdObject = UIPackage.CreateObject(creation.Descriptor.PackageName,
                     creation.Descriptor.ComponentName);
@@ -278,21 +420,23 @@ namespace GameLogic
                         $"Factory did not create the registered type '{windowType.Name}'.");
                 window.InternalAttach(view, packageLease);
                 packageLease = null;
-                _host.GetLayer(creation.Descriptor.Layer).AddChild(view);
+                host.GetLayer(creation.Descriptor.Layer).AddChild(view);
                 view = null;
 
-                await window.InternalCreateAsync(creation.FirstUserData, linkedCts.Token);
-                linkedCts.Token.ThrowIfCancellationRequested();
+                await window.InternalCreateAsync(creation.FirstUserData, token);
+                EnsureCurrentCreation(windowType, creation, token);
                 _windows.Add(windowType, window);
                 window.InternalSetVisible(true);
+                EnsureCurrentWindow(windowType, window);
                 SetModalEngaged(window, creation.Descriptor.Modal);
+                EnsureCurrentWindow(windowType, window);
                 RemoveCreation(windowType, creation);
                 creation.Completion.TrySetResult(window);
             }
             catch (OperationCanceledException exception)
             {
                 RemoveCreation(windowType, creation);
-                CleanupFailedWindow(window, view, packageLease);
+                CleanupFailedWindow(windowType, window, view, packageLease);
                 if (timeoutCts.IsCancellationRequested && !creation.Cts.IsCancellationRequested)
                     creation.Completion.TrySetException(new FguiTimeoutException(
                         $"FairyGUI window '{windowType.Name}' exceeded {timeoutSeconds:0.##} seconds.",
@@ -303,7 +447,7 @@ namespace GameLogic
             catch (Exception exception)
             {
                 RemoveCreation(windowType, creation);
-                CleanupFailedWindow(window, view, packageLease);
+                CleanupFailedWindow(windowType, window, view, packageLease);
                 if (exception is FguiLoadException || exception is FguiTimeoutException)
                     creation.Completion.TrySetException(exception);
                 else
@@ -317,24 +461,58 @@ namespace GameLogic
             }
         }
 
-        private static void CleanupFailedWindow(FguiWindow window, GComponent unattachedView,
+        private async UniTask<FguiPackageLease> AcquirePackageAsync(FguiPackageService packages,
+            string packageKey, CancellationToken token)
+        {
+            while (true)
+            {
+                try
+                {
+                    return await packages.AcquireAsync(packageKey, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    token.ThrowIfCancellationRequested();
+                    // A just-closed creation may have canceled the package service's shared load.
+                    // Let that load publish Idle before this new creation starts a fresh generation.
+                    await UniTask.Yield(PlayerLoopTiming.Update, token);
+                }
+            }
+        }
+
+        private void CleanupFailedWindow(Type windowType, FguiWindow window, GComponent unattachedView,
             FguiPackageLease packageLease)
         {
             try
             {
                 if (window != null)
+                {
+                    RemoveWindowIfCurrent(windowType, window);
+                    window.BeginDestroy();
                     window.InternalDestroy();
-                else if (unattachedView != null && !unattachedView.isDisposed)
-                    unattachedView.Dispose();
+                }
             }
             catch (Exception exception)
             {
-                Log.Warning($"Failed FairyGUI window cleanup raised an exception: {exception}");
+                LogWarningSafely($"Failed FairyGUI window cleanup raised an exception: {exception}");
             }
             finally
             {
-                if (window == null)
-                    packageLease?.Dispose();
+                try
+                {
+                    if (unattachedView != null && !unattachedView.isDisposed)
+                        unattachedView.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"Failed to dispose unattached FairyGUI view: {exception}");
+                }
+
+                try { packageLease?.Dispose(); }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"Failed to release FairyGUI package lease: {exception}");
+                }
             }
         }
 
@@ -343,14 +521,12 @@ namespace GameLogic
             if (_creations.TryGetValue(windowType, out Creation creation))
             {
                 _creations.Remove(windowType);
-                creation.Cts.Cancel();
+                CancelCreation(creation);
             }
 
             if (!_windows.TryGetValue(windowType, out FguiWindow window))
                 return;
-            _windows.Remove(windowType);
-            SetModalEngaged(window, false);
-            window.InternalDestroy();
+            CloseWindow(windowType, window);
         }
 
         private bool IsCurrentCreation(Type windowType, Creation creation)
@@ -366,14 +542,124 @@ namespace GameLogic
 
         private void ShowExisting(FguiWindow window)
         {
+            EnsureCurrentWindow(window.GetType(), window);
             window.InternalSetVisible(true);
+            EnsureCurrentWindow(window.GetType(), window);
             FguiWindowDescriptor descriptor = _descriptors[window.GetType()];
             SetModalEngaged(window, descriptor.Modal);
+            EnsureCurrentWindow(window.GetType(), window);
         }
 
         private static void BringToFront(FguiWindow window)
         {
             window.View?.parent?.SetChildIndex(window.View, window.View.parent.numChildren - 1);
+        }
+
+        private async UniTask AwaitRefreshAsync(UniTask refresh, CancellationToken lifetimeToken,
+            CancellationToken callerToken)
+        {
+            CancellationTokenSource linkedCts = null;
+            try
+            {
+                CancellationToken waitToken = lifetimeToken;
+                if (callerToken.CanBeCanceled || lifetimeToken.CanBeCanceled)
+                {
+                    linkedCts = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken, callerToken);
+                    waitToken = linkedCts.Token;
+                }
+
+                if (waitToken.CanBeCanceled)
+                    await refresh.AttachExternalCancellation(waitToken);
+                else
+                    await refresh;
+            }
+            finally
+            {
+                linkedCts?.Dispose();
+            }
+        }
+
+        private void HandleRefreshFailure(Type windowType, FguiWindow window, Exception exception)
+        {
+            if (!IsCurrentWindow(windowType, window))
+                return;
+
+            CloseWindow(windowType, window);
+        }
+
+        private static Exception NormalizeFguiException(FguiWindow window, string stage, Exception exception)
+        {
+            if (exception is FguiLoadException || exception is FguiTimeoutException ||
+                exception is OperationCanceledException)
+            {
+                return exception;
+            }
+
+            return new FguiLoadException(stage, null, window?.GetType().Name,
+                $"Failed to {stage} FairyGUI window '{window?.GetType().Name}'.", exception);
+        }
+
+        private void EnsureCurrentCreation(Type windowType, Creation creation, CancellationToken token)
+        {
+            if (!IsCurrentCreation(windowType, creation) || token.IsCancellationRequested)
+                throw new OperationCanceledException(token);
+        }
+
+        private void EnsureCurrentWindow(Type windowType, FguiWindow window)
+        {
+            if (!IsCurrentWindow(windowType, window) || window == null || window.IsDestroyed ||
+                window.View == null || window.View.isDisposed)
+            {
+                throw new OperationCanceledException();
+            }
+        }
+
+        private bool IsCurrentWindow(Type windowType, FguiWindow window)
+        {
+            return window != null && _windows.TryGetValue(windowType, out FguiWindow current) &&
+                   ReferenceEquals(current, window);
+        }
+
+        private void RemoveWindowIfCurrent(Type windowType, FguiWindow window)
+        {
+            if (!IsCurrentWindow(windowType, window))
+                return;
+
+            window.BeginDestroy();
+            _windows.Remove(windowType);
+            SetModalEngagedSafely(window, false);
+        }
+
+        private void CloseWindow(Type windowType, FguiWindow window)
+        {
+            if (!IsCurrentWindow(windowType, window))
+                return;
+
+            window.BeginDestroy();
+            _windows.Remove(windowType);
+            SetModalEngagedSafely(window, false);
+            window.InternalDestroy();
+        }
+
+        private void CancelCreation(Creation creation)
+        {
+            if (creation == null || creation.Cts == null || creation.Cts.IsCancellationRequested)
+                return;
+
+            try { creation.Cts.Cancel(); }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"FairyGUI creation cancellation failed: {exception}");
+            }
+        }
+
+        private void SetModalEngagedSafely(FguiWindow window, bool engaged)
+        {
+            try { SetModalEngaged(window, engaged); }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"FairyGUI modal presentation cleanup failed: {exception}");
+            }
         }
 
         private void SetModalEngaged(FguiWindow window, bool engaged)
@@ -386,8 +672,29 @@ namespace GameLogic
 
         private void EnsureInitialized()
         {
+            if (!ModuleSystem.IsRunning)
+                throw new ObjectDisposedException(nameof(FguiModule), "FairyGUI is shutting down and cannot accept new work.");
+
             if (!IsInitialized)
                 throw new InvalidOperationException("FairyGUI is not initialized. Await InitializeAsync first.");
+        }
+
+        private void EnsureCanStartWork()
+        {
+            if (!ModuleSystem.IsRunning || _shutdown)
+                throw new ObjectDisposedException(nameof(FguiModule), "FairyGUI is shutting down and cannot accept new work.");
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
+        }
+
+        private static void LogWarningSafely(string message)
+        {
+            try { Log.Warning(message); }
+            catch { }
         }
     }
 }

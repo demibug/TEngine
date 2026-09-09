@@ -25,6 +25,8 @@ namespace TEngine
         private float _fadeoutTimer;
         private const float FADEOUT_DURATION = 0.2f;
         private bool _inPool;
+        private bool _destroyed;
+        private AssetHandle _pendingHandle;
 
         /// <summary>
         /// 音频代理辅助器运行时状态。
@@ -210,8 +212,20 @@ namespace TEngine
         /// <param name="index">音频代理辅助器编号。</param>
         public void Init(AudioCategory audioCategory, int index = 0)
         {
-            _audioModule = ModuleSystem.GetModule<IAudioModule>();
-            _resourceModule = ModuleSystem.GetModule<IResourceModule>();
+            if (!ModuleSystem.IsRunning || audioCategory == null)
+            {
+                return;
+            }
+
+            _destroyed = false;
+
+            _audioModule = ModuleSystem.TryGetExistingModule<IAudioModule>();
+            _resourceModule = ModuleSystem.TryGetExistingModule<IResourceModule>();
+            if (_audioModule == null || _resourceModule == null)
+            {
+                return;
+            }
+
             GameObject host = new GameObject(Utility.Text.Format("Audio Agent Helper - {0} - {1}", audioCategory.AudioMixerGroup.name, index));
             host.transform.SetParent(audioCategory.InstanceRoot);
             host.transform.localPosition = Vector3.zero;
@@ -240,6 +254,11 @@ namespace TEngine
         /// <param name="bInPool">是否池化。</param>
         public void Load(string path, bool bAsync, bool bInPool = false)
         {
+            if (!ModuleSystem.IsRunning || _audioModule == null || _resourceModule == null)
+            {
+                return;
+            }
+
             _inPool = bInPool;
             if (_audioAgentRuntimeState == AudioAgentRuntimeState.None || _audioAgentRuntimeState == AudioAgentRuntimeState.End)
             {
@@ -256,7 +275,18 @@ namespace TEngine
                     {
                         _audioAgentRuntimeState = AudioAgentRuntimeState.Loading;
                         AssetHandle handle = _resourceModule.LoadAssetAsyncHandle<AudioClip>(path);
-                        handle.Completed += OnAssetLoadComplete;
+                        _pendingHandle = handle;
+                        try
+                        {
+                            handle.Completed += OnAssetLoadComplete;
+                        }
+                        catch
+                        {
+                            _pendingHandle = null;
+                            try { handle?.Dispose(); }
+                            catch (System.Exception exception) { LogErrorSafely("Audio handle setup cleanup failed: {0}", exception); }
+                            _audioAgentRuntimeState = AudioAgentRuntimeState.End;
+                        }
                     }
                     else
                     {
@@ -325,6 +355,27 @@ namespace TEngine
         /// <param name="handle">资源操作句柄。</param>
         void OnAssetLoadComplete(AssetHandle handle)
         {
+            if (_pendingHandle != null && !ReferenceEquals(_pendingHandle, handle))
+            {
+                try { handle?.Dispose(); }
+                catch (System.Exception exception) { LogErrorSafely("Stale audio handle cleanup failed: {0}", exception); }
+                return;
+            }
+
+            if (ReferenceEquals(_pendingHandle, handle))
+            {
+                _pendingHandle = null;
+            }
+
+            if (_destroyed || !ModuleSystem.IsRunning || _audioModule == null || _resourceModule == null)
+            {
+                try { handle?.Dispose(); }
+                catch (System.Exception exception) { LogErrorSafely("Late audio handle cleanup failed: {0}", exception); }
+                _pendingLoad = null;
+                _audioAgentRuntimeState = AudioAgentRuntimeState.End;
+                return;
+            }
+
             if (handle != null)
             {
                 if (_inPool)
@@ -380,6 +431,11 @@ namespace TEngine
         /// <param name="elapseSeconds">逻辑流逝时间，以秒为单位。</param>
         public void Update(float elapseSeconds)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             if (_audioAgentRuntimeState == AudioAgentRuntimeState.Playing)
             {
                 if (!_source.isPlaying)
@@ -418,15 +474,68 @@ namespace TEngine
         /// </summary>
         public void Destroy()
         {
-            if (_transform != null)
+            if (_destroyed)
             {
-                Object.Destroy(_transform.gameObject);
+                return;
+            }
+
+            _destroyed = true;
+            _pendingLoad = null;
+
+            AssetHandle pendingHandle = _pendingHandle;
+            _pendingHandle = null;
+            if (pendingHandle != null)
+            {
+                try
+                {
+                    pendingHandle.Completed -= OnAssetLoadComplete;
+                }
+                catch (System.Exception exception)
+                {
+                    LogErrorSafely("Audio callback detach failed: {0}", exception);
+                }
+
+                try
+                {
+                    pendingHandle.Dispose();
+                }
+                catch (System.Exception exception)
+                {
+                    LogErrorSafely("Audio pending handle cleanup failed: {0}", exception);
+                }
+            }
+
+            Transform transform = _transform;
+            _transform = null;
+            _source = null;
+            if (transform != null)
+            {
+                try
+                {
+                    Object.Destroy(transform.gameObject);
+                }
+                catch (System.Exception exception)
+                {
+                    LogErrorSafely("Audio agent object cleanup failed: {0}", exception);
+                }
             }
 
             if (_audioData != null)
             {
-                AudioData.DeAlloc(_audioData);
+                AudioData audioData = _audioData;
+                _audioData = null;
+                AudioData.DeAlloc(audioData);
             }
+
+            _audioModule = null;
+            _resourceModule = null;
+            _audioAgentRuntimeState = AudioAgentRuntimeState.End;
+        }
+
+        private static void LogErrorSafely(string format, System.Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
         }
     }
 }

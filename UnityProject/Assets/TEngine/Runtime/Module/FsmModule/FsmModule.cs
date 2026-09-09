@@ -38,6 +38,11 @@ namespace TEngine
         /// <param name="realElapseSeconds">真实流逝时间，以秒为单位。</param>
         public void Update(float elapseSeconds, float realElapseSeconds)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _tempFsmList.Clear();
             if (_fsmMap.Count <= 0)
             {
@@ -51,12 +56,24 @@ namespace TEngine
 
             foreach (FsmBase fsm in _tempFsmList)
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    break;
+                }
+
                 if (fsm.IsDestroyed)
                 {
                     continue;
                 }
 
                 fsm.Update(elapseSeconds, realElapseSeconds);
+
+                // 当前状态回调可能直接触发统一退出；Shutdown 会清空临时列表，
+                // 因此必须在离开当前回调后立刻停止 foreach，避免继续 MoveNext。
+                if (!ModuleSystem.IsRunning)
+                {
+                    break;
+                }
             }
         }
 
@@ -69,13 +86,27 @@ namespace TEngine
         /// </summary>
         public override void Shutdown()
         {
-            foreach (KeyValuePair<TypeNamePair, FsmBase> fsm in _fsmMap)
-            {
-                fsm.Value.Shutdown();
-            }
-
+            var fsmSnapshot = new List<FsmBase>(_fsmMap.Values);
             _fsmMap.Clear();
             _tempFsmList.Clear();
+
+            foreach (FsmBase fsm in fsmSnapshot)
+            {
+                try
+                {
+                    fsm.Shutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("FSM shutdown failed: {0}", exception);
+                }
+            }
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
         }
 
         /// <summary>
@@ -238,6 +269,11 @@ namespace TEngine
         /// <returns>要创建的有限状态机。</returns>
         public IFsm<T> CreateFsm<T>(string name, T owner, params FsmState<T>[] states) where T : class
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("FSM module is shutting down and cannot create an FSM.");
+            }
+
             TypeNamePair typeNamePair = new TypeNamePair(typeof(T), name);
             if (HasFsm<T>(name))
             {
@@ -271,6 +307,11 @@ namespace TEngine
         /// <returns>要创建的有限状态机。</returns>
         public IFsm<T> CreateFsm<T>(string name, T owner, List<FsmState<T>> states) where T : class
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("FSM module is shutting down and cannot create an FSM.");
+            }
+
             TypeNamePair typeNamePair = new TypeNamePair(typeof(T), name);
             if (HasFsm<T>(name))
             {

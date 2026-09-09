@@ -25,6 +25,12 @@
 
 ## 汇总与后续阅读
 
+- [第 5B 批退出协调执行契约](synthesis/shutdown-coordination-plan.md)：用户确认 5A 完成后的下一步，明确统一退出顺序、异常隔离、资源 owner 与会话门禁；本轮只规划。
+
+- [第 5A 批启动终态执行契约](synthesis/startup-terminal-plan.md)：先明确资源 bootstrap、包初始化和热更入口成功/失败；5B 退出协调另行规划，本轮不实施。
+
+- [第 4 批 UI 生命周期执行契约](synthesis/ui-lifecycle-plan.md)：用户确认资源批次完成后的下一步；修正 UGUI 完成/关闭契约并复现 FGUI 并发失败，本轮只规划。
+
 - [第 3 批资源生命周期执行契约](synthesis/resource-lifecycle-plan.md)：用户确认前批完成后形成的下一步手动实施提示词；本轮只规划，未实施资源改造，也未补作前批验收。
 
 - [architecture.md](synthesis/architecture.md)：统一框架地图、生命周期、第三方归属及 master 源码核验定位。

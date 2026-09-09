@@ -13,15 +13,45 @@ namespace TEngine
         /// Raised once per RootModule instance before framework modules (especially resources) shut down.
         /// Subscribers are isolated so one failure cannot skip the remaining cleanup.
         /// </summary>
-        public static event Action BeforeShutdown;
+        private static event Action _beforeShutdown;
+
+        /// <summary>
+        /// Raised once before framework modules (especially resources) shut down.
+        /// New subscriptions are rejected after shutdown has begun so a late callback
+        /// cannot repopulate the next session.
+        /// </summary>
+        public static event Action BeforeShutdown
+        {
+            add
+            {
+                if (value == null || !ModuleSystem.IsRunning)
+                {
+                    return;
+                }
+
+                _beforeShutdown += value;
+            }
+            remove => _beforeShutdown -= value;
+        }
 
         private static RootModule _instance = null;
-        private bool _beforeShutdownDispatched;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetForNewSession()
+        {
+            _instance = null;
+            _beforeShutdown = null;
+        }
 
         public static RootModule Instance
         {
             get
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    return null;
+                }
+
                 if (_instance == null)
                 {
                     _instance = Utility.Unity.FindObjectOfType<RootModule>();
@@ -122,41 +152,81 @@ namespace TEngine
         /// </summary>
         private void Awake()
         {
-            _instance = this;
-            InitTextHelper();
-            InitLogHelper();
-            Log.Info("Unity Version: {0}", Application.unityVersion);
-
-            InitJsonHelper();
-
-            Utility.Converter.ScreenDpi = Screen.dpi;
-            if (Utility.Converter.ScreenDpi <= 0)
+            if ((_instance != null && !ReferenceEquals(_instance, this)) || !ModuleSystem.TryBeginSession(this))
             {
-                Utility.Converter.ScreenDpi = DEFAULT_DPI;
+                Destroy(gameObject);
+                return;
             }
 
-            Application.targetFrameRate = frameRate;
-            Time.timeScale = gameSpeed;
-            Application.runInBackground = runInBackground;
-            Screen.sleepTimeout = neverSleep ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
+            _instance = this;
+            try
+            {
+                InitTextHelper();
+                InitLogHelper();
+                Log.Info("Unity Version: {0}", Application.unityVersion);
 
-            Application.lowMemory += OnLowMemory;
-            GameTime.StartFrame();
+                InitJsonHelper();
+
+                Utility.Converter.ScreenDpi = Screen.dpi;
+                if (Utility.Converter.ScreenDpi <= 0)
+                {
+                    Utility.Converter.ScreenDpi = DEFAULT_DPI;
+                }
+
+                Application.targetFrameRate = frameRate;
+                Time.timeScale = gameSpeed;
+                Application.runInBackground = runInBackground;
+                Screen.sleepTimeout = neverSleep ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
+
+                Application.lowMemory += OnLowMemory;
+                GameTime.StartFrame();
+            }
+            catch (Exception exception)
+            {
+                Application.lowMemory -= OnLowMemory;
+                try
+                {
+                    Debug.LogException(exception);
+                }
+                catch
+                {
+                    // Keep the shutdown attempt below as the source of truth if logging is not ready.
+                }
+
+                ModuleSystem.Shutdown(this);
+                _instance = null;
+                Destroy(gameObject);
+            }
         }
 
         private void Update()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             GameTime.StartFrame();
             ModuleSystem.Update(GameTime.deltaTime, GameTime.unscaledDeltaTime);
         }
 
         private void FixedUpdate()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             GameTime.StartFrame();
         }
 
         private void LateUpdate()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             GameTime.StartFrame();
         }
 
@@ -164,35 +234,32 @@ namespace TEngine
         {
             Application.lowMemory -= OnLowMemory;
             StopAllCoroutines();
+            ModuleSystem.Shutdown(this);
         }
 
         private void OnDestroy()
         {
-            DispatchBeforeShutdown();
-#if !UNITY_EDITOR
-            ModuleSystem.Shutdown();
-#endif
-            if (_instance == this)
+            Application.lowMemory -= OnLowMemory;
+            if (ReferenceEquals(_instance, this))
             {
+                ModuleSystem.Shutdown(this);
                 _instance = null;
             }
         }
 
-        private void DispatchBeforeShutdown()
+        internal static void DispatchBeforeShutdown()
         {
-            if (_beforeShutdownDispatched)
+            if (_beforeShutdown == null)
             {
                 return;
             }
 
-            _beforeShutdownDispatched = true;
-            Delegate[] listeners = BeforeShutdown?.GetInvocationList();
-            if (listeners == null)
-            {
-                return;
-            }
+            // 先摘除静态表，再执行外部回调。回调重入或晚订阅都不能再次进入旧列表。
+            Action listeners = _beforeShutdown;
+            _beforeShutdown = null;
+            Delegate[] invocationList = listeners.GetInvocationList();
 
-            foreach (Delegate listener in listeners)
+            foreach (Delegate listener in invocationList)
             {
                 try
                 {
@@ -200,7 +267,15 @@ namespace TEngine
                 }
                 catch (Exception exception)
                 {
-                    Log.Error("BeforeShutdown listener failed: {0}", exception);
+                    ModuleSystem.RecordShutdownError(exception);
+                    try
+                    {
+                        Log.Error("BeforeShutdown listener failed: {0}", exception);
+                    }
+                    catch
+                    {
+                        // The shutdown aggregate already owns the failure if logging is unavailable.
+                    }
                 }
             }
         }
@@ -247,6 +322,7 @@ namespace TEngine
 
         internal void Shutdown()
         {
+            ModuleSystem.Shutdown(this);
             Destroy(gameObject);
         }
 
@@ -327,13 +403,13 @@ namespace TEngine
         {
             Log.Warning("Low memory reported...");
 
-            IObjectPoolModule objectPoolModule = ModuleSystem.GetModule<IObjectPoolModule>();
+            IObjectPoolModule objectPoolModule = ModuleSystem.TryGetExistingModule<IObjectPoolModule>();
             if (objectPoolModule != null)
             {
                 objectPoolModule.ReleaseAllUnused();
             }
 
-            IResourceModule resourceModule = ModuleSystem.GetModule<IResourceModule>();
+            IResourceModule resourceModule = ModuleSystem.TryGetExistingModule<IResourceModule>();
             if (resourceModule != null)
             {
                 resourceModule.OnLowMemory();

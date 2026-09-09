@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
+using System;
 using TEngine;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace GameLogic
 {
@@ -26,6 +28,8 @@ namespace GameLogic
         /// </summary>
         // ReSharper disable once InconsistentNaming
         public string name { protected set; get; } = string.Empty;
+
+        private bool _destroyStarted;
 
         /// <summary>
         /// UI类型。
@@ -59,10 +63,15 @@ namespace GameLogic
         /// </summary>
         public bool Visible
         {
-            get => gameObject.activeSelf;
+            get => gameObject != null && gameObject.activeSelf;
 
             set
             {
+                if (gameObject == null || _destroyStarted)
+                {
+                    return;
+                }
+
                 gameObject.SetActive(value);
                 OnSetVisible(value);
             }
@@ -163,13 +172,15 @@ namespace GameLogic
         /// <returns></returns>
         public bool CreateByPath(string resPath, UIBase parentUI, Transform parentTrans = null, bool visible = true)
         {
+            if (parentUI == null) throw new ArgumentNullException(nameof(parentUI));
+            parentUI.ThrowIfWidgetOwnerInvalid();
             GameObject goInst = UIModule.Resource.LoadGameObject(resPath, parent: parentTrans);
             if (goInst == null)
             {
                 return false;
             }
 
-            if (!Create(parentUI, goInst, visible))
+            if (!CreateOwned(parentUI, goInst, false, visible))
             {
                 return false;
             }
@@ -190,16 +201,39 @@ namespace GameLogic
         /// <returns>是否创建成功。</returns>
         public bool CreateByPrefab(UIBase parentUI, GameObject goPrefab, Transform parentTrans, bool visible = true)
         {
+            if (parentUI == null) throw new ArgumentNullException(nameof(parentUI));
+            parentUI.ThrowIfWidgetOwnerInvalid();
             if (parentTrans == null)
             {
                 parentTrans = parentUI.rectTransform;
             }
 
-            return CreateImp(parentUI, Object.Instantiate(goPrefab, parentTrans), true, visible);
+            return CreateOwned(parentUI, Object.Instantiate(goPrefab, parentTrans), true, visible);
+        }
+
+        private bool CreateOwned(UIBase parentUI, GameObject instance, bool bindGo, bool visible)
+        {
+            bool created = false;
+            try
+            {
+                created = CreateImp(parentUI, instance, bindGo, visible);
+                return created;
+            }
+            finally
+            {
+                if (!created && instance != null)
+                    Object.Destroy(instance);
+            }
         }
 
         private bool CreateImp(UIBase parentUI, GameObject widgetRoot, bool bindGo, bool visible = true)
         {
+            if (!ModuleSystem.IsRunning || parentUI == null || parentUI.IsLifecycleInvalid)
+            {
+                throw new ObjectDisposedException(parentUI?.GetType().Name ?? nameof(UIBase),
+                    "The UI owner is closing and cannot create a widget.");
+            }
+
             if (!CreateBase(widgetRoot, bindGo))
             {
                 return false;
@@ -209,27 +243,44 @@ namespace GameLogic
             _parent = parentUI;
             Parent.ListChild.Add(this);
             Parent.SetUpdateDirty();
-            Inject();
-            ScriptGenerator();
-            BindMemberProperty();
-            RegisterEvent();
-            OnCreate();
-            OnRefresh();
-            IsPrepare = true;
+            try
+            {
+                Inject();
+                ScriptGenerator();
+                BindMemberProperty();
+                RegisterEvent();
+                OnCreate();
+                OnRefresh();
+                IsPrepare = true;
 
-            if (!visible)
-            {
-                gameObject.SetActive(false);
-            }
-            else
-            {
-                if (!gameObject.activeSelf)
+                if (!visible)
                 {
-                    gameObject.SetActive(true);
+                    gameObject.SetActive(false);
                 }
-            }
+                else
+                {
+                    if (!gameObject.activeSelf)
+                    {
+                        gameObject.SetActive(true);
+                    }
+                }
 
-            return true;
+                return true;
+            }
+            catch
+            {
+                try
+                {
+                    _parent?.ListChild.Remove(this);
+                    InternalDestroy();
+                }
+                catch (Exception cleanupException)
+                {
+                    Log.Warning($"UI widget '{GetType().Name}' cleanup after create failure raised an exception: {cleanupException}");
+                }
+
+                throw;
+            }
         }
 
         protected bool CreateBase(GameObject go, bool bindGo)
@@ -281,19 +332,81 @@ namespace GameLogic
         /// </summary>
         protected internal void OnDestroyWidget()
         {
-            Parent?.SetUpdateDirty();
-            
-            RemoveAllUIEvent();
+            InternalDestroy();
+        }
 
-            foreach (var uiChild in ListChild)
+        internal void InternalDestroy()
+        {
+            if (_destroyStarted)
             {
-                uiChild.OnDestroy();
-                uiChild.OnDestroyWidget();
+                return;
             }
 
-            if (gameObject != null)
+            _destroyStarted = true;
+            BlockUIEvents();
+            Parent?.SetUpdateDirty();
+
+            Exception firstException = null;
+            try
             {
-                Object.Destroy(gameObject);
+                try
+                {
+                    RemoveAllUIEvent();
+                }
+                catch (Exception exception)
+                {
+                    firstException = exception;
+                }
+
+                List<UIWidget> children = new List<UIWidget>(ListChild);
+                ListChild.Clear();
+                for (int i = children.Count - 1; i >= 0; i--)
+                {
+                    try
+                    {
+                        children[i]?.InternalDestroy();
+                    }
+                    catch (Exception exception)
+                    {
+                        firstException ??= exception;
+                    }
+                }
+
+                try
+                {
+                    OnDestroy();
+                }
+                catch (Exception exception)
+                {
+                    firstException ??= exception;
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (gameObject != null)
+                    {
+                        Object.Destroy(gameObject);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    firstException ??= exception;
+                }
+                finally
+                {
+                    IsPrepare = false;
+                    _parent = null;
+                    gameObject = null;
+                    transform = null;
+                    rectTransform = null;
+                }
+            }
+
+            if (firstException != null)
+            {
+                throw firstException;
             }
         }
 
@@ -305,9 +418,9 @@ namespace GameLogic
             if (_parent != null)
             {
                 _parent.ListChild.Remove(this);
-                OnDestroy();
-                OnDestroyWidget();
             }
+
+            InternalDestroy();
         }
 
         #endregion

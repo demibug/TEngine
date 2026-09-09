@@ -54,6 +54,11 @@ namespace TEngine
         /// </summary>
         public async UniTaskVoid StartProcedure()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             if (_procedureModule == null)
             {
                 _procedureModule = ModuleSystem.GetModule<IProcedureModule>();
@@ -97,6 +102,11 @@ namespace TEngine
             _procedureModule.Initialize(ModuleSystem.GetModule<IFsmModule>(), procedures);
 
             await UniTask.Yield();
+
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
 
             _procedureModule.StartProcedure(_entranceProcedure.GetType());
         }

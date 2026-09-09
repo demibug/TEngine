@@ -21,6 +21,9 @@ namespace GameLogic
 
         public static void Configure(IFguiResourceProvider resources, FguiPackageCatalog catalog)
         {
+            if (!ModuleSystem.IsRunning)
+                throw new ObjectDisposedException(nameof(FguiExternalLoader), "FairyGUI external loader cannot be configured while the module system is not running.");
+
             _resources = resources ?? throw new ArgumentNullException(nameof(resources));
             _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
             UIObjectFactory.SetLoaderExtension(typeof(FguiExternalLoader));
@@ -37,10 +40,13 @@ namespace GameLogic
         {
             CancelCurrentLoad();
             int generation = ++_generation;
+            if (!ModuleSystem.IsRunning)
+                return;
+
             string requestedUrl = url;
             if (!requestedUrl.StartsWith("asset://", StringComparison.Ordinal))
             {
-                Log.Warning($"Unsupported FairyGUI external URL '{requestedUrl}'. Only asset:// is allowed.");
+                LogWarningSafely($"Unsupported FairyGUI external URL '{requestedUrl}'. Only asset:// is allowed.");
                 onExternalLoadFailed();
                 return;
             }
@@ -49,7 +55,7 @@ namespace GameLogic
             if (_catalog == null || _resources == null || !_catalog.TryGetExternal(key, out FguiExternalAsset asset) ||
                 asset.Kind != FguiAssetKind.Texture2D)
             {
-                Log.Warning($"FairyGUI external texture '{key}' is missing from the catalog.");
+                LogWarningSafely($"FairyGUI external texture '{key}' is missing from the catalog.");
                 onExternalLoadFailed();
                 return;
             }
@@ -85,7 +91,7 @@ namespace GameLogic
                     try { lease.Dispose(); }
                     catch (Exception exception)
                     {
-                        Log.Warning($"Failed to release FairyGUI external texture lease: {exception}");
+                        LogWarningSafely($"Failed to release FairyGUI external texture lease: {exception}");
                     }
                 }
                 _leases.Clear();
@@ -100,7 +106,8 @@ namespace GameLogic
             {
                 lease = await _resources.LoadAsync(asset.Address, typeof(Texture2D), asset.YooAssetPackageName,
                     cancellationToken);
-                if (generation != _generation || url != requestedUrl || isDisposed || cancellationToken.IsCancellationRequested)
+                if (!ModuleSystem.IsRunning || generation != _generation || url != requestedUrl || isDisposed ||
+                    cancellationToken.IsCancellationRequested)
                     return;
 
                 var texture = new NTexture((Texture2D)lease.Asset) { destroyMethod = DestroyMethod.None };
@@ -111,25 +118,51 @@ namespace GameLogic
             catch (OperationCanceledException) { }
             catch (Exception exception)
             {
-                if (generation == _generation && url == requestedUrl && !isDisposed)
+                if (ModuleSystem.IsRunning && generation == _generation && url == requestedUrl && !isDisposed)
                 {
-                    Log.Warning($"Failed to load FairyGUI external texture '{requestedUrl}': {exception}");
+                    LogWarningSafely($"Failed to load FairyGUI external texture '{requestedUrl}': {exception}");
                     onExternalLoadFailed();
                 }
             }
             finally
             {
-                lease?.Dispose();
+                try
+                {
+                    lease?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"Failed to release late FairyGUI external texture lease: {exception}");
+                }
             }
         }
 
         private void CancelCurrentLoad()
         {
-            if (_loadCts == null)
-                return;
-            _loadCts.Cancel();
-            _loadCts.Dispose();
+            CancellationTokenSource loadCts = _loadCts;
             _loadCts = null;
+            if (loadCts == null)
+                return;
+
+            try
+            {
+                loadCts.Cancel();
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"Failed to cancel FairyGUI external texture load: {exception}");
+            }
+            finally
+            {
+                try { loadCts.Dispose(); }
+                catch (Exception exception) { LogWarningSafely($"Failed to dispose FairyGUI external texture load: {exception}"); }
+            }
+        }
+
+        private static void LogWarningSafely(string message)
+        {
+            try { Log.Warning(message); }
+            catch { }
         }
     }
 }

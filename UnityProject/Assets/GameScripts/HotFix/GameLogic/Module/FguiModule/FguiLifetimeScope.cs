@@ -90,17 +90,23 @@ namespace GameLogic
             _disposed = true;
 
             try { _cancellation.Cancel(); }
-            catch (Exception exception) { Log.Warning($"FairyGUI lifetime cancellation failed: {exception}"); }
+            catch (Exception exception) { LogWarningSafely($"FairyGUI lifetime cancellation failed: {exception}"); }
 
             for (int i = _cleanup.Count - 1; i >= 0; i--)
             {
                 try { _cleanup[i](); }
-                catch (Exception exception) { Log.Warning($"FairyGUI lifetime cleanup failed: {exception}"); }
+                catch (Exception exception) { LogWarningSafely($"FairyGUI lifetime cleanup failed: {exception}"); }
             }
             _cleanup.Clear();
             try { _events.Clear(); }
-            catch (Exception exception) { Log.Warning($"FairyGUI event cleanup failed: {exception}"); }
+            catch (Exception exception) { LogWarningSafely($"FairyGUI event cleanup failed: {exception}"); }
             finally { _cancellation.Dispose(); }
+        }
+
+        private static void LogWarningSafely(string message)
+        {
+            try { Log.Warning(message); }
+            catch { }
         }
 
         private void ThrowIfDisposed()

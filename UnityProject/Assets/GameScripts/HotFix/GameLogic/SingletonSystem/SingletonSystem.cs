@@ -55,6 +55,14 @@ namespace GameLogic
     }
 
     /// <summary>
+    /// 让统一关闭器在 Unity 延迟 Destroy 之前摘除 MonoBehaviour 单例的静态引用。
+    /// </summary>
+    internal interface ISingletonInstanceResetter
+    {
+        void ClearInstanceForShutdown();
+    }
+
+    /// <summary>
     /// 框架中的全局对象与Unity场景依赖相关的DontDestroyOnLoad需要统一管理，方便重启游戏时清除工作
     /// </summary>
     public static class SingletonSystem
@@ -70,10 +78,69 @@ namespace GameLogic
 #endif
         
         private static readonly Dictionary<string, GameObject> _gameObjects = new Dictionary<string, GameObject>();
+        private static readonly Dictionary<string, object> _gameObjectOwners = new Dictionary<string, object>();
+        private static readonly List<Action> _sessionResetters = new List<Action>();
+        private static readonly HashSet<Action> _sessionResetterSet = new HashSet<Action>();
+        private static bool _isReleasing;
+        private static bool _shutdownHookRegistered;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetForNewSession()
+        {
+            var resetterSnapshot = new List<Action>(_sessionResetters);
+            foreach (Action resetter in resetterSnapshot)
+            {
+                try
+                {
+                    resetter();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Singleton session reset failed: {0}", exception);
+                }
+            }
+
+            _sessionResetters.Clear();
+            _sessionResetterSet.Clear();
+            _gameObjects.Clear();
+            _gameObjectOwners.Clear();
+            _singletons.Clear();
+            _updates.Clear();
+            _fixedUpdates.Clear();
+            _lateUpdates.Clear();
+#if UNITY_EDITOR
+            _drawGizmos.Clear();
+            _drawGizmosSelecteds.Clear();
+#endif
+            _updateDriver = null;
+            _isInit = false;
+            _isReleasing = false;
+            _shutdownHookRegistered = false;
+        }
+
+        internal static void RegisterSessionResetter(Action resetter)
+        {
+            if (resetter != null && _sessionResetterSet.Add(resetter))
+            {
+                _sessionResetters.Add(resetter);
+            }
+        }
 
         public static void Retain(ISingleton singleton)
         {
+            EnsureCanRegister();
+            if (singleton == null)
+            {
+                throw new GameFrameworkException("Singleton is invalid.");
+            }
+
             CheckInit();
+            EnsureShutdownHook();
+
+            if (_singletons.Contains(singleton))
+            {
+                return;
+            }
 
             _singletons.Add(singleton);
 
@@ -82,10 +149,18 @@ namespace GameLogic
 
         public static void Retain(GameObject go, object singleton)
         {
+            EnsureCanRegister();
+            if (go == null || singleton == null)
+            {
+                throw new GameFrameworkException("Singleton GameObject or instance is invalid.");
+            }
+
             CheckInit();
+            EnsureShutdownHook();
 
             if (_gameObjects.TryAdd(go.name, go))
             {
+                _gameObjectOwners[go.name] = singleton;
                 if (Application.isPlaying)
                 {
                     Object.DontDestroyOnLoad(go);
@@ -137,11 +212,26 @@ namespace GameLogic
 
         public static void Release(GameObject go, object singleton)
         {
-            if (_gameObjects != null && _gameObjects.ContainsKey(go.name))
+            if (go == null || _gameObjects == null)
             {
-                _gameObjects.Remove(go.name);
-                Object.Destroy(go);
+                return;
+            }
+
+            string name = go.name;
+            if (_gameObjects.TryGetValue(name, out GameObject registered) &&
+                ReferenceEquals(registered, go))
+            {
+                _gameObjects.Remove(name);
+                _gameObjectOwners.Remove(name);
                 ReleaseLifeCycle(singleton);
+                try
+                {
+                    Object.Destroy(go);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Singleton GameObject destroy failed: {0}", exception);
+                }
             }
         }
 
@@ -211,40 +301,136 @@ namespace GameLogic
 
         public static void Release()
         {
-            if (_gameObjects != null)
+            if (_isReleasing)
             {
-                var gameObjectSnapshot = new List<GameObject>(_gameObjects.Values);
-                foreach (var gameObject in gameObjectSnapshot)
+                return;
+            }
+
+            _isReleasing = true;
+            try
+            {
+                var gameObjectSnapshot = new List<KeyValuePair<GameObject, object>>(_gameObjectOwners.Count);
+                foreach (KeyValuePair<string, GameObject> pair in _gameObjects)
                 {
-                    if (gameObject != null)
-                    {
-                        Object.Destroy(gameObject);
-                    }
+                    _gameObjectOwners.TryGetValue(pair.Key, out object owner);
+                    gameObjectSnapshot.Add(new KeyValuePair<GameObject, object>(pair.Value, owner));
                 }
 
                 _gameObjects.Clear();
-            }
+                _gameObjectOwners.Clear();
+                _updates.Clear();
+                _fixedUpdates.Clear();
+                _lateUpdates.Clear();
+#if UNITY_EDITOR
+                _drawGizmos.Clear();
+                _drawGizmosSelecteds.Clear();
+#endif
 
-            if (_singletons != null)
-            {
-                var singletonSnapshot = new List<ISingleton>(_singletons);
-                for (int i = singletonSnapshot.Count - 1; i >= 0; i--)
+                foreach (KeyValuePair<GameObject, object> entry in gameObjectSnapshot)
                 {
-                    singletonSnapshot[i]?.Release();
+                    ClearInstanceReference(entry.Value);
+                    if (entry.Key == null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        Object.Destroy(entry.Key);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("Singleton GameObject destroy failed: {0}", exception);
+                    }
                 }
 
+                var singletonSnapshot = new List<ISingleton>(_singletons);
                 _singletons.Clear();
+                for (int i = singletonSnapshot.Count - 1; i >= 0; i--)
+                {
+                    ISingleton singleton = singletonSnapshot[i];
+                    if (singleton == null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        singleton.Release();
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("Singleton release failed: {0}", exception);
+                    }
+                    finally
+                    {
+                        ClearInstanceReference(singleton);
+                    }
+                }
+
+                DeInit();
+                try
+                {
+                    Resources.UnloadUnusedAssets();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Singleton resource unload failed: {0}", exception);
+                }
+            }
+            finally
+            {
+                _gameObjects.Clear();
+                _gameObjectOwners.Clear();
+                _singletons.Clear();
+                _updates.Clear();
+                _fixedUpdates.Clear();
+                _lateUpdates.Clear();
+#if UNITY_EDITOR
+                _drawGizmos.Clear();
+                _drawGizmosSelecteds.Clear();
+#endif
+                _sessionResetters.Clear();
+                _sessionResetterSet.Clear();
+                RootModule.BeforeShutdown -= Release;
+                _shutdownHookRegistered = false;
+                DeInit();
+                _isReleasing = false;
+            }
+        }
+
+        private static void EnsureCanRegister()
+        {
+            if (!ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("Can not register a singleton while the module system is shutting down.");
+            }
+        }
+
+        private static void EnsureShutdownHook()
+        {
+            if (_shutdownHookRegistered || !ModuleSystem.IsRunning)
+            {
+                return;
             }
 
-            _updates.Clear();
-            _fixedUpdates.Clear();
-            _lateUpdates.Clear();
-#if UNITY_EDITOR
-            _drawGizmos.Clear();
-            _drawGizmosSelecteds.Clear();
-#endif
-            DeInit();
-            Resources.UnloadUnusedAssets();
+            RootModule.BeforeShutdown += Release;
+            _shutdownHookRegistered = true;
+        }
+
+        private static void ClearInstanceReference(object singleton)
+        {
+            if (singleton is ISingletonInstanceResetter resetter)
+            {
+                try
+                {
+                    resetter.ClearInstanceForShutdown();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Singleton static reference cleanup failed: {0}", exception);
+                }
+            }
         }
 
         public static GameObject GetGameObject(string name)
@@ -270,6 +456,11 @@ namespace GameLogic
 
         public static void Restart()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("Can not restart while the module system is shutting down.");
+            }
+
             if (Camera.main != null)
             {
                 Camera.main.gameObject.SetActive(false);
@@ -302,17 +493,65 @@ namespace GameLogic
             {
                 return;
             }
-            
-            _isInit = true;
 
-            _updateDriver ??= ModuleSystem.GetModule<IUpdateDriver>();
-            _updateDriver.AddUpdateListener(OnUpdate);
-            _updateDriver.AddFixedUpdateListener(OnFixedUpdate);
-            _updateDriver.AddLateUpdateListener(OnLateUpdate);
+            IUpdateDriver updateDriver = null;
+            bool updateAdded = false;
+            bool fixedUpdateAdded = false;
+            bool lateUpdateAdded = false;
 #if UNITY_EDITOR
-            _updateDriver.AddOnDrawGizmosListener(OnDrawGizmos);
-            _updateDriver.AddOnDrawGizmosSelectedListener(OnDrawGizmosSelected);
+            bool drawGizmosAdded = false;
+            bool drawGizmosSelectedAdded = false;
 #endif
+
+            try
+            {
+                updateDriver = _updateDriver ?? ModuleSystem.GetModule<IUpdateDriver>();
+                updateDriver.AddUpdateListener(OnUpdate);
+                updateAdded = true;
+                updateDriver.AddFixedUpdateListener(OnFixedUpdate);
+                fixedUpdateAdded = true;
+                updateDriver.AddLateUpdateListener(OnLateUpdate);
+                lateUpdateAdded = true;
+#if UNITY_EDITOR
+                updateDriver.AddOnDrawGizmosListener(OnDrawGizmos);
+                drawGizmosAdded = true;
+                updateDriver.AddOnDrawGizmosSelectedListener(OnDrawGizmosSelected);
+                drawGizmosSelectedAdded = true;
+#endif
+                _updateDriver = updateDriver;
+                _isInit = true;
+            }
+            catch
+            {
+                if (updateAdded)
+                {
+                    try { updateDriver.RemoveUpdateListener(OnUpdate); } catch (Exception exception) { LogErrorSafely("Singleton update listener rollback failed: {0}", exception); }
+                }
+
+                if (fixedUpdateAdded)
+                {
+                    try { updateDriver.RemoveFixedUpdateListener(OnFixedUpdate); } catch (Exception exception) { LogErrorSafely("Singleton fixed listener rollback failed: {0}", exception); }
+                }
+
+                if (lateUpdateAdded)
+                {
+                    try { updateDriver.RemoveLateUpdateListener(OnLateUpdate); } catch (Exception exception) { LogErrorSafely("Singleton late listener rollback failed: {0}", exception); }
+                }
+#if UNITY_EDITOR
+                if (drawGizmosAdded)
+                {
+                    try { updateDriver.RemoveOnDrawGizmosListener(OnDrawGizmos); } catch (Exception exception) { LogErrorSafely("Singleton gizmo listener rollback failed: {0}", exception); }
+                }
+
+                if (drawGizmosSelectedAdded)
+                {
+                    try { updateDriver.RemoveOnDrawGizmosSelectedListener(OnDrawGizmosSelected); } catch (Exception exception) { LogErrorSafely("Singleton selected gizmo listener rollback failed: {0}", exception); }
+                }
+#endif
+                _updateDriver = null;
+                _isInit = false;
+                throw;
+            }
         }
         
         private static void DeInit()
@@ -324,37 +563,136 @@ namespace GameLogic
 
             _isInit = false;
 
-            _updateDriver ??= ModuleSystem.GetModule<IUpdateDriver>();
-            _updateDriver.RemoveUpdateListener(OnUpdate);
-            _updateDriver.RemoveFixedUpdateListener(OnFixedUpdate);
-            _updateDriver.RemoveLateUpdateListener(OnLateUpdate);
+            IUpdateDriver updateDriver = _updateDriver ?? ModuleSystem.TryGetExistingModule<IUpdateDriver>();
+            if (updateDriver == null)
+            {
+                _updateDriver = null;
+                return;
+            }
+
+            try
+            {
+                updateDriver.RemoveUpdateListener(OnUpdate);
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("Singleton update listener removal failed: {0}", exception);
+            }
+
+            try
+            {
+                updateDriver.RemoveFixedUpdateListener(OnFixedUpdate);
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("Singleton fixed listener removal failed: {0}", exception);
+            }
+
+            try
+            {
+                updateDriver.RemoveLateUpdateListener(OnLateUpdate);
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("Singleton late listener removal failed: {0}", exception);
+            }
 #if UNITY_EDITOR
-            _updateDriver.RemoveOnDrawGizmosListener(OnDrawGizmos);
-            _updateDriver.RemoveOnDrawGizmosSelectedListener(OnDrawGizmosSelected);
+            try
+            {
+                updateDriver.RemoveOnDrawGizmosListener(OnDrawGizmos);
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("Singleton gizmo listener removal failed: {0}", exception);
+            }
+
+            try
+            {
+                updateDriver.RemoveOnDrawGizmosSelectedListener(OnDrawGizmosSelected);
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("Singleton selected gizmo listener removal failed: {0}", exception);
+            }
 #endif
+            _updateDriver = null;
         }
 
         private static void OnUpdate()
         {
-            foreach (var update in _updates)
+            if (!ModuleSystem.IsRunning)
             {
-                update.OnUpdate();
+                return;
+            }
+
+            var snapshot = new List<IUpdate>(_updates);
+            foreach (var update in snapshot)
+            {
+                if (!ModuleSystem.IsRunning)
+                {
+                    break;
+                }
+
+                try
+                {
+                    update.OnUpdate();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Singleton update failed: {0}", exception);
+                }
             }
         }
 
         private static void OnFixedUpdate()
         {
-            foreach (var fixedUpdate in _fixedUpdates)
+            if (!ModuleSystem.IsRunning)
             {
-                fixedUpdate.OnFixedUpdate();
+                return;
+            }
+
+            var snapshot = new List<IFixedUpdate>(_fixedUpdates);
+            foreach (var fixedUpdate in snapshot)
+            {
+                if (!ModuleSystem.IsRunning)
+                {
+                    break;
+                }
+
+                try
+                {
+                    fixedUpdate.OnFixedUpdate();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Singleton fixed update failed: {0}", exception);
+                }
             }
         }
 
         private static void OnLateUpdate()
         {
-            foreach (var lateUpdate in _lateUpdates)
+            if (!ModuleSystem.IsRunning)
             {
-                lateUpdate.OnLateUpdate();
+                return;
+            }
+
+            var snapshot = new List<ILateUpdate>(_lateUpdates);
+            foreach (var lateUpdate in snapshot)
+            {
+                if (!ModuleSystem.IsRunning)
+                {
+                    break;
+                }
+
+                try
+                {
+                    lateUpdate.OnLateUpdate();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Singleton late update failed: {0}", exception);
+                }
             }
         }
 
@@ -376,6 +714,12 @@ namespace GameLogic
                 drawGizmosSelected.OnDrawGizmosSelected();
             }
 #endif
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
         }
         #endregion
     }

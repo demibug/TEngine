@@ -65,6 +65,12 @@ namespace TEngine
         /// </summary>
         private void Awake()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
             _resourceModule = ModuleSystem.GetModule<IResourceModule>();
             if (_resourceModule == null)
             {
@@ -79,6 +85,11 @@ namespace TEngine
 
         private void Start()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             RootModule rootModule = RootModule.Instance;
             if (rootModule == null)
             {
@@ -94,6 +105,11 @@ namespace TEngine
 
         private async UniTask<bool> AsyncInit()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return false;
+            }
+
             if (string.IsNullOrEmpty(_defaultLanguage))
             {
                 Log.Fatal($"Must set defaultLanguage.");
@@ -123,6 +139,11 @@ namespace TEngine
         /// </summary>
         public async UniTask LoadLanguageTotalAsset(string assetName)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
 #if UNITY_EDITOR
             if (!useRuntimeModule)
             {
@@ -131,6 +152,11 @@ namespace TEngine
             }
 #endif
             TextAsset assetTextAsset = await _resourceModule.LoadAssetAsync<TextAsset>(assetName);
+
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
 
             if (assetTextAsset == null)
             {
@@ -151,6 +177,11 @@ namespace TEngine
         /// <param name="fromInit">是否初始化Inner语言。</param>
         public async UniTask LoadLanguage(string language, bool setCurrent = false, bool fromInit = false)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
 #if UNITY_EDITOR
             if (!useRuntimeModule)
             {
@@ -165,6 +196,10 @@ namespace TEngine
                 var assetName = GetLanguageAssetName(language);
 
                 assetTextAsset = await _resourceModule.LoadAssetAsync<TextAsset>(assetName);
+                if (!ModuleSystem.IsRunning)
+                {
+                    return;
+                }
             }
             else
             {
@@ -240,6 +275,11 @@ namespace TEngine
         /// <returns></returns>
         public bool SetLanguage(string language, bool load = false)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return false;
+            }
+
             if (!CheckLanguage(language))
             {
                 if (load)
@@ -270,6 +310,11 @@ namespace TEngine
         /// <returns>是否设置成功。</returns>
         public bool SetLanguage(int languageId)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return false;
+            }
+
             if (languageId < 0 || languageId >= allLanguage.Count)
             {
                 Log.Warning($"Error languageIndex. Could not set and check {languageId}  Language.Count = {allLanguage.Count}.");
@@ -299,6 +344,11 @@ namespace TEngine
         /// <returns>返回资源实例。</returns>
         public T LoadFromBundle<T>(string path) where T : Object
         {
+            if (!ModuleSystem.IsRunning || _resourceModule == null)
+            {
+                return null;
+            }
+
             var assetObject = _resourceModule.LoadAsset<T>(path);
             if (assetObject != null)
             {

@@ -20,6 +20,7 @@ namespace GameLogic
         private Camera _uiCamera = null;                        // UI专用摄像机
         private readonly List<UIWindow> _uiStack = new List<UIWindow>(128); // 窗口堆栈
         private ErrorLogger _errorLogger;                       // 错误日志记录器
+        private bool _shuttingDown;
 
         // 常量定义
         public const int LAYER_DEEP = 2000; 
@@ -29,6 +30,17 @@ namespace GameLogic
 
         // 资源加载接口
         public static IUIResourceLoader Resource;
+
+        // Tests may shorten this value through the internal test hook; production keeps the
+        // historical sixty-second creation budget.
+        internal static float CreationTimeoutSeconds = 60f;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetForNewSession()
+        {
+            _instanceRoot = null;
+            Resource = null;
+        }
         
         /// <summary>
         /// UI根节点访问属性
@@ -48,6 +60,7 @@ namespace GameLogic
         /// </summary>
         protected override void OnInit()
         {
+            _shuttingDown = false;
             var uiRoot = GameObject.Find("UIRoot");
             if (uiRoot != null)
             {
@@ -101,15 +114,44 @@ namespace GameLogic
         /// </summary>
         protected override void OnRelease()
         {
-            if (_errorLogger != null)
+            _shuttingDown = true;
+            try
             {
-                _errorLogger.Dispose();
+                if (_errorLogger != null)
+                {
+                    _errorLogger.Dispose();
+                }
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("UI error logger shutdown failed: {0}", exception);
+            }
+            finally
+            {
                 _errorLogger = null;
             }
-            CloseAll(isShutDown:true);
-            if (_instanceRoot != null && _instanceRoot.parent != null)
+
+            try
             {
-                UnityEngine.Object.Destroy(_instanceRoot.parent.gameObject);
+                CloseAll(isShutDown: true);
+            }
+            finally
+            {
+                try
+                {
+                    if (_instanceRoot != null && _instanceRoot.parent != null)
+                    {
+                        UnityEngine.Object.Destroy(_instanceRoot.parent.gameObject);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("UI root shutdown failed: {0}", exception);
+                }
+
+                Resource = null;
+                _instanceRoot = null;
+                _uiCamera = null;
             }
         }
 
@@ -215,7 +257,7 @@ namespace GameLogic
             for (int i = 0; i < _uiStack.Count; i++)
             {
                 var window = _uiStack[i];
-                if (window.IsLoadDone == false)
+                if (window.IsLoading)
                     return true;
             }
 
@@ -249,7 +291,12 @@ namespace GameLogic
         /// <returns>打开窗口操作句柄。</returns>
         public void ShowUIAsync<T>(params System.Object[] userDatas) where T : UIWindow , new()
         {
-            ShowUIImp<T>(true, userDatas);
+            if (!CanOpenWindows())
+            {
+                return;
+            }
+
+            ShowUIAsyncImp(typeof(T), userDatas).Forget(HandleFireAndForgetException);
         }
 
         /// <summary>
@@ -260,7 +307,12 @@ namespace GameLogic
         /// <returns>打开窗口操作句柄。</returns>
         public void ShowUIAsync(Type type, params System.Object[] userDatas)
         {
-            ShowUIImp(type, true, userDatas);
+            if (!CanOpenWindows())
+            {
+                return;
+            }
+
+            ShowUIAsyncImp(type, userDatas).Forget(HandleFireAndForgetException);
         }
 
         /// <summary>
@@ -271,6 +323,7 @@ namespace GameLogic
         /// <returns>打开窗口操作句柄。</returns>
         public void ShowUI<T>(params System.Object[] userDatas) where T : UIWindow , new()
         {
+            EnsureCanOpenWindows();
             ShowUIImp<T>(false, userDatas);
         }
         
@@ -281,7 +334,8 @@ namespace GameLogic
         /// <returns>打开窗口操作句柄。</returns>
         public async UniTask<T> ShowUIAsyncAwait<T>(params System.Object[] userDatas) where T : UIWindow , new()
         {
-            return await ShowUIAwaitImp<T>(true, userDatas) as T;
+            EnsureCanOpenWindows();
+            return await ShowUIAsyncImp(typeof(T), userDatas) as T;
         }
 
         /// <summary>
@@ -292,75 +346,233 @@ namespace GameLogic
         /// <returns>打开窗口操作句柄。</returns>
         public void ShowUI(Type type, params System.Object[] userDatas)
         {
+            EnsureCanOpenWindows();
             ShowUIImp(type, false, userDatas);
         }
 
         private void ShowUIImp(Type type, bool isAsync, params System.Object[] userDatas)
         {
-            string windowName = type.FullName;
-
-            if (!TryGetWindow(windowName, out UIWindow window, userDatas))
+            EnsureCanOpenWindows();
+            if (isAsync)
             {
-                window = CreateInstance(type);
-                Push(window); //首次压入
-                window.InternalLoad(window.AssetName, OnWindowPrepare, isAsync, userDatas).Forget();
+                ShowUIAsyncImp(type, userDatas).Forget(HandleFireAndForgetException);
+                return;
             }
+
+            ShowUISyncImp(type, userDatas);
         }
         
         private void ShowUIImp<T>(bool isAsync, params System.Object[] userDatas) where T : UIWindow , new()
         {
-            Type type = typeof(T);
-            string windowName = type.FullName;
-
-            if (!TryGetWindow(windowName, out UIWindow window, userDatas))
+            EnsureCanOpenWindows();
+            if (isAsync)
             {
-                window = CreateInstance<T>();
-                Push(window); //首次压入
-                window.InternalLoad(window.AssetName, OnWindowPrepare, isAsync, userDatas).Forget();
+                ShowUIAsyncImp(typeof(T), userDatas).Forget(HandleFireAndForgetException);
+                return;
             }
+
+            ShowUISyncImp(typeof(T), userDatas);
         }
 
-        private bool TryGetWindow(string windowName,out UIWindow window, params System.Object[] userDatas)
+        private void ShowUISyncImp(Type type, params System.Object[] userDatas)
         {
-            window = null;
-            if (IsContains(windowName))
+            EnsureCanOpenWindows();
+            UIWindow window = GetWindow(type.FullName);
+            if (window != null)
             {
-                window = GetWindow(windowName);
-                Pop(window); //弹出窗口
-                Push(window); //重新压入
-                window.TryInvoke(OnWindowPrepare, userDatas);
-                
-                return true;
-            }
-            return false;
-        }
-        
-        private async UniTask<T> ShowUIAwaitImp<T>(bool isAsync, params System.Object[] userDatas) where T : UIWindow , new()
-        {
-            Type type = typeof(T);
-            string windowName = type.FullName;
-
-            if (TryGetWindow(windowName, out UIWindow window, userDatas))
-            {
-                return window as T;
-            }
-            else
-            {
-                window = CreateInstance<T>();
-                Push(window); //首次压入
-                window.InternalLoad(window.AssetName, OnWindowPrepare, isAsync, userDatas).Forget();
-                float time = 0f;
-                while (!window.IsLoadDone)
+                if (window.IsLoading)
                 {
-                    time += Time.deltaTime;
-                    if (time > 60f)
-                    {
-                        break;
-                    }
-                    await UniTask.Yield();
+                    throw new GameFrameworkException(
+                        $"Cannot synchronously show UI window '{type.FullName}' while it is loading.");
                 }
-                return window as T;
+
+                if (!window.IsReady)
+                {
+                    CloseWindow(window);
+                    window = null;
+                }
+                else
+                {
+                    window.InternalSetUserDatas(userDatas);
+                    BringWindowToFront(window);
+                    try
+                    {
+                        OnWindowPrepare(window);
+                        EnsureCurrentReady(window);
+                    }
+                    catch (Exception exception)
+                    {
+                        Exception failure = NormalizeWindowException(window, "prepare", exception);
+                        if (!IsExpectedWindowCancellation(window, exception))
+                        {
+                            FailAndClose(window, failure);
+                            throw failure;
+                        }
+
+                        throw;
+                    }
+                    return;
+                }
             }
+
+            window = CreateInstance(type);
+            Push(window);
+            window.InternalSetUserDatas(userDatas);
+            try
+            {
+                window.InternalLoadSync(window.AssetName, OnWindowPrepare);
+                EnsureCurrentReady(window);
+            }
+            catch (Exception exception)
+            {
+                Exception failure = NormalizeWindowException(window, "create", exception);
+                if (!IsExpectedWindowCancellation(window, exception))
+                {
+                    FailAndClose(window, failure);
+                    throw failure;
+                }
+
+                throw;
+            }
+        }
+
+        private async UniTask<UIWindow> ShowUIAsyncImp(Type type, params System.Object[] userDatas)
+        {
+            EnsureCanOpenWindows();
+            if (type == null)
+            {
+                throw new ArgumentNullException(nameof(type));
+            }
+
+            UIWindow window = GetWindow(type.FullName);
+            if (window != null)
+            {
+                if (window.IsLoading)
+                {
+                    window.InternalSetUserDatas(userDatas);
+                    return await WaitForReady(window);
+                }
+
+                if (window.IsReady)
+                {
+                    window.InternalSetUserDatas(userDatas);
+                    try
+                    {
+                        BringWindowToFront(window);
+                        OnWindowPrepare(window);
+                        EnsureCurrentReady(window);
+                        return window;
+                    }
+                    catch (Exception exception)
+                    {
+                        if (IsExpectedWindowCancellation(window, exception))
+                        {
+                            throw;
+                        }
+
+                        Exception failure = NormalizeWindowException(window, "prepare", exception);
+                        FailAndClose(window, failure);
+                        throw failure;
+                    }
+                }
+
+                CloseWindow(window);
+            }
+
+            window = CreateInstance(type);
+            Push(window);
+            window.InternalSetUserDatas(userDatas);
+            StartAsyncLoad(window);
+            return await WaitForReady(window);
+        }
+
+        private async UniTask<UIWindow> WaitForReady(UIWindow window)
+        {
+            UIWindow result = await window.CompletionTask;
+            EnsureCurrentReady(window);
+            return result;
+        }
+
+        private void StartAsyncLoad(UIWindow window)
+        {
+            LoadWindowAsync(window).Forget(exception => HandleWindowLoadFailure(window, exception));
+        }
+
+        private async UniTask LoadWindowAsync(UIWindow window)
+        {
+            await window.InternalLoadAsync(window.AssetName, OnWindowPrepare);
+        }
+
+        private void HandleWindowLoadFailure(UIWindow window, Exception exception)
+        {
+            if (window == null || !IsCurrentWindow(window) || IsExpectedWindowCancellation(window, exception))
+            {
+                return;
+            }
+
+            Exception failure = NormalizeWindowException(window, "create", exception);
+            FailAndClose(window, failure);
+        }
+
+        private void HandleFireAndForgetException(Exception exception)
+        {
+            if (exception is OperationCanceledException)
+            {
+                return;
+            }
+
+            Log.Error($"UGUI window show failed: {exception}");
+        }
+
+        private void FailAndClose(UIWindow window, Exception exception)
+        {
+            if (window == null || !IsCurrentWindow(window))
+            {
+                return;
+            }
+
+            window.RecordFailure(exception);
+            CloseWindow(window);
+        }
+
+        private static Exception NormalizeWindowException(UIWindow window, string stage, Exception exception)
+        {
+            if (exception is UIWindowLoadException || exception is UIWindowTimeoutException)
+            {
+                return exception;
+            }
+
+            if (exception is OperationCanceledException && window.IsClosingOrDestroyed)
+            {
+                return exception;
+            }
+
+            return new UIWindowLoadException(stage, window.WindowName,
+                $"Failed to {stage} UGUI window '{window.WindowName}'.", exception);
+        }
+
+        private static bool IsExpectedWindowCancellation(UIWindow window, Exception exception)
+        {
+            return exception is OperationCanceledException && window.IsClosingOrDestroyed;
+        }
+
+        private void EnsureCurrentReady(UIWindow window)
+        {
+            if (!IsCurrentWindow(window) || !window.IsReady || window.IsDestroyed)
+            {
+                throw new OperationCanceledException();
+            }
+        }
+
+        private void BringWindowToFront(UIWindow window)
+        {
+            if (!IsCurrentWindow(window))
+            {
+                throw new OperationCanceledException();
+            }
+
+            Pop(window);
+            Push(window);
         }
 
         /// <summary>
@@ -374,15 +586,12 @@ namespace GameLogic
 
         public void CloseUI(Type type)
         {
-            string windowName = type.FullName;
-            UIWindow window = GetWindow(windowName);
-            if (window == null)
+            if (type == null)
+            {
                 return;
+            }
 
-            window.InternalDestroy();
-            Pop(window);
-            OnSortWindowDepth(window.WindowLayer);
-            OnSetWindowVisible();
+            CloseWindow(GetWindow(type.FullName));
         }
         
         public void HideUI<T>() where T : UIWindow
@@ -392,8 +601,12 @@ namespace GameLogic
 
         public void HideUI(Type type)
         {
-            string windowName = type.FullName;
-            UIWindow window = GetWindow(windowName);
+            if (type == null)
+            {
+                return;
+            }
+
+            UIWindow window = GetWindow(type.FullName);
             if (window == null)
             {
                 return;
@@ -401,21 +614,31 @@ namespace GameLogic
 
             if (window.HideTimeToClose <= 0)
             {
-                CloseUI(type);
+                CloseWindow(window);
                 return;
             }
 
             window.CancelHideToCloseTimer();
             window.Visible = false;
             window.IsHide = true;
-            window.HideTimerId = GameModule.Timer.AddTimer((arg) =>
+            if (!IsCurrentWindow(window))
             {
-                CloseUI(type);
-            },window.HideTimeToClose);
+                return;
+            }
+
+            ITimerModule timerModule = GameModule.Timer;
+            int timerId = timerModule.AddTimer((arg) =>
+            {
+                if (IsCurrentWindow(window))
+                {
+                    CloseWindow(window);
+                }
+            }, window.HideTimeToClose);
+            window.SetHideTimer(timerModule, timerId);
 
             if (window.FullScreen)
             {
-                OnSetWindowVisible();
+                SafeRefreshPresentation();
             }
         }
 
@@ -424,13 +647,32 @@ namespace GameLogic
         /// </summary>
         public void CloseAll(bool isShutDown = false)
         {
-            for (int i = 0; i < _uiStack.Count; i++)
+            UIWindow[] windows = _uiStack.ToArray();
+            _uiStack.Clear();
+            for (int i = 0; i < windows.Length; i++)
             {
-                UIWindow window = _uiStack[i];
-                window.InternalDestroy(isShutDown);
+                try
+                {
+                    windows[i]?.BeginClose();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"UI window close preparation failed: {exception}");
+                }
             }
 
-            _uiStack.Clear();
+            SafeRefreshPresentation();
+            for (int i = 0; i < windows.Length; i++)
+            {
+                try
+                {
+                    windows[i].InternalDestroy(isShutDown);
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"UI window '{windows[i]?.WindowName}' cleanup raised an exception: {exception}");
+                }
+            }
         }
 
         /// <summary>
@@ -438,16 +680,47 @@ namespace GameLogic
         /// </summary>
         public void CloseAllWithOut(UIWindow withOut)
         {
+            CloseWindowsExcept(window => window == withOut);
+        }
+
+        private void CloseWindowsExcept(Func<UIWindow, bool> keep)
+        {
+            var windows = new List<UIWindow>();
             for (int i = _uiStack.Count - 1; i >= 0; i--)
             {
                 UIWindow window = _uiStack[i];
-                if (window == withOut)
+                if (keep(window))
                 {
                     continue;
                 }
 
-                window.InternalDestroy();
                 _uiStack.RemoveAt(i);
+                windows.Add(window);
+            }
+
+            for (int i = 0; i < windows.Count; i++)
+            {
+                try
+                {
+                    windows[i]?.BeginClose();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"UI window close preparation failed: {exception}");
+                }
+            }
+
+            SafeRefreshPresentation();
+            for (int i = 0; i < windows.Count; i++)
+            {
+                try
+                {
+                    windows[i].InternalDestroy();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"UI window '{windows[i]?.WindowName}' cleanup raised an exception: {exception}");
+                }
             }
         }
 
@@ -456,35 +729,35 @@ namespace GameLogic
         /// </summary>
         public void CloseAllWithOut<T>() where T : UIWindow
         {
-            for (int i = _uiStack.Count - 1; i >= 0; i--)
-            {
-                UIWindow window = _uiStack[i];
-                if (window.GetType() == typeof(T))
-                {
-                    continue;
-                }
-
-                window.InternalDestroy();
-                _uiStack.RemoveAt(i);
-            }
+            CloseWindowsExcept(window => window.GetType() == typeof(T));
         }
 
         private void OnWindowPrepare(UIWindow window)
         {
-            window.InternalCreate();
+            EnsureCurrentWindow(window);
+            if (!window.IsCreated)
+            {
+                window.InternalCreate();
+            }
+            EnsureCurrentWindow(window);
             window.InternalRefresh();
+            EnsureCurrentWindow(window);
             OnSortWindowDepth(window.WindowLayer);
+            EnsureCurrentWindow(window);
             OnSetWindowVisible();
+            EnsureCurrentWindow(window);
         }
 
         private void OnSortWindowDepth(int layer)
         {
             int depth = layer * LAYER_DEEP;
-            for (int i = 0; i < _uiStack.Count; i++)
+            UIWindow[] windows = _uiStack.ToArray();
+            for (int i = 0; i < windows.Length; i++)
             {
-                if (_uiStack[i].WindowLayer == layer)
+                UIWindow window = windows[i];
+                if (IsCurrentWindow(window) && window.WindowLayer == layer)
                 {
-                    _uiStack[i].Depth = depth;
+                    window.Depth = depth;
                     depth += WINDOW_DEEP;
                 }
             }
@@ -493,9 +766,15 @@ namespace GameLogic
         private void OnSetWindowVisible()
         {
             bool isHideNext = false;
-            for (int i = _uiStack.Count - 1; i >= 0; i--)
+            UIWindow[] windows = _uiStack.ToArray();
+            for (int i = windows.Length - 1; i >= 0; i--)
             {
-                UIWindow window = _uiStack[i];
+                UIWindow window = windows[i];
+                if (!IsCurrentWindow(window))
+                {
+                    continue;
+                }
+
                 if (isHideNext == false)
                 {
                     if (window.IsHide)
@@ -503,20 +782,104 @@ namespace GameLogic
                         continue;
                     }
                     window.Visible = true;
-                    if (window.IsPrepare && window.FullScreen)
+                    if (IsCurrentWindow(window) && window.IsCreated && window.FullScreen)
                     {
                         isHideNext = true;
                     }
                 }
                 else
                 {
-                    window.Visible = false;
+                    if (IsCurrentWindow(window))
+                    {
+                        window.Visible = false;
+                    }
                 }
             }
         }
-        
+
+        private void CloseWindow(UIWindow window, bool isShutDown = false)
+        {
+            if (window == null)
+            {
+                return;
+            }
+
+            int layer = window.WindowLayer;
+            // Cancellation callbacks can synchronously reopen this window type.
+            Pop(window);
+            if (!window.BeginClose())
+            {
+                return;
+            }
+            try
+            {
+                OnSortWindowDepth(layer);
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"UI window presentation cleanup failed after closing '{window.WindowName}': {exception}");
+            }
+
+            try
+            {
+                OnSetWindowVisible();
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"UI window visibility cleanup failed after closing '{window.WindowName}': {exception}");
+            }
+
+            try
+            {
+                window.InternalDestroy(isShutDown);
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"UI window '{window.WindowName}' cleanup raised an exception: {exception}");
+            }
+        }
+
+        private void SafeRefreshPresentation()
+        {
+            try
+            {
+                OnSetWindowVisible();
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"UI window presentation refresh failed during cleanup: {exception}");
+            }
+        }
+
+        private void EnsureCurrentWindow(UIWindow window)
+        {
+            if (!IsCurrentWindow(window) || !window.IsLifecycleActive)
+            {
+                throw new OperationCanceledException(window?.LifecycleToken ?? CancellationToken.None);
+            }
+        }
+
+        private bool IsCurrentWindow(UIWindow window)
+        {
+            if (window == null || window.IsClosingOrDestroyed)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < _uiStack.Count; i++)
+            {
+                if (ReferenceEquals(_uiStack[i], window))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private UIWindow CreateInstance<T>() where T : UIWindow , new()
         {
+            EnsureCanOpenWindows();
             Type type = typeof(T);
             UIWindow window = new T();
             WindowAttribute attribute = Attribute.GetCustomAttribute(type, typeof(WindowAttribute)) as WindowAttribute;
@@ -539,6 +902,7 @@ namespace GameLogic
 
         private UIWindow CreateInstance(Type type)
         {
+            EnsureCanOpenWindows();
             UIWindow window = Activator.CreateInstance(type) as UIWindow;
             WindowAttribute attribute = Attribute.GetCustomAttribute(type, typeof(WindowAttribute)) as WindowAttribute;
 
@@ -578,22 +942,15 @@ namespace GameLogic
                 return null;
             }
 
-            if (ret.IsLoadDone)
+            if (ret.IsReady)
             {
+                EnsureCurrentReady(ret);
                 return ret;
             }
 
-            float time = 0f;
-            while (!ret.IsLoadDone)
-            {
-                time += Time.deltaTime;
-                if (time > 60f)
-                {
-                    break;
-                }
-                await UniTask.Yield(cancellationToken: cancellationToken);
-            }
-            return ret;
+            UIWindow result = await ret.CompletionTask.AttachExternalCancellation(cancellationToken);
+            EnsureCurrentReady(result);
+            return result as T;
         }
 
         /// <summary>
@@ -607,6 +964,7 @@ namespace GameLogic
             var window = GetWindow(windowName);
             if (window == null)
             {
+                InvokeGetCallback(callback, null);
                 return;
             }
 
@@ -614,24 +972,57 @@ namespace GameLogic
             
             if (ret == null)
             {
+                InvokeGetCallback(callback, null);
                 return;
             }
 
-            GetUIAsyncImp(callback).Forget();
-
-            async UniTaskVoid GetUIAsyncImp(Action<T> ctx)
+            GetUIAsyncImp(ret, callback).Forget(exception =>
             {
-                float time = 0f;
-                while (!ret.IsLoadDone)
+                if (exception is not OperationCanceledException)
                 {
-                    time += Time.deltaTime;
-                    if (time > 60f)
-                    {
-                        break;
-                    }
-                    await UniTask.Yield();
+                    Log.Error($"UGUI window get failed: {exception}");
                 }
-                ctx?.Invoke(ret);
+
+                InvokeGetCallback(callback, null);
+            });
+
+            async UniTask GetUIAsyncImp(UIWindow target, Action<T> ctx)
+            {
+                T result = null;
+                Exception failure = null;
+                try
+                {
+                    UIWindow completed = target.IsReady
+                        ? target
+                        : await target.CompletionTask;
+                    if (IsCurrentWindow(completed) && completed.IsReady && !completed.IsDestroyed)
+                    {
+                        result = completed as T;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                }
+
+                if (failure != null && failure is not OperationCanceledException)
+                {
+                    Log.Error($"UGUI window get failed: {failure}");
+                }
+
+                InvokeGetCallback(ctx, result);
+            }
+        }
+
+        private static void InvokeGetCallback<T>(Action<T> callback, T value) where T : UIWindow
+        {
+            try
+            {
+                callback?.Invoke(value);
+            }
+            catch (Exception exception)
+            {
+                Log.Error($"UGUI window get callback failed: {exception}");
             }
         }
 
@@ -709,9 +1100,22 @@ namespace GameLogic
             _uiStack.Remove(window);
         }
 
+        private bool CanOpenWindows()
+        {
+            return !_shuttingDown && ModuleSystem.IsRunning;
+        }
+
+        private void EnsureCanOpenWindows()
+        {
+            if (!CanOpenWindows())
+            {
+                throw new ObjectDisposedException(nameof(UIModule), "UI module is shutting down and cannot create a window.");
+            }
+        }
+
         public void OnUpdate()
         {
-            if (_uiStack == null)
+            if (_uiStack == null || !ModuleSystem.IsRunning)
             {
                 return;
             }
@@ -727,6 +1131,18 @@ namespace GameLogic
                 var window = _uiStack[i];
                 window.InternalUpdate();
             }
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
+        }
+
+        private static void LogWarningSafely(string message)
+        {
+            try { Log.Warning(message); }
+            catch { }
         }
     }
 }

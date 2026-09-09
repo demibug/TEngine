@@ -52,6 +52,12 @@ namespace TEngine
         void Initialize();
 
         /// <summary>
+        /// 等待资源模块 bootstrap 初始化完成。
+        /// <remarks>只等待资源模块自身，不代表任何资源包或 manifest 已 ready；取消只影响当前等待者。</remarks>
+        /// </summary>
+        UniTask WaitUntilInitializedAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// 初始化操作。
         /// </summary>
         /// <param name="customPackageName">资源包名称。</param>
@@ -111,6 +117,8 @@ namespace TEngine
         /// <summary>
         /// 卸载资源。
         /// </summary>
+        /// <remarks>一份成功加载对应一次归还；调用一次归还一份 spawn。无法识别同对象的不同调用者，
+        /// 不实现“同对象只释放一次”。</remarks>
         /// <param name="asset">要卸载的资源。</param>
         void UnloadAsset(object asset);
 
@@ -243,8 +251,13 @@ namespace TEngine
         /// <param name="location">资源定位地址。</param>
         /// <param name="assetType">要加载的资源类型。</param>
         /// <param name="cancellationToken">取消操作Token。</param>
-        /// <param name="packageName">指定资源包的名称。不传使用默认资源包</param>
+        /// <param name="packageName">指定资源包名称，不传使用默认资源包</param>
         /// <returns>异步资源实例。</returns>
+        /// <remarks>
+        /// 所有权契约：返回非 null 表示已交付一份持有权（对应一次 UnloadAsset 归还）；
+        /// 正常资源不存在、底层加载失败、类型不符返回 null 并保留原因日志；调用者取消返回 null（取消原因由 token 判断）。
+        /// 等待者取消不影响同 key 的加载者与其他等待者；失败后允许重新发起加载。
+        /// </remarks>
         UniTask<UnityEngine.Object> LoadAssetAsync(string location, Type assetType, CancellationToken cancellationToken = default, string packageName = "");
 
         /// <summary>
@@ -253,9 +266,13 @@ namespace TEngine
         /// <param name="location">资源定位地址。</param>
         /// <param name="parent">资源实例父节点。</param>
         /// <param name="cancellationToken">取消操作Token。</param>
-        /// <param name="packageName">指定资源包的名称。不传使用默认资源包</param>
+        /// <param name="packageName">指定资源包名称，不传使用默认资源包</param>
         /// <returns>异步游戏物体实例。</returns>
-        /// <remarks>会实例化资源到场景，无需主动UnloadAsset，Destroy时自动UnloadAsset。</remarks>
+        /// <remarks>
+        /// 会实例化资源到场景，无需主动UnloadAsset，Destroy时自动UnloadAsset。
+        /// 每个成功返回的实例拥有一份源 prefab spawn；实例化/绑定失败或交付前取消时，
+        /// 未交付实例被销毁并归还该份 spawn，不重复归还。
+        /// </remarks>
         UniTask<GameObject> LoadGameObjectAsync(string location, Transform parent = null, CancellationToken cancellationToken = default, string packageName = "");
 
         /// <summary>

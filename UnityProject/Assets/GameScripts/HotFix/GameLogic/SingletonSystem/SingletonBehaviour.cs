@@ -1,4 +1,4 @@
-﻿using TEngine;
+using TEngine;
 using UnityEngine;
 
 namespace GameLogic
@@ -7,7 +7,7 @@ namespace GameLogic
     /// 全局MonoBehavior必须继承于此
     /// </summary>
     /// <typeparam name="T">子类类型</typeparam>
-    public class SingletonBehaviour<T> : MonoBehaviour where T : SingletonBehaviour<T>
+    public class SingletonBehaviour<T> : MonoBehaviour, ISingletonInstanceResetter where T : SingletonBehaviour<T>
     {
         private static T _instance;
 
@@ -21,6 +21,12 @@ namespace GameLogic
 
         private bool CheckInstance()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                Destroy(gameObject);
+                return false;
+            }
+
             if (this == Instance)
             {
                 return true;
@@ -57,9 +63,18 @@ namespace GameLogic
 
         public static void Release()
         {
-            if (_instance != null)
+            T instance = _instance;
+            if (ReferenceEquals(instance, null))
             {
-                SingletonSystem.Release(_instance.gameObject, _instance);
+                return;
+            }
+
+            try
+            {
+                SingletonSystem.Release(instance.gameObject, instance);
+            }
+            finally
+            {
                 _instance = null;
             }
         }
@@ -71,6 +86,12 @@ namespace GameLogic
         {
             get
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    throw new GameFrameworkException("Can not access a singleton behaviour while the module system is not running.");
+                }
+
+                SingletonSystem.RegisterSessionResetter(ResetForNewSession);
                 if (_instance == null)
                 {
                     System.Type thisType = typeof(T);
@@ -99,12 +120,25 @@ namespace GameLogic
                     {
                         Log.Fatal($"Can't create SingletonBehaviour<{typeof(T)}>");
                     }
-                    
+
                     SingletonSystem.Retain(go, _instance);
                 }
 
                 return _instance;
             }
+        }
+
+        void ISingletonInstanceResetter.ClearInstanceForShutdown()
+        {
+            if (ReferenceEquals(_instance, this))
+            {
+                _instance = null;
+            }
+        }
+
+        private static void ResetForNewSession()
+        {
+            _instance = null;
         }
     }
 }

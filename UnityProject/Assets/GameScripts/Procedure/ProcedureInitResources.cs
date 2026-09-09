@@ -17,6 +17,11 @@ namespace Procedure
 
         protected override void OnEnter(ProcedureOwner procedureOwner)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _procedureOwner = procedureOwner;
 
             base.OnEnter(procedureOwner);
@@ -31,11 +36,19 @@ namespace Procedure
 
         private void ChangeToCreateDownloaderState(ProcedureOwner procedureOwner)
         {
-            ChangeState<ProcedureCreateDownloader>(procedureOwner);
+            if (ModuleSystem.IsRunning)
+            {
+                ChangeState<ProcedureCreateDownloader>(procedureOwner);
+            }
         }
 
         protected override void OnUpdate(ProcedureOwner procedureOwner, float elapseSeconds, float realElapseSeconds)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             base.OnUpdate(procedureOwner, elapseSeconds, realElapseSeconds);
 
             if (!_initResourcesComplete)
@@ -70,12 +83,22 @@ namespace Procedure
         /// <remarks>YooAsset 需要保持编辑器、单机、联机模式流程一致。</remarks>
         private IEnumerator InitResources(ProcedureOwner procedureOwner)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                yield break;
+            }
+
             Log.Info("更新资源清单！！！");
             LauncherMgr.ShowUI<LoadUpdateUI>($"更新清单文件...");
 
             // 1. 获取资源清单的版本信息
             var operation1 = _resourceModule.RequestPackageVersionAsync();
             yield return operation1;
+            if (!ModuleSystem.IsRunning)
+            {
+                yield break;
+            }
+
             if (operation1.Status != EOperationStatus.Succeed)
             {
                 OnInitResourcesError(procedureOwner, operation1.Error);
@@ -95,6 +118,11 @@ namespace Procedure
             // 2. 传入的版本信息更新资源清单
             var operation2 = _resourceModule.UpdatePackageManifestAsync(packageVersion);
             yield return operation2;
+            if (!ModuleSystem.IsRunning)
+            {
+                yield break;
+            }
+
             if (operation2.Status != EOperationStatus.Succeed)
             {
                 OnInitResourcesError(procedureOwner, operation2.Error);
@@ -106,11 +134,19 @@ namespace Procedure
 
         private void ChangeToPreloadState(ProcedureOwner procedureOwner)
         {
-            ChangeState<ProcedurePreload>(procedureOwner);
+            if (ModuleSystem.IsRunning)
+            {
+                ChangeState<ProcedurePreload>(procedureOwner);
+            }
         }
 
         private void OnInitResourcesError(ProcedureOwner procedureOwner, string message)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             // 检查设备网络连接状态。
             if (_resourceModule.PlayMode == EPlayMode.HostPlayMode)
             {
@@ -122,7 +158,13 @@ namespace Procedure
                 {
                     Log.Error(message);
                     LauncherMgr.ShowMessageBox($"获取远程版本失败！点击确认重试\n <color=#FF0000>{message}</color>"
-                    , () => { Utility.Unity.StartCoroutine(InitResources(procedureOwner)); }
+                    , () =>
+                    {
+                        if (ModuleSystem.IsRunning)
+                        {
+                            Utility.Unity.StartCoroutine(InitResources(procedureOwner));
+                        }
+                    }
                     ,Application.Quit);
                     return;
                 }
@@ -130,11 +172,22 @@ namespace Procedure
 
             Log.Error(message);
             LauncherMgr.ShowMessageBox($"初始化资源失败！点击确认重试 \n <color=#FF0000>{message}</color>"
-                ,() => { Utility.Unity.StartCoroutine(InitResources(procedureOwner)); }, Application.Quit);
+                ,() =>
+                {
+                    if (ModuleSystem.IsRunning)
+                    {
+                        Utility.Unity.StartCoroutine(InitResources(procedureOwner));
+                    }
+                }, Application.Quit);
         }
 
         private bool IsNeedUpdate()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return false;
+            }
+
             // 如果不能联网且当前游戏非强制(不更新可以进入游戏。)
             if (Settings.UpdateSetting.UpdateStyle == UpdateStyle.Optional && !_resourceModule.UpdatableWhilePlaying)
             {
@@ -144,7 +197,13 @@ namespace Procedure
                 {
                     LauncherMgr.ShowUI<LoadUpdateUI>(LoadText.Instance.Label_Net_UnReachable);
                     LauncherMgr.ShowMessageBox("没有找到本地版本记录，需要更新资源！",
-                        () => { Utility.Unity.StartCoroutine(InitResources(_procedureOwner)); },
+                        () =>
+                        {
+                            if (ModuleSystem.IsRunning)
+                            {
+                                Utility.Unity.StartCoroutine(InitResources(_procedureOwner));
+                            }
+                        },
                         Application.Quit);
                     return false;
                 }
@@ -155,8 +214,20 @@ namespace Procedure
                 {
                     LauncherMgr.ShowUI<LoadUpdateUI>(LoadText.Instance.Label_Load_Notice);
                     LauncherMgr.ShowMessageBox($"更新失败，检测到可选资源更新，推荐完成更新提升游戏体验！ \\n \\n 确定再试一次，取消进入游戏",
-                        () => { Utility.Unity.StartCoroutine(InitResources(_procedureOwner)); },
-                        () => { ChangeState<ProcedurePreload>(_procedureOwner); });
+                        () =>
+                        {
+                            if (ModuleSystem.IsRunning)
+                            {
+                                Utility.Unity.StartCoroutine(InitResources(_procedureOwner));
+                            }
+                        },
+                        () =>
+                        {
+                            if (ModuleSystem.IsRunning)
+                            {
+                                ChangeState<ProcedurePreload>(_procedureOwner);
+                            }
+                        });
                 }
                 else
                 {

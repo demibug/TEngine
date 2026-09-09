@@ -510,16 +510,36 @@ namespace TEngine
 
             internal override void Shutdown()
             {
-                foreach (KeyValuePair<object, Object<T>> objectInMap in _objectMap)
-                {
-                    objectInMap.Value.Release(true);
-                    MemoryPool.Release(objectInMap.Value);
-                }
-
+                // 先摘除池索引，再逐条执行外部对象清理；外部回调即使重入或抛错，也不能
+                // 让后续对象和内部 wrapper 遗留在池中。
+                var objectSnapshot = new List<Object<T>>(_objectMap.Values);
                 _objects.Clear();
                 _objectMap.Clear();
                 _cachedCanReleaseObjects.Clear();
                 _cachedToReleaseObjects.Clear();
+
+                foreach (Object<T> internalObject in objectSnapshot)
+                {
+                    try
+                    {
+                        internalObject.Release(true);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("Object pool item shutdown failed: {0}", exception);
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            MemoryPool.Release(internalObject);
+                        }
+                        catch (Exception exception)
+                        {
+                            LogErrorSafely("Object pool wrapper release failed: {0}", exception);
+                        }
+                    }
+                }
             }
 
             private Object<T> GetObject(object target)

@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
+using TEngine;
 
 namespace GameLogic
 {
@@ -6,7 +7,7 @@ namespace GameLogic
     /// 全局对象必须继承于此。
     /// </summary>
     /// <typeparam name="T">子类类型。</typeparam>
-    public abstract class Singleton<T> : ISingleton where T : Singleton<T>, new()
+    public abstract class Singleton<T> : ISingleton, ISingletonInstanceResetter where T : Singleton<T>, new()
     {
         protected static T _instance = default(T);
 
@@ -14,11 +15,27 @@ namespace GameLogic
         {
             get
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    throw new GameFrameworkException("Can not access a singleton while the module system is not running.");
+                }
+
+                SingletonSystem.RegisterSessionResetter(ResetForNewSession);
                 if (null == _instance)
                 {
-                    _instance = new T();
-                    _instance.OnInit();
-                    SingletonSystem.Retain(_instance);
+                    T instance = new T();
+                    _instance = instance;
+                    try
+                    {
+                        instance.OnInit();
+                        SingletonSystem.Retain(instance);
+                    }
+                    catch
+                    {
+                        _instance = null;
+                        SingletonSystem.Release(instance);
+                        throw;
+                    }
                 }
 
                 return _instance;
@@ -49,16 +66,38 @@ namespace GameLogic
 
         public virtual void Release()
         {
-            OnRelease();
-            if (_instance != null)
+            T instance = _instance;
+            if (instance == null)
             {
-                SingletonSystem.Release(_instance);
+                return;
+            }
+
+            try
+            {
+                OnRelease();
+            }
+            finally
+            {
+                SingletonSystem.Release(instance);
                 _instance = null;
             }
         }
 
         protected virtual void OnRelease()
         {
+        }
+
+        void ISingletonInstanceResetter.ClearInstanceForShutdown()
+        {
+            if (ReferenceEquals(_instance, this))
+            {
+                _instance = null;
+            }
+        }
+
+        private static void ResetForNewSession()
+        {
+            _instance = null;
         }
     }
 }

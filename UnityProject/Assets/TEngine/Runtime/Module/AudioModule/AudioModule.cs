@@ -23,6 +23,7 @@ namespace TEngine
         private readonly AudioCategory[] _audioCategories = new AudioCategory[(int)AudioType.Max];
         private readonly float[] _categoriesVolume = new float[(int)AudioType.Max];
         private bool _bUnityAudioDisabled = false;
+        private bool _shutdown;
 
         #region Public Propreties
 
@@ -321,14 +322,45 @@ namespace TEngine
 
         public override void OnInit()
         {
+            _shutdown = false;
             _resourceModule = ModuleSystem.GetModule<IResourceModule>();
             Initialize(Settings.AudioSetting.audioGroupConfigs);
         }
 
         public override void Shutdown()
         {
-            StopAll(fadeout: false);
-            CleanSoundPool();
+            if (_shutdown)
+            {
+                return;
+            }
+
+            _shutdown = true;
+            try
+            {
+                StopAll(fadeout: false);
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("Audio stop-all failed: {0}", exception);
+            }
+
+            try
+            {
+                DestroyAgents();
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("Audio agent shutdown failed: {0}", exception);
+            }
+
+            try
+            {
+                CleanSoundPool();
+            }
+            catch (Exception exception)
+            {
+                LogErrorSafely("Audio clip pool shutdown failed: {0}", exception);
+            }
         }
 
         /// <summary>
@@ -340,6 +372,11 @@ namespace TEngine
         /// <exception cref="GameFrameworkException"></exception>
         public void Initialize(AudioGroupConfig[] audioGroupConfigs, Transform instanceRoot = null, AudioMixer audioMixer = null)
         {
+            if (_shutdown || !ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("Audio module is shutting down and cannot initialize.");
+            }
+
             if (_instanceRoot == null)
             {
                 _instanceRoot = instanceRoot;
@@ -400,7 +437,7 @@ namespace TEngine
         /// </summary>
         public void Restart()
         {
-            if (_bUnityAudioDisabled)
+            if (_shutdown || !ModuleSystem.IsRunning || _bUnityAudioDisabled)
             {
                 return;
             }
@@ -440,7 +477,7 @@ namespace TEngine
         /// <param name="bInPool">是否支持资源池</param>
         public AudioAgent Play(AudioType type, string path, bool bLoop = false, float volume = 1.0f, bool bAsync = false, bool bInPool = false)
         {
-            if (_bUnityAudioDisabled)
+            if (_shutdown || !ModuleSystem.IsRunning || _bUnityAudioDisabled)
             {
                 return null;
             }
@@ -464,7 +501,7 @@ namespace TEngine
         /// <param name="fadeout">是否渐消。</param>
         public void Stop(AudioType type, bool fadeout)
         {
-            if (_bUnityAudioDisabled)
+            if (_shutdown || !ModuleSystem.IsRunning || _bUnityAudioDisabled)
             {
                 return;
             }
@@ -487,7 +524,14 @@ namespace TEngine
             {
                 if (_audioCategories[i] != null)
                 {
-                    _audioCategories[i].Stop(fadeout);
+                    try
+                    {
+                        _audioCategories[i].Stop(fadeout);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("Audio category stop failed: {0}", exception);
+                    }
                 }
             }
         }
@@ -498,7 +542,7 @@ namespace TEngine
         /// <param name="list">AudioClip的AssetPath集合。</param>
         public void PutInAudioPool(List<string> list)
         {
-            if (_bUnityAudioDisabled)
+            if (_shutdown || !ModuleSystem.IsRunning || _bUnityAudioDisabled || list == null || _resourceModule == null)
             {
                 return;
             }
@@ -507,8 +551,37 @@ namespace TEngine
             {
                 if (AudioClipPool != null && !AudioClipPool.ContainsKey(path))
                 {
-                    AssetHandle assetData = _resourceModule.LoadAssetAsyncHandle<AudioClip>(path);
-                    assetData.Completed += handle => { AudioClipPool?.Add(path, handle); };
+                    AssetHandle assetData;
+                    try
+                    {
+                        assetData = _resourceModule.LoadAssetAsyncHandle<AudioClip>(path);
+                    }
+                    catch (Exception exception)
+                    {
+                        Log.Error("Audio clip preload failed: {0}", exception);
+                        continue;
+                    }
+
+                    if (assetData == null)
+                    {
+                        continue;
+                    }
+
+                    assetData.Completed += handle =>
+                    {
+                        if (_shutdown || !ModuleSystem.IsRunning || AudioClipPool == null)
+                        {
+                            try { handle?.Dispose(); }
+                        catch (Exception exception) { LogErrorSafely("Late audio clip handle cleanup failed: {0}", exception); }
+                            return;
+                        }
+
+                        if (!AudioClipPool.TryAdd(path, handle))
+                        {
+                            try { handle?.Dispose(); }
+                            catch (Exception exception) { LogErrorSafely("Duplicate audio clip handle cleanup failed: {0}", exception); }
+                        }
+                    };
                 }
             }
         }
@@ -519,7 +592,7 @@ namespace TEngine
         /// <param name="list">AudioClip的AssetPath集合。</param>
         public void RemoveClipFromPool(List<string> list)
         {
-            if (_bUnityAudioDisabled)
+            if (_bUnityAudioDisabled || list == null)
             {
                 return;
             }
@@ -544,12 +617,24 @@ namespace TEngine
                 return;
             }
 
-            foreach (var dic in AudioClipPool)
+            if (AudioClipPool == null)
             {
-                dic.Value.Dispose();
+                return;
             }
 
+            var handles = new List<AssetHandle>(AudioClipPool.Values);
             AudioClipPool.Clear();
+            foreach (AssetHandle handle in handles)
+            {
+                try
+                {
+                    handle?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Audio clip handle cleanup failed: {0}", exception);
+                }
+            }
         }
 
         /// <summary>
@@ -559,13 +644,58 @@ namespace TEngine
         /// <param name="realElapseSeconds">真实流逝时间，以秒为单位。</param>
         public void Update(float elapseSeconds, float realElapseSeconds)
         {
+            if (_shutdown || !ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             foreach (var audioCategory in _audioCategories)
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    break;
+                }
+
                 if (audioCategory != null)
                 {
                     audioCategory.Update(elapseSeconds);
                 }
             }
+        }
+
+        private void DestroyAgents()
+        {
+            foreach (AudioCategory audioCategory in _audioCategories)
+            {
+                if (audioCategory?.AudioAgents == null)
+                {
+                    continue;
+                }
+
+                AudioAgent[] agents = audioCategory.AudioAgents.ToArray();
+                foreach (AudioAgent audioAgent in agents)
+                {
+                    if (audioAgent == null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        audioAgent.Destroy();
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("Audio agent cleanup failed: {0}", exception);
+                    }
+                }
+            }
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using FairyGUI;
+using TEngine;
 using TEngine.FairyGUIIntegration;
 using UnityEngine;
 
@@ -61,7 +62,7 @@ namespace GameLogic
 
         public async UniTask<FguiPackageLease> AcquireAsync(string packageKey, CancellationToken cancellationToken)
         {
-            if (_shutdown)
+            if (_shutdown || !ModuleSystem.IsRunning)
                 throw new ObjectDisposedException(nameof(FguiPackageService));
             cancellationToken.ThrowIfCancellationRequested();
             if (!_entries.TryGetValue(packageKey, out Entry entry))
@@ -82,6 +83,8 @@ namespace GameLogic
             {
                 UIPackage package = await completion.Task.AttachExternalCancellation(cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
+                if (_shutdown || entry.State != EntryState.Ready || entry.Package == null)
+                    throw new ObjectDisposedException(nameof(FguiPackageService));
                 entry.OwnerCount++;
                 return new FguiPackageLease(this, packageKey, package);
             }
@@ -101,16 +104,54 @@ namespace GameLogic
                 return;
             _shutdown = true;
 
-            foreach (Entry entry in _entries.Values)
-                entry.LoadCts?.Cancel();
+            var entries = new List<Entry>(_entries.Values);
+            foreach (Entry entry in entries)
+            {
+                try
+                {
+                    entry.LoadCts?.Cancel();
+                    entry.Completion?.TrySetCanceled();
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"Failed to cancel FairyGUI package '{entry.Catalog.Key}': {exception}");
+                }
+            }
 
-            List<string> order = BuildTopologicalOrder();
+            List<string> order;
+            try
+            {
+                order = BuildTopologicalOrder();
+            }
+            catch (Exception exception)
+            {
+                LogWarningSafely($"Failed to build FairyGUI package shutdown order: {exception}");
+                order = new List<string>();
+                foreach (Entry entry in entries)
+                    order.Add(entry.Catalog.Key);
+            }
+
             for (int i = order.Count - 1; i >= 0; i--)
-                ForceUnload(_entries[order[i]]);
+            {
+                if (!_entries.TryGetValue(order[i], out Entry entry))
+                    continue;
+
+                try
+                {
+                    ForceUnload(entry);
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSafely($"Failed to unload FairyGUI package '{entry.Catalog.Key}': {exception}");
+                }
+            }
         }
 
         internal void Release(string packageKey)
         {
+            if (_shutdown)
+                return;
+
             if (!_entries.TryGetValue(packageKey, out Entry entry) || entry.OwnerCount == 0)
                 return;
             entry.OwnerCount--;
@@ -120,6 +161,9 @@ namespace GameLogic
 
         private void BeginLoad(Entry entry)
         {
+            if (_shutdown || !ModuleSystem.IsRunning)
+                throw new ObjectDisposedException(nameof(FguiPackageService));
+
             entry.State = EntryState.Loading;
             var loadCts = new CancellationTokenSource();
             var completion = new UniTaskCompletionSource<UIPackage>();
@@ -139,22 +183,57 @@ namespace GameLogic
             CancellationToken token = linkedCts.Token;
             try
             {
+                EnsureLoading(entry, loadToken);
                 foreach (string dependency in entry.Catalog.Dependencies)
-                    entry.DependencyLeases.Add(await AcquireAsync(dependency, token));
+                {
+                    FguiPackageLease dependencyLease = null;
+                    try
+                    {
+                        dependencyLease = await AcquireAsync(dependency, token);
+                        EnsureLoading(entry, loadToken);
+                        entry.DependencyLeases.Add(dependencyLease);
+                        dependencyLease = null;
+                    }
+                    finally
+                    {
+                        DisposeLeaseSafely(dependencyLease, "FairyGUI dependency lease cleanup after cancellation failed");
+                    }
+                }
 
-                entry.DescriptionLease = await _resources.LoadAsync(entry.Catalog.DescriptionAddress,
-                    typeof(TextAsset), entry.Catalog.YooAssetPackageName, token);
+                FguiAssetLease descriptionLease = null;
+                try
+                {
+                    descriptionLease = await _resources.LoadAsync(entry.Catalog.DescriptionAddress,
+                        typeof(TextAsset), entry.Catalog.YooAssetPackageName, token);
+                    EnsureLoading(entry, loadToken);
+                    entry.DescriptionLease = descriptionLease;
+                    descriptionLease = null;
+                }
+                finally
+                {
+                    DisposeLeaseSafely(descriptionLease, "FairyGUI description lease cleanup after cancellation failed");
+                }
 
                 foreach (FguiCatalogAsset asset in entry.Catalog.Assets)
                 {
                     Type assetType = ResolveAssetType(asset.Kind);
-                    FguiAssetLease lease = await _resources.LoadAsync(asset.Address, assetType,
-                        entry.Catalog.YooAssetPackageName, token);
-                    entry.AssetLeases.Add(lease);
-                    entry.Assets.Add(asset.LookupKey, lease);
+                    FguiAssetLease lease = null;
+                    try
+                    {
+                        lease = await _resources.LoadAsync(asset.Address, assetType,
+                            entry.Catalog.YooAssetPackageName, token);
+                        EnsureLoading(entry, loadToken);
+                        entry.AssetLeases.Add(lease);
+                        entry.Assets.Add(asset.LookupKey, lease);
+                        lease = null;
+                    }
+                    finally
+                    {
+                        DisposeLeaseSafely(lease, "FairyGUI asset lease cleanup after cancellation failed");
+                    }
                 }
 
-                token.ThrowIfCancellationRequested();
+                EnsureLoading(entry, loadToken);
                 CheckGlobalPackageConflict(entry);
                 var desc = entry.DescriptionLease.Asset as TextAsset;
                 if (desc == null || desc.bytes == null || desc.bytes.Length == 0)
@@ -186,7 +265,7 @@ namespace GameLogic
 
                 ValidateDescriptorDependencies(entry);
                 entry.Package.LoadAllAssets();
-                token.ThrowIfCancellationRequested();
+                EnsureLoading(entry, loadToken);
                 entry.State = EntryState.Ready;
                 completion.TrySetResult(entry.Package);
             }
@@ -274,30 +353,30 @@ namespace GameLogic
         private static void RemovePackageIfPresent(Entry entry)
         {
             UIPackage package = entry.Package;
-            if (package == null)
-                return;
-
-            // FairyGUI clears its global package registry from StageEngine.OnApplicationQuit before
-            // Unity destroys TEngine's hotfix listener. Treat that SDK-owned cleanup as already done,
-            // while still releasing the YooAsset leases below.
-            UIPackage registeredById = UIPackage.GetById(package.id);
-            UIPackage registeredByName = UIPackage.GetByName(package.name);
-            string registeredKey = ReferenceEquals(registeredById, package)
-                ? package.id
-                : ReferenceEquals(registeredByName, package)
-                    ? package.name
-                    : null;
             entry.Package = null;
-            if (registeredKey == null)
+            if (package == null)
                 return;
 
             try
             {
+                // FairyGUI clears its global package registry from StageEngine.OnApplicationQuit before
+                // Unity destroys TEngine's hotfix listener. Treat that SDK-owned cleanup as already done,
+                // while still releasing the YooAsset leases below.
+                UIPackage registeredById = UIPackage.GetById(package.id);
+                UIPackage registeredByName = UIPackage.GetByName(package.name);
+                string registeredKey = ReferenceEquals(registeredById, package)
+                    ? package.id
+                    : ReferenceEquals(registeredByName, package)
+                        ? package.name
+                        : null;
+                if (registeredKey == null)
+                    return;
+
                 UIPackage.RemovePackage(registeredKey);
             }
             catch (Exception exception)
             {
-                TEngine.Log.Warning($"Failed to remove FairyGUI package '{entry.Catalog.Key}': {exception}");
+                LogWarningSafely($"Failed to remove FairyGUI package '{entry.Catalog.Key}': {exception}");
             }
         }
 
@@ -308,7 +387,7 @@ namespace GameLogic
                 try { entry.AssetLeases[i].Dispose(); }
                 catch (Exception exception)
                 {
-                    TEngine.Log.Warning($"Failed to release FairyGUI asset lease: {exception}");
+                    LogWarningSafely($"Failed to release FairyGUI asset lease: {exception}");
                 }
             }
             entry.AssetLeases.Clear();
@@ -316,7 +395,7 @@ namespace GameLogic
             try { entry.DescriptionLease?.Dispose(); }
             catch (Exception exception)
             {
-                TEngine.Log.Warning($"Failed to release FairyGUI package description lease: {exception}");
+                LogWarningSafely($"Failed to release FairyGUI package description lease: {exception}");
             }
             entry.DescriptionLease = null;
         }
@@ -328,7 +407,7 @@ namespace GameLogic
                 try { entry.DependencyLeases[i].Dispose(); }
                 catch (Exception exception)
                 {
-                    TEngine.Log.Warning($"Failed to release FairyGUI dependency lease: {exception}");
+                    LogWarningSafely($"Failed to release FairyGUI dependency lease: {exception}");
                 }
             }
             entry.DependencyLeases.Clear();
@@ -340,6 +419,12 @@ namespace GameLogic
             DisposeAssets(entry);
             DisposeDependencies(entry);
             entry.State = EntryState.Idle;
+        }
+
+        private void EnsureLoading(Entry entry, CancellationToken loadToken)
+        {
+            if (_shutdown || !ModuleSystem.IsRunning || loadToken.IsCancellationRequested || entry.State != EntryState.Loading)
+                throw new OperationCanceledException(loadToken);
         }
 
         private void UnloadReadyEntry(Entry entry)
@@ -376,6 +461,21 @@ namespace GameLogic
             foreach (string dependency in _entries[key].Catalog.Dependencies)
                 Visit(dependency, visited, order);
             order.Add(key);
+        }
+
+        private static void LogWarningSafely(string message)
+        {
+            try { TEngine.Log.Warning(message); }
+            catch { }
+        }
+
+        private static void DisposeLeaseSafely(IDisposable lease, string message)
+        {
+            if (lease == null)
+                return;
+
+            try { lease.Dispose(); }
+            catch (Exception exception) { LogWarningSafely($"{message}: {exception}"); }
         }
     }
 

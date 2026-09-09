@@ -66,16 +66,28 @@ namespace TEngine
         /// </summary>
         public override void Shutdown()
         {
-            if (_fsmModule != null)
-            {
-                if (_procedureFsm != null)
-                {
-                    _fsmModule.DestroyFsm(_procedureFsm);
-                    _procedureFsm = null;
-                }
+            IFsmModule fsmModule = _fsmModule;
+            IFsm<IProcedureModule> procedureFsm = _procedureFsm;
+            _fsmModule = null;
+            _procedureFsm = null;
 
-                _fsmModule = null;
+            if (fsmModule != null && procedureFsm != null)
+            {
+                try
+                {
+                    fsmModule.DestroyFsm(procedureFsm);
+                }
+                catch (Exception exception)
+                {
+                    LogErrorSafely("Procedure FSM shutdown failed: {0}", exception);
+                }
             }
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
         }
 
         /// <summary>
@@ -85,6 +97,11 @@ namespace TEngine
         /// <param name="procedures">流程管理器包含的流程。</param>
         public void Initialize(IFsmModule fsmModule, params ProcedureBase[] procedures)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("Procedure module is shutting down and cannot initialize.");
+            }
+
             if (fsmModule == null)
             {
                 throw new GameFrameworkException("FSM manager is invalid.");
@@ -100,6 +117,11 @@ namespace TEngine
         /// <typeparam name="T">要开始的流程类型。</typeparam>
         public void StartProcedure<T>() where T : ProcedureBase
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             if (_procedureFsm == null)
             {
                 throw new GameFrameworkException("You must initialize procedure first.");
@@ -114,6 +136,11 @@ namespace TEngine
         /// <param name="procedureType">要开始的流程类型。</param>
         public void StartProcedure(Type procedureType)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             if (_procedureFsm == null)
             {
                 throw new GameFrameworkException("You must initialize procedure first.");
@@ -191,6 +218,11 @@ namespace TEngine
         /// <exception cref="GameFrameworkException">重启异常。</exception>
         public bool RestartProcedure(params ProcedureBase[] procedures)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return false;
+            }
+
             if (procedures == null || procedures.Length <= 0)
             {
                 throw new GameFrameworkException("RestartProcedure Failed procedures is invalid.");

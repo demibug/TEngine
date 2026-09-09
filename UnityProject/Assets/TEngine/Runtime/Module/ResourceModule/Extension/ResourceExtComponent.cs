@@ -67,6 +67,37 @@ namespace TEngine
         /// </summary>
         private IObjectPool<AssetItemObject> _assetItemPool;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetForNewSession()
+        {
+            Instance = null;
+            _resourceModule = null;
+
+            var loadingStates = new LoadingState[_loadingStates.Count];
+            _loadingStates.Values.CopyTo(loadingStates, 0);
+            _loadingStates.Clear();
+            foreach (var state in loadingStates)
+            {
+                try
+                {
+                    state.Cancel();
+                }
+                catch (Exception ex)
+                {
+                    LogErrorSafely($"Reset resource loading state failed: {ex}");
+                }
+
+                try
+                {
+                    MemoryPool.Release(state);
+                }
+                catch (Exception ex)
+                {
+                    LogErrorSafely($"Release resource loading state failed: {ex}");
+                }
+            }
+        }
+
 
 #if UNITY_EDITOR
         public LinkedList<LoadAssetObject> LoadAssetObjectsLinkedList
@@ -77,9 +108,23 @@ namespace TEngine
 #endif
         private IEnumerator Start()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                yield break;
+            }
+
             Instance = this;
             yield return new WaitForEndOfFrame();
-            IObjectPoolModule objectPoolComponent = ModuleSystem.GetModule<IObjectPoolModule>();
+            if (!ModuleSystem.IsRunning)
+            {
+                yield break;
+            }
+
+            IObjectPoolModule objectPoolComponent = ModuleSystem.TryGetExistingModule<IObjectPoolModule>();
+            if (objectPoolComponent == null)
+            {
+                yield break;
+            }
             _assetItemPool = objectPoolComponent.CreateMultiSpawnObjectPool<AssetItemObject>(
                 "SetAssetPool",
                 autoReleaseInterval, 16, 60, 0);
@@ -90,6 +135,11 @@ namespace TEngine
 
         private void Update()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _checkCanReleaseTime += Time.unscaledDeltaTime;
             if (_checkCanReleaseTime < (double)checkCanReleaseInterval)
             {
@@ -108,7 +158,7 @@ namespace TEngine
 #endif
         public void ReleaseUnused()
         {
-            if (_loadAssetObjectsLinkedList == null || _loadAssetObjectsLinkedList.Count == 0)
+            if (!ModuleSystem.IsRunning || _loadAssetObjectsLinkedList == null || _loadAssetObjectsLinkedList.Count == 0)
             {
                 _currentProcessNode = null;
                 _checkCanReleaseTime = 0f;
@@ -131,7 +181,7 @@ namespace TEngine
                 
                 if (current.Value.AssetObject.IsCanRelease())
                 {
-                    _assetItemPool.Unspawn(current.Value.AssetTarget);
+                    _assetItemPool?.Unspawn(current.Value.AssetTarget);
                     MemoryPool.Release(current.Value.AssetObject);
                     _loadAssetObjectsLinkedList.Remove(current);
                 }
@@ -175,9 +225,22 @@ namespace TEngine
                 {
                     if (_timeoutController.IsTimeout())
                     {
-                        Log.Error($"LoadAssetAsync Waiting {assetObjectKey} timeout. reason:{ex.Message}");
+                        LogErrorSafely($"LoadAssetAsync Waiting {assetObjectKey} timeout. reason:{ex.Message}");
                     }
                 }
+            }
+        }
+
+        private static void LogErrorSafely(string message)
+        {
+            try
+            {
+                Log.Error(message);
+            }
+            catch
+            {
+                try { Debug.LogError(message); }
+                catch { }
             }
         }
     }

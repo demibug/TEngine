@@ -73,6 +73,11 @@ namespace TEngine
         /// <param name="audioGroupConfig">音频轨道组配置。</param>
         public AudioCategory(int maxChannel, AudioMixer audioMixer, AudioGroupConfig audioGroupConfig)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                throw new GameFrameworkException("Audio category cannot be created while the module system is not running.");
+            }
+
             var audioModule = ModuleSystem.GetModule<IAudioModule>();
 
             this.audioMixer = audioMixer;
@@ -105,6 +110,11 @@ namespace TEngine
         /// <param name="num"></param>
         public void AddAudio(int num)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _maxChannel += num;
             for (int i = 0; i < num; i++)
             {
@@ -121,7 +131,7 @@ namespace TEngine
         /// <returns></returns>
         public AudioAgent Play(string path, bool bAsync, bool bInPool = false)
         {
-            if (!_bEnable)
+            if (!ModuleSystem.IsRunning || !_bEnable)
             {
                 return null;
             }

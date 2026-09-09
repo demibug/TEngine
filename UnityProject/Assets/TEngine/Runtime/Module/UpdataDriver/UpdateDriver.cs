@@ -12,10 +12,30 @@ namespace TEngine
     {
         private GameObject _entity;
         private MainBehaviour _behaviour;
+        private int _lifetimeVersion;
+        private bool _stopping;
 
         public override void OnInit()
         {
+            _stopping = false;
+            _lifetimeVersion++;
             _MakeEntity();
+        }
+
+        /// <summary>
+        /// 第一阶段只禁止新协程、新监听和延迟回调重新挂载，不提前释放 Behaviour；
+        /// SingletonSystem 仍需要在 BeforeShutdown 阶段从现有 driver 摘除监听。
+        /// </summary>
+        internal void BeginShutdown()
+        {
+            if (_stopping)
+            {
+                return;
+            }
+
+            _stopping = true;
+            _lifetimeVersion++;
+            StopAllCoroutines();
         }
         
         /// <summary>
@@ -23,6 +43,8 @@ namespace TEngine
         /// </summary>
         public override void Shutdown()
         {
+            BeginShutdown();
+
             if (_behaviour != null)
             {
                 _behaviour.Release();
@@ -34,6 +56,7 @@ namespace TEngine
             }
 
             _entity = null;
+            _behaviour = null;
         }
 
         #region 控制协程Coroutine
@@ -45,8 +68,13 @@ namespace TEngine
                 return null;
             }
 
+            if (!CanAcceptNewWork())
+            {
+                return null;
+            }
+
             _MakeEntity();
-            return _behaviour.StartCoroutine(methodName);
+            return _behaviour?.StartCoroutine(methodName);
         }
 
         public Coroutine StartCoroutine(IEnumerator routine)
@@ -56,8 +84,13 @@ namespace TEngine
                 return null;
             }
 
+            if (!CanAcceptNewWork())
+            {
+                return null;
+            }
+
             _MakeEntity();
-            return _behaviour.StartCoroutine(routine);
+            return _behaviour?.StartCoroutine(routine);
         }
 
         public Coroutine StartCoroutine(string methodName, [DefaultValue("null")] object value)
@@ -67,8 +100,13 @@ namespace TEngine
                 return null;
             }
 
+            if (!CanAcceptNewWork())
+            {
+                return null;
+            }
+
             _MakeEntity();
-            return _behaviour.StartCoroutine(methodName, value);
+            return _behaviour?.StartCoroutine(methodName, value);
         }
 
         public void StopCoroutine(string methodName)
@@ -78,7 +116,7 @@ namespace TEngine
                 return;
             }
 
-            if (_entity != null)
+            if (_behaviour != null)
             {
                 _behaviour.StopCoroutine(methodName);
             }
@@ -91,7 +129,7 @@ namespace TEngine
                 return;
             }
 
-            if (_entity != null)
+            if (_behaviour != null)
             {
                 _behaviour.StopCoroutine(routine);
             }
@@ -102,7 +140,7 @@ namespace TEngine
             if (routine == null)
                 return;
 
-            if (_entity != null)
+            if (_behaviour != null)
             {
                 _behaviour.StopCoroutine(routine);
                 routine = null;
@@ -111,7 +149,7 @@ namespace TEngine
 
         public void StopAllCoroutines()
         {
-            if (_entity != null)
+            if (_behaviour != null)
             {
                 _behaviour.StopAllCoroutines();
             }
@@ -127,14 +165,23 @@ namespace TEngine
         /// <param name="action"></param>
         public void AddUpdateListener(Action action)
         {
+            if (action == null || !CanAcceptNewWork())
+            {
+                return;
+            }
+
+            int lifetimeVersion = _lifetimeVersion;
             _MakeEntity();
-            AddUpdateListenerImp(action).Forget();
+            AddUpdateListenerImp(action, lifetimeVersion).Forget();
         }
 
-        private async UniTaskVoid AddUpdateListenerImp(Action action)
+        private async UniTaskVoid AddUpdateListenerImp(Action action, int lifetimeVersion)
         {
             await UniTask.Yield();
-            _behaviour.AddUpdateListener(action);
+            if (IsCurrentLifetime(lifetimeVersion))
+            {
+                _behaviour.AddUpdateListener(action);
+            }
         }
 
         /// <summary>
@@ -143,14 +190,23 @@ namespace TEngine
         /// <param name="action"></param>
         public void AddFixedUpdateListener(Action action)
         {
+            if (action == null || !CanAcceptNewWork())
+            {
+                return;
+            }
+
+            int lifetimeVersion = _lifetimeVersion;
             _MakeEntity();
-            AddFixedUpdateListenerImp(action).Forget();
+            AddFixedUpdateListenerImp(action, lifetimeVersion).Forget();
         }
 
-        private async UniTaskVoid AddFixedUpdateListenerImp(Action action)
+        private async UniTaskVoid AddFixedUpdateListenerImp(Action action, int lifetimeVersion)
         {
             await UniTask.Yield(PlayerLoopTiming.LastEarlyUpdate);
-            _behaviour.AddFixedUpdateListener(action);
+            if (IsCurrentLifetime(lifetimeVersion))
+            {
+                _behaviour.AddFixedUpdateListener(action);
+            }
         }
 
         /// <summary>
@@ -159,14 +215,23 @@ namespace TEngine
         /// <param name="action"></param>
         public void AddLateUpdateListener(Action action)
         {
+            if (action == null || !CanAcceptNewWork())
+            {
+                return;
+            }
+
+            int lifetimeVersion = _lifetimeVersion;
             _MakeEntity();
-            AddLateUpdateListenerImp(action).Forget();
+            AddLateUpdateListenerImp(action, lifetimeVersion).Forget();
         }
 
-        private async UniTaskVoid AddLateUpdateListenerImp(Action action)
+        private async UniTaskVoid AddLateUpdateListenerImp(Action action, int lifetimeVersion)
         {
             await UniTask.Yield();
-            _behaviour.AddLateUpdateListener(action);
+            if (IsCurrentLifetime(lifetimeVersion))
+            {
+                _behaviour.AddLateUpdateListener(action);
+            }
         }
 
         /// <summary>
@@ -175,8 +240,7 @@ namespace TEngine
         /// <param name="action"></param>
         public void RemoveUpdateListener(Action action)
         {
-            _MakeEntity();
-            _behaviour.RemoveUpdateListener(action);
+            _behaviour?.RemoveUpdateListener(action);
         }
 
         /// <summary>
@@ -185,8 +249,7 @@ namespace TEngine
         /// <param name="action"></param>
         public void RemoveFixedUpdateListener(Action action)
         {
-            _MakeEntity();
-            _behaviour.RemoveFixedUpdateListener(action);
+            _behaviour?.RemoveFixedUpdateListener(action);
         }
 
         /// <summary>
@@ -195,8 +258,7 @@ namespace TEngine
         /// <param name="action"></param>
         public void RemoveLateUpdateListener(Action action)
         {
-            _MakeEntity();
-            _behaviour.RemoveLateUpdateListener(action);
+            _behaviour?.RemoveLateUpdateListener(action);
         }
 
         #endregion
@@ -209,8 +271,13 @@ namespace TEngine
         /// <param name="action"></param>
         public void AddDestroyListener(Action action)
         {
+            if (action == null || !CanAcceptNewWork())
+            {
+                return;
+            }
+
             _MakeEntity();
-            _behaviour.AddDestroyListener(action);
+            _behaviour?.AddDestroyListener(action);
         }
 
         /// <summary>
@@ -219,8 +286,7 @@ namespace TEngine
         /// <param name="action"></param>
         public void RemoveDestroyListener(Action action)
         {
-            _MakeEntity();
-            _behaviour.RemoveDestroyListener(action);
+            _behaviour?.RemoveDestroyListener(action);
         }
 
         /// <summary>
@@ -229,8 +295,13 @@ namespace TEngine
         /// <param name="action"></param>
         public void AddOnDrawGizmosListener(Action action)
         {
+            if (action == null || !CanAcceptNewWork())
+            {
+                return;
+            }
+
             _MakeEntity();
-            _behaviour.AddOnDrawGizmosListener(action);
+            _behaviour?.AddOnDrawGizmosListener(action);
         }
 
         /// <summary>
@@ -239,8 +310,7 @@ namespace TEngine
         /// <param name="action"></param>
         public void RemoveOnDrawGizmosListener(Action action)
         {
-            _MakeEntity();
-            _behaviour.RemoveOnDrawGizmosListener(action);
+            _behaviour?.RemoveOnDrawGizmosListener(action);
         }
         
         /// <summary>
@@ -249,8 +319,13 @@ namespace TEngine
         /// <param name="action"></param>
         public void AddOnDrawGizmosSelectedListener(Action action)
         {
+            if (action == null || !CanAcceptNewWork())
+            {
+                return;
+            }
+
             _MakeEntity();
-            _behaviour.AddOnDrawGizmosSelectedListener(action);
+            _behaviour?.AddOnDrawGizmosSelectedListener(action);
         }
 
         /// <summary>
@@ -259,8 +334,7 @@ namespace TEngine
         /// <param name="action"></param>
         public void RemoveOnDrawGizmosSelectedListener(Action action)
         {
-            _MakeEntity();
-            _behaviour.RemoveOnDrawGizmosSelectedListener(action);
+            _behaviour?.RemoveOnDrawGizmosSelectedListener(action);
         }
 
         /// <summary>
@@ -269,8 +343,13 @@ namespace TEngine
         /// <param name="action"></param>
         public void AddOnApplicationPauseListener(Action<bool> action)
         {
+            if (action == null || !CanAcceptNewWork())
+            {
+                return;
+            }
+
             _MakeEntity();
-            _behaviour.AddOnApplicationPauseListener(action);
+            _behaviour?.AddOnApplicationPauseListener(action);
         }
 
         /// <summary>
@@ -279,15 +358,14 @@ namespace TEngine
         /// <param name="action"></param>
         public void RemoveOnApplicationPauseListener(Action<bool> action)
         {
-            _MakeEntity();
-            _behaviour.RemoveOnApplicationPauseListener(action);
+            _behaviour?.RemoveOnApplicationPauseListener(action);
         }
 
         #endregion
 
         private void _MakeEntity()
         {
-            if (_entity != null)
+            if (_entity != null || !CanAcceptNewWork())
             {
                 return;
             }
@@ -296,6 +374,16 @@ namespace TEngine
             _entity.SetActive(true);
             Object.DontDestroyOnLoad(_entity);
             _behaviour = _entity.AddComponent<MainBehaviour>();
+        }
+
+        private bool CanAcceptNewWork()
+        {
+            return !_stopping && ModuleSystem.IsRunning;
+        }
+
+        private bool IsCurrentLifetime(int lifetimeVersion)
+        {
+            return CanAcceptNewWork() && lifetimeVersion == _lifetimeVersion && _behaviour != null;
         }
 
         private class MainBehaviour : MonoBehaviour
@@ -310,25 +398,37 @@ namespace TEngine
 
             void Update()
             {
-                if (UpdateEvent != null)
-                {
-                    UpdateEvent();
-                }
+                InvokeUpdateEvent(UpdateEvent);
             }
 
             void FixedUpdate()
             {
-                if (FixedUpdateEvent != null)
-                {
-                    FixedUpdateEvent();
-                }
+                InvokeUpdateEvent(FixedUpdateEvent);
             }
 
             void LateUpdate()
             {
-                if (LateUpdateEvent != null)
+                InvokeUpdateEvent(LateUpdateEvent);
+            }
+
+            private static void InvokeUpdateEvent(Action updateEvent)
+            {
+                if (!ModuleSystem.IsRunning || updateEvent == null)
                 {
-                    LateUpdateEvent();
+                    return;
+                }
+
+                // 多播委托会在调用开始时固定 invocation list；若前一个监听触发
+                // Shutdown，必须在调用下一个监听前再次检查会话状态。
+                Delegate[] invocationList = updateEvent.GetInvocationList();
+                foreach (Delegate listener in invocationList)
+                {
+                    if (!ModuleSystem.IsRunning)
+                    {
+                        break;
+                    }
+
+                    ((Action)listener).Invoke();
                 }
             }
 

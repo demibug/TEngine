@@ -16,6 +16,8 @@ namespace TEngine
         private readonly Dictionary<string, SceneHandle> _subScenes = new Dictionary<string, SceneHandle>();
 
         private readonly HashSet<string> _handlingScene = new HashSet<string>();
+        private bool _stopping;
+        private int _lifetimeVersion;
 
         /// <summary>
         /// 当前主场景名称。
@@ -24,26 +26,56 @@ namespace TEngine
 
         public override void OnInit()
         {
+            _stopping = false;
+            _lifetimeVersion++;
             _currentMainScene = null;
             _currentMainSceneName = SceneManager.GetSceneByBuildIndex(0).name;
         }
 
         public override void Shutdown()
         {
-            var iter = _subScenes.Values.GetEnumerator();
-            while (iter.MoveNext())
+            if (_stopping)
             {
-                SceneHandle subScene = iter.Current;
-                if (subScene != null)
-                {
-                    subScene.UnloadAsync();
-                }
+                return;
             }
 
-            iter.Dispose();
+            _stopping = true;
+            _lifetimeVersion++;
+
+            var sceneSnapshot = new List<SceneHandle>(_subScenes.Values);
+            if (_currentMainScene != null)
+            {
+                sceneSnapshot.Add(_currentMainScene);
+            }
+
             _subScenes.Clear();
             _handlingScene.Clear();
+            _currentMainScene = null;
             _currentMainSceneName = string.Empty;
+
+            foreach (SceneHandle scene in sceneSnapshot)
+            {
+                if (scene == null)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (scene.IsValid)
+                    {
+                        // UnloadSceneOperation can wait for a scene that is still loading;
+                        // do not leave the owner handle behind merely because SceneObject is
+                        // not valid yet.
+                        scene.UnloadAsync();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    try { Log.Error("Scene shutdown failed: {0}", exception); }
+                    catch { }
+                }
+            }
         }
 
         /// <summary>
@@ -58,72 +90,101 @@ namespace TEngine
         public async UniTask<Scene> LoadSceneAsync(string location, LoadSceneMode sceneMode = LoadSceneMode.Single, bool suspendLoad = false, uint priority = 100,
             bool gcCollect = true, Action<float> progressCallBack = null)
         {
+            if (!CanAcceptNewWork())
+            {
+                return default;
+            }
+
+            int lifetimeVersion = _lifetimeVersion;
             if (!_handlingScene.Add(location))
             {
                 Log.Error($"Could not load scene while loading. Scene: {location}");
                 return default;
             }
 
-            if (sceneMode == LoadSceneMode.Additive)
+            try
             {
-                if (_subScenes.TryGetValue(location, out SceneHandle subScene))
+                if (sceneMode == LoadSceneMode.Additive)
                 {
-                    throw new Exception($"Could not load subScene while already loaded. Scene: {location}");
-                }
-
-                subScene = YooAssets.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, priority);
-
-                //Fix 这里前置，subScene.IsDone在UnSupendLoad之后才会是true
-                _subScenes.Add(location, subScene);
-
-                if (progressCallBack != null)
-                {
-                    while (!subScene.IsDone && subScene.IsValid)
+                    if (_subScenes.TryGetValue(location, out SceneHandle subScene))
                     {
-                        progressCallBack.Invoke(subScene.Progress);
-                        await UniTask.Yield();
+                        throw new Exception($"Could not load subScene while already loaded. Scene: {location}");
                     }
+
+                    subScene = YooAssets.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, priority);
+
+                    //Fix 这里前置，subScene.IsDone在UnSupendLoad之后才会是true
+                    _subScenes.Add(location, subScene);
+
+                    if (progressCallBack != null)
+                    {
+                        while (!subScene.IsDone && subScene.IsValid)
+                        {
+                            if (!IsCurrentLifetime(lifetimeVersion))
+                            {
+                                return default;
+                            }
+
+                            progressCallBack.Invoke(subScene.Progress);
+                            await UniTask.Yield();
+                        }
+                    }
+                    else
+                    {
+                        await subScene.ToUniTask();
+                    }
+
+                    if (!IsCurrentLifetime(lifetimeVersion))
+                    {
+                        return default;
+                    }
+
+                    return subScene.SceneObject;
                 }
                 else
                 {
-                    await subScene.ToUniTask();
-                }
-
-                _handlingScene.Remove(location);
-
-                return subScene.SceneObject;
-            }
-            else
-            {
-                if (_currentMainScene is { IsDone: false })
-                {
-                    throw new Exception($"Could not load MainScene while loading. CurrentMainScene: {_currentMainSceneName}.");
-                }
-
-                _currentMainSceneName = location;
-
-                _currentMainScene = YooAssets.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, priority);
-
-                if (progressCallBack != null)
-                {
-                    while (!_currentMainScene.IsDone && _currentMainScene.IsValid)
+                    if (_currentMainScene is { IsDone: false })
                     {
-                        progressCallBack.Invoke(_currentMainScene.Progress);
-                        await UniTask.Yield();
+                        throw new Exception($"Could not load MainScene while loading. CurrentMainScene: {_currentMainSceneName}.");
                     }
-                }
-                else
-                {
-                    await _currentMainScene.ToUniTask();
-                }
+
+                    _currentMainSceneName = location;
+
+                    _currentMainScene = YooAssets.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, priority);
+
+                    if (progressCallBack != null)
+                    {
+                        while (!_currentMainScene.IsDone && _currentMainScene.IsValid)
+                        {
+                            if (!IsCurrentLifetime(lifetimeVersion))
+                            {
+                                return default;
+                            }
+
+                            progressCallBack.Invoke(_currentMainScene.Progress);
+                            await UniTask.Yield();
+                        }
+                    }
+                    else
+                    {
+                        await _currentMainScene.ToUniTask();
+                    }
+
+                    if (!IsCurrentLifetime(lifetimeVersion))
+                    {
+                        return default;
+                    }
 #if UNITY_EDITOR&&EditorFixedMaterialShader
-                Utility.MaterialHelper.WaitGetRootGameObjects(_currentMainScene).Forget();
+                    Utility.MaterialHelper.WaitGetRootGameObjects(_currentMainScene).Forget();
 #endif
-                ModuleSystem.GetModule<IResourceModule>().ForceUnloadUnusedAssets(gcCollect);
+                    ModuleSystem.TryGetExistingModule<IResourceModule>()?.ForceUnloadUnusedAssets(gcCollect);
 
+                    return _currentMainScene.SceneObject;
+                }
+            }
+            finally
+            {
                 _handlingScene.Remove(location);
-
-                return _currentMainScene.SceneObject;
             }
         }
 
@@ -141,61 +202,85 @@ namespace TEngine
             Action<Scene> callBack = null,
             bool gcCollect = true, Action<float> progressCallBack = null)
         {
+            if (!CanAcceptNewWork())
+            {
+                return;
+            }
+
+            int lifetimeVersion = _lifetimeVersion;
             if (!_handlingScene.Add(location))
             {
                 Log.Error($"Could not load scene while loading. Scene: {location}");
                 return;
             }
 
-            if (sceneMode == LoadSceneMode.Additive)
+            try
             {
-                if (_subScenes.TryGetValue(location, out SceneHandle subScene))
+                if (sceneMode == LoadSceneMode.Additive)
                 {
-                    Log.Warning($"Could not load subScene while already loaded. Scene: {location}");
-                    return;
+                    if (_subScenes.TryGetValue(location, out SceneHandle subScene))
+                    {
+                        Log.Warning($"Could not load subScene while already loaded. Scene: {location}");
+                        return;
+                    }
+
+                    subScene = YooAssets.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, priority);
+
+                    subScene.Completed += handle =>
+                    {
+                        _handlingScene.Remove(location);
+                        if (!IsCurrentLifetime(lifetimeVersion))
+                        {
+                            return;
+                        }
+
+                        callBack?.Invoke(handle.SceneObject);
+                    };
+
+                    if (progressCallBack != null)
+                    {
+                        InvokeProgress(subScene, progressCallBack).Forget();
+                    }
+
+                    _subScenes.Add(location, subScene);
                 }
-
-                subScene = YooAssets.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, priority);
-
-                subScene.Completed += handle =>
+                else
                 {
-                    _handlingScene.Remove(location);
-                    callBack?.Invoke(handle.SceneObject);
-                };
+                    if (_currentMainScene is { IsDone: false })
+                    {
+                        Log.Warning($"Could not load MainScene while loading. CurrentMainScene: {_currentMainSceneName}.");
+                        return;
+                    }
 
-                if (progressCallBack != null)
-                {
-                    InvokeProgress(subScene, progressCallBack).Forget();
-                }
+                    _currentMainSceneName = location;
 
-                _subScenes.Add(location, subScene);
-            }
-            else
-            {
-                if (_currentMainScene is { IsDone: false })
-                {
-                    Log.Warning($"Could not load MainScene while loading. CurrentMainScene: {_currentMainSceneName}.");
-                    return;
-                }
+                    _currentMainScene = YooAssets.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, priority);
 
-                _currentMainSceneName = location;
+                    _currentMainScene.Completed += handle =>
+                    {
+                        _handlingScene.Remove(location);
+                        if (!IsCurrentLifetime(lifetimeVersion))
+                        {
+                            return;
+                        }
 
-                _currentMainScene = YooAssets.LoadSceneAsync(location, sceneMode, LocalPhysicsMode.None, suspendLoad, priority);
+                        callBack?.Invoke(handle.SceneObject);
+                    };
 
-                _currentMainScene.Completed += handle =>
-                {
-                    _handlingScene.Remove(location);
-                    callBack?.Invoke(handle.SceneObject);
-                };
-
-                if (progressCallBack != null)
-                {
-                    InvokeProgress(_currentMainScene, progressCallBack).Forget();
-                }
+                    if (progressCallBack != null)
+                    {
+                        InvokeProgress(_currentMainScene, progressCallBack).Forget();
+                    }
 #if UNITY_EDITOR&&EditorFixedMaterialShader
-                Utility.MaterialHelper.WaitGetRootGameObjects(_currentMainScene).Forget();
+                    Utility.MaterialHelper.WaitGetRootGameObjects(_currentMainScene).Forget();
 #endif
-                ModuleSystem.GetModule<IResourceModule>().ForceUnloadUnusedAssets(gcCollect);
+                    ModuleSystem.TryGetExistingModule<IResourceModule>()?.ForceUnloadUnusedAssets(gcCollect);
+                }
+            }
+            catch
+            {
+                _handlingScene.Remove(location);
+                throw;
             }
         }
 
@@ -206,11 +291,15 @@ namespace TEngine
                 return;
             }
 
-            while (!sceneHandle.IsDone && sceneHandle.IsValid)
+            int lifetimeVersion = _lifetimeVersion;
+            while (IsCurrentLifetime(lifetimeVersion) && !sceneHandle.IsDone && sceneHandle.IsValid)
             {
                 await UniTask.Yield();
 
-                progress?.Invoke(sceneHandle.Progress);
+                if (IsCurrentLifetime(lifetimeVersion))
+                {
+                    progress?.Invoke(sceneHandle.Progress);
+                }
             }
         }
 
@@ -221,6 +310,11 @@ namespace TEngine
         /// <returns>是否操作成功。</returns>
         public bool ActivateScene(string location)
         {
+            if (!CanAcceptNewWork())
+            {
+                return false;
+            }
+
             if (_currentMainSceneName.Equals(location))
             {
                 if (_currentMainScene != null)
@@ -248,6 +342,11 @@ namespace TEngine
         /// <returns>是否操作成功。</returns>
         public bool UnSuspend(string location)
         {
+            if (!CanAcceptNewWork())
+            {
+                return false;
+            }
+
             if (_currentMainSceneName.Equals(location))
             {
                 if (_currentMainScene != null)
@@ -275,6 +374,11 @@ namespace TEngine
         /// <returns>是否主场景。</returns>
         public bool IsMainScene(string location)
         {
+            if (!CanAcceptNewWork())
+            {
+                return false;
+            }
+
             // 获取当前激活的场景  
             Scene currentScene = SceneManager.GetActiveScene();
 
@@ -311,6 +415,12 @@ namespace TEngine
         /// <param name="progressCallBack">进度回调。</param>
         public async UniTask<bool> UnloadAsync(string location, Action<float> progressCallBack = null)
         {
+            if (!CanAcceptNewWork())
+            {
+                return false;
+            }
+
+            int lifetimeVersion = _lifetimeVersion;
             _subScenes.TryGetValue(location, out SceneHandle subScene);
             if (subScene != null)
             {
@@ -328,24 +438,39 @@ namespace TEngine
 
                 var unloadOperation = subScene.UnloadAsync();
 
-                if (progressCallBack != null)
+                try
                 {
-                    while (!unloadOperation.IsDone && unloadOperation.Status != EOperationStatus.Failed)
+                    if (progressCallBack != null)
                     {
-                        progressCallBack.Invoke(unloadOperation.Progress);
-                        await UniTask.Yield();
+                        while (!unloadOperation.IsDone && unloadOperation.Status != EOperationStatus.Failed)
+                        {
+                            if (!IsCurrentLifetime(lifetimeVersion))
+                            {
+                                return false;
+                            }
+
+                            progressCallBack.Invoke(unloadOperation.Progress);
+                            await UniTask.Yield();
+                        }
                     }
+                    else
+                    {
+                        await unloadOperation.ToUniTask();
+                    }
+
+                    if (!IsCurrentLifetime(lifetimeVersion))
+                    {
+                        return false;
+                    }
+
+                    _subScenes.Remove(location);
+
+                    return true;
                 }
-                else
+                finally
                 {
-                    await unloadOperation.ToUniTask();
+                    _handlingScene.Remove(location);
                 }
-
-                _subScenes.Remove(location);
-
-                _handlingScene.Remove(location);
-
-                return true;
             }
 
             Log.Warning($"UnloadAsync invalid location:{location}");
@@ -360,6 +485,12 @@ namespace TEngine
         /// <param name="progressCallBack">进度回调。</param>
         public void Unload(string location, Action callBack = null, Action<float> progressCallBack = null)
         {
+            if (!CanAcceptNewWork())
+            {
+                return;
+            }
+
+            int lifetimeVersion = _lifetimeVersion;
             _subScenes.TryGetValue(location, out SceneHandle subScene);
             if (subScene != null)
             {
@@ -375,17 +506,30 @@ namespace TEngine
                     return;
                 }
 
-                subScene.UnloadAsync();
-                subScene.UnloadAsync().Completed += @base =>
+                try
                 {
-                    _subScenes.Remove(location);
-                    _handlingScene.Remove(location);
-                    callBack?.Invoke();
-                };
+                    var unloadOperation = subScene.UnloadAsync();
+                    unloadOperation.Completed += @base =>
+                    {
+                        _handlingScene.Remove(location);
+                        if (!IsCurrentLifetime(lifetimeVersion))
+                        {
+                            return;
+                        }
 
-                if (progressCallBack != null)
+                        _subScenes.Remove(location);
+                        callBack?.Invoke();
+                    };
+
+                    if (progressCallBack != null)
+                    {
+                        InvokeProgress(subScene, progressCallBack).Forget();
+                    }
+                }
+                catch
                 {
-                    InvokeProgress(subScene, progressCallBack).Forget();
+                    _handlingScene.Remove(location);
+                    throw;
                 }
 
                 return;
@@ -401,12 +545,27 @@ namespace TEngine
         /// <returns>是否包含场景。</returns>
         public bool IsContainScene(string location)
         {
+            if (!CanAcceptNewWork())
+            {
+                return false;
+            }
+
             if (_currentMainSceneName.Equals(location))
             {
                 return true;
             }
 
             return _subScenes.TryGetValue(location, out var _);
+        }
+
+        private bool CanAcceptNewWork()
+        {
+            return !_stopping && ModuleSystem.IsRunning;
+        }
+
+        private bool IsCurrentLifetime(int lifetimeVersion)
+        {
+            return CanAcceptNewWork() && lifetimeVersion == _lifetimeVersion;
         }
     }
 }

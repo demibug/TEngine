@@ -15,6 +15,7 @@ namespace TEngine
         private FsmState<T> _currentState;
         private float _currentStateTime;
         private bool _isDestroyed;
+        private bool _isClearing;
 
         /// <summary>
         /// 初始化有限状态机的新实例。
@@ -27,6 +28,7 @@ namespace TEngine
             _currentState = null;
             _currentStateTime = 0f;
             _isDestroyed = true;
+            _isClearing = false;
         }
 
         /// <summary>
@@ -92,21 +94,37 @@ namespace TEngine
             fsm.Name = name;
             fsm._owner = owner;
             fsm._isDestroyed = false;
-            foreach (FsmState<T> state in states)
+            try
             {
-                if (state == null)
+                foreach (FsmState<T> state in states)
                 {
-                    throw new GameFrameworkException("FSM states is invalid.");
+                    if (state == null)
+                    {
+                        throw new GameFrameworkException("FSM states is invalid.");
+                    }
+
+                    Type stateType = state.GetType();
+                    if (fsm._states.ContainsKey(stateType))
+                    {
+                        throw new GameFrameworkException(Utility.Text.Format("FSM '{0}' state '{1}' is already exist.", new TypeNamePair(typeof(T), name), stateType.FullName));
+                    }
+
+                    fsm._states.Add(stateType, state);
+                    state.OnInit(fsm);
+                }
+            }
+            catch
+            {
+                try
+                {
+                    fsm.Clear();
+                }
+                finally
+                {
+                    MemoryPool.Release(fsm);
                 }
 
-                Type stateType = state.GetType();
-                if (fsm._states.ContainsKey(stateType))
-                {
-                    throw new GameFrameworkException(Utility.Text.Format("FSM '{0}' state '{1}' is already exist.", new TypeNamePair(typeof(T), name), stateType.FullName));
-                }
-
-                fsm._states.Add(stateType, state);
-                state.OnInit(fsm);
+                throw;
             }
 
             return fsm;
@@ -135,21 +153,37 @@ namespace TEngine
             fsm.Name = name;
             fsm._owner = owner;
             fsm._isDestroyed = false;
-            foreach (FsmState<T> state in states)
+            try
             {
-                if (state == null)
+                foreach (FsmState<T> state in states)
                 {
-                    throw new GameFrameworkException("FSM states is invalid.");
+                    if (state == null)
+                    {
+                        throw new GameFrameworkException("FSM states is invalid.");
+                    }
+
+                    Type stateType = state.GetType();
+                    if (fsm._states.ContainsKey(stateType))
+                    {
+                        throw new GameFrameworkException(Utility.Text.Format("FSM '{0}' state '{1}' is already exist.", new TypeNamePair(typeof(T), name), stateType.FullName));
+                    }
+
+                    fsm._states.Add(stateType, state);
+                    state.OnInit(fsm);
+                }
+            }
+            catch
+            {
+                try
+                {
+                    fsm.Clear();
+                }
+                finally
+                {
+                    MemoryPool.Release(fsm);
                 }
 
-                Type stateType = state.GetType();
-                if (fsm._states.ContainsKey(stateType))
-                {
-                    throw new GameFrameworkException(Utility.Text.Format("FSM '{0}' state '{1}' is already exist.", new TypeNamePair(typeof(T), name), stateType.FullName));
-                }
-
-                fsm._states.Add(stateType, state);
-                state.OnInit(fsm);
+                throw;
             }
 
             return fsm;
@@ -160,23 +194,50 @@ namespace TEngine
         /// </summary>
         public void Clear()
         {
-            if (_currentState != null)
+            if (_isDestroyed || _isClearing)
             {
-                _currentState.OnLeave(this, true);
+                return;
             }
 
-            foreach (KeyValuePair<Type, FsmState<T>> state in _states)
+            _isClearing = true;
+            try
             {
-                state.Value.OnDestroy(this);
-            }
+                if (_currentState != null)
+                {
+                    try
+                    {
+                        _currentState.OnLeave(this, true);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("FSM current state leave failed: {0}", exception);
+                    }
+                }
 
-            Name = null;
-            _owner = null;
-            _states?.Clear();
-            _dataMap?.Clear();
-            _currentState = null;
-            _currentStateTime = 0f;
-            _isDestroyed = true;
+                var stateSnapshot = new List<FsmState<T>>(_states.Values);
+                foreach (FsmState<T> state in stateSnapshot)
+                {
+                    try
+                    {
+                        state.OnDestroy(this);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("FSM state destroy failed: {0}", exception);
+                    }
+                }
+            }
+            finally
+            {
+                Name = null;
+                _owner = null;
+                _states.Clear();
+                _dataMap?.Clear();
+                _currentState = null;
+                _currentStateTime = 0f;
+                _isDestroyed = true;
+                _isClearing = false;
+            }
         }
 
         /// <summary>
@@ -185,6 +246,11 @@ namespace TEngine
         /// <typeparam name="TState">要开始的有限状态机状态类型。</typeparam>
         public void Start<TState>() where TState : FsmState<T>
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             if (IsRunning)
             {
                 throw new GameFrameworkException("FSM is running, can not start again.");
@@ -207,6 +273,11 @@ namespace TEngine
         /// <param name="stateType">要开始的有限状态机状态类型。</param>
         public void Start(Type stateType)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             if (IsRunning)
             {
                 throw new GameFrameworkException("FSM is running, can not start again.");
@@ -485,6 +556,11 @@ namespace TEngine
         /// <param name="stateType">要切换到的有限状态机状态类型。</param>
         internal void ChangeState(Type stateType)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             if (_currentState == null)
             {
                 throw new GameFrameworkException("Current state is invalid.");
@@ -500,6 +576,12 @@ namespace TEngine
             _currentStateTime = 0f;
             _currentState = state;
             _currentState.OnEnter(this);
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
         }
     }
 }

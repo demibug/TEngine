@@ -235,39 +235,73 @@ namespace TEngine
 
         private void Start()
         {
-            _resourceModule = ModuleSystem.GetModule<IResourceModule>();
-            if (_resourceModule == null)
+            if (!ModuleSystem.IsRunning)
             {
-                Log.Fatal("Resource module is invalid.");
                 return;
             }
 
-            if (PlayMode == EPlayMode.EditorSimulateMode)
+            try
             {
-                Log.Info("During this run, ResourceModule will use editor resource files, which you should validate first.");
-#if !UNITY_EDITOR
-                PlayMode = EPlayMode.OfflinePlayMode;
-#endif
-            }
+                _resourceModule = ModuleSystem.GetModule<IResourceModule>();
+                if (_resourceModule == null)
+                {
+                    throw new InvalidOperationException("Resource module is invalid.");
+                }
 
-            _resourceModule.DefaultPackageName = PackageName;
-            _resourceModule.PlayMode = PlayMode;
-            _resourceModule.EncryptionType = encryptionType;
-            _resourceModule.Milliseconds = milliseconds;
-            _resourceModule.AutoUnloadBundleWhenUnused = autoUnloadBundleWhenUnused;
-            _resourceModule.HostServerURL = Settings.UpdateSetting.GetResDownLoadPath();
-            _resourceModule.FallbackHostServerURL = Settings.UpdateSetting.GetFallbackResDownLoadPath();
-            _resourceModule.LoadResWayWebGL=Settings.UpdateSetting.GetLoadResWayWebGL();
-            _resourceModule.DownloadingMaxNum = DownloadingMaxNum;
-            _resourceModule.FailedTryAgain = FailedTryAgain;
-            _resourceModule.UpdatableWhilePlaying = UpdatableWhilePlaying;
-            _resourceModule.Initialize();
-            _resourceModule.AssetAutoReleaseInterval = assetAutoReleaseInterval;
-            _resourceModule.AssetCapacity = assetCapacity;
-            _resourceModule.AssetExpireTime = assetExpireTime;
-            _resourceModule.AssetPriority = assetPriority;
-            _resourceModule.SetForceUnloadUnusedAssetsAction(ForceUnloadUnusedAssets);
-            Log.Info($"ResourceModule Run Mode：{PlayMode}");
+                if (PlayMode == EPlayMode.EditorSimulateMode)
+                {
+                    Log.Info("During this run, ResourceModule will use editor resource files, which you should validate first.");
+#if !UNITY_EDITOR
+                    PlayMode = EPlayMode.OfflinePlayMode;
+#endif
+                }
+
+                _resourceModule.DefaultPackageName = PackageName;
+                _resourceModule.PlayMode = PlayMode;
+                _resourceModule.EncryptionType = encryptionType;
+                _resourceModule.Milliseconds = milliseconds;
+                _resourceModule.AutoUnloadBundleWhenUnused = autoUnloadBundleWhenUnused;
+                _resourceModule.HostServerURL = Settings.UpdateSetting.GetResDownLoadPath();
+                _resourceModule.FallbackHostServerURL = Settings.UpdateSetting.GetFallbackResDownLoadPath();
+                _resourceModule.LoadResWayWebGL = Settings.UpdateSetting.GetLoadResWayWebGL();
+                _resourceModule.DownloadingMaxNum = DownloadingMaxNum;
+                _resourceModule.FailedTryAgain = FailedTryAgain;
+                _resourceModule.UpdatableWhilePlaying = UpdatableWhilePlaying;
+
+                if (_resourceModule is ResourceModule resourceModule)
+                {
+                    resourceModule.ConfigureObjectPoolForInitialization(
+                        assetAutoReleaseInterval,
+                        assetCapacity,
+                        assetExpireTime,
+                        assetPriority,
+                        ForceUnloadUnusedAssets);
+                }
+
+                _resourceModule.Initialize();
+
+                // ResourceModule 将上述配置纳入 bootstrap 事务；保留接口实现的兼容路径。
+                if (!(_resourceModule is ResourceModule))
+                {
+                    _resourceModule.AssetAutoReleaseInterval = assetAutoReleaseInterval;
+                    _resourceModule.AssetCapacity = assetCapacity;
+                    _resourceModule.AssetExpireTime = assetExpireTime;
+                    _resourceModule.AssetPriority = assetPriority;
+                    _resourceModule.SetForceUnloadUnusedAssetsAction(ForceUnloadUnusedAssets);
+                }
+                Log.Info($"ResourceModule Run Mode：{PlayMode}");
+            }
+            catch (Exception exception)
+            {
+                // 参数读取、Initialize 或对象池配置的异常都必须完成 bootstrap 失败源，
+                // 让 ProcedureInitPackage 在超时前观察到真实原因。
+                if (_resourceModule is ResourceModule resourceModule)
+                {
+                    resourceModule.FailInitialization(exception);
+                }
+
+                Log.Fatal($"ResourceModule driver initialization failed: {exception}");
+            }
         }
 
         #region 释放资源
@@ -278,6 +312,11 @@ namespace TEngine
         /// <param name="performGCCollect">是否使用垃圾回收。</param>
         public void ForceUnloadUnusedAssets(bool performGCCollect)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _forceUnloadUnusedAssets = true;
             if (performGCCollect)
             {
@@ -288,6 +327,11 @@ namespace TEngine
 
         private void Update()
         {
+            if (!ModuleSystem.IsRunning || _resourceModule == null)
+            {
+                return;
+            }
+
             _lastUnloadUnusedAssetsOperationElapseSeconds += Time.unscaledDeltaTime;
             if (_asyncOperation == null && (_forceUnloadUnusedAssets || _lastUnloadUnusedAssetsOperationElapseSeconds >= maxUnloadUnusedAssetsInterval ||
                                             _preorderUnloadUnusedAssets && _lastUnloadUnusedAssetsOperationElapseSeconds >= minUnloadUnusedAssetsInterval))

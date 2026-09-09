@@ -29,6 +29,11 @@ namespace Procedure
 
         protected override void OnEnter(ProcedureOwner procedureOwner)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _procedureOwner = procedureOwner;
 
             Log.Info("创建补丁下载器");
@@ -42,7 +47,17 @@ namespace Procedure
         {
             await UniTask.Delay(TimeSpan.FromSeconds(0.5f));
 
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _downloader = _resourceModule.CreateResourceDownloader();
+
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
 
             if (_downloader.TotalDownloadCount == 0)
             {
@@ -70,6 +85,11 @@ namespace Procedure
 
         void StartDownFile()
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             ChangeState<ProcedureDownloadFile>(_procedureOwner);
         }
     }

@@ -41,7 +41,7 @@ namespace TEngine
 
         private void InitializedResources()
         {
-            _resourceModule = ModuleSystem.GetModule<IResourceModule>();
+            _resourceModule = ModuleSystem.TryGetExistingModule<IResourceModule>();
         }
 
         /// <summary>
@@ -52,8 +52,15 @@ namespace TEngine
         /// <typeparam name="T">Unity对象类型。</typeparam>
         public async UniTaskVoid SetAssetByResources<T>(ISetAssetObject setAssetObject, CancellationToken cancellationToken) where T : UnityEngine.Object
         {
+            if (!ModuleSystem.IsRunning || _resourceModule == null)
+            {
+                MemoryPool.Release(setAssetObject);
+                return;
+            }
+
             var target = setAssetObject.TargetObject;
             var location = setAssetObject.Location;
+            IResourceModule resourceModule = _resourceModule;
 
             if (target == null)
             {
@@ -79,21 +86,32 @@ namespace TEngine
                 await TryWaitingLoading(location).AttachExternalCancellation(linkedTokenSource.Token);
 
                 // 再次检查是否被新请求替换。
-                if (!IsCurrentRequest(target, loadingState))
+                if (!ModuleSystem.IsRunning || !IsCurrentRequest(target, loadingState))
                 {
                     return;
                 }
 
                 // 检查缓存。
-                if (_assetItemPool.CanSpawn(location))
+                if (_assetItemPool != null && _assetItemPool.CanSpawn(location))
                 {
                     var assetObject = (T)_assetItemPool.Spawn(location).Target;
+                    if (!ModuleSystem.IsRunning || !IsCurrentRequest(target, loadingState))
+                    {
+                        _assetItemPool.Unspawn(assetObject);
+                        return;
+                    }
+
                     DetachCurrentRequest(target, loadingState);
                     setAssetObjectTransferred = true;
                     SetAsset(setAssetObject, assetObject);
                 }
                 else
                 {
+                    if (!ModuleSystem.IsRunning)
+                    {
+                        return;
+                    }
+
                     // 防止重复加载同一资源。
                     if (!_assetLoadingList.Add(location))
                     {
@@ -104,14 +122,19 @@ namespace TEngine
 
                     hasLoadingMarker = true;
 
-                    loadedResource = await _resourceModule.LoadAssetAsync<T>(location, linkedTokenSource.Token);
+                    loadedResource = await resourceModule.LoadAssetAsync<T>(location, linkedTokenSource.Token);
                     if (loadedResource == null)
                     {
-                        Log.Error("加载资源失败，资源为空: '{0}'", location);
+                        LogErrorSafely($"加载资源失败，资源为空: '{location}'");
                         return;
                     }
 
-                    if (!IsCurrentRequest(target, loadingState))
+                    if (!ModuleSystem.IsRunning || !IsCurrentRequest(target, loadingState))
+                    {
+                        return;
+                    }
+
+                    if (_assetItemPool == null || !ModuleSystem.IsRunning)
                     {
                         return;
                     }
@@ -129,7 +152,7 @@ namespace TEngine
             }
             catch (Exception ex)
             {
-                Log.Error($"Failed to load asset '{location}': {ex}");
+                LogErrorSafely($"Failed to load asset '{location}': {ex}");
             }
             finally
             {
@@ -142,7 +165,14 @@ namespace TEngine
 
                 if (loadedResource != null && !resourceRegistered)
                 {
-                    _resourceModule.UnloadAsset(loadedResource);
+                    try
+                    {
+                        resourceModule.UnloadAsset(loadedResource);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogErrorSafely($"Failed to return late resource '{location}': {ex}");
+                    }
                 }
 
                 if (!setAssetObjectTransferred)
@@ -186,12 +216,34 @@ namespace TEngine
         /// </summary>
         private void OnDestroy()
         {
+            if (ReferenceEquals(Instance, this))
+            {
+                Instance = null;
+                _resourceModule = null;
+            }
+
             var loadingStates = new LoadingState[_loadingStates.Count];
             _loadingStates.Values.CopyTo(loadingStates, 0);
             _loadingStates.Clear();
             foreach (var state in loadingStates)
             {
-                state.Cancel();
+                try
+                {
+                    state.Cancel();
+                }
+                catch (Exception ex)
+                {
+                    LogErrorSafely($"Cancel resource loading state failed: {ex}");
+                }
+
+                try
+                {
+                    MemoryPool.Release(state);
+                }
+                catch (Exception ex)
+                {
+                    LogErrorSafely($"Release resource loading state failed: {ex}");
+                }
             }
         }
     }

@@ -15,6 +15,11 @@ namespace Procedure
 
         protected override void OnEnter(ProcedureOwner procedureOwner)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _procedureOwner = procedureOwner;
             Log.Info("清理未使用的缓存文件！");
 
@@ -27,6 +32,11 @@ namespace Procedure
 
         private void Operation_Completed(YooAsset.AsyncOperationBase obj)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             LauncherMgr.ShowUI<LoadUpdateUI>($"清理完成 即将进入游戏...");
 
             ChangeState<ProcedurePreload>(_procedureOwner);

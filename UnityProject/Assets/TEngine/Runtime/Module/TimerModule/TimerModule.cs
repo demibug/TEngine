@@ -27,6 +27,7 @@ namespace TEngine
         private readonly List<Timer> _unscaledTimerList = new List<Timer>();
         private readonly List<int> _cacheRemoveTimers = new List<int>();
         private readonly List<int> _cacheRemoveUnscaledTimers = new List<int>();
+        private bool _shutdown;
 
         /// <summary>
         /// 添加计时器。
@@ -39,6 +40,11 @@ namespace TEngine
         /// <returns>计时器Id。</returns>
         public int AddTimer(TimerHandler callback, float time, bool isLoop = false, bool isUnscaled = false, params object[] args)
         {
+            if (_shutdown || !ModuleSystem.IsRunning || callback == null)
+            {
+                return 0;
+            }
+
             Timer timer = new Timer
             {
                 timerId = ++_curTimerId,
@@ -341,7 +347,7 @@ namespace TEngine
         private void UpdateTimer(float elapseSeconds)
         {
             bool isLoopCall = false;
-            for (int i = 0, len = _timerList.Count; i < len; i++)
+            for (int i = 0, len = _timerList.Count; i < len && !_shutdown && ModuleSystem.IsRunning; i++)
             {
                 Timer timer = _timerList[i];
                 if (timer.isNeedRemove)
@@ -357,6 +363,13 @@ namespace TEngine
                     if (timer.Handler != null)
                     {
                         timer.Handler(timer.Args);
+                    }
+
+                    // 计时器回调可能触发 Shutdown，Shutdown 会清空两个计时器列表。
+                    // 当前回调结束后立即退出，不能继续访问旧索引或触发循环补偿。
+                    if (_shutdown || !ModuleSystem.IsRunning)
+                    {
+                        break;
                     }
 
                     if (timer.isLoop)
@@ -380,7 +393,7 @@ namespace TEngine
                 _cacheRemoveTimers.RemoveAt(i);
             }
 
-            if (isLoopCall)
+            if (isLoopCall && !_shutdown && ModuleSystem.IsRunning)
             {
                 LoopCallInBadFrame();
             }
@@ -389,7 +402,7 @@ namespace TEngine
         private void UpdateUnscaledTimer(float realElapseSeconds)
         {
             bool isLoopCall = false;
-            for (int i = 0, len = _unscaledTimerList.Count; i < len; i++)
+            for (int i = 0, len = _unscaledTimerList.Count; i < len && !_shutdown && ModuleSystem.IsRunning; i++)
             {
                 Timer timer = _unscaledTimerList[i];
                 if (timer.isNeedRemove)
@@ -405,6 +418,11 @@ namespace TEngine
                     if (timer.Handler != null)
                     {
                         timer.Handler(timer.Args);
+                    }
+
+                    if (_shutdown || !ModuleSystem.IsRunning)
+                    {
+                        break;
                     }
 
                     if (timer.isLoop)
@@ -428,7 +446,7 @@ namespace TEngine
                 _cacheRemoveUnscaledTimers.RemoveAt(i);
             }
 
-            if (isLoopCall)
+            if (isLoopCall && !_shutdown && ModuleSystem.IsRunning)
             {
                 LoopCallUnscaledInBadFrame();
             }
@@ -438,6 +456,11 @@ namespace TEngine
 
         public System.Timers.Timer AddSystemTimer(Action<object, System.Timers.ElapsedEventArgs> callBack)
         {
+            if (_shutdown || !ModuleSystem.IsRunning || callBack == null)
+            {
+                return null;
+            }
+
             int interval = 1000;
             var timerTick = new System.Timers.Timer(interval);
             timerTick.AutoReset = true;
@@ -451,29 +474,62 @@ namespace TEngine
 
         private void DestroySystemTimer()
         {
-            foreach (var ticker in _ticker)
+            foreach (var ticker in _ticker.ToArray())
             {
                 if (ticker != null)
                 {
-                    ticker.Stop();
+                    try
+                    {
+                        ticker.Stop();
+                        ticker.Dispose();
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorSafely("System timer shutdown failed: {0}", exception);
+                    }
                 }
             }
+
+            _ticker.Clear();
         }
 
         public override void OnInit()
         {
+            _shutdown = false;
         }
 
         public override void Shutdown()
         {
+            if (_shutdown)
+            {
+                return;
+            }
+
+            _shutdown = true;
             RemoveAllTimer();
             DestroySystemTimer();
         }
 
         public void Update(float elapseSeconds, float realElapseSeconds)
         {
+            if (_shutdown || !ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             UpdateTimer(elapseSeconds);
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             UpdateUnscaledTimer(realElapseSeconds);
+        }
+
+        private static void LogErrorSafely(string format, Exception exception)
+        {
+            try { Log.Error(format, exception); }
+            catch { }
         }
     }
 }

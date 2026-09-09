@@ -15,10 +15,21 @@ namespace TEngine
         {
             private static IUpdateDriver _updateDriver;
 
+            [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+            private static void ResetForNewSession()
+            {
+                _updateDriver = null;
+            }
+
             #region 控制协程Coroutine
 
             public static GameCoroutine StartCoroutine(string name, IEnumerator routine, MonoBehaviour bindBehaviour)
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    return null;
+                }
+
                 if (bindBehaviour == null)
                 {
                     Log.Error("StartCoroutine {0} failed, bindBehaviour is null", name);
@@ -31,6 +42,11 @@ namespace TEngine
 
             public static GameCoroutine StartCoroutine(string name, IEnumerator routine, GameObject bindGo)
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    return null;
+                }
+
                 if (bindGo == null)
                 {
                     Log.Error("StartCoroutine {0} failed, BindGo is null", name);
@@ -43,7 +59,17 @@ namespace TEngine
 
             public static GameCoroutine StartGlobalCoroutine(string name, IEnumerator routine)
             {
+                if (!ModuleSystem.IsRunning)
+                {
+                    return null;
+                }
+
                 var coroutine = StartCoroutine(routine);
+                if (coroutine == null)
+                {
+                    return null;
+                }
+
                 var gameCoroutine = new GameCoroutine();
                 gameCoroutine.Coroutine = coroutine;
                 gameCoroutine.Name = name;
@@ -94,75 +120,71 @@ namespace TEngine
 
             public static Coroutine StartCoroutine(string methodName)
             {
-                if (string.IsNullOrEmpty(methodName))
+                if (!ModuleSystem.IsRunning || string.IsNullOrEmpty(methodName) || !_MakeEntity())
                 {
                     return null;
                 }
 
-                _MakeEntity();
                 return _updateDriver.StartCoroutine(methodName);
             }
 
             public static Coroutine StartCoroutine(IEnumerator routine)
             {
-                if (routine == null)
+                if (!ModuleSystem.IsRunning || routine == null || !_MakeEntity())
                 {
                     return null;
                 }
 
-                _MakeEntity();
                 return _updateDriver.StartCoroutine(routine);
             }
 
             public static Coroutine StartCoroutine(string methodName, [DefaultValue("null")] object value)
             {
-                if (string.IsNullOrEmpty(methodName))
+                if (!ModuleSystem.IsRunning || string.IsNullOrEmpty(methodName) || !_MakeEntity())
                 {
                     return null;
                 }
 
-                _MakeEntity();
                 return _updateDriver.StartCoroutine(methodName, value);
             }
 
             public static void StopCoroutine(string methodName)
             {
-                if (string.IsNullOrEmpty(methodName))
+                if (string.IsNullOrEmpty(methodName) || !_TryGetExistingDriver())
                 {
                     return;
                 }
 
-                _MakeEntity();
                 _updateDriver.StopCoroutine(methodName);
             }
 
             public static void StopCoroutine(IEnumerator routine)
             {
-                if (routine == null)
+                if (routine == null || !_TryGetExistingDriver())
                 {
                     return;
                 }
 
-                _MakeEntity();
                 _updateDriver.StopCoroutine(routine);
             }
 
             public static void StopCoroutine(Coroutine routine)
             {
-                if (routine == null)
+                if (routine == null || !_TryGetExistingDriver())
                 {
                     return;
                 }
 
-                _MakeEntity();
                 _updateDriver.StopCoroutine(routine);
                 routine = null;
             }
 
             public static void StopAllCoroutines()
             {
-                _MakeEntity();
-                _updateDriver.StopAllCoroutines();
+                if (_TryGetExistingDriver())
+                {
+                    _updateDriver.StopAllCoroutines();
+                }
             }
 
             #endregion
@@ -175,14 +197,19 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void AddUpdateListener(Action fun)
             {
-                _MakeEntity();
-                AddUpdateListenerImp(fun).Forget();
+                if (fun != null && _MakeEntity())
+                {
+                    AddUpdateListenerImp(fun, _updateDriver).Forget();
+                }
             }
 
-            private static async UniTaskVoid AddUpdateListenerImp(Action fun)
+            private static async UniTaskVoid AddUpdateListenerImp(Action fun, IUpdateDriver driver)
             {
                 await UniTask.Yield( /*PlayerLoopTiming.LastPreUpdate*/);
-                _updateDriver.AddUpdateListener(fun);
+                if (ModuleSystem.IsRunning && driver != null)
+                {
+                    driver.AddUpdateListener(fun);
+                }
             }
 
             /// <summary>
@@ -191,14 +218,19 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void AddFixedUpdateListener(Action fun)
             {
-                _MakeEntity();
-                AddFixedUpdateListenerImp(fun).Forget();
+                if (fun != null && _MakeEntity())
+                {
+                    AddFixedUpdateListenerImp(fun, _updateDriver).Forget();
+                }
             }
 
-            private static async UniTaskVoid AddFixedUpdateListenerImp(Action fun)
+            private static async UniTaskVoid AddFixedUpdateListenerImp(Action fun, IUpdateDriver driver)
             {
                 await UniTask.Yield(PlayerLoopTiming.LastEarlyUpdate);
-                _updateDriver.AddFixedUpdateListener(fun);
+                if (ModuleSystem.IsRunning && driver != null)
+                {
+                    driver.AddFixedUpdateListener(fun);
+                }
             }
 
             /// <summary>
@@ -207,14 +239,19 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void AddLateUpdateListener(Action fun)
             {
-                _MakeEntity();
-                AddLateUpdateListenerImp(fun).Forget();
+                if (fun != null && _MakeEntity())
+                {
+                    AddLateUpdateListenerImp(fun, _updateDriver).Forget();
+                }
             }
 
-            private static async UniTaskVoid AddLateUpdateListenerImp(Action fun)
+            private static async UniTaskVoid AddLateUpdateListenerImp(Action fun, IUpdateDriver driver)
             {
                 await UniTask.Yield( /*PlayerLoopTiming.LastPreLateUpdate*/);
-                _updateDriver.AddLateUpdateListener(fun);
+                if (ModuleSystem.IsRunning && driver != null)
+                {
+                    driver.AddLateUpdateListener(fun);
+                }
             }
 
             /// <summary>
@@ -223,8 +260,10 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void RemoveUpdateListener(Action fun)
             {
-                _MakeEntity();
-                _updateDriver.RemoveUpdateListener(fun);
+                if (_TryGetExistingDriver())
+                {
+                    _updateDriver.RemoveUpdateListener(fun);
+                }
             }
 
             /// <summary>
@@ -233,8 +272,10 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void RemoveFixedUpdateListener(Action fun)
             {
-                _MakeEntity();
-                _updateDriver.RemoveFixedUpdateListener(fun);
+                if (_TryGetExistingDriver())
+                {
+                    _updateDriver.RemoveFixedUpdateListener(fun);
+                }
             }
 
             /// <summary>
@@ -243,8 +284,10 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void RemoveLateUpdateListener(Action fun)
             {
-                _MakeEntity();
-                _updateDriver.RemoveLateUpdateListener(fun);
+                if (_TryGetExistingDriver())
+                {
+                    _updateDriver.RemoveLateUpdateListener(fun);
+                }
             }
 
             #endregion
@@ -257,8 +300,10 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void AddDestroyListener(Action fun)
             {
-                _MakeEntity();
-                _updateDriver.AddDestroyListener(fun);
+                if (fun != null && _MakeEntity())
+                {
+                    _updateDriver.AddDestroyListener(fun);
+                }
             }
 
             /// <summary>
@@ -267,8 +312,10 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void RemoveDestroyListener(Action fun)
             {
-                _MakeEntity();
-                _updateDriver.RemoveDestroyListener(fun);
+                if (_TryGetExistingDriver())
+                {
+                    _updateDriver.RemoveDestroyListener(fun);
+                }
             }
 
             /// <summary>
@@ -277,8 +324,10 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void AddOnDrawGizmosListener(Action fun)
             {
-                _MakeEntity();
-                _updateDriver.AddOnDrawGizmosListener(fun);
+                if (fun != null && _MakeEntity())
+                {
+                    _updateDriver.AddOnDrawGizmosListener(fun);
+                }
             }
 
             /// <summary>
@@ -287,8 +336,10 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void RemoveOnDrawGizmosListener(Action fun)
             {
-                _MakeEntity();
-                _updateDriver.RemoveOnDrawGizmosListener(fun);
+                if (_TryGetExistingDriver())
+                {
+                    _updateDriver.RemoveOnDrawGizmosListener(fun);
+                }
             }
 
             /// <summary>
@@ -297,8 +348,10 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void AddOnApplicationPauseListener(Action<bool> fun)
             {
-                _MakeEntity();
-                _updateDriver.AddOnApplicationPauseListener(fun);
+                if (fun != null && _MakeEntity())
+                {
+                    _updateDriver.AddOnApplicationPauseListener(fun);
+                }
             }
 
             /// <summary>
@@ -307,20 +360,33 @@ namespace TEngine
             /// <param name="fun"></param>
             public static void RemoveOnApplicationPauseListener(Action<bool> fun)
             {
-                _MakeEntity();
-                _updateDriver.RemoveOnApplicationPauseListener(fun);
+                if (_TryGetExistingDriver())
+                {
+                    _updateDriver.RemoveOnApplicationPauseListener(fun);
+                }
             }
 
             #endregion
 
-            private static void _MakeEntity()
+            private static bool _MakeEntity()
             {
-                if (_updateDriver != null)
+                if (!ModuleSystem.IsRunning)
                 {
-                    return;
+                    return false;
                 }
 
-                _updateDriver = ModuleSystem.GetModule<IUpdateDriver>();
+                if (_updateDriver != null)
+                {
+                    return true;
+                }
+
+                _updateDriver = ModuleSystem.TryGetExistingModule<IUpdateDriver>();
+                return _updateDriver != null;
+            }
+
+            private static bool _TryGetExistingDriver()
+            {
+                return _updateDriver != null || (_updateDriver = ModuleSystem.TryGetExistingModule<IUpdateDriver>()) != null;
             }
 
             #region FindObjectOfType

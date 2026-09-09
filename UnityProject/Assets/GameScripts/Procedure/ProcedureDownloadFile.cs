@@ -18,6 +18,7 @@ namespace Procedure
         private float _lastUpdateDownloadedSize;
         private float _totalSpeed;
         private int _speedSampleCount;
+        private ResourceDownloaderOperation _downloader;
 
         private float CurrentSpeed
         {
@@ -37,6 +38,11 @@ namespace Procedure
 
         protected override void OnEnter(ProcedureOwner procedureOwner)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             _procedureOwner = procedureOwner;
 
             Log.Info("开始下载更新文件！");
@@ -46,15 +52,43 @@ namespace Procedure
             BeginDownload().Forget();
         }
 
+        protected override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
+        {
+            try
+            {
+                base.OnLeave(procedureOwner, isShutdown);
+            }
+            finally
+            {
+                ResourceDownloaderOperation downloader = _downloader;
+                _downloader = null;
+                if (downloader != null)
+                {
+                    downloader.DownloadErrorCallback = null;
+                    downloader.DownloadUpdateCallback = null;
+                }
+            }
+        }
+
         private async UniTaskVoid BeginDownload()
         {
             var downloader = _resourceModule.Downloader;
+            _downloader = downloader;
+            if (!ModuleSystem.IsRunning || downloader == null)
+            {
+                return;
+            }
 
             // 注册下载回调
             downloader.DownloadErrorCallback = OnDownloadErrorCallback;
             downloader.DownloadUpdateCallback = OnDownloadProgressCallback;
             downloader.BeginDownload();
             await downloader;
+
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
 
             // 检测下载结果
             if (downloader.Status != EOperationStatus.Succeed)
@@ -65,12 +99,28 @@ namespace Procedure
 
         private void OnDownloadErrorCallback(DownloadErrorData downloadErrorData)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             LauncherMgr.ShowMessageBox($"Failed to download file : {downloadErrorData.FileName}",
-                () => { ChangeState<ProcedureCreateDownloader>(_procedureOwner); }, UnityEngine.Application.Quit);
+                () =>
+                {
+                    if (ModuleSystem.IsRunning)
+                    {
+                        ChangeState<ProcedureCreateDownloader>(_procedureOwner);
+                    }
+                }, UnityEngine.Application.Quit);
         }
 
         private void OnDownloadProgressCallback(DownloadUpdateData downloadUpdateData)
         {
+            if (!ModuleSystem.IsRunning)
+            {
+                return;
+            }
+
             string currentSizeMb = (downloadUpdateData.CurrentDownloadBytes / 1048576f).ToString("f1");
             string totalSizeMb = (downloadUpdateData.TotalDownloadBytes / 1048576f).ToString("f1");
             float progressPercentage = _resourceModule.Downloader.Progress * 100;
@@ -82,6 +132,11 @@ namespace Procedure
             string line3 = Utility.Text.Format("当前网速 {0}/s，剩余时间 {1}", speed,
                 GetRemainingTime(downloadUpdateData.TotalDownloadBytes, downloadUpdateData.CurrentDownloadBytes,
                     CurrentSpeed));
+
+            if (!ModuleSystem.IsRunning || _resourceModule.Downloader == null)
+            {
+                return;
+            }
 
             LauncherMgr.RefreshProgress(_resourceModule.Downloader.Progress);
             LauncherMgr.ShowUI<LoadUpdateUI>($"{line1}\n{line2}\n{line3}");

@@ -9,6 +9,7 @@ namespace TEngine
     {
         // 实际的本地化管理器实例。
         private LocalizationManager _localizationManager;
+        private bool _shutdown;
 
         /// <summary>
         /// 绑定具体的本地化管理器实现。
@@ -24,6 +25,7 @@ namespace TEngine
         /// </summary>
         public override void OnInit()
         {
+            _shutdown = false;
         }
 
         /// <summary>
@@ -31,7 +33,18 @@ namespace TEngine
         /// </summary>
         public override void Shutdown()
         {
-            UnityEngine.Object.Destroy(_localizationManager);
+            if (_shutdown)
+            {
+                return;
+            }
+
+            _shutdown = true;
+            LocalizationManager manager = _localizationManager;
+            _localizationManager = null;
+            if (manager != null)
+            {
+                UnityEngine.Object.Destroy(manager);
+            }
         }
 
         /// <summary>
@@ -39,14 +52,20 @@ namespace TEngine
         /// </summary>
         public Language Language
         {
-            get => _localizationManager.Language;
-            set => _localizationManager.Language = value;
+            get => CanAcceptNewWork() ? _localizationManager.Language : Language.Unspecified;
+            set
+            {
+                if (CanAcceptNewWork())
+                {
+                    _localizationManager.Language = value;
+                }
+            }
         }
 
         /// <summary>
         /// 获取系统默认语言。
         /// </summary>
-        public Language SystemLanguage => _localizationManager.SystemLanguage;
+        public Language SystemLanguage => CanAcceptNewWork() ? _localizationManager.SystemLanguage : Language.Unspecified;
 
         /// <summary>
         /// 加载完整的语言资源包。
@@ -54,6 +73,11 @@ namespace TEngine
         /// <param name="assetName">要加载的资源包名称</param>
         public async UniTask LoadLanguageTotalAsset(string assetName)
         {
+            if (!CanAcceptNewWork())
+            {
+                return;
+            }
+
             await _localizationManager.LoadLanguageTotalAsset(assetName);
         }
 
@@ -65,6 +89,11 @@ namespace TEngine
         /// <param name="fromInit">是否来自初始化流程。</param>
         public async UniTask LoadLanguage(string language, bool setCurrent = false, bool fromInit = false)
         {
+            if (!CanAcceptNewWork())
+            {
+                return;
+            }
+
             await _localizationManager.LoadLanguage(language, setCurrent, fromInit);
         }
 
@@ -75,7 +104,7 @@ namespace TEngine
         /// <returns>如果语言可用返回true，否则false。</returns>
         public bool CheckLanguage(string language)
         {
-            return _localizationManager.CheckLanguage(language);
+            return CanAcceptNewWork() && _localizationManager != null && _localizationManager.CheckLanguage(language);
         }
 
         /// <summary>
@@ -86,7 +115,7 @@ namespace TEngine
         /// <returns>设置是否成功。</returns>
         public bool SetLanguage(Language language, bool load = false)
         {
-            return _localizationManager.SetLanguage(language, load);
+            return CanAcceptNewWork() && _localizationManager != null && _localizationManager.SetLanguage(language, load);
         }
 
         /// <summary>
@@ -97,7 +126,7 @@ namespace TEngine
         /// <returns>设置是否成功。</returns>
         public bool SetLanguage(string language, bool load = false)
         {
-            return _localizationManager.SetLanguage(language, load);
+            return CanAcceptNewWork() && _localizationManager != null && _localizationManager.SetLanguage(language, load);
         }
 
         /// <summary>
@@ -107,7 +136,12 @@ namespace TEngine
         /// <returns>设置是否成功。</returns>
         public bool SetLanguage(int languageId)
         {
-            return _localizationManager.SetLanguage(languageId);
+            return CanAcceptNewWork() && _localizationManager != null && _localizationManager.SetLanguage(languageId);
+        }
+
+        private bool CanAcceptNewWork()
+        {
+            return !_shutdown && ModuleSystem.IsRunning && _localizationManager != null;
         }
     }
 }

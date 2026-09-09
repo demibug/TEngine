@@ -46,7 +46,7 @@ namespace TEngine
         /// <param name="callerWrap">callerWrap接口名字。</param>
         public void RegWrapInterface<T>(T callerWrap)
         {
-            if (callerWrap != null)
+            if (ModuleSystem.IsRunning && callerWrap != null)
             {
                 var entry = new EventEntryData
                 {
