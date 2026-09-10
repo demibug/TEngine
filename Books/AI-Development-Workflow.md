@@ -59,7 +59,7 @@
 
 - 通过 REST API 自动化 Unity Editor 操作
 - 已集成到 `unity-skills` 技能中
-- 安装方法见 [unity-mcp-guide.md](skills/tengine-dev/references/unity-mcp-guide.md)
+- 安装方法见 [mcp-tools.md](../UnityProject/.claude/skills/tengine-dev/references/mcp-tools.md)
 
 **unity-skills 触发词**：Unity、Unity Skills、in Unity、automate Unity、editor automation、创建脚本、场景分析、build scene、管理资源、Unity Editor 自动化、Unity 编辑器、Unity 技能、操作 Unity、全自动模式、半自动模式
 
@@ -318,7 +318,7 @@ graph LR
 npm install -g @fission-ai/openspec@latest
 
 # 在 TEngine 项目根目录初始化
-cd I:\WorkSpace\TEngine
+cd TEngine
 openspec init
 
 # 选择 Claude Code 作为 AI 工具
@@ -707,16 +707,17 @@ sequenceDiagram
 tengine-dev 技能遵循以下核心原则：
 
 1. **异步优先**: IO 操作用 `UniTask`，禁止同步加载/Coroutine
-2. **模块访问**: 通过 `GameModule.XXX` 访问
+2. **模块访问**: 通过 `GameModule.XXX` 访问（`IObjectPoolModule` 等少数模块除外）
 3. **资源必须释放**: `LoadAssetAsync` 对应 `UnloadAsset`
-4. **热更边界**: `GameScripts/Main` 不热更，`GameScripts/HotFix/` 全部热更
+4. **热更边界**: `GameScripts/GameEntry.cs`、`GameScripts/Procedure/`、`Assets/Launcher/`、`Assets/TEngine/` 不热更，`GameScripts/HotFix/`（GameUpdater/GameProto/GameLogic）全部热更
 5. **事件解耦**: 模块间用 `GameEvent`，UI 内部用 `AddUIEvent`
 
 ### 程序集分层
 
 ```
-GameScripts/Main/       → 主包（不热更）
+GameScripts/GameEntry.cs、Procedure/  → 主包（不热更，Assembly-CSharp）
 GameScripts/HotFix/
+  ├── GameUpdater/      → 两阶段更新引导程序集（默认不启用）
   ├── GameProto/        → Luban 配置代码
   └── GameLogic/        → 业务逻辑（GameApp.cs 入口）
 ```
@@ -1119,38 +1120,39 @@ flowchart LR
 
 - [ ] **异步优先**: 所有 IO 操作使用 `UniTask`
   ```csharp
-  ✅ await GameModule.Resource.LoadAssetAsync<Sprite>(path);
-  ❌ Resources.Load<Sprite>(path);  // 禁止
-  ❌ StartCoroutine(LoadSprite());   // 禁止
+  ✅ await GameModule.Resource.LoadAssetAsync<TextAsset>(path);
+  ❌ Resources.Load<TextAsset>(path);  // 禁止
+  ❌ StartCoroutine(LoadText());       // 禁止
   ```
 
 - [ ] **资源释放**: 每个 `LoadAssetAsync` 都有对应的 `UnloadAsset`
   ```csharp
-  ✅ private AssetHandle _handle;
-      _handle = await GameModule.Resource.LoadAssetAsync<Sprite>(path);
+  ✅ private TextAsset _textAsset;
+      _textAsset = await GameModule.Resource.LoadAssetAsync<TextAsset>(path);
       // 使用完毕后
-      GameModule.Resource.UnloadAsset(_handle);
+      GameModule.Resource.UnloadAsset(_textAsset);
 
-  ❌ await GameModule.Resource.LoadAssetAsync<Sprite>(path);
-      // 没有保存 handle，无法释放
+  ❌ await GameModule.Resource.LoadAssetAsync<TextAsset>(path);
+      // 没有保存资源引用，无法释放
   ```
 
 - [ ] **模块访问**: 通过 `GameModule.XXX` 访问
   ```csharp
-  ✅ GameModule.Audio.PlaySound("click");
-  ❌ ModuleSystem.GetModule<AudioModule>().PlaySound("click");
+  ✅ GameModule.Audio.Play(AudioType.Sound, "click");
+  ❌ ModuleSystem.GetModule<IAudioModule>().Play(AudioType.Sound, "click");
   ```
 
 - [ ] **热更边界**: 代码放在正确的目录
   ```
   ✅ GameScripts/HotFix/GameLogic/UI/UIInventory.cs
-  ❌ GameScripts/Main/UI/UIInventory.cs  // 不热更，错误！
+  ❌ GameScripts/Procedure/UI/UIInventory.cs  // 主包流程，不热更，错误！
   ```
 
 - [ ] **事件解耦**: 使用正确的事件类型
   ```csharp
-  ✅ 模块间：GameEvent.Send(EventName.OnInventoryChanged);
-  ✅ UI 内：AddUIEvent(btnClose, OnCloseClicked);
+  ✅ 模块间：GameEvent.Send(IBattleEvent_Event.OnInventoryChanged); // 或 GameEvent.Get<接口>().OnXxx()
+  ✅ UI 内：AddUIEvent(IBattleEvent_Event.OnInventoryChanged, OnInventoryChanged); // GameEvent 事件监听
+  ✅ 按钮点击：m_btnClose.onClick.AddListener(OnCloseClicked); // 按钮回调不走事件系统
   ❌ 直接引用：otherModule.OnInventoryChanged();
   ```
 
@@ -1287,32 +1289,36 @@ git push
 // ✅ 批量预加载
 private async UniTask PreloadResources()
 {
-    var tasks = new List<UniTask<AssetHandle>>();
-    foreach (var path in iconPaths)
+    var tasks = new List<UniTask<AudioClip>>();
+    foreach (var path in audioPaths)
     {
-        tasks.Add(GameModule.Resource.LoadAssetAsync<Sprite>(path));
+        tasks.Add(GameModule.Resource.LoadAssetAsync<AudioClip>(path));
     }
-    _handles = (await UniTask.WhenAll(tasks)).ToList();
+    _clips = (await UniTask.WhenAll(tasks)).ToList();
 }
 
 // ❌ 逐个加载
 private async UniTask LoadResourcesOneByOne()
 {
-    foreach (var path in iconPaths)
+    foreach (var path in audioPaths)
     {
-        await GameModule.Resource.LoadAssetAsync<Sprite>(path);
+        await GameModule.Resource.LoadAssetAsync<AudioClip>(path);
     }
 }
 ```
 
+> 注意：Sprite 图片请使用 `SetSprite` 扩展方法（内置缓存池），不要用 `LoadAssetAsync<Sprite>`。
+
 #### UI 实例化优化
 
 ```csharp
-// ✅ 使用对象池
-var item = await GameModule.UI.CreateUIWidgetFromPool<UIInventoryItem>(prefabPath);
+// ✅ 列表项复用：按数据数量自动增删 Widget（UIBase 提供，内部复用已有 Widget）
+AdjustIconNum(_itemWidgets, data.Count, m_itemContainer);
+// 数据量大时用异步分帧版，避免单帧卡顿
+AsyncAdjustIconNum(_itemWidgets, data.Count, m_itemContainer, assetPath: "ItemWidget");
 
-// ❌ 每次都创建新对象
-var item = await GameModule.Resource.LoadGameObjectAsync(prefabPath);
+// ❌ 每次都重新加载并实例化
+var item = await GameModule.Resource.LoadGameObjectAsync("ItemWidget");
 ```
 
 ### 8. 安全注意事项
@@ -1322,23 +1328,27 @@ var item = await GameModule.Resource.LoadGameObjectAsync(prefabPath);
 ```csharp
 public class UIInventory : UIWindow
 {
-    private List<AssetHandle> _handles = new();
+    private readonly List<TextAsset> _configs = new();
 
-    // ✅ 统一管理资源句柄
-    protected override async UniTask OnCreate()
+    // ✅ OnCreate 为同步回调；异步加载用 UniTaskVoid 启动
+    protected override void OnCreate()
     {
-        var handle = await GameModule.Resource.LoadAssetAsync<Sprite>(path);
-        _handles.Add(handle);  // 保存句柄
+        LoadConfigsAsync().Forget();
+    }
+
+    private async UniTaskVoid LoadConfigsAsync()
+    {
+        _configs.Add(await GameModule.Resource.LoadAssetAsync<TextAsset>("level_data"));
     }
 
     // ✅ 确保释放
     protected override void OnDestroy()
     {
-        foreach (var handle in _handles)
+        foreach (var config in _configs)
         {
-            GameModule.Resource.UnloadAsset(handle);
+            GameModule.Resource.UnloadAsset(config);
         }
-        _handles.Clear();
+        _configs.Clear();
         base.OnDestroy();
     }
 }
@@ -1458,10 +1468,10 @@ sequenceDiagram
 ## 相关文档
 
 - [openspec 官方文档](https://github.com/openspec/openspec)
-- [TEngine 框架文档](Books/0-介绍.md)
-- [tengine-dev 技能参考](skills/tengine-dev/references/)
+- [TEngine 框架文档](./0-介绍.md)
+- [tengine-dev 技能参考](../UnityProject/.claude/skills/tengine-dev/references/)
 - [claude-mem 插件](https://github.com/fission-ai/claude-mem)
-- [Unity-MCP 指南](skills/tengine-dev/references/unity-mcp-guide.md)
+- [Unity-MCP 指南](../UnityProject/.claude/skills/tengine-dev/references/mcp-tools.md)
 
 ---
 

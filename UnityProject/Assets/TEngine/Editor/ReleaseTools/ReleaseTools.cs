@@ -192,6 +192,8 @@ namespace TEngine
                 if (errors.Count > 0)
                     return Fail(result, string.Join("\n", errors));
 
+                TwoStageReleaseBuilder.ReserveReleaseId(config);
+
                 result.Target = config.BuildTarget;
                 result.PackageVersion = config.PackageVersion;
 
@@ -246,6 +248,9 @@ namespace TEngine
 
                     if (player.Status != BuildStatus.Succeeded)
                         return Fail(result, string.IsNullOrEmpty(player.Error) ? "Player 构建失败" : player.Error, player.Exception);
+
+                    // Player 构建可能更新最终 strip 产物；成功前必须重新核对 descriptor 的 metadata 摘要。
+                    TwoStageReleaseBuilder.VerifyFinalAotMetadata(config, result.OutputPackageDirectory);
                 }
 
                 // 6. Completed：所有请求阶段完成后才报告成功
@@ -256,6 +261,11 @@ namespace TEngine
             catch (Exception e)
             {
                 return Fail(result, e.Message, e);
+            }
+            finally
+            {
+                if (config != null)
+                    config.TwoStageReleaseIdReserved = false;
             }
         }
 
@@ -360,8 +370,16 @@ namespace TEngine
         /// </summary>
         internal static AbStageOutcome BuildAssetBundleStage(BuildConfig config)
         {
+            bool reservedHere = false;
             try
             {
+                if (Settings.UpdateSetting != null && Settings.UpdateSetting.EnableTwoStageUpdate &&
+                    !config.TwoStageReleaseIdReserved)
+                {
+                    TwoStageReleaseBuilder.ReserveReleaseId(config);
+                    reservedHere = true;
+                }
+
                 Debug.Log($"[ReleaseTools] 开始构建 : {config.BuildTarget}");
 
                 string outputRoot = ResolveOutputRoot(config);
@@ -384,12 +402,19 @@ namespace TEngine
                 if (missing.Count > 0)
                     return AbStageOutcome.Fail($"AssetBundle 输出缺失必需文件:\n{string.Join("\n", missing)}");
 
+                TwoStageReleaseBuilder.GenerateAndVerify(config, buildResult.OutputPackageDirectory);
+
                 Debug.Log($"[ReleaseTools] 构建成功 : {buildResult.OutputPackageDirectory}");
                 return AbStageOutcome.Succeed(buildResult.OutputPackageDirectory);
             }
             catch (Exception e)
             {
                 return AbStageOutcome.Fail($"AssetBundle 构建异常: {e.Message}", e);
+            }
+            finally
+            {
+                if (reservedHere)
+                    config.TwoStageReleaseIdReserved = false;
             }
         }
 
@@ -401,6 +426,20 @@ namespace TEngine
             string outputRoot = config.OutputRoot;
             if (!Path.IsPathRooted(outputRoot))
                 outputRoot = Path.Combine(Application.dataPath + "/../", outputRoot);
+
+            UpdateSetting setting = Settings.UpdateSetting;
+            if (setting != null && setting.EnableTwoStageUpdate)
+            {
+                outputRoot = Path.Combine(
+                    outputRoot,
+                    "TwoStageReleases",
+                    setting.BasePlayerId,
+                    TwoStageReleaseBuilder.GetPlatformName(config.BuildTarget),
+                    setting.Channel,
+                    PackageName,
+                    config.ReleaseId);
+            }
+
             return Path.GetFullPath(outputRoot).Replace('\\', '/');
         }
 

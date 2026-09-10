@@ -89,6 +89,42 @@ namespace TEngine
         /// </summary>
         public string AssemblyTextAssetPath = "AssetRaw/DLL";
 
+        [Header("Two-stage update (default disabled)")]
+        [Tooltip("AOT host downloads and loads GameUpdater first, then GameUpdater controls the remaining update.")]
+        public bool EnableTwoStageUpdate = false;
+
+        public int TwoStageContractVersion = 1;
+
+        [Tooltip("Build-time compatibility id for the exact AOT ABI and final stripped Player output.")]
+        public string BasePlayerId = string.Empty;
+
+        public string Channel = "default";
+
+        public string BootstrapAssemblyName = "GameUpdater.dll";
+
+        public string BootstrapTextAssetPath = "AssetRaw/Bootstrap/DLL";
+
+        public string BootstrapTag = "BOOTSTRAP";
+
+        [Tooltip("Trusted descriptor URL. Production Player requires HTTPS; loopback HTTP is allowed only when explicitly enabled.")]
+        public string TwoStageReleaseDescriptorUrl = string.Empty;
+
+        [Tooltip("Pinned primary YooAsset host for the whole two-stage session. The descriptor cannot override it.")]
+        public string TwoStageHostServerUrl = string.Empty;
+
+        [Tooltip("Pinned fallback YooAsset host for the whole two-stage session. The descriptor cannot override it.")]
+        public string TwoStageFallbackHostServerUrl = string.Empty;
+
+        [Tooltip("Development-only opt-in for loopback HTTP descriptor and bundle hosts.")]
+        public bool AllowInsecureLoopbackHttp = false;
+
+        [Min(5f)]
+        public float TwoStageNoProgressTimeoutSeconds = 60f;
+
+        [Tooltip("Optional descriptor JSON used only by EditorSimulate logical tests.")]
+        [TextArea(3, 12)]
+        public string EditorSimulateReleaseDescriptorJson = string.Empty;
+
         [Header("更新设置")]
         public UpdateStyle UpdateStyle = UpdateStyle.Force;
 
@@ -206,6 +242,8 @@ namespace TEngine
 
                 case RuntimePlatform.Android:
                     return "Android";
+                case RuntimePlatform.LinuxPlayer:
+                    return "Linux64";
                 case RuntimePlatform.WebGLPlayer:
                     return "WebGL";
 

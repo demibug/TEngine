@@ -14,8 +14,9 @@ namespace TEngine
     /// <summary>
     /// 资源管理器。
     /// </summary>
-    internal sealed partial class ResourceModule : Module, IResourceModule, IUpdateModule
+    internal sealed partial class ResourceModule : Module, IResourceModule, IUpdateModule, IPinnedManifestIntegrity
     {
+        private PinnedManifestIntegrityVerifier _pinnedManifestVerifier;
         /// <summary>
         /// 默认资源包名称。
         /// </summary>
@@ -46,6 +47,7 @@ namespace TEngine
 
         public override void OnInit()
         {
+            _pinnedManifestVerifier = null;
             _stopping = false;
             _poolClosed = false;
             _shutdownComplete = false;
@@ -673,6 +675,13 @@ namespace TEngine
                     CacheFileSystemParameters = FileSystemParameters.CreateDefaultCacheFileSystemParameters(remoteServices, decryptionServices),
                     AutoUnloadBundleWhenUnused = parameters.AutoUnloadBundleWhenUnused,
                 };
+                if (_pinnedManifestVerifier != null)
+                {
+                    createParameters.BuildinFileSystemParameters.AddParameter(
+                        FileSystemParametersDefine.MANIFEST_SERVICES, _pinnedManifestVerifier);
+                    createParameters.CacheFileSystemParameters.AddParameter(
+                        FileSystemParametersDefine.MANIFEST_SERVICES, _pinnedManifestVerifier);
+                }
                 return package.InitializeAsync(createParameters);
             }
 
@@ -806,6 +815,26 @@ namespace TEngine
             return package.UpdatePackageManifestAsync(packageVersion, timeout);
         }
 
+        void IPinnedManifestIntegrity.ConfigurePinnedManifest(
+            string packageName, string packageVersion, string manifestSha256)
+        {
+            if (_packageInitializationContexts.ContainsKey(packageName))
+                throw new InvalidOperationException(
+                    $"Pinned manifest integrity must be configured before package '{packageName}' initialization.");
+
+            _pinnedManifestVerifier = new PinnedManifestIntegrityVerifier(
+                packageName, packageVersion, manifestSha256);
+        }
+
+        void IPinnedManifestIntegrity.VerifyPinnedManifestActivated(
+            string packageName, string packageVersion, string manifestSha256)
+        {
+            if (_pinnedManifestVerifier == null)
+                throw new InvalidOperationException("Pinned manifest integrity verifier is not configured.");
+
+            _pinnedManifestVerifier.VerifyActivated(packageName, packageVersion, manifestSha256);
+        }
+
         /// <summary>
         /// 资源下载器，用于下载当前资源版本所有的资源包文件。
         /// </summary>
@@ -829,6 +858,28 @@ namespace TEngine
             }
 
             Downloader = package.CreateResourceDownloader(DownloadingMaxNum, FailedTryAgain);
+            return Downloader;
+        }
+
+        /// <summary>
+        /// 按标签创建差量下载器。保留单一 ResourceModule owner，并让调用阶段拥有回调绑定与终态收尾。
+        /// </summary>
+        public ResourceDownloaderOperation CreateResourceDownloaderByTags(string[] tags, string customPackageName = "")
+        {
+            EnsureAcceptingRequests();
+            if (tags == null || tags.Length == 0)
+            {
+                throw new ArgumentException("Download tags are empty.", nameof(tags));
+            }
+
+            string packageName = string.IsNullOrEmpty(customPackageName) ? DefaultPackageName : customPackageName;
+            ResourcePackage package = YooAssets.GetPackage(packageName);
+            if (package == null)
+            {
+                throw new InvalidOperationException($"Resource package '{packageName}' is not initialized.");
+            }
+
+            Downloader = package.CreateResourceDownloader(tags, DownloadingMaxNum, FailedTryAgain);
             return Downloader;
         }
 

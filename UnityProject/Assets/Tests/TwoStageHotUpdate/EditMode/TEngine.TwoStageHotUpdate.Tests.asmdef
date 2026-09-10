@@ -1,0 +1,26 @@
+{
+    "name": "TEngine.TwoStageHotUpdate.Tests",
+    "rootNamespace": "TEngine.TwoStageHotUpdateTests",
+    "references": [
+        "TEngine.Runtime",
+        "GameUpdater",
+        "UniTask",
+        "YooAsset"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

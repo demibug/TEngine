@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   projectName: Demo
   HotUpdateAssemblies:
+  - GameUpdater.dll
   - GameProto.dll
   - GameLogic.dll
   AOTMetaAssemblies:
@@ -27,6 +28,19 @@ MonoBehaviour:
   LogicMainDllName: GameLogic.dll
   AssemblyTextAssetExtension: .bytes
   AssemblyTextAssetPath: AssetRaw/DLL
+  EnableTwoStageUpdate: 0
+  TwoStageContractVersion: 1
+  BasePlayerId: ''
+  Channel: default
+  BootstrapAssemblyName: GameUpdater.dll
+  BootstrapTextAssetPath: AssetRaw/Bootstrap/DLL
+  BootstrapTag: BOOTSTRAP
+  TwoStageReleaseDescriptorUrl: ''
+  TwoStageHostServerUrl: ''
+  TwoStageFallbackHostServerUrl: ''
+  AllowInsecureLoopbackHttp: 0
+  TwoStageNoProgressTimeoutSeconds: 60
+  EditorSimulateReleaseDescriptorJson: ''
   UpdateStyle: 1
   UpdateNotice: 1
   ResDownLoadPath: http://127.0.0.1:8081

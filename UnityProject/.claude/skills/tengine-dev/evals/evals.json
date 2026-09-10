@@ -242,10 +242,10 @@
     {
       "id": 15,
       "name": "aot-generic-supplement",
-      "description": "验证 AI 能正确诊断 HybridCLR AOT 泛型缺失问题，指向 AOTGenericReferences 和 HybridCLR Generate 操作，不建议使用 dynamic 或 Emit 等不支持的特性。",
+      "description": "验证 AI 能正确诊断 HybridCLR AOT 泛型缺失问题，指向 AOTGenericReference（HybridCLR/Generate 菜单）与生成的 AOTGenericReferences.cs，不建议使用 dynamic 或 Emit 等不支持的特性。",
       "prompt": "热更代码中使用了 UniTask<MyCustomData> 和 List<MyCustomData>，在真机上出现 ExecutionEngineException。如何修复？",
       "expected_patterns": [
-        "AOT Generic References",
+        "AOTGenericReference",
         "AOTGenericReferences",
         "HybridCLR",
         "Generate"
@@ -305,6 +305,22 @@
         "manage_script",
         "\"_Color\"",
         "Standard"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "fgui-window-create",
+      "description": "验证 AI 能正确使用 TEngine 的 FairyGUI 体系创建窗口：继承 FguiWindow、通过 FguiModule 初始化与 GameModule.FGUI 访问、使用 Gen 生成物与注册类，不虚构不存在的 Bag 包/BagFguiWindow，不混用 UGUI 的 UIWindow 与 ShowUIAsync。",
+      "prompt": "用 TEngine 的 FairyGUI 体系创建一个新的界面窗口 MyFirstFgui（对应 FairyGUI 包 MyFirst 的 Main 组件），说明从导包、代码生成到注册显示的完整流程。",
+      "expected_patterns": [
+        "FguiWindow",
+        "FguiModule",
+        "GameModule.FGUI",
+        "Gen"
+      ],
+      "forbidden_patterns": [
+        "BagFguiWindow",
+        "UI_BagMain"
       ]
     }
   ]

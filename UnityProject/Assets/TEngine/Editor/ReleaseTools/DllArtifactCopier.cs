@@ -114,14 +114,32 @@ namespace TEngine
         /// <returns>完整路径。</returns>
         public static string ResolveAssemblyTextAssetDir(bool createIfMissing)
         {
-            string relative = Settings.UpdateSetting.AssemblyTextAssetPath;
+            return ResolveAssetOutputDir(
+                Settings.UpdateSetting.AssemblyTextAssetPath,
+                "UpdateSetting.AssemblyTextAssetPath",
+                createIfMissing);
+        }
+
+        /// <summary>
+        /// 解析 Bootstrap DLL/metadata 独立输出目录，禁止越出 Assets。
+        /// </summary>
+        public static string ResolveBootstrapTextAssetDir(bool createIfMissing)
+        {
+            return ResolveAssetOutputDir(
+                Settings.UpdateSetting.BootstrapTextAssetPath,
+                "UpdateSetting.BootstrapTextAssetPath",
+                createIfMissing);
+        }
+
+        private static string ResolveAssetOutputDir(string relative, string fieldName, bool createIfMissing)
+        {
             if (string.IsNullOrWhiteSpace(relative))
-                throw new InvalidOperationException("UpdateSetting.AssemblyTextAssetPath 未配置");
+                throw new InvalidOperationException($"{fieldName} 未配置");
 
             string assetsRoot = Path.GetFullPath(Application.dataPath);
             string fullDir = Path.GetFullPath(Path.Combine(assetsRoot, relative));
             if (!fullDir.StartsWith(assetsRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"AssemblyTextAssetPath 越出 Assets 输出范围: {relative} -> {fullDir}");
+                throw new InvalidOperationException($"{fieldName} 越出 Assets 输出范围: {relative} -> {fullDir}");
 
             if (createIfMissing)
                 Directory.CreateDirectory(fullDir);

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
+using UnityEngine;
+using YooAsset;
 using YooAsset.Editor;
 
 namespace TEngine
@@ -49,6 +51,8 @@ namespace TEngine
 
             if (config.BuildHotFixDll && !hybridClrAvailable)
                 errors.Add("已请求编译热更DLL，但 HybridCLR 未启用（编辑器程序集缺少 ENABLE_HYBRIDCLR 宏），不能空操作成功；请先执行菜单 HybridCLR/Define Symbols/Enable HybridCLR");
+
+            errors.AddRange(ValidateTwoStageUpdate(config, hybridClrAvailable));
 
             if (playerRequested)
                 errors.AddRange(ValidatePlayerRequest(config.BuildTarget, config.PlayerPlatform, config.PlayerOutputPath, enabledScenesProvider));
@@ -131,6 +135,140 @@ namespace TEngine
         private static bool ContainsInvalidFileNameChars(string value)
         {
             return value.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0;
+        }
+
+        private static IEnumerable<string> ValidateTwoStageUpdate(BuildConfig config, bool hybridClrAvailable)
+        {
+            var errors = new List<string>();
+            UpdateSetting setting = Settings.UpdateSetting;
+            if (setting == null || !setting.EnableTwoStageUpdate)
+                return errors;
+
+            if (!hybridClrAvailable)
+                errors.Add("两阶段更新已开启，但 HybridCLR 宏未启用");
+            if (!IsSupportedTwoStageTarget(config.BuildTarget))
+                errors.Add($"两阶段更新首版不支持构建目标: {config.BuildTarget}");
+            if (!IsSafePathSegment(config.ReleaseId))
+                errors.Add("两阶段 ReleaseId 必须是安全的单一目录段");
+            if (setting.UpdateStyle != UpdateStyle.Force)
+                errors.Add("两阶段更新首版要求 UpdateStyle.Force");
+            if (setting.TwoStageContractVersion <= 0)
+                errors.Add("TwoStageContractVersion 必须大于 0");
+            if (!IsSafePathSegment(setting.BasePlayerId))
+                errors.Add("两阶段 BasePlayerId 必须是安全的单一目录段");
+            if (!IsSafePathSegment(setting.Channel))
+                errors.Add("两阶段 Channel 必须是安全的单一目录段");
+            if (string.IsNullOrWhiteSpace(setting.BootstrapAssemblyName) ||
+                setting.HotUpdateAssemblies == null ||
+                !setting.HotUpdateAssemblies.Contains(setting.BootstrapAssemblyName))
+                errors.Add("BootstrapAssemblyName 必须且只能来自 HotUpdateAssemblies");
+            if (!string.Equals(setting.BootstrapAssemblyName, "GameUpdater.dll", StringComparison.Ordinal))
+                errors.Add("两阶段首版 BootstrapAssemblyName 固定为 GameUpdater.dll");
+            if (string.IsNullOrWhiteSpace(setting.LogicMainDllName) ||
+                setting.HotUpdateAssemblies == null ||
+                !setting.HotUpdateAssemblies.Contains(setting.LogicMainDllName) ||
+                string.Equals(setting.LogicMainDllName, setting.BootstrapAssemblyName, StringComparison.Ordinal))
+                errors.Add("LogicMainDllName 必须位于业务热更程序集名单且不能是 Bootstrap updater");
+            if (string.IsNullOrWhiteSpace(setting.BootstrapTextAssetPath) ||
+                string.Equals(setting.BootstrapTextAssetPath, setting.AssemblyTextAssetPath, StringComparison.OrdinalIgnoreCase))
+                errors.Add("BootstrapTextAssetPath 必须非空且与业务 AssemblyTextAssetPath 分离");
+            if (string.IsNullOrWhiteSpace(setting.BootstrapTag))
+                errors.Add("BootstrapTag 为空");
+
+            ValidateUniqueNames(errors, setting.HotUpdateAssemblies, "HotUpdateAssemblies");
+            ValidateUniqueNames(errors, setting.AOTMetaAssemblies, "AOTMetaAssemblies");
+            if (setting.AOTMetaAssemblies == null || setting.AOTMetaAssemblies.Count == 0)
+                errors.Add("两阶段 Bootstrap 必须包含完整的 AOT metadata 名单");
+            ValidateTrustedUrl(errors, setting.TwoStageReleaseDescriptorUrl, setting.AllowInsecureLoopbackHttp, "descriptor");
+            ValidateTrustedUrl(errors, setting.TwoStageHostServerUrl, setting.AllowInsecureLoopbackHttp, "primary host");
+            ValidateTrustedUrl(errors, setting.TwoStageFallbackHostServerUrl, setting.AllowInsecureLoopbackHttp, "fallback host");
+            ValidateResourceDriver(errors);
+            try
+            {
+                TwoStageReleaseBuilder.ValidateReleaseIdAvailable(config);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception.Message);
+            }
+            return errors;
+        }
+
+        private static void ValidateResourceDriver(List<string> errors)
+        {
+            const string gameEntryPath = "Assets/TEngine/Settings/Prefab/GameEntry.prefab";
+            GameObject gameEntry = AssetDatabase.LoadAssetAtPath<GameObject>(gameEntryPath);
+            ResourceModuleDriver driver = gameEntry != null
+                ? gameEntry.GetComponentInChildren<ResourceModuleDriver>(true)
+                : null;
+            if (driver == null)
+            {
+                errors.Add($"两阶段构建找不到 ResourceModuleDriver: {gameEntryPath}");
+                return;
+            }
+
+            SerializedProperty playMode = new SerializedObject(driver).FindProperty("playMode");
+            if (playMode == null || playMode.enumValueIndex != (int)EPlayMode.HostPlayMode)
+                errors.Add("两阶段 Player 要求 GameEntry.prefab 的 ResourceModuleDriver.playMode=HostPlayMode");
+            if (driver.UpdatableWhilePlaying)
+                errors.Add("两阶段首版不支持 ResourceModuleDriver.updatableWhilePlaying");
+        }
+
+        private static bool IsSupportedTwoStageTarget(BuildTarget target)
+        {
+            switch (target)
+            {
+                case BuildTarget.StandaloneWindows64:
+                case BuildTarget.StandaloneOSX:
+                case BuildTarget.StandaloneLinux64:
+                case BuildTarget.Android:
+                case BuildTarget.iOS:
+                case BuildTarget.PS5:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsSafePathSegment(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) &&
+                   !ContainsInvalidFileNameChars(value) &&
+                   value.IndexOf('/') < 0 &&
+                   value.IndexOf('\\') < 0 &&
+                   !value.Contains("..") &&
+                   !Path.IsPathRooted(value);
+        }
+
+        private static void ValidateUniqueNames(List<string> errors, IEnumerable<string> names, string field)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            if (names == null)
+            {
+                errors.Add($"{field} 为空");
+                return;
+            }
+
+            foreach (string name in names)
+            {
+                if (string.IsNullOrWhiteSpace(name) || !seen.Add(name))
+                    errors.Add($"{field} 包含空值或重复项: '{name}'");
+            }
+        }
+
+        private static void ValidateTrustedUrl(List<string> errors, string value, bool allowLoopbackHttp, string label)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out Uri uri))
+            {
+                errors.Add($"两阶段 {label} URL 无效: '{value}'");
+                return;
+            }
+
+            bool secure = string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+            bool allowedLoopback = string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+                                   uri.IsLoopback && allowLoopbackHttp;
+            if (!secure && !allowedLoopback)
+                errors.Add($"两阶段 {label} URL 必须使用 HTTPS；仅显式允许的 loopback HTTP 可用于开发: '{value}'");
         }
     }
 }

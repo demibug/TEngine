@@ -7,6 +7,66 @@ using YooAsset;
 namespace TEngine
 {
     /// <summary>
+    /// YooAsset 在解析缓存、主源或备源 manifest 前调用此服务。
+    /// 只有实际进入解析器且原始字节摘要匹配时，才产生可用于 ActiveManifest 的信任记录。
+    /// </summary>
+    public sealed class PinnedManifestIntegrityVerifier : IManifestRestoreServices
+    {
+        private readonly string _packageName;
+        private readonly string _packageVersion;
+        private readonly string _manifestSha256;
+        private bool _verified;
+
+        public PinnedManifestIntegrityVerifier(
+            string packageName, string packageVersion, string manifestSha256)
+        {
+            if (string.IsNullOrWhiteSpace(packageName))
+                throw new ArgumentException("Pinned package name is empty.", nameof(packageName));
+            if (string.IsNullOrWhiteSpace(packageVersion))
+                throw new ArgumentException("Pinned package version is empty.", nameof(packageVersion));
+            if (!IsSha256(manifestSha256))
+                throw new ArgumentException("Pinned manifest SHA-256 is invalid.", nameof(manifestSha256));
+
+            _packageName = packageName;
+            _packageVersion = packageVersion;
+            _manifestSha256 = manifestSha256;
+        }
+
+        byte[] IManifestRestoreServices.RestoreManifest(byte[] fileData)
+        {
+            if (!UpdateReleaseDescriptorValidator.HashMatches(fileData, _manifestSha256))
+                throw new InvalidDataException(
+                    $"Pinned manifest SHA-256 mismatch for '{_packageName}@{_packageVersion}'.");
+
+            _verified = true;
+            return fileData;
+        }
+
+        public void VerifyActivated(string packageName, string packageVersion, string manifestSha256)
+        {
+            if (!_verified ||
+                !string.Equals(_packageName, packageName, StringComparison.Ordinal) ||
+                !string.Equals(_packageVersion, packageVersion, StringComparison.Ordinal) ||
+                !string.Equals(_manifestSha256, manifestSha256, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    $"Active manifest '{packageName}@{packageVersion}' has no matching verified byte record.");
+        }
+
+        private static bool IsSha256(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length != 64)
+                return false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+                    return false;
+            }
+            return true;
+        }
+    }
+
+    /// <summary>
     /// 远端资源地址查询服务类
     /// </summary>
     internal class RemoteServices : IRemoteServices

@@ -323,6 +323,11 @@ namespace TEngine
         ResourceDownloaderOperation CreateResourceDownloader(string customPackageName = "");
 
         /// <summary>
+        /// 按标签创建差量下载器。标签依赖闭包由 YooAsset 当前 manifest 解析。
+        /// </summary>
+        ResourceDownloaderOperation CreateResourceDownloaderByTags(string[] tags, string customPackageName = "");
+
+        /// <summary>
         /// 当前最新的包裹版本。
         /// </summary>
         string PackageVersion { set; get; }

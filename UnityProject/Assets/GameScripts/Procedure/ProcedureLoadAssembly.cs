@@ -139,8 +139,16 @@ namespace Procedure
                     throw new InvalidOperationException($"Unsupported resource play mode: {_resourceModule.PlayMode}.");
                 }
 
-                await LoadMetadataForAOTAssemblies(attempt, cancellationToken);
-                EnsureCurrentRunning(attempt);
+                if (!_setting.EnableTwoStageUpdate)
+                {
+                    await LoadMetadataForAOTAssemblies(attempt, cancellationToken);
+                    EnsureCurrentRunning(attempt);
+                }
+                else if (!TwoStageUpdateCoordinator.ResourcesReady)
+                {
+                    throw new InvalidOperationException(
+                        "Business assemblies cannot load before the two-stage updater confirms and the host verifies resources ready.");
+                }
 
                 foreach (string hotUpdateAssemblyName in _hotUpdateAssemblyNames)
                 {
@@ -150,6 +158,11 @@ namespace Procedure
             }
 
             EnsureMainAssemblyIsReady();
+            if (_setting.EnableTwoStageUpdate)
+            {
+                TwoStageUpdateCoordinator.VerifyReadyForEntry(_resourceModule);
+            }
+
             SubmitEntrance(attempt);
         }
 
@@ -165,8 +178,54 @@ namespace Procedure
                 throw new InvalidOperationException("LogicMainDllName is empty.");
             }
 
-            _hotUpdateAssemblyNames = DeduplicateAssemblyNames(_setting.HotUpdateAssemblies, "HotUpdateAssemblies");
+            List<string> configuredHotUpdateNames = DeduplicateAssemblyNames(
+                _setting.HotUpdateAssemblies,
+                "HotUpdateAssemblies");
+            _hotUpdateAssemblyNames = new List<string>();
+            foreach (string configuredName in configuredHotUpdateNames)
+            {
+                if (!string.IsNullOrWhiteSpace(_setting.BootstrapAssemblyName) &&
+                    string.Equals(configuredName, _setting.BootstrapAssemblyName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                _hotUpdateAssemblyNames.Add(configuredName);
+            }
+
+            if (_setting.EnableTwoStageUpdate)
+            {
+                if (!TwoStageUpdateCoordinator.IsPrepared)
+                {
+                    throw new InvalidOperationException("Two-stage update session is not prepared.");
+                }
+
+                List<string> releaseBusinessNames = TwoStageUpdateCoordinator.GetBusinessAssemblyNames();
+                if (!HaveSameOrderedNames(_hotUpdateAssemblyNames, releaseBusinessNames))
+                {
+                    throw new InvalidOperationException(
+                        "Business assembly order/list drifted from the fixed release descriptor.");
+                }
+            }
             _aotMetadataAssemblyNames = DeduplicateAssemblyNames(_setting.AOTMetaAssemblies, "AOTMetaAssemblies");
+        }
+
+        private static bool HaveSameOrderedNames(IReadOnlyList<string> left, IReadOnlyList<string> right)
+        {
+            if (left == null || right == null || left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; i++)
+            {
+                if (!string.Equals(left[i], right[i], StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static List<string> DeduplicateAssemblyNames(IEnumerable<string> configuredNames, string fieldName)
@@ -220,7 +279,10 @@ namespace Procedure
             StartupAttempt attempt,
             CancellationToken cancellationToken)
         {
-            string assetLocation = GetAssemblyAssetLocation(configuredName);
+            UpdateArtifactDescriptor releaseArtifact = _setting.EnableTwoStageUpdate
+                ? TwoStageUpdateCoordinator.GetArtifact(configuredName)
+                : null;
+            string assetLocation = releaseArtifact?.Address ?? GetAssemblyAssetLocation(configuredName);
             TextAsset textAsset = null;
             try
             {
@@ -233,6 +295,11 @@ namespace Procedure
                         $"Required hot-update DLL asset '{configuredName}' returned null from '{assetLocation}'.");
                 }
 
+                if (releaseArtifact != null)
+                {
+                    TwoStageUpdateCoordinator.ValidateArtifactBytes(releaseArtifact, textAsset.bytes);
+                }
+
                 Assembly assembly;
                 try
                 {
@@ -243,6 +310,11 @@ namespace Procedure
                     throw new InvalidOperationException(
                         $"Assembly.Load failed for configured DLL '{configuredName}' from asset '{assetLocation}'.",
                         exception);
+                }
+
+                if (_setting.EnableTwoStageUpdate)
+                {
+                    TwoStageUpdateCoordinator.RecordLoadedAssembly(configuredName, assembly);
                 }
 
                 AddAssemblyWithIdentityCheck(configuredName, assembly);
@@ -416,6 +488,13 @@ namespace Procedure
             }
 
             EnsureCurrentRunning(attempt);
+            if (_setting.EnableTwoStageUpdate &&
+                !TwoStageUpdateCoordinator.TryWriteEntryCompletedCheckpoint(out string checkpointError))
+            {
+                // Entrance 已执行成功，本进程绝不能因持久化失败再次调用。允许继续，但明确告警。
+                Log.Warning($"EntryCompleted checkpoint was not saved: {checkpointError}");
+            }
+
             _startGameSubmitted = true;
             if (!attempt.TrySucceed())
             {

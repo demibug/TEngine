@@ -109,6 +109,17 @@ namespace Procedure
             await _resourceModule.WaitUntilInitializedAsync(cancellationToken);
             EnsureCurrentRunning(attempt);
 
+            if (Settings.UpdateSetting != null && Settings.UpdateSetting.EnableTwoStageUpdate &&
+                !TwoStageUpdateCoordinator.IsPrepared)
+            {
+                LauncherMgr.ShowUI<LoadUpdateUI>("正在校验两阶段 release...");
+                await TwoStageUpdateCoordinator.PrepareAsync(
+                    Settings.UpdateSetting,
+                    _resourceModule,
+                    cancellationToken);
+                EnsureCurrentRunning(attempt);
+            }
+
             UniTask<InitializationOperation> packageTask =
                 _resourceModule.InitPackage(_resourceModule.DefaultPackageName);
             InitializationOperation initializationOperation =

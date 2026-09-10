@@ -201,6 +201,14 @@ namespace TEngine
                     }
                     EditorGUILayout.EndHorizontal();
 
+                    EditorGUILayout.BeginHorizontal();
+                    _config.ReleaseId = EditorGUILayout.TextField("两阶段 Release ID", _config.ReleaseId);
+                    if (GUILayout.Button("自动", GUILayout.Width(50)))
+                    {
+                        _config.ReleaseId = BuildConfig.GetDefaultReleaseId();
+                    }
+                    EditorGUILayout.EndHorizontal();
+
                     // 输出目录
                     EditorGUILayout.BeginHorizontal();
                     _config.OutputRoot = EditorGUILayout.TextField("AB输出目录", _config.OutputRoot);
@@ -615,6 +623,7 @@ namespace TEngine
             _config.EncryptionType = (EncryptionType)EditorPrefs.GetInt("TEngine_BP_EncryptionType", 0);
 
             _config.PackageVersion = EditorPrefs.GetString("TEngine_BP_PackageVersion", "");
+            _config.ReleaseId = EditorPrefs.GetString("TEngine_BP_ReleaseId", BuildConfig.GetDefaultReleaseId());
             _config.OutputRoot = EditorPrefs.GetString("TEngine_BP_OutputRoot", "./Builds/");
 
             _config.MinimalPackage = EditorPrefs.GetBool("TEngine_BP_MinimalPackage", false);
@@ -649,6 +658,7 @@ namespace TEngine
             EditorPrefs.SetInt("TEngine_BP_CompressOption", (int)_config.CompressOption);
             EditorPrefs.SetInt("TEngine_BP_EncryptionType", (int)_config.EncryptionType);
             EditorPrefs.SetString("TEngine_BP_PackageVersion", _config.PackageVersion);
+            EditorPrefs.SetString("TEngine_BP_ReleaseId", _config.ReleaseId);
             EditorPrefs.SetString("TEngine_BP_OutputRoot", _config.OutputRoot);
             EditorPrefs.SetBool("TEngine_BP_MinimalPackage", _config.MinimalPackage);
             EditorPrefs.SetString("TEngine_BP_RetainTags", _config.RetainTags);
@@ -702,6 +712,7 @@ namespace TEngine
                 CompressOption = source.CompressOption,
                 EncryptionType = source.EncryptionType,
                 PackageVersion = source.PackageVersion,
+                ReleaseId = source.ReleaseId,
                 OutputRoot = source.OutputRoot,
                 MinimalPackage = source.MinimalPackage,
                 RetainTags = source.RetainTags,

@@ -7,12 +7,16 @@ namespace TEngine
 {
     public class BuildConfig
     {
+        [System.NonSerialized]
+        internal bool TwoStageReleaseIdReserved;
+
         // 基础设置
         public BuildTarget BuildTarget;
         public EBuildPipeline BuildPipeline = EBuildPipeline.ScriptableBuildPipeline;
         public ECompressOption CompressOption = ECompressOption.LZ4;
         public EncryptionType EncryptionType = EncryptionType.None;
         public string PackageVersion = "";
+        public string ReleaseId = GetDefaultReleaseId();
         public string OutputRoot = "./Builds/";
 
         // 最小包设置
@@ -42,6 +46,7 @@ namespace TEngine
                 BuildTarget = EditorUserBuildSettings.activeBuildTarget,
                 PlayerPlatform = EditorUserBuildSettings.activeBuildTarget,
                 PackageVersion = GetDefaultPackageVersion(),
+                ReleaseId = GetDefaultReleaseId(),
                 OutputRoot = "./Builds/",
                 PlayerOutputPath = GetDefaultPlayerOutputPath(EditorUserBuildSettings.activeBuildTarget),
             };
@@ -51,6 +56,12 @@ namespace TEngine
         {
             int totalMinutes = System.DateTime.Now.Hour * 60 + System.DateTime.Now.Minute;
             return System.DateTime.Now.ToString("yyyy-MM-dd") + "-" + totalMinutes;
+        }
+
+        public static string GetDefaultReleaseId()
+        {
+            return System.DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" +
+                   System.Guid.NewGuid().ToString("N").Substring(0, 8);
         }
 
         public static string GetDefaultPlayerOutputPath(BuildTarget target)

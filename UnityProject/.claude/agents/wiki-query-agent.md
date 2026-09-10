@@ -61,7 +61,7 @@ memory: project
 1. **异步优先**：IO 操作使用 `UniTask`，禁止同步加载和 Coroutine
 2. **模块访问**：通过 `GameModule.XXX` 访问模块，而非 `ModuleSystem.GetModule<T>()`
 3. **资源生命周期**：`LoadAssetAsync` 必须对应 `UnloadAsset`，GameObject 使用 `LoadGameObjectAsync`
-4. **热更边界**：`GameScripts/Main` 不热更，`GameScripts/HotFix/` 全部热更
+4. **热更边界**：`GameScripts/Procedure`、`Assets/Launcher/`、`Assets/TEngine/` 不热更，`GameScripts/HotFix/`（GameUpdater/GameProto/GameLogic）全部热更
 5. **事件解耦**：模块间用 `GameEvent`，UI 内部用 `AddUIEvent`
 
 ## 文档主题映射

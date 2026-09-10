@@ -168,5 +168,83 @@ namespace TEngine.BuildPipelineTests
             var errors = BuildPreflight.Validate(null, false, BuildTarget.Android, true, OneScene);
             Assert.IsNotEmpty(errors);
         }
+
+        [Test]
+        public void TwoStageEnabledWithoutHybridClr_FailsBeforeBuild()
+        {
+            using (new TwoStageSettingScope(Settings.UpdateSetting))
+            {
+                var errors = BuildPreflight.Validate(
+                    CreateValidConfig(), false, BuildTarget.Android, hybridClrAvailable: false, OneScene);
+                Assert.IsTrue(
+                    errors.Any(error => error.Contains("两阶段更新已开启") && error.Contains("HybridCLR")),
+                    string.Join("\n", errors));
+            }
+        }
+
+        [Test]
+        public void TwoStageUnsafeReleaseId_IsRejected()
+        {
+            using (new TwoStageSettingScope(Settings.UpdateSetting))
+            {
+                BuildConfig config = CreateValidConfig();
+                config.ReleaseId = "../shared";
+                var errors = BuildPreflight.Validate(config, false, BuildTarget.Android, true, OneScene);
+                Assert.IsTrue(errors.Any(error => error.Contains("ReleaseId")), string.Join("\n", errors));
+            }
+        }
+
+        [Test]
+        public void TwoStageOutputRoot_IsolatedByCompatibilityCoordinates()
+        {
+            using (new TwoStageSettingScope(Settings.UpdateSetting))
+            {
+                BuildConfig config = CreateValidConfig();
+                config.ReleaseId = "release-123";
+                string outputRoot = ReleaseTools.ResolveOutputRoot(config).Replace('\\', '/');
+                StringAssert.Contains(
+                    "/TwoStageReleases/player-test/Android/channel-test/DefaultPackage/release-123",
+                    outputRoot);
+            }
+        }
+
+        private sealed class TwoStageSettingScope : System.IDisposable
+        {
+            private readonly UpdateSetting _setting;
+            private readonly bool _enabled;
+            private readonly string _basePlayerId;
+            private readonly string _channel;
+            private readonly string _descriptorUrl;
+            private readonly string _hostUrl;
+            private readonly string _fallbackUrl;
+
+            public TwoStageSettingScope(UpdateSetting setting)
+            {
+                _setting = setting;
+                _enabled = setting.EnableTwoStageUpdate;
+                _basePlayerId = setting.BasePlayerId;
+                _channel = setting.Channel;
+                _descriptorUrl = setting.TwoStageReleaseDescriptorUrl;
+                _hostUrl = setting.TwoStageHostServerUrl;
+                _fallbackUrl = setting.TwoStageFallbackHostServerUrl;
+
+                setting.EnableTwoStageUpdate = true;
+                setting.BasePlayerId = "player-test";
+                setting.Channel = "channel-test";
+                setting.TwoStageReleaseDescriptorUrl = "https://example.invalid/release.json";
+                setting.TwoStageHostServerUrl = "https://example.invalid/assets";
+                setting.TwoStageFallbackHostServerUrl = "https://fallback.example.invalid/assets";
+            }
+
+            public void Dispose()
+            {
+                _setting.EnableTwoStageUpdate = _enabled;
+                _setting.BasePlayerId = _basePlayerId;
+                _setting.Channel = _channel;
+                _setting.TwoStageReleaseDescriptorUrl = _descriptorUrl;
+                _setting.TwoStageHostServerUrl = _hostUrl;
+                _setting.TwoStageFallbackHostServerUrl = _fallbackUrl;
+            }
+        }
     }
 }

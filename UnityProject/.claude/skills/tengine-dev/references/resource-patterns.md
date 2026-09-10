@@ -27,13 +27,16 @@ public class HeroDetailUI : UIWindow
         _cts.Dispose();
         _cts = new CancellationTokenSource();
 
-        try
+        // 取消或失败时返回 null（不抛 OperationCanceledException），按 null 判断即可
+        var heroConfig = await GameModule.Resource.LoadAssetAsync<TextAsset>(
+            $"hero_config_{heroId}", _cts.Token);
+        if (heroConfig == null)
         {
-            _heroConfig = await GameModule.Resource.LoadAssetAsync<TextAsset>(
-                $"hero_config_{heroId}", _cts.Token);
-            // 使用数据...
+            return; // 已取消或加载失败：不赋值、不使用
         }
-        catch (OperationCanceledException) { /* 正常取消 */ }
+
+        _heroConfig = heroConfig;
+        // 使用数据...
     }
 
     protected override void OnDestroy()
@@ -51,7 +54,8 @@ public class HeroDetailUI : UIWindow
 
 **关键点**：
 - `OnRefresh` 每次 ShowUI 都执行，多次打开同一窗口需先取消上次加载
-- `OnDestroy` 是释放的唯一时机（不存在 `OnClose`）
+- 取消传参给 `LoadAssetAsync` 后由框架归还该份引用，业务层只需在返回 null 时跳过赋值
+- `OnDestroy` 是释放的唯一时机（生命周期回调中不存在 `OnClose`；`UIWindow.Close()` 只是发起关闭的动作方法，关闭最终仍走 `OnDestroy`）
 - `CancellationTokenSource` 本身也需要 `Dispose`
 
 ---
@@ -74,7 +78,7 @@ public class BattleMainUI : UIWindow
 
     protected override void OnDestroy()
     {
-        GameModule.Audio.Stop(AudioType.Music);
+        GameModule.Audio.Stop(AudioType.Music, fadeout: false);
         if (_bgmClip != null)
         {
             GameModule.Resource.UnloadAsset(_bgmClip);
@@ -83,6 +87,43 @@ public class BattleMainUI : UIWindow
     }
 }
 ```
+
+---
+
+### 模式：LoadGameObjectAsync 实例 Destroy 即归还
+
+`LoadGameObjectAsync` 返回的实例自带 `AssetsReference` 组件并绑定源 Prefab 的那份 spawn，销毁实例即自动归还，业务层只需 `Object.Destroy`：
+
+```csharp
+[Window(UILayer.UI, "EffectPlayUI")]
+public class EffectPlayUI : UIWindow
+{
+    private GameObject _effectGo;
+
+    private async void PlayEffect()
+    {
+        _effectGo = await GameModule.Resource.LoadGameObjectAsync("Fx_Hit", rectTransform, _cts.Token);
+        if (_effectGo == null)
+        {
+            return; // 已取消或加载失败
+        }
+    }
+
+    private void RemoveEffect()
+    {
+        if (_effectGo != null)
+        {
+            Object.Destroy(_effectGo);   // AssetsReference.OnDestroy 自动归还源 Prefab 引用
+            _effectGo = null;
+        }
+    }
+}
+```
+
+**关键点**：
+- 释放链路：`Object.Destroy(instance)` → `AssetsReference.OnDestroy` → `UnloadAsset(源 Prefab)`；业务层不要再对实例手动 `UnloadAsset`（同一份 spawn 会被重复归还）
+- 对实例做 `Instantiate` 克隆不继承持有权，克隆体销毁不会触发归还
+- 从未激活即被销毁的实例不保证触发 `OnDestroy`，ResourceModule 会轮询"伪 null"实例做一次性兜底归还，无需业务补偿
 
 ---
 
@@ -132,16 +173,14 @@ public async UniTask SwitchToBattleScene()
     await GameModule.Scene.LoadSceneAsync("BattleScene", LoadSceneMode.Single,
         progressCallBack: p => { /* 显示进度条 */ });
 
-    // 3. 整理已无引用的资源
-    GameModule.Resource.UnloadUnusedAssets();
-
-    // 4. 强制 GC（可选，视内存压力决定）
-    // GameModule.Resource.ForceUnloadUnusedAssets(performGCCollect: true);
-
-    // 5. 打开新 UI
+    // 3. 打开新 UI
     GameModule.UI.ShowUIAsync<BattleMainUI>();
 }
 ```
+
+**关键点**：
+- **主场景（Single）加载完成后框架自动整理**：`LoadSceneAsync` 内部在场景加载完成时自动调用 `ForceUnloadUnusedAssets(gcCollect)`（`gcCollect` 参数默认 `true`），由 ResourceModuleDriver 在后续 Update 中执行 `Resources.UnloadUnusedAssets()` 并跟随 `GC.Collect()`（默认 `UseSystemUnloadUnusedAssets=true` 时还会同步触发 `ResourceModule.UnloadUnusedAssets()` 归还池中未使用对象），无需手动调用。
+- `ForceUnloadUnusedAssets(bool performGCCollect)` 是异步标志位触发，不是同步立即执行；仅在场景加载路径之外需要额外整理时手动调用。
 
 ### 叠加场景的资源管理
 
@@ -150,6 +189,7 @@ public async UniTask SwitchToBattleScene()
 await GameModule.Scene.LoadSceneAsync("MinigameScene", LoadSceneMode.Additive);
 
 // 卸载叠加场景时显式清理
+// 注意：UnloadAsync（子场景卸载）不会自动触发资源整理，与主场景加载不同
 await GameModule.Scene.UnloadAsync("MinigameScene");
 GameModule.Resource.UnloadUnusedAssets();   // 清理叠加场景释放出的资源
 ```
@@ -191,8 +231,11 @@ _imgIcon.SetSprite($"icon_{itemCfg.IconId}");
 var itemCfg = ConfigSystem.Instance.Tables.TbItem.Get(itemId);
 
 // 不要将配置数据缓存到自己的静态变量中
-// 配置数据由 ConfigSystem 统一持有和释放
+// 配置数据由 ConfigSystem 统一持有：内部经同步 LoadAsset 载入 .bytes 后全程持有，
+// 不做 UnloadAsset，业务层也无需（不应）对其释放
 ```
+
+> 注意：`ConfigSystem.cs` 不在 Assets 默认目录中，由生成脚本从仓库根 `Configs/GameConfig/CustomTemplate/ConfigSystem.cs` 复制到 `Assets/GameScripts/HotFix/GameProto/`，首次导表后才出现。详见 [luban-config.md](luban-config.md)。
 
 ---
 
@@ -201,9 +244,12 @@ var itemCfg = ConfigSystem.Instance.Tables.TbItem.Get(itemId);
 ### 泄漏类型1：OnDestroy 中未释放
 
 ```
-症状：内存随操作次数线性增长，调试器显示资源引用计数不降
+症状：内存随操作次数线性增长，资源对象池中未使用对象持续堆积
 根因：LoadAssetAsync 有调用，但 UnloadAsset 缺失或条件分支遗漏
-排查：TEngine 调试器（~ 键）→ 资源引用计数视图，找引用计数 > 预期的项
+      （UnloadAsset 契约是"一份成功加载对应一次归还"，缺失即 spawn 滞留池中）
+排查：Debugger 组件（ActiveWindowType 控制显隐，共 4 值：AlwaysOpen/OnlyOpenWhenDevelopment/OnlyOpenInEditor/AlwaysClose）
+      → Profiler/Object Pool 窗口查看 Asset Pool 的对象数量与引用计数（SpawnCount），
+      或用 Profiler/Memory/* 窗口采样定位滞留的 Unity 对象
 ```
 
 ### 泄漏类型2：异步加载后对象已销毁
@@ -218,17 +264,20 @@ protected override async void OnRefresh()
     // 若此时窗口已销毁，_config 赋值但 OnDestroy 已执行，资源泄漏
 }
 
-// ✅ 正确：检查 this == null 或使用 CancellationToken
+// ✅ 正确：使用 CancellationToken（UIWindow/UIWidget 是普通 C# 类，
+// this == null 永远为 false，不能用它判断窗口是否销毁）
 protected override async void OnRefresh()
 {
-    try
+    // 取消或失败时 LoadAssetAsync 返回 null（框架统一以 null 结束取消的请求，
+    // 并自动归还该份引用，不抛 OperationCanceledException）
+    var config = await GameModule.Resource.LoadAssetAsync<TextAsset>("config", _cts.Token);
+    if (config == null)
     {
-        var config = await GameModule.Resource.LoadAssetAsync<TextAsset>("config", _cts.Token);
-        if (this == null) return;   // 窗口已销毁
-        _config = config;
-        RefreshUI();
+        return; // 已取消或加载失败：不赋值、不刷新 UI
     }
-    catch (OperationCanceledException) { /* CancellationToken 取消 */ }
+
+    _config = config;
+    RefreshUI();
 }
 ```
 
@@ -273,19 +322,26 @@ bool valid = GameModule.Resource.CheckLocationValid("BossPrefab", "DLC_Chapter2"
 ```csharp
 public async UniTask EnsureDLCReady(string packageName)
 {
-    // 检查本地是否已有
+    // 检查资源状态
+    // HasAssetResult 含义：Valid=location 无效 / NotExist=资源不存在 /
+    // AssetOnline=需从远端下载 / AssetOnDisk=本地已有
+    // （另有 AssetOnFileSystem/BinaryOnDisk/BinaryOnFileSystem 等文件系统/二进制变体）
     var result = GameModule.Resource.HasAsset("BossPrefab", packageName);
-    if (result == HasAssetResult.Valid) return;   // 本地已有，直接使用
+    if (result == HasAssetResult.AssetOnDisk) return;   // 本地已有，直接使用
 
     // 触发下载（参考 hotfix-workflow.md 的下载流程）
+    // 注意：该重载创建的下载器针对整个包裹版本的差量文件，而非单个资源
     var downloader = GameModule.Resource.CreateResourceDownloader(packageName);
     if (downloader.TotalDownloadCount > 0)
     {
         downloader.BeginDownload();
-        await downloader.Task;
+        await downloader;   // UniTask 的 YooAsset 扩展（UniTask.YooAsset.asmdef 定义 UNITASK_YOOASSET_SUPPORT）提供 GetAwaiter；Failed 时会抛异常（ProcedureDownloadFile.cs 用法）
+        // 若需自行处理失败状态而不抛异常，可用轮询：while (!downloader.IsDone) { await UniTask.Yield(); }（ProcedureTwoStageUpdate.cs 用法）
     }
 }
 ```
+
+**注意**：不要用 `HasAssetResult.Valid` 判断"本地已有"——`Valid` 表示资源定位地址无效（location 未收集进清单），与资源是否存在无关。
 
 ---
 
@@ -307,10 +363,13 @@ foreach (var config in configs)
 ### 预加载策略
 
 ```csharp
-// PRELOAD 标签资源在 ProcedurePreload 阶段统一加载
+// PRELOAD 标签资源在 ProcedurePreload 阶段统一加载（WebGL 平台另有 WEBGL_PRELOAD 标签；
+// EditorSimulateMode 下跳过预热）
 // 业务代码使用时可同步加载（已在内存中）：
 var config = GameModule.Resource.LoadAsset<TextAsset>("hero_config_common");
 
+// 注意：同步加载若撞上同 location 未完成的异步加载会直接抛异常，
+// 仅在确认无并发异步加载同地址时使用同步入口
 // 非 PRELOAD 资源必须异步加载，避免主线程卡顿
 var rareAsset = await GameModule.Resource.LoadAssetAsync<TextAsset>("rare_boss_config");
 ```

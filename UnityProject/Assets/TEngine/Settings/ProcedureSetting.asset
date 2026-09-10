@@ -24,4 +24,5 @@ MonoBehaviour:
   - Procedure.ProcedurePreload
   - Procedure.ProcedureSplash
   - Procedure.ProcedureStartGame
+  - Procedure.ProcedureTwoStageUpdate
   entranceProcedureTypeName: Procedure.ProcedureLaunch

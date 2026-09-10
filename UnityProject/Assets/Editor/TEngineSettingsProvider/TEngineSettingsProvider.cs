@@ -27,6 +27,19 @@ public static class TEngineSettingsProvider
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("LogicMainDllName"));  
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("AssemblyTextAssetExtension"));  
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("AssemblyTextAssetPath"));  
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("EnableTwoStageUpdate"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageContractVersion"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("BasePlayerId"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("Channel"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("BootstrapAssemblyName"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("BootstrapTextAssetPath"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("BootstrapTag"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageReleaseDescriptorUrl"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageHostServerUrl"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageFallbackHostServerUrl"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("AllowInsecureLoopbackHttp"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageNoProgressTimeoutSeconds"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("EditorSimulateReleaseDescriptorJson"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("UpdateStyle"));  
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("ResDownLoadPath"));  
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("FallbackResDownLoadPath"));  
@@ -89,4 +102,4 @@ public static class TEngineSettingsProvider
         EditorGUILayout.EndVertical();
         GUILayout.Space(10);
     }
-}  
+}

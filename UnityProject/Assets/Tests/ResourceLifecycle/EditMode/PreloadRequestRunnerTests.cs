@@ -152,6 +152,7 @@ namespace TEngine.ResourceLifecycleTests
         public void ClearAllBundleFiles(string customPackageName = "") { }
         public ResourceDownloaderOperation Downloader { get; set; }
         public ResourceDownloaderOperation CreateResourceDownloader(string customPackageName = "") => null;
+        public ResourceDownloaderOperation CreateResourceDownloaderByTags(string[] tags, string customPackageName = "") => null;
         public string PackageVersion { get; set; }
         public string GetPackageVersion(string customPackageName = "") => string.Empty;
         public RequestPackageVersionOperation RequestPackageVersionAsync(bool appendTimeTicks = false, int timeout = 60, string customPackageName = "") => null;

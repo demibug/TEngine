@@ -77,6 +77,19 @@ MonoBehaviour:
         FilterRuleName: CollectAll
         AssetTags: 
         UserData: 
+    - GroupName: BootstrapDLL
+      GroupDesc: Two-stage updater and required AOT metadata only
+      AssetTags: BOOTSTRAP
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/AssetRaw/Bootstrap/DLL
+        CollectorGUID: 46a4cc4ac0a746f3ba3a659df7d20442
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackDirectory
+        FilterRuleName: CollectAll
+        AssetTags: BOOTSTRAP
+        UserData:
     - GroupName: Effects
       GroupDesc: 
       AssetTags: 

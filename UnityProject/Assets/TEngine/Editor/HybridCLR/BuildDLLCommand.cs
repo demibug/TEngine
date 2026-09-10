@@ -163,10 +163,11 @@ public static class BuildDLLCommand
 
             // 2. 解析并校验目标目录（按需创建，禁止越出 Assets 输出范围）
             string dstDir = TEngine.DllArtifactCopier.ResolveAssemblyTextAssetDir(true);
+            string bootstrapDir = TEngine.DllArtifactCopier.ResolveBootstrapTextAssetDir(true);
 
             // 3. 生成复制计划（含混淆产物选择规则）
-            List<TEngine.DllCopyEntry> entries = BuildBaseCopyPlan(target, dstDir);
-            AppendObfuzPlan(target, dstDir, entries, regenerate: true);
+            List<TEngine.DllCopyEntry> entries = BuildBaseCopyPlan(target, dstDir, bootstrapDir);
+            AppendObfuzPlan(target, dstDir, bootstrapDir, entries, regenerate: true);
 
             // 4. 先整体校验所有源文件，缺任意文件都失败（列出全部缺失项，不 continue）
             List<string> errors = TEngine.DllArtifactCopier.ValidateSources(entries);
@@ -178,6 +179,7 @@ public static class BuildDLLCommand
 
             // 5. 统一复制；复制异常立即失败，不执行 AB（由上层编排保证）
             TEngine.DllArtifactCopier.CopyAll(entries);
+            CleanupOwnedStaleArtifacts(dstDir, bootstrapDir, cleanupHotUpdate: true, cleanupMetadata: true);
             result.CopiedFiles.AddRange(entries.Select(e => e.DestPath));
 
             AssetDatabase.Refresh();
@@ -213,11 +215,13 @@ public static class BuildDLLCommand
         {
             // 只解析校验目标目录（不创建）
             string dstDir = TEngine.DllArtifactCopier.ResolveAssemblyTextAssetDir(false);
+            string bootstrapDir = TEngine.DllArtifactCopier.ResolveBootstrapTextAssetDir(false);
 
-            List<TEngine.DllCopyEntry> entries = BuildBaseCopyPlan(target, dstDir);
-            AppendObfuzPlan(target, dstDir, entries, regenerate: false);
+            List<TEngine.DllCopyEntry> entries = BuildBaseCopyPlan(target, dstDir, bootstrapDir);
+            AppendObfuzPlan(target, dstDir, bootstrapDir, entries, regenerate: false);
 
             List<string> errors = TEngine.DllArtifactCopier.ValidateReuse(entries);
+            errors.AddRange(ValidateOwnedArtifactLayout(dstDir, bootstrapDir));
             if (errors.Count > 0)
             {
                 result.Errors.AddRange(errors);
@@ -265,9 +269,10 @@ public static class BuildDLLCommand
         try
         {
             string dstDir = TEngine.DllArtifactCopier.ResolveAssemblyTextAssetDir(true);
+            string bootstrapDir = TEngine.DllArtifactCopier.ResolveBootstrapTextAssetDir(true);
 
-            List<TEngine.DllCopyEntry> entries = BuildBaseCopyPlan(target, dstDir);
-            AppendObfuzPlan(target, dstDir, entries, regenerate: true);
+            List<TEngine.DllCopyEntry> entries = BuildBaseCopyPlan(target, dstDir, bootstrapDir);
+            AppendObfuzPlan(target, dstDir, bootstrapDir, entries, regenerate: true);
 
             List<string> errors = TEngine.DllArtifactCopier.ValidateSources(entries);
             if (errors.Count > 0)
@@ -277,6 +282,7 @@ public static class BuildDLLCommand
             }
 
             TEngine.DllArtifactCopier.CopyAll(entries);
+            CleanupOwnedStaleArtifacts(dstDir, bootstrapDir, cleanupHotUpdate: true, cleanupMetadata: true);
             result.CopiedFiles.AddRange(entries.Select(e => e.DestPath));
 
             AssetDatabase.Refresh();
@@ -311,7 +317,11 @@ public static class BuildDLLCommand
         try
         {
             string aotAssembliesSrcDir = SettingsUtil.GetAssembliesPostIl2CppStripDir(target);
-            string aotAssembliesDstDir = TEngine.DllArtifactCopier.ResolveAssemblyTextAssetDir(true);
+            string businessDir = TEngine.DllArtifactCopier.ResolveAssemblyTextAssetDir(true);
+            string bootstrapDir = TEngine.DllArtifactCopier.ResolveBootstrapTextAssetDir(true);
+            string aotAssembliesDstDir = TEngine.Settings.UpdateSetting.EnableTwoStageUpdate
+                ? bootstrapDir
+                : businessDir;
 
             var entries = new List<TEngine.DllCopyEntry>();
             foreach (var dll in TEngine.Settings.UpdateSetting.AOTMetaAssemblies)
@@ -324,6 +334,7 @@ public static class BuildDLLCommand
                 throw new TEngine.BuildExecutionException(TEngine.BuildStage.Dll, string.Join("\n", errors));
 
             TEngine.DllArtifactCopier.CopyAll(entries);
+            CleanupOwnedStaleArtifacts(businessDir, bootstrapDir, cleanupHotUpdate: false, cleanupMetadata: true);
             AssetDatabase.Refresh();
         }
         catch (Exception e)
@@ -355,12 +366,14 @@ public static class BuildDLLCommand
         try
         {
             string hotfixDllSrcDir = SettingsUtil.GetHotUpdateDllsOutputDirByTarget(target);
-            string hotfixAssembliesDstDir = TEngine.DllArtifactCopier.ResolveAssemblyTextAssetDir(true);
+            string businessDir = TEngine.DllArtifactCopier.ResolveAssemblyTextAssetDir(true);
+            string bootstrapDir = TEngine.DllArtifactCopier.ResolveBootstrapTextAssetDir(true);
 
             var entries = new List<TEngine.DllCopyEntry>();
             foreach (var dll in SettingsUtil.HotUpdateAssemblyFilesExcludePreserved)
             {
-                entries.Add(new TEngine.DllCopyEntry($"{hotfixDllSrcDir}/{dll}", $"{hotfixAssembliesDstDir}/{dll}.bytes"));
+                string destinationDir = GetHotUpdateDestinationDir(dll, businessDir, bootstrapDir);
+                entries.Add(new TEngine.DllCopyEntry($"{hotfixDllSrcDir}/{dll}", $"{destinationDir}/{dll}.bytes"));
             }
 
             List<string> errors = TEngine.DllArtifactCopier.ValidateSources(entries);
@@ -368,6 +381,7 @@ public static class BuildDLLCommand
                 throw new TEngine.BuildExecutionException(TEngine.BuildStage.Dll, string.Join("\n", errors));
 
             TEngine.DllArtifactCopier.CopyAll(entries);
+            CleanupOwnedStaleArtifacts(businessDir, bootstrapDir, cleanupHotUpdate: true, cleanupMetadata: false);
             AssetDatabase.Refresh();
         }
         catch (Exception e)
@@ -387,7 +401,10 @@ public static class BuildDLLCommand
     /// <summary>
     /// 基础复制计划：AOT 补充元数据 + 热更程序集（排除保留名单），源目录按显式目标解析。
     /// </summary>
-    private static List<TEngine.DllCopyEntry> BuildBaseCopyPlan(BuildTarget target, string dstDir)
+    private static List<TEngine.DllCopyEntry> BuildBaseCopyPlan(
+        BuildTarget target,
+        string businessDir,
+        string bootstrapDir)
     {
         var entries = new List<TEngine.DllCopyEntry>();
 
@@ -395,14 +412,18 @@ public static class BuildDLLCommand
         string aotAssembliesSrcDir = SettingsUtil.GetAssembliesPostIl2CppStripDir(target);
         foreach (var dll in TEngine.Settings.UpdateSetting.AOTMetaAssemblies)
         {
-            entries.Add(new TEngine.DllCopyEntry($"{aotAssembliesSrcDir}/{dll}", $"{dstDir}/{dll}.bytes"));
+            string destinationDir = TEngine.Settings.UpdateSetting.EnableTwoStageUpdate
+                ? bootstrapDir
+                : businessDir;
+            entries.Add(new TEngine.DllCopyEntry($"{aotAssembliesSrcDir}/{dll}", $"{destinationDir}/{dll}.bytes"));
         }
 
         // 热更程序集（排除保留名单）
         string hotUpdateDllPath = SettingsUtil.GetHotUpdateDllsOutputDirByTarget(target);
         foreach (var dll in SettingsUtil.HotUpdateAssemblyFilesExcludePreserved)
         {
-            entries.Add(new TEngine.DllCopyEntry($"{hotUpdateDllPath}/{dll}", $"{dstDir}/{dll}.bytes"));
+            string destinationDir = GetHotUpdateDestinationDir(dll, businessDir, bootstrapDir);
+            entries.Add(new TEngine.DllCopyEntry($"{hotUpdateDllPath}/{dll}", $"{destinationDir}/{dll}.bytes"));
         }
 
         return entries;
@@ -412,7 +433,12 @@ public static class BuildDLLCommand
     /// 追加/覆盖混淆产物计划（保留现有选择规则：混淆名单内的程序集必须取混淆输出，缺混淆文件不能默默使用未混淆文件）。
     /// </summary>
     /// <param name="regenerate">true 时按原流程重新编译并混淆；false 时仅引用既有混淆产物（复用校验用）。</param>
-    private static void AppendObfuzPlan(BuildTarget target, string dstDir, List<TEngine.DllCopyEntry> entries, bool regenerate)
+    private static void AppendObfuzPlan(
+        BuildTarget target,
+        string businessDir,
+        string bootstrapDir,
+        List<TEngine.DllCopyEntry> entries,
+        bool regenerate)
     {
 #if ENABLE_OBFUZ
         if (regenerate)
@@ -432,7 +458,9 @@ public static class BuildDLLCommand
         {
             string srcDir = obfuscationRelativeAssemblyNames.Contains(assName) ? obfuscatedDllPath : plainDllPath;
             string srcFile = $"{srcDir}/{assName}.dll";
-            string dstFile = $"{dstDir}/{assName}.dll.bytes";
+            string fileName = $"{assName}.dll";
+            string destinationDir = GetHotUpdateDestinationDir(fileName, businessDir, bootstrapDir);
+            string dstFile = $"{destinationDir}/{fileName}.bytes";
             UpsertEntry(entries, dstFile, srcFile);
         }
 #endif
@@ -449,6 +477,85 @@ public static class BuildDLLCommand
             }
         }
         entries.Add(new TEngine.DllCopyEntry(srcFile, dstFile));
+    }
+
+    private static string GetHotUpdateDestinationDir(string dllFileName, string businessDir, string bootstrapDir)
+    {
+        return string.Equals(
+            dllFileName,
+            TEngine.Settings.UpdateSetting.BootstrapAssemblyName,
+            StringComparison.Ordinal)
+            ? bootstrapDir
+            : businessDir;
+    }
+
+    /// <summary>
+    /// 仅清理当前 UpdateSetting 明确拥有的相反分类副本，防止同地址被两个 collector 重复收集。
+    /// </summary>
+    private static void CleanupOwnedStaleArtifacts(
+        string businessDir,
+        string bootstrapDir,
+        bool cleanupHotUpdate,
+        bool cleanupMetadata)
+    {
+        TEngine.UpdateSetting setting = TEngine.Settings.UpdateSetting;
+        if (cleanupHotUpdate)
+        {
+            foreach (string hotUpdateDll in setting.HotUpdateAssemblies)
+            {
+                string staleDir = string.Equals(hotUpdateDll, setting.BootstrapAssemblyName, StringComparison.Ordinal)
+                    ? businessDir
+                    : bootstrapDir;
+                DeleteOwnedFile(Path.Combine(staleDir, hotUpdateDll + setting.AssemblyTextAssetExtension));
+            }
+        }
+
+        if (cleanupMetadata)
+        {
+            foreach (string metadataDll in setting.AOTMetaAssemblies)
+            {
+                string staleDir = setting.EnableTwoStageUpdate ? businessDir : bootstrapDir;
+                DeleteOwnedFile(Path.Combine(staleDir, metadataDll + setting.AssemblyTextAssetExtension));
+            }
+        }
+    }
+
+    private static List<string> ValidateOwnedArtifactLayout(string businessDir, string bootstrapDir)
+    {
+        List<string> errors = new List<string>();
+        TEngine.UpdateSetting setting = TEngine.Settings.UpdateSetting;
+        foreach (string hotUpdateDll in setting.HotUpdateAssemblies)
+        {
+            string staleDir = string.Equals(hotUpdateDll, setting.BootstrapAssemblyName, StringComparison.Ordinal)
+                ? businessDir
+                : bootstrapDir;
+            string stale = Path.Combine(staleDir, hotUpdateDll + setting.AssemblyTextAssetExtension);
+            if (File.Exists(stale))
+                errors.Add($"检测到热更程序集的相反分类旧副本，拒绝复用: {stale}");
+        }
+
+        foreach (string metadataDll in setting.AOTMetaAssemblies)
+        {
+            string staleDir = setting.EnableTwoStageUpdate ? businessDir : bootstrapDir;
+            string stale = Path.Combine(staleDir, metadataDll + setting.AssemblyTextAssetExtension);
+            if (File.Exists(stale))
+                errors.Add($"检测到 metadata 的相反分类旧副本，拒绝复用: {stale}");
+        }
+
+        return errors;
+    }
+
+    private static void DeleteOwnedFile(string path)
+    {
+        if (File.Exists(path))
+        {
+            File.Delete(path);
+            string metaPath = path + ".meta";
+            if (File.Exists(metaPath))
+            {
+                File.Delete(metaPath);
+            }
+        }
     }
 #endif
 

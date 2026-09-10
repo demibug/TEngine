@@ -75,8 +75,24 @@ TEngine 基于 HybridCLR + YooAsset + UniTask + Luban 构建。
 1. **异步优先**：IO 操作用 `UniTask`，禁止同步加载/Coroutine
 2. **模块访问**：通过 `GameModule.XXX` 访问，而非 `ModuleSystem.GetModule<T>()`
 3. **资源必须释放**：`LoadAssetAsync` 对应 `UnloadAsset`，GameObject 用 `LoadGameObjectAsync`
-4. **热更边界**：`GameScripts/Main` 不热更，`GameScripts/HotFix/` 全部热更
+4. **热更边界**：`GameScripts/Procedure`、`Assets/Launcher/`、`Assets/TEngine/` 不热更，`GameScripts/HotFix/`（GameUpdater/GameProto/GameLogic）全部热更
 5. **事件解耦**：模块间用 `GameEvent`，UI 内部用 `AddUIEvent`
+
+## 注释与文件格式
+
+- 新增或修改的注释必须使用中文。
+- 所有注释必须使用通俗易懂的说明，直接表达代码的用途、原因或注意事项。
+- 文件统一保持 UTF-8 无 BOM 编码。
+- 修改已有文件时保持原有 EOF 换行状态；新建文件默认以换行结尾。
+
+## PowerShell 使用规范
+
+- 优先使用 PowerShell 7：`C:\Program Files\PowerShell\7\pwsh.exe`，不要主动使用 Windows PowerShell 5.1。
+- 执行 PowerShell 命令时必须设置 UTF-8 输出：
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; chcp 65001 > $null
+```
 
 ---
 
@@ -89,6 +105,7 @@ TEngine 基于 HybridCLR + YooAsset + UniTask + Luban 构建。
 | architecture.md | 项目结构/启动流程 | 核心 |
 | modules.md | 模块 API（Timer/Scene/Audio/Fsm）| 核心 |
 | ui-lifecycle.md | UI 开发（生命周期/层级/属性）| 核心 |
+| fgui.md | FairyGUI 双体系（FguiModule/FguiWindow/事件/代码生成）| 核心 |
 | event-system.md | 事件系统（两种模式/核心接口）| 核心 |
 | resource-api.md | 资源加载/卸载 | 核心 |
 | hotfix-workflow.md | 热更代码（HybridCLR/程序集划分/热更包）| 核心 |

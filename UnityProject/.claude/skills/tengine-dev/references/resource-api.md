@@ -1,6 +1,6 @@
 # 资源加载核心 API
 
-> **适用场景**：SetSprite/LoadGameObjectAsync/LoadAssetAsync 加载、UnloadAsset/UnloadUnusedAssets 卸载、热更下载 API | **关联文档**：[resource-patterns.md](resource-patterns.md)（生命周期模式）、[ui-lifecycle.md](ui-lifecycle.md)（窗口内资源释放时机）
+> **适用场景**：SetSprite/LoadGameObjectAsync/LoadAssetAsync 加载、UnloadAsset/UnloadUnusedAssets 卸载、热更下载 API | **底层**：YooAsset 2.3.17 | **关联文档**：[resource-patterns.md](resource-patterns.md)（生命周期模式）、[ui-lifecycle.md](ui-lifecycle.md)（窗口内资源释放时机）
 
 ## 核心原则
 
@@ -18,14 +18,14 @@
 
 ### 资源寻址
 
-YooAsset 通过 **location**（文件名，不含路径和扩展名）寻址：
+YooAsset 通过 **location**（收集规则 `AddressByFileName` = 文件名，不含路径和扩展名）寻址：
 
 ```
 Assets/AssetRaw/UI/Prefabs/BattleMainUI.prefab  →  location：BattleMainUI
 Assets/AssetRaw/Audios/BGM/MainTheme.mp3        →  location：MainTheme
 ```
 
-同名文件可使用相对路径去重：`UI/BattleMainUI`
+location 在整个资源包内必须唯一：同名文件会导致**构建报错**（`The address is existed`），无法用相对路径去重。当前收集器使用 `AddressByFileName` 规则（地址=文件名，不含扩展名），此规则下无法以完整路径区分同名文件；确需同名时应调整目录规划保证文件名唯一，或改用其他 AddressRule 配置（需修改收集器 `AddressRule` 设置，非开箱即用）。
 
 ### 加载方式选择
 
@@ -57,7 +57,7 @@ void SetSubSprite(this SpriteRenderer spriteRenderer, string location,
     string spriteName, CancellationToken cancellationToken = default)
 ```
 
-> **要点**：SetSprite 的 callback 类型是 `Action<Image>` / `Action<SpriteRenderer>`（不是 `Action<Sprite>`）。SetSubSprite **没有** Action 回调重载。
+> **要点**：SetSprite 的 callback 类型是 `Action<Image>` / `Action<SpriteRenderer>`（不是 `Action<Sprite>`）。SetSubSprite **没有** Action 回调重载。扩展类 `SetSpriteExtensions` 定义在**全局命名空间**，无需 using 即可调用。
 
 使用示例：
 
@@ -82,12 +82,14 @@ _spriteRenderer.SetSubSprite("ItemAtlas", "hero_sword");                // Sprit
 UniTask<GameObject> LoadGameObjectAsync(string location, Transform parent = null,
     CancellationToken cancellationToken = default, string packageName = "")
 
-// 同步（需资源已预加载）
+// 同步（资源需已在本地；首次调用会直接同步加载并入池，无需预加载）
 GameObject LoadGameObject(string location, Transform parent = null, string packageName = "")
 
 // 回收：直接 Destroy
 Destroy(go);  // 框架自动归还引用计数
 ```
+
+> 同步加载失败情形：资源不在本地（HostPlayMode 未下载）返回 null；与进行中的同 key 异步加载冲突会抛 `GameFrameworkException`（应改用 await 异步版）。`LoadAsset` 同理。
 
 禁止 `LoadAssetAsync<GameObject>` + `Instantiate` 组合（需手动追踪和 UnloadAsset）。
 
@@ -118,21 +120,48 @@ void UnloadAsset(object asset)
 ### 资源卸载
 
 ```csharp
-UnloadAsset(asset)                                    // 引用计数-1
-UnloadUnusedAssets()                                  // 卸载引用计数为0的资源
-ForceUnloadUnusedAssets(performGCCollect: true)       // 强制整理 + 可选 GC
-ForceUnloadAllAssets()                                // 退出游戏时
+UnloadAsset(asset)                                    // 归还一份 spawn（引用计数-1）
+UnloadUnusedAssets()                                  // 回收引用计数为0的资源
+ForceUnloadUnusedAssets(performGCCollect: true)       // 强制整理 + 可选 GC（延迟到下一帧执行）
+ForceUnloadAllAssets()                                // 强制回收所有资源（WebGL 不支持）
 ```
+
+> **UnloadAsset 契约**："一份成功加载对应一次归还"——每次 `LoadAssetAsync` 成功交付一份持有，需调用一次 `UnloadAsset` 归还。它不识别调用者：同一对象被释放两次会多减一次计数，因此严禁对同一资产重复调用。
 
 ### 资源信息查询
 
 ```csharp
 bool valid = CheckLocationValid(string location, string packageName = "")
-HasAssetResult result = HasAsset(string location, string packageName = "")  // Valid/NotExist/AssetOnline/AssetOnDisk
+HasAssetResult result = HasAsset(string location, string packageName = "")
 AssetInfo info = GetAssetInfo(string location, string packageName = "")
 AssetInfo[] infos = GetAssetInfos(string tag, string packageName = "")      // 按标签
 AssetInfo[] infos = GetAssetInfos(string[] tags, string packageName = "")   // 按标签数组
 ```
+
+`HasAssetResult` 枚举共 7 个值（按声明顺序）：`NotExist`（不存在）、`AssetOnline`（需从远端下载）、`AssetOnDisk`（在磁盘上）、`AssetOnFileSystem`（在文件系统里）、`BinaryOnDisk`、`BinaryOnFileSystem`、`Valid`（资源定位地址无效）。
+
+### 回调式加载
+
+传统 GameFramework 风格的回调式异步加载（支持进度回调），与 UniTask 版并存：
+
+```csharp
+void LoadAssetAsync(string location, int priority, LoadAssetCallbacks loadAssetCallbacks,
+    object userData, string packageName = "")
+
+void LoadAssetAsync(string location, Type assetType, int priority, LoadAssetCallbacks loadAssetCallbacks,
+    object userData, string packageName = "")
+```
+
+`LoadAssetCallbacks` 构造时成功回调必填，可选失败/进度回调：
+
+```csharp
+GameModule.Resource.LoadAssetAsync("level_data", 0, new LoadAssetCallbacks(
+    (name, asset, duration, userData) => { /* 成功 */ },
+    (name, status, error, userData) => { /* 失败 */ },
+    (name, progress, userData) => { /* 进度 */ }), null);
+```
+
+回调签名：成功 `(string assetName, object asset, float duration, object userData)`；失败 `(string assetName, LoadResourceStatus status, string errorMessage, object userData)`；进度 `(string assetName, float progress, object userData)`。注意：若未提供失败回调，加载失败会直接抛出 `GameFrameworkException`（框架在无失败接收者时保持异常可见）。新代码优先用 UniTask 版 `LoadAssetAsync<T>`（支持 await 与取消）。
 
 ### 句柄式加载
 
@@ -140,11 +169,11 @@ AssetInfo[] infos = GetAssetInfos(string[] tags, string packageName = "")   // �
 
 ```csharp
 // 同步句柄（泛型 + 非泛型）
-AssetHandle LoadAssetSyncHandle<T>(string location, string packageName = "")
+AssetHandle LoadAssetSyncHandle<T>(string location, string packageName = "") where T : UnityEngine.Object
 AssetHandle LoadAssetSyncHandle(string location, Type assetType, string packageName = "")
 
 // 异步句柄（泛型 + 非泛型）
-AssetHandle LoadAssetAsyncHandle<T>(string location, string packageName = "")
+AssetHandle LoadAssetAsyncHandle<T>(string location, string packageName = "") where T : UnityEngine.Object
 AssetHandle LoadAssetAsyncHandle(string location, Type type, string packageName = "")
 ```
 
@@ -155,8 +184,39 @@ using var syncHandle = GameModule.Resource.LoadAssetSyncHandle<Sprite>("icon");
 if (syncHandle.IsValid) { var sprite = syncHandle.AssetObject as Sprite; }
 
 using var asyncHandle = GameModule.Resource.LoadAssetAsyncHandle<Sprite>("icon");
-await asyncHandle.Task;
+await asyncHandle;          // UniTask 的 HandleBaseExtensions 扩展支持直接 await；await asyncHandle.Task（标准 System.Threading.Tasks.Task）仅等待完成，失败不抛异常
 if (asyncHandle.IsValid) { var sprite = asyncHandle.AssetObject as Sprite; }
+```
+
+> 句柄用完需 `Dispose()`（`using` 自动执行）释放底层引用；也可用 `GetAssetObject<TAsset>()` 强类型取值。注意：直接 `await` 句柄时，底层加载失败会抛出携带 `LastError` 的异常（与 `LoadAssetAsync<T>` 失败返回 null 的语义不同）。
+
+### 预加载执行器（PreloadRequestRunner）
+
+批量预热资源：地址去重后并发加载，每次成功回调自动归还预热自己持有的引用，资产留在资源池按正常容量/过期策略回收。
+
+```csharp
+var runner = new PreloadRequestRunner(GameModule.Resource, () => { /* 全部请求到达终态后回调一次 */ });
+runner.Begin(new[] { "hero_config", "hero_voice", "hero_voice" });  // 地址集合可重复，内部去重
+runner.Invalidate();  // 离开当前流程时使本代失效；晚到的旧回调仍会归还资源，但不再更新状态
+
+// 状态：runner.Progress（0~1，空清单视为 1）、runner.AllTerminal、runner.IsEmpty、runner.FailedLocations（当前代失败地址）
+```
+
+### 场景加载（GameModule.Scene）
+
+```csharp
+// 异步加载（推荐）；gcCollect 默认 true：主场景加载完成后自动 ForceUnloadUnusedAssets
+UniTask<Scene> LoadSceneAsync(string location, LoadSceneMode sceneMode = LoadSceneMode.Single,
+    bool suspendLoad = false, uint priority = 100, bool gcCollect = true,
+    Action<float> progressCallBack = null)
+
+// 回调式加载
+void LoadScene(string location, LoadSceneMode sceneMode = LoadSceneMode.Single,
+    bool suspendLoad = false, uint priority = 100, Action<Scene> callBack = null,
+    bool gcCollect = true, Action<float> progressCallBack = null)
+
+// 卸载子场景
+UniTask<bool> UnloadAsync(string location, Action<float> progressCallBack = null)
 ```
 
 ### 热更/下载 API
@@ -175,6 +235,9 @@ UpdatePackageManifestOperation UpdatePackageManifestAsync(
 
 // 创建差量下载器
 ResourceDownloaderOperation CreateResourceDownloader(string customPackageName = "")
+
+// 按标签创建差量下载器（标签依赖闭包由当前 manifest 解析）
+ResourceDownloaderOperation CreateResourceDownloaderByTags(string[] tags, string customPackageName = "")
 
 // 清理冗余缓存文件
 ClearCacheFilesOperation ClearCacheFilesAsync(
@@ -223,17 +286,27 @@ protected override void OnDestroy()
 
 ### CancellationToken 取消加载
 
+**取消时 `LoadAssetAsync` 返回 null，不抛 `OperationCanceledException`**（取消与加载失败都表现为 null）：
+
 ```csharp
 private CancellationTokenSource _cts = new();
 
 private async UniTaskVoid LoadAsync()
 {
-    try { var asset = await GameModule.Resource.LoadAssetAsync<TextAsset>("config", _cts.Token); }
-    catch (OperationCanceledException) { /* 正常取消 */ }
+    var asset = await GameModule.Resource.LoadAssetAsync<TextAsset>("config", _cts.Token);
+    if (asset == null)
+    {
+        if (_cts.IsCancellationRequested) { /* 调用者取消 */ }
+        else { /* 加载失败，失败原因已有日志 */ }
+        return;
+    }
+    // 正常使用 asset ...
 }
 
 protected override void OnDestroy() { _cts.Cancel(); _cts.Dispose(); }
 ```
+
+> 同一 location 的并发加载会自动合并：后到的等待者复用先到的加载，取消等待者不影响同 key 的加载者与其他等待者。
 
 ### 并发与批量加载
 
@@ -253,18 +326,33 @@ var configs = await UniTask.WhenAll(
 ### 场景切换资源整理
 
 ```csharp
+// LoadSceneAsync 自带 gcCollect 参数（默认 true）：加载主场景后自动 ForceUnloadUnusedAssets
 await GameModule.Scene.LoadSceneAsync("BattleScene");
-GameModule.Resource.UnloadUnusedAssets();  // 整理未使用资源
+
+// 也可手动触发整理（通常无需同时使用）
+GameModule.Resource.UnloadUnusedAssets();  // 回收引用计数为0的资源
 GameModule.Resource.ForceUnloadUnusedAssets(performGCCollect: true);  // 强制整理+GC
 ```
 
 ### 多资源包
 
-所有资源加载 API 均支持 `packageName` 可选参数，用于多资源包场景：
+所有资源加载 API 均支持 `packageName` 可选参数（不传使用默认包 `DefaultPackage`），用于多资源包场景：
 
 ```csharp
 var asset = await GameModule.Resource.LoadAssetAsync<TextAsset>("config", packageName: "DLC1");
 var go = await GameModule.Resource.LoadGameObjectAsync("BossPrefab", parent, packageName: "DLC1");
+```
+
+非默认资源包使用前需先初始化（默认包由框架启动流程自动处理）：
+
+```csharp
+// 初始化指定资源包；needInitMainFest=true 时直接请求并更新清单（单机模式自定义包使用）
+await GameModule.Resource.InitPackage("DLC1", needInitMainFest: true);
+```
+
+```csharp
+// 等待资源模块 bootstrap 初始化完成（只等待模块自身，不代表任何资源包或清单已 ready）
+await GameModule.Resource.WaitUntilInitializedAsync();
 ```
 
 ---
@@ -286,6 +374,8 @@ var go = await GameModule.Resource.LoadGameObjectAsync("BossPrefab", parent, pac
 | `SetSpriteAsync("icon")` | `SetSprite("icon")` | 不存在 SetSpriteAsync，SetSprite 本身内部异步 |
 | `ReleaseSprite("icon")` | 无需手动释放 | SetSprite 内置缓存池，无需 ReleaseSprite |
 | `LoadAssetAsync<Sprite>` + 手动释放 | `_img.SetSprite("icon")` | Sprite 加载必须用 SetSprite，禁止 LoadAssetAsync<Sprite> |
+| `catch (OperationCanceledException)` 处理取消 | 判断返回值是否为 null + token 状态 | 取消时 LoadAssetAsync 返回 null，不抛异常 |
+| 同名文件用相对路径 `UI/BattleMainUI` 寻址 | 保证文件名全包唯一，或用完整资源路径 | location 全包内必须唯一，重复会构建报错 |
 
 ---
 

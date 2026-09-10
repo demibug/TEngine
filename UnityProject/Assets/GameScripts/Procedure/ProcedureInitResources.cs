@@ -1,4 +1,7 @@
 ﻿using System.Collections;
+using System;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using Launcher;
 using TEngine;
 using UnityEngine;
@@ -15,6 +18,9 @@ namespace Procedure
 
         private ProcedureOwner _procedureOwner;
 
+        private StartupAttempt _twoStageAttempt;
+        private int _nextTwoStageAttemptId;
+
         protected override void OnEnter(ProcedureOwner procedureOwner)
         {
             if (!ModuleSystem.IsRunning)
@@ -30,8 +36,29 @@ namespace Procedure
 
             LauncherMgr.ShowUI<LoadUpdateUI>("初始化资源中...");
 
+            if (Settings.UpdateSetting != null && Settings.UpdateSetting.EnableTwoStageUpdate)
+            {
+                StartTwoStageManifestAttempt();
+                return;
+            }
+
             // 注意：使用单机模式并初始化资源前，需要先构建 AssetBundle 并复制到 StreamingAssets 中，否则会产生 HTTP 404 错误
             Utility.Unity.StartCoroutine(InitResources(procedureOwner));
+        }
+
+        protected override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
+        {
+            try
+            {
+                base.OnLeave(procedureOwner, isShutdown);
+            }
+            finally
+            {
+                StartupAttempt attempt = _twoStageAttempt;
+                _twoStageAttempt = null;
+                attempt?.Invalidate();
+                attempt?.Dispose();
+            }
         }
 
         private void ChangeToCreateDownloaderState(ProcedureOwner procedureOwner)
@@ -57,6 +84,12 @@ namespace Procedure
                 return;
             }
 
+            if (Settings.UpdateSetting != null && Settings.UpdateSetting.EnableTwoStageUpdate)
+            {
+                ChangeState<ProcedureTwoStageUpdate>(procedureOwner);
+                return;
+            }
+
             if (_resourceModule.PlayMode == EPlayMode.HostPlayMode || _resourceModule.PlayMode == EPlayMode.WebPlayMode)
             {
                 //线上最新版本operation.PackageVersion
@@ -76,6 +109,119 @@ namespace Procedure
             }
 
             ChangeToPreloadState(procedureOwner);
+        }
+
+        private void StartTwoStageManifestAttempt()
+        {
+            StartupAttempt previous = _twoStageAttempt;
+            _twoStageAttempt = null;
+            previous?.Invalidate();
+            previous?.Dispose();
+
+            StartupAttempt attempt = new StartupAttempt(++_nextTwoStageAttemptId);
+            _twoStageAttempt = attempt;
+            InitializeTwoStageManifestAsync(attempt).Forget();
+        }
+
+        private async UniTaskVoid InitializeTwoStageManifestAsync(StartupAttempt attempt)
+        {
+            try
+            {
+                if (!IsCurrentTwoStageAttempt(attempt) || !TwoStageUpdateCoordinator.IsPrepared)
+                {
+                    throw new OperationCanceledException(attempt.Token);
+                }
+
+                string packageVersion = TwoStageUpdateCoordinator.PackageVersion;
+                _resourceModule.PackageVersion = packageVersion;
+                LauncherMgr.ShowUI<LoadUpdateUI>($"固定 release 清单：{packageVersion}");
+
+                if (_resourceModule.PlayMode != EPlayMode.EditorSimulateMode)
+                {
+                    await TwoStageUpdateCoordinator.VerifyPinnedManifestSourcesAsync(attempt.Token);
+                    if (!IsCurrentTwoStageAttempt(attempt))
+                        throw new OperationCanceledException(attempt.Token);
+
+                    UpdatePackageManifestOperation operation =
+                        _resourceModule.UpdatePackageManifestAsync(packageVersion);
+                    await operation.ToUniTask().AttachExternalCancellation(attempt.Token);
+                    if (!IsCurrentTwoStageAttempt(attempt))
+                    {
+                        throw new OperationCanceledException(attempt.Token);
+                    }
+
+                    if (operation.Status != EOperationStatus.Succeed)
+                    {
+                        throw new InvalidOperationException(
+                            $"Fixed manifest '{packageVersion}' failed: {operation.Error}");
+                    }
+
+                    string actual = _resourceModule.GetPackageVersion();
+                    if (!string.Equals(actual, packageVersion, StringComparison.Ordinal))
+                    {
+                        throw new InvalidOperationException(
+                            $"Manifest version drift after update: expected '{packageVersion}', actual '{actual}'.");
+                    }
+
+                    if (!(_resourceModule is IPinnedManifestIntegrity manifestIntegrity))
+                        throw new InvalidOperationException(
+                            "Resource module cannot verify the active manifest byte identity.");
+
+                    manifestIntegrity.VerifyPinnedManifestActivated(
+                        TwoStageUpdateCoordinator.Release.PackageName,
+                        packageVersion,
+                        TwoStageUpdateCoordinator.Release.ManifestSha256);
+                }
+
+                if (!attempt.TrySucceed())
+                {
+                    return;
+                }
+
+                _initResourcesComplete = true;
+            }
+            catch (OperationCanceledException)
+            {
+                if (IsCurrentTwoStageAttempt(attempt))
+                {
+                    attempt.TryCancel();
+                }
+            }
+            catch (Exception exception)
+            {
+                FailTwoStageManifestAttempt(attempt, exception);
+            }
+        }
+
+        private bool IsCurrentTwoStageAttempt(StartupAttempt attempt)
+        {
+            return ModuleSystem.IsRunning && attempt != null &&
+                   ReferenceEquals(_twoStageAttempt, attempt) && attempt.IsRunning;
+        }
+
+        private void FailTwoStageManifestAttempt(StartupAttempt attempt, Exception exception)
+        {
+            if (!IsCurrentTwoStageAttempt(attempt) || !attempt.TryFail())
+            {
+                return;
+            }
+
+            string releaseId = TwoStageUpdateCoordinator.ReleaseId ?? "<unknown>";
+            string userMessage = $"固定 release 清单更新失败：{releaseId}\n\n" +
+                                 $"<color=#FF0000>{exception}</color>\n\n" +
+                                 "尚未装载程序集，可重试同一 release 或退出。";
+            Log.Error(userMessage);
+            LauncherMgr.ShowMessageBox(
+                userMessage,
+                () =>
+                {
+                    if (ReferenceEquals(_twoStageAttempt, attempt) &&
+                        attempt.State == StartupAttempt.TerminalState.Failed)
+                    {
+                        StartTwoStageManifestAttempt();
+                    }
+                },
+                Application.Quit);
         }
 
         //// <summary>
