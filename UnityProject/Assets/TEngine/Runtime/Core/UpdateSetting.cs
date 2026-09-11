@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
@@ -46,6 +46,22 @@ namespace TEngine
         Remote,
         StreamingAssets,
     }
+
+    /// <summary>
+    /// 两阶段更新 descriptor 的来源模式。
+    /// </summary>
+    public enum TwoStageReleaseSourceMode
+    {
+        /// <summary>
+        /// 直接把 TwoStageReleaseDescriptorUrl 当作完整 descriptor 地址，兼容旧配置。
+        /// </summary>
+        DirectDescriptor = 0,
+
+        /// <summary>
+        /// 把 TwoStageReleaseDescriptorUrl 当作固定 current.json 入口地址。
+        /// </summary>
+        FixedEntry = 1,
+    }
     
     [CreateAssetMenu(menuName = "TEngine/UpdateSetting", fileName = "UpdateSetting")]
     public class UpdateSetting : ScriptableObject
@@ -89,13 +105,13 @@ namespace TEngine
         /// </summary>
         public string AssemblyTextAssetPath = "AssetRaw/DLL";
 
-        [Header("Two-stage update (default disabled)")]
-        [Tooltip("AOT host downloads and loads GameUpdater first, then GameUpdater controls the remaining update.")]
+        [Header("两阶段更新（默认关闭）")]
+        [Tooltip("AOT 主包先下载并加载 GameUpdater，再由 GameUpdater 控制后续更新。")]
         public bool EnableTwoStageUpdate = false;
 
         public int TwoStageContractVersion = 1;
 
-        [Tooltip("Build-time compatibility id for the exact AOT ABI and final stripped Player output.")]
+        [Tooltip("构建期兼容标识，对应精确的 AOT ABI 和最终裁剪后的 Player 输出。")]
         public string BasePlayerId = string.Empty;
 
         public string Channel = "default";
@@ -106,16 +122,19 @@ namespace TEngine
 
         public string BootstrapTag = "BOOTSTRAP";
 
-        [Tooltip("Trusted descriptor URL. Production Player requires HTTPS; loopback HTTP is allowed only when explicitly enabled.")]
+        [Tooltip("选择 DirectDescriptor 时填写完整 descriptor URL；选择 FixedEntry 时填写以 /current.json 结尾的固定入口 URL。")]
+        public TwoStageReleaseSourceMode TwoStageReleaseSourceMode = TwoStageReleaseSourceMode.DirectDescriptor;
+
+        [Tooltip("DirectDescriptor：完整的 TwoStageRelease_{ReleaseId}.json 地址；FixedEntry：固定发布目录中的 current.json 地址。")]
         public string TwoStageReleaseDescriptorUrl = string.Empty;
 
-        [Tooltip("Pinned primary YooAsset host for the whole two-stage session. The descriptor cannot override it.")]
+        [Tooltip("DirectDescriptor：当前 release 的资源目录；FixedEntry：基础包/平台/渠道/资源包的固定根目录，客户端会追加 /releases/{ReleaseId}。descriptor 不能覆盖该地址。")]
         public string TwoStageHostServerUrl = string.Empty;
 
-        [Tooltip("Pinned fallback YooAsset host for the whole two-stage session. The descriptor cannot override it.")]
+        [Tooltip("DirectDescriptor：当前 release 的备用资源目录；FixedEntry：同一身份的备用固定根目录，客户端会追加 /releases/{ReleaseId}。descriptor 不能覆盖该地址。")]
         public string TwoStageFallbackHostServerUrl = string.Empty;
 
-        [Tooltip("Development-only opt-in for loopback HTTP descriptor and bundle hosts.")]
+        [Tooltip("仅开发环境使用：显式允许入口和资源地址采用 loopback HTTP；正式环境应使用 HTTPS。")]
         public bool AllowInsecureLoopbackHttp = false;
 
         [Min(5f)]

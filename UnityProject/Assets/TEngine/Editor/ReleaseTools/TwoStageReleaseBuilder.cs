@@ -252,17 +252,48 @@ namespace TEngine
 
         private static void WriteRecordReplacement(string path, string json)
         {
-            string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+            string temporary = CreateShortTemporaryPath(path);
+            bool temporaryCreated = false;
             try
             {
-                File.WriteAllText(temporary, json, new UTF8Encoding(false));
+                byte[] bytes = new UTF8Encoding(false).GetBytes(json);
+                using (FileStream stream = new FileStream(
+                           temporary,
+                           FileMode.CreateNew,
+                           FileAccess.Write,
+                           FileShare.None))
+                {
+                    temporaryCreated = true;
+                    stream.Write(bytes, 0, bytes.Length);
+                }
                 File.Replace(temporary, path, null);
             }
             finally
             {
-                if (File.Exists(temporary))
+                if (temporaryCreated && File.Exists(temporary))
                     File.Delete(temporary);
             }
+        }
+
+        /// <summary>
+        /// 在目标文件同目录创建短临时文件名，避免完整目标路径叠加长后缀触发 Windows MAX_PATH。
+        /// </summary>
+        private static string CreateShortTemporaryPath(string destination)
+        {
+            string directory = Path.GetDirectoryName(destination);
+            if (string.IsNullOrEmpty(directory))
+                throw new IOException($"临时文件目标目录为空: {destination}");
+
+            for (int i = 0; i < 8; i++)
+            {
+                string temporary = Path.Combine(
+                    directory,
+                    ".ts-" + Guid.NewGuid().ToString("N").Substring(0, 12) + ".tmp");
+                if (!File.Exists(temporary) && !Directory.Exists(temporary))
+                    return temporary;
+            }
+
+            throw new IOException($"无法为目标创建不冲突的临时文件名: {destination}");
         }
 
         private static void EnsureSafeIdentitySegment(string value, string field)
@@ -418,15 +449,24 @@ namespace TEngine
                 return;
             }
 
-            string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
+            string temporary = CreateShortTemporaryPath(path);
+            bool temporaryCreated = false;
             try
             {
-                File.WriteAllBytes(temporary, bytes);
+                using (FileStream stream = new FileStream(
+                           temporary,
+                           FileMode.CreateNew,
+                           FileAccess.Write,
+                           FileShare.None))
+                {
+                    temporaryCreated = true;
+                    stream.Write(bytes, 0, bytes.Length);
+                }
                 File.Move(temporary, path);
             }
             finally
             {
-                if (File.Exists(temporary))
+                if (temporaryCreated && File.Exists(temporary))
                     File.Delete(temporary);
             }
         }

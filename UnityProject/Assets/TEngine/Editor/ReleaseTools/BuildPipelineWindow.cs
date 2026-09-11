@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using YooAsset;
@@ -83,6 +85,13 @@ namespace TEngine
         private List<string> _buildLogs = new List<string>();
         private Vector2 _logScrollPosition;
 
+        // 构建已排队标记：构建期间禁用按钮，避免重复触发
+        private bool _buildScheduled;
+
+        // 本地固定入口发布选项，仅保存在 EditorPrefs，不写入 UpdateSetting。
+        private bool _publishAfterBuild;
+        private string _publishRoot;
+
         [MenuItem("TEngine/Build/打包工具窗口", false, 0)]
         public static void ShowWindow()
         {
@@ -109,6 +118,7 @@ namespace TEngine
                 DrawAdvancedSettings();
                 DrawDllSettings();
                 DrawPlayerSettings();
+                DrawPublishSettings();
                 DrawActionButtons();
                 DrawBuildLog();
             }
@@ -388,6 +398,46 @@ namespace TEngine
 
         #endregion
 
+        #region 本地发布设置
+
+        private void DrawPublishSettings()
+        {
+            EditorGUILayout.BeginVertical("HelpBox");
+            {
+                _publishAfterBuild = EditorGUILayout.ToggleLeft(
+                    new GUIContent("构建成功后发布到本地目录",
+                        "仅对 AssetBundle 构建和一键构建生效；Player-only 不发布"),
+                    _publishAfterBuild);
+
+                EditorGUILayout.BeginHorizontal();
+                _publishRoot = EditorGUILayout.TextField(
+                    new GUIContent("本地发布根目录", "发布为身份/current.json 与 releases/{ReleaseId} 的服务根目录"),
+                    _publishRoot);
+                if (GUILayout.Button("浏览", GUILayout.Width(50)))
+                {
+                    string selected = EditorUtility.OpenFolderPanel(
+                        "选择本地发布根目录",
+                        _publishRoot,
+                        "");
+                    if (!string.IsNullOrEmpty(selected))
+                    {
+                        string projectPath = PathGetRelative(Application.dataPath + "/../", selected);
+                        _publishRoot = string.IsNullOrEmpty(projectPath) ? selected : projectPath;
+                    }
+                }
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.HelpBox(
+                    "启用后要求 UpdateSetting 开启两阶段更新并选择 FixedEntry；构建和 Player 阶段全部成功后才会复制并提交 current.json。\n" +
+                    "发布器不会修改 UpdateSetting，也不会上传远程服务器。",
+                    MessageType.Info);
+            }
+            EditorGUILayout.EndVertical();
+            GUILayout.Space(5);
+        }
+
+        #endregion
+
         #region 操作按钮
 
         private void DrawActionButtons()
@@ -395,45 +445,102 @@ namespace TEngine
             EditorGUILayout.LabelField("", GUI.skin.horizontalSlider);
             GUILayout.Space(5);
 
-            // 主按钮行
-            EditorGUILayout.BeginHorizontal();
+            EditorGUI.BeginDisabledGroup(_buildScheduled);
             {
-                var abStyle = new GUIStyle(GUI.skin.button)
+                // 主按钮行
+                EditorGUILayout.BeginHorizontal();
+                {
+                    var abStyle = new GUIStyle(GUI.skin.button)
+                    {
+                        fontSize = 13,
+                        fontStyle = FontStyle.Bold,
+                    };
+
+                    if (GUILayout.Button("构建 AssetBundle", abStyle, GUILayout.Height(35)))
+                    {
+                        QueueBuild(buildPlayer: false);
+                    }
+
+                    if (GUILayout.Button("构建 Player", abStyle, GUILayout.Height(35)))
+                    {
+                        BuildConfig snapshot = CloneConfig(_config);
+                        ScheduleBuild(() => ExecuteBuildPlayerOnlyAsync(snapshot));
+                    }
+                }
+                EditorGUILayout.EndHorizontal();
+
+                // 一键构建按钮
+                var fullBuildStyle = new GUIStyle(GUI.skin.button)
                 {
                     fontSize = 13,
                     fontStyle = FontStyle.Bold,
+                    normal = { textColor = new Color(0.2f, 0.6f, 1f) },
                 };
 
-                if (GUILayout.Button("构建 AssetBundle", abStyle, GUILayout.Height(35)))
+                if (GUILayout.Button("一键构建 (AB + Player)", fullBuildStyle, GUILayout.Height(38)))
                 {
-                    SaveSettings();
-                    ExecuteBuild(buildPlayer: false);
-                }
-
-                if (GUILayout.Button("构建 Player", abStyle, GUILayout.Height(35)))
-                {
-                    SaveSettings();
-                    ExecuteBuildPlayerOnly();
+                    _config.BuildPlayer = true;
+                    QueueBuild(buildPlayer: true);
                 }
             }
-            EditorGUILayout.EndHorizontal();
-
-            // 一键构建按钮
-            var fullBuildStyle = new GUIStyle(GUI.skin.button)
-            {
-                fontSize = 13,
-                fontStyle = FontStyle.Bold,
-                normal = { textColor = new Color(0.2f, 0.6f, 1f) },
-            };
-
-            if (GUILayout.Button("一键构建 (AB + Player)", fullBuildStyle, GUILayout.Height(38)))
-            {
-                SaveSettings();
-                _config.BuildPlayer = true;
-                ExecuteBuild(buildPlayer: true);
-            }
+            EditorGUI.EndDisabledGroup();
 
             GUILayout.Space(5);
+        }
+
+        /// <summary>
+        /// 排队执行构建，等到 OnGUI 返回后再真正调用。
+        /// 构建是长同步操作，期间 Unity 会继续派发 IMGUI 事件；若直接在按钮回调里执行
+        /// （此时滚动视图分组尚未闭合），外层 OnGUI 的 GUILayout 分组栈会被冲掉，
+        /// 恢复后 EndScrollView 就会报 "EndLayoutGroup: BeginLayoutGroup must be called first"。
+        /// </summary>
+        private void QueueBuild(bool buildPlayer)
+        {
+            BuildConfig snapshot = CloneConfig(_config);
+            // “构建 AssetBundle”明确不请求 Player；一键构建明确请求 Player。
+            snapshot.BuildPlayer = buildPlayer;
+            bool publishAfterBuild = _publishAfterBuild;
+            string publishRoot = _publishRoot;
+            ScheduleBuild(() => ExecuteBuildAsync(
+                snapshot,
+                buildPlayer,
+                publishAfterBuild,
+                publishRoot));
+        }
+
+        private void ScheduleBuild(Func<UniTask> build)
+        {
+            if (_buildScheduled)
+            {
+                return;
+            }
+
+            SaveSettings();
+            _buildScheduled = true;
+            EditorApplication.delayCall += () =>
+            {
+                RunScheduledBuildAsync(build).Forget();
+            };
+
+            Repaint();
+        }
+
+        private async UniTaskVoid RunScheduledBuildAsync(Func<UniTask> build)
+        {
+            try
+            {
+                await build();
+            }
+            catch (Exception exception)
+            {
+                AddLog($"[错误] 构建任务异常: {exception}");
+                _showBuildLog = true;
+            }
+            finally
+            {
+                _buildScheduled = false;
+                Repaint();
+            }
         }
 
         #endregion
@@ -473,34 +580,43 @@ namespace TEngine
 
         #region 构建执行
 
-        private void ExecuteBuild(bool buildPlayer)
+        private async UniTask ExecuteBuildAsync(
+            BuildConfig configSnapshot,
+            bool buildPlayer,
+            bool publishAfterBuild,
+            string publishRoot)
         {
             _buildLogs.Clear();
             AddLog($"========== 开始构建 ==========");
-            AddLog($"平台: {_config.BuildTarget} | 管线: {_config.BuildPipeline} | 最小包: {_config.MinimalPackage}");
+            AddLog($"平台: {configSnapshot.BuildTarget} | 管线: {configSnapshot.BuildPipeline} | 最小包: {configSnapshot.MinimalPackage}");
 
-            if (string.IsNullOrWhiteSpace(_config.PackageVersion))
+            if (string.IsNullOrWhiteSpace(configSnapshot.PackageVersion))
             {
-                _config.PackageVersion = BuildConfig.GetDefaultPackageVersion();
-                AddLog($"版本号为空，自动生成: {_config.PackageVersion}");
+                configSnapshot.PackageVersion = BuildConfig.GetDefaultPackageVersion();
+                AddLog($"版本号为空，自动生成: {configSnapshot.PackageVersion}");
             }
 
             BuildExecutionResult result = null;
+            TwoStageBuildAndPublishResult publishResult = null;
             try
             {
                 // 注册日志回调
                 Application.logMessageReceived += OnBuildLogReceived;
 
-                if (buildPlayer)
+                if (publishAfterBuild)
                 {
-                    result = ReleaseTools.ExecuteBuildWithResult(_config, buildPlayer: true);
+                    AddLog("已启用构建后本地发布：构建完整成功后将校验并提交 current.json。");
+                    publishResult = await TwoStageBuildAndPublish.ExecuteAsync(
+                        configSnapshot,
+                        publishRoot,
+                        buildPlayer,
+                        CancellationToken.None);
+                    result = publishResult?.BuildResult;
                 }
                 else
                 {
-                    // 仅构建AB，不走Player
-                    var configCopy = CloneConfig(_config);
-                    configCopy.BuildPlayer = false;
-                    result = ReleaseTools.ExecuteBuildWithResult(configCopy, buildPlayer: false);
+                    // 发布开关关闭时沿用原同步构建流程。
+                    result = ReleaseTools.ExecuteBuildWithResult(configSnapshot, buildPlayer);
                 }
             }
             finally
@@ -508,14 +624,58 @@ namespace TEngine
                 Application.logMessageReceived -= OnBuildLogReceived;
             }
 
-            // 结果判定以阶段化结果为准，方法正常返回不代表成功
+            LogBuildResult(result);
+            if (publishAfterBuild)
+                LogPublishResult(publishResult);
+
+            // 自动滚动到底部并展开日志
+            _showBuildLog = true;
+            Repaint();
+        }
+
+        private async UniTask ExecuteBuildPlayerOnlyAsync(BuildConfig configSnapshot)
+        {
+            _buildLogs.Clear();
+            AddLog($"========== 仅构建 Player（独立模式） ==========");
+            AddLog($"平台: {configSnapshot.PlayerPlatform} | 输出: {configSnapshot.PlayerOutputPath}");
+
+            BuildExecutionResult result = null;
+            try
+            {
+                Application.logMessageReceived += OnBuildLogReceived;
+                // 保持 Player-only 与本地发布完全隔离。
+                result = ReleaseTools.ExecutePlayerOnlyWithResult(configSnapshot);
+            }
+            finally
+            {
+                Application.logMessageReceived -= OnBuildLogReceived;
+            }
+
+            if (result == null)
+                AddLog("[错误] 构建核心返回空结果");
+            else if (result.Succeeded)
+                AddLog($"========== 仅 Player 构建完成 ==========" +
+                       $"\nPlayer输出: {result.PlayerOutputPath}\n" +
+                       "注意：仅 Player 模式不执行 DLL/AB/最小包流程，不代表完整发布成功。");
+            else if (result.Cancelled)
+                AddLog($"========== Player 构建被取消 [阶段: {result.Stage}] ==========\n[取消] {result.Error}");
+            else
+                AddLog($"========== Player 构建失败 [阶段: {result.Stage}] ==========\n[失败] {result.Error}");
+
+            _showBuildLog = true;
+            Repaint();
+        }
+
+        private void LogBuildResult(BuildExecutionResult result)
+        {
+            // 结果判定以阶段化结果为准，方法正常返回不代表成功。
             if (result == null)
             {
                 AddLog("[错误] 构建核心返回空结果");
             }
             else if (result.Succeeded)
             {
-                AddLog($"========== 构建成功 ==========");
+                AddLog("========== 构建成功 ==========");
                 AddLog($"阶段: 已全部完成 | AB输出: {result.OutputPackageDirectory ?? "无"}");
                 if (!string.IsNullOrEmpty(result.PlayerOutputPath))
                     AddLog($"Player输出: {result.PlayerOutputPath}");
@@ -530,52 +690,41 @@ namespace TEngine
                 AddLog($"========== 构建失败 [阶段: {result.Stage}] ==========");
                 AddLog($"[失败] {result.Error}");
             }
-
-            // 自动滚动到底部并展开日志
-            _showBuildLog = true;
-            Repaint();
         }
 
-        private void ExecuteBuildPlayerOnly()
+        private void LogPublishResult(TwoStageBuildAndPublishResult result)
         {
-            _buildLogs.Clear();
-            AddLog($"========== 仅构建 Player（独立模式） ==========");
-            AddLog($"平台: {_config.PlayerPlatform} | 输出: {_config.PlayerOutputPath}");
-
-            BuildExecutionResult result = null;
-            try
+            if (result == null || result.PublishResult == null)
             {
-                Application.logMessageReceived += OnBuildLogReceived;
-                result = ReleaseTools.ExecutePlayerOnlyWithResult(_config);
-            }
-            finally
-            {
-                Application.logMessageReceived -= OnBuildLogReceived;
+                AddLog("========== 发布未执行 ==========");
+                AddLog("[发布] 未获得发布结果。");
+                return;
             }
 
-            if (result == null)
+            TwoStageReleasePublishResult publish = result.PublishResult;
+            if (publish.Succeeded)
             {
-                AddLog("[错误] 构建核心返回空结果");
+                AddLog("========== 本地发布成功 ==========");
+                AddLog($"发布目录: {publish.PublishDirectory}");
+                AddLog($"入口路径: {publish.EntryPath}");
+                if (publish.ReusedExistingRelease)
+                    AddLog("[发布] 目标 release 内容完全一致，已复用历史目录。");
             }
-            else if (result.Succeeded)
+            else if (publish.Cancelled)
             {
-                AddLog($"========== 仅 Player 构建完成 ==========");
-                AddLog($"Player输出: {result.PlayerOutputPath}");
-                AddLog("注意：仅 Player 模式不执行 DLL/AB/最小包流程，不代表完整发布成功。");
+                AddLog("========== 本地发布已取消 ==========");
+                AddLog($"[发布取消] {publish.Error}");
             }
-            else if (result.Cancelled)
+            else if (publish.Status == TwoStageReleasePublishStatus.NotRun)
             {
-                AddLog($"========== Player 构建被取消 [阶段: {result.Stage}] ==========");
-                AddLog($"[取消] {result.Error}");
+                AddLog("========== 发布未执行 ==========");
+                AddLog($"[发布] {publish.Error}");
             }
             else
             {
-                AddLog($"========== Player 构建失败 [阶段: {result.Stage}] ==========");
-                AddLog($"[失败] {result.Error}");
+                AddLog("========== 本地发布失败 ==========");
+                AddLog($"[发布失败] {publish.Error}");
             }
-
-            _showBuildLog = true;
-            Repaint();
         }
 
         private void OnBuildLogReceived(string condition, string stackTrace, LogType type)
@@ -649,6 +798,9 @@ namespace TEngine
 
             _config.PlayerOutputPath = EditorPrefs.GetString("TEngine_BP_PlayerOutput",
                 BuildConfig.GetDefaultPlayerOutputPath(_config.PlayerPlatform));
+
+            _publishAfterBuild = EditorPrefs.GetBool("TEngine_BP_PublishAfterBuild", false);
+            _publishRoot = EditorPrefs.GetString("TEngine_BP_PublishRoot", "./LocalPublish");
         }
 
         private void SaveSettings()
@@ -672,6 +824,8 @@ namespace TEngine
             EditorPrefs.SetBool("TEngine_BP_BuildPlayer", _config.BuildPlayer);
             EditorPrefs.SetInt("TEngine_BP_PlayerPlatform", _playerPlatformIndex);
             EditorPrefs.SetString("TEngine_BP_PlayerOutput", _config.PlayerOutputPath);
+            EditorPrefs.SetBool("TEngine_BP_PublishAfterBuild", _publishAfterBuild);
+            EditorPrefs.SetString("TEngine_BP_PublishRoot", _publishRoot);
         }
 
         private int GetActivePlatformIndex()

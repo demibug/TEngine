@@ -4,6 +4,7 @@
     "references": [
         "TEngine.Runtime",
         "TEngine.Editor",
+        "UniTask",
         "YooAsset",
         "YooAsset.Editor"
     ],

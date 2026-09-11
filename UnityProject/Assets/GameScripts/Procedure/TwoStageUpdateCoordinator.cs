@@ -17,6 +17,7 @@ namespace Procedure
     /// </summary>
     internal static class TwoStageUpdateCoordinator
     {
+        private const int MaxEntryBytes = UpdateReleaseEntryValidator.MaximumEntryBytes;
         private const int MaxDescriptorBytes = 1024 * 1024;
 
         private static readonly HashSet<string> InjectedMetadata = new HashSet<string>(StringComparer.Ordinal);
@@ -76,6 +77,7 @@ namespace Procedure
             ValidateRuntimeConfiguration(setting, resourceModule);
 
             string json;
+            string selectedReleaseId = null;
             if (resourceModule.PlayMode == EPlayMode.EditorSimulateMode)
             {
                 json = setting.EditorSimulateReleaseDescriptorJson;
@@ -87,7 +89,37 @@ namespace Procedure
             }
             else
             {
-                json = await DownloadDescriptorAsync(setting.TwoStageReleaseDescriptorUrl, setting, cancellationToken);
+                switch (setting.TwoStageReleaseSourceMode)
+                {
+                    case TwoStageReleaseSourceMode.DirectDescriptor:
+                        json = await DownloadDescriptorAsync(
+                            setting.TwoStageReleaseDescriptorUrl,
+                            setting,
+                            cancellationToken,
+                            rejectRedirect: false);
+                        break;
+
+                    case TwoStageReleaseSourceMode.FixedEntry:
+                        UpdateReleaseEntry entry = await DownloadEntryAsync(
+                            setting.TwoStageReleaseDescriptorUrl,
+                            setting,
+                            cancellationToken);
+                        selectedReleaseId = entry.ReleaseId;
+                        string descriptorUrl = TwoStageReleaseUrl.BuildDescriptorUrl(
+                            setting.TwoStageReleaseDescriptorUrl,
+                            selectedReleaseId,
+                            setting.AllowInsecureLoopbackHttp);
+                        json = await DownloadDescriptorAsync(
+                            descriptorUrl,
+                            setting,
+                            cancellationToken,
+                            rejectRedirect: true);
+                        break;
+
+                    default:
+                        throw new InvalidOperationException(
+                            $"Two-stage release source mode '{(int)setting.TwoStageReleaseSourceMode}' is not supported.");
+                }
             }
 
             UpdateReleaseDescriptor descriptor;
@@ -98,6 +130,19 @@ namespace Procedure
             catch (Exception exception)
             {
                 throw new InvalidOperationException("Release descriptor JSON is invalid.", exception);
+            }
+
+            if (descriptor == null)
+            {
+                throw new InvalidOperationException("Release descriptor JSON is null.");
+            }
+
+            if (resourceModule.PlayMode != EPlayMode.EditorSimulateMode &&
+                setting.TwoStageReleaseSourceMode == TwoStageReleaseSourceMode.FixedEntry &&
+                !string.Equals(descriptor.ReleaseId, selectedReleaseId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"固定入口 ReleaseId 与 descriptor 不一致：入口为 '{selectedReleaseId}'，descriptor 为 '{descriptor.ReleaseId ?? "<null>"}'。");
             }
 
             UpdateReleaseValidationContext expected = new UpdateReleaseValidationContext
@@ -131,8 +176,23 @@ namespace Procedure
             if (resourceModule.PlayMode == EPlayMode.HostPlayMode)
             {
                 // RemoteServices captures these strings during InitPackage. They are pinned here, before that call.
-                primaryHostUrl = NormalizeTrustedUrl(setting.TwoStageHostServerUrl);
-                fallbackHostUrl = NormalizeTrustedUrl(setting.TwoStageFallbackHostServerUrl);
+                if (setting.TwoStageReleaseSourceMode == TwoStageReleaseSourceMode.FixedEntry)
+                {
+                    primaryHostUrl = TwoStageReleaseUrl.BuildReleaseRootUrl(
+                        setting.TwoStageHostServerUrl,
+                        descriptor.ReleaseId,
+                        setting.AllowInsecureLoopbackHttp);
+                    fallbackHostUrl = TwoStageReleaseUrl.BuildReleaseRootUrl(
+                        setting.TwoStageFallbackHostServerUrl,
+                        descriptor.ReleaseId,
+                        setting.AllowInsecureLoopbackHttp);
+                }
+                else
+                {
+                    primaryHostUrl = NormalizeTrustedUrl(setting.TwoStageHostServerUrl);
+                    fallbackHostUrl = NormalizeTrustedUrl(setting.TwoStageFallbackHostServerUrl);
+                }
+
                 resourceModule.SetRemoteServicesUrl(primaryHostUrl, fallbackHostUrl);
             }
 
@@ -296,7 +356,14 @@ namespace Procedure
             {
                 try
                 {
-                    byte[] bytes = await DownloadBytesAsync(url, _setting, cancellationToken);
+                    byte[] bytes = await DownloadBytesAsync(
+                        url,
+                        _setting,
+                        cancellationToken,
+                        maxBytes: 0,
+                        appendCacheBust: false,
+                        rejectRedirect: false,
+                        responseName: "固定清单");
                     reachable++;
                     if (!UpdateReleaseDescriptorValidator.HashMatches(bytes, _release.ManifestSha256))
                         throw new InvalidOperationException(
@@ -479,19 +546,48 @@ namespace Procedure
                 cancellationToken);
         }
 
-        private static async UniTask<string> DownloadDescriptorAsync(
+        private static async UniTask<UpdateReleaseEntry> DownloadEntryAsync(
             string url,
             UpdateSetting setting,
             CancellationToken cancellationToken)
         {
-            byte[] bytes = await DownloadBytesAsync(url, setting, cancellationToken);
-            if (bytes.Length > MaxDescriptorBytes)
+            byte[] bytes = await DownloadBytesAsync(
+                url,
+                setting,
+                cancellationToken,
+                MaxEntryBytes,
+                appendCacheBust: true,
+                rejectRedirect: true,
+                responseName: "固定入口");
+
+            string json = DecodeUtf8(bytes, "固定入口");
+            if (!UpdateReleaseEntryValidator.TryParse(json, out UpdateReleaseEntry entry, out string error))
             {
-                throw new InvalidOperationException(
-                    $"Release descriptor exceeds the {MaxDescriptorBytes}-byte limit.");
+                throw new InvalidOperationException($"固定入口校验失败：{error}");
             }
 
-            string json = Encoding.UTF8.GetString(bytes);
+            return entry;
+        }
+
+        private static async UniTask<string> DownloadDescriptorAsync(
+            string url,
+            UpdateSetting setting,
+            CancellationToken cancellationToken,
+            bool rejectRedirect)
+        {
+            byte[] bytes = await DownloadBytesAsync(
+                url,
+                setting,
+                cancellationToken,
+                MaxDescriptorBytes,
+                appendCacheBust: false,
+                rejectRedirect: rejectRedirect,
+                responseName: "Release descriptor");
+
+            // 旧 DirectDescriptor 路径保持原有 UTF-8 容错解码；固定 descriptor 则使用严格文本校验。
+            string json = rejectRedirect
+                ? DecodeUtf8(bytes, "Release descriptor")
+                : Encoding.UTF8.GetString(bytes);
             if (string.IsNullOrWhiteSpace(json))
             {
                 throw new InvalidOperationException("Release descriptor response is empty.");
@@ -503,26 +599,92 @@ namespace Procedure
         private static async UniTask<byte[]> DownloadBytesAsync(
             string url,
             UpdateSetting setting,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            int maxBytes,
+            bool appendCacheBust,
+            bool rejectRedirect,
+            string responseName)
         {
             ValidateTrustedUrl(url, setting);
-            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            string requestUrl = appendCacheBust
+                ? TwoStageReleaseUrl.AppendCacheBust(url, Guid.NewGuid().ToString("N"))
+                : url;
+            using (UnityWebRequest request = UnityWebRequest.Get(requestUrl))
             {
                 request.timeout = 60;
-                await request.SendWebRequest().WithCancellation(cancellationToken);
-                if (request.result != UnityWebRequest.Result.Success)
+                if (rejectRedirect)
                 {
-                    throw new InvalidOperationException(
-                        $"Release descriptor request failed: url='{url}', code={request.responseCode}, error='{request.error}'.");
+                    request.redirectLimit = 0;
                 }
 
-                byte[] bytes = request.downloadHandler?.data;
+                if (appendCacheBust)
+                {
+                    request.SetRequestHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+                    request.SetRequestHeader("Pragma", "no-cache");
+                }
+
+                LimitedDownloadHandler limitedHandler = null;
+                if (maxBytes > 0)
+                {
+                    limitedHandler = new LimitedDownloadHandler(maxBytes);
+                    request.downloadHandler = limitedHandler;
+                }
+
+                Exception requestException = null;
+                try
+                {
+                    await request.SendWebRequest().WithCancellation(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (UnityWebRequestException exception)
+                {
+                    // UniTask 会在 HTTP、网络或数据处理失败时于 await 处抛出，先保存异常再按请求状态分类。
+                    requestException = exception;
+                }
+
+                if (limitedHandler != null && limitedHandler.ExceededLimit)
+                {
+                    throw new InvalidOperationException(
+                        $"{responseName} 超过 {maxBytes} 字节上限，已终止请求：'{url}'。");
+                }
+
+                if (rejectRedirect && request.responseCode >= 300 && request.responseCode < 400)
+                {
+                    throw new InvalidOperationException(
+                        $"{responseName} 不允许重定向：url='{url}', code={request.responseCode}。");
+                }
+
+                if (request.result != UnityWebRequest.Result.Success || requestException != null)
+                {
+                    throw new InvalidOperationException(
+                        $"{responseName}请求失败：url='{url}', code={request.responseCode}, error='{request.error}'。",
+                        requestException);
+                }
+
+                byte[] bytes = limitedHandler != null
+                    ? limitedHandler.GetReceivedBytes()
+                    : request.downloadHandler?.data;
                 if (bytes == null || bytes.Length == 0)
                 {
-                    throw new InvalidOperationException($"Trusted response is empty: '{url}'.");
+                    throw new InvalidOperationException($"{responseName}响应为空：url='{url}'。");
                 }
 
                 return bytes;
+            }
+        }
+
+        private static string DecodeUtf8(byte[] bytes, string responseName)
+        {
+            try
+            {
+                return new UTF8Encoding(false, true).GetString(bytes);
+            }
+            catch (DecoderFallbackException exception)
+            {
+                throw new InvalidOperationException($"{responseName}不是有效的 UTF-8 文本。", exception);
             }
         }
 
@@ -531,6 +693,12 @@ namespace Procedure
             if (setting == null)
             {
                 throw new InvalidOperationException("UpdateSetting is missing.");
+            }
+
+            if (!Enum.IsDefined(typeof(TwoStageReleaseSourceMode), setting.TwoStageReleaseSourceMode))
+            {
+                throw new InvalidOperationException(
+                    $"Two-stage release source mode '{(int)setting.TwoStageReleaseSourceMode}' is not supported.");
             }
 
             if (!setting.EnableTwoStageUpdate)
@@ -592,44 +760,44 @@ namespace Procedure
 
             if (resourceModule.PlayMode == EPlayMode.HostPlayMode)
             {
-                ValidateTrustedUrl(setting.TwoStageReleaseDescriptorUrl, setting);
-                ValidateTrustedUrl(setting.TwoStageHostServerUrl, setting);
-                ValidateTrustedUrl(setting.TwoStageFallbackHostServerUrl, setting);
+                if (setting.TwoStageReleaseSourceMode == TwoStageReleaseSourceMode.FixedEntry)
+                {
+                    TwoStageReleaseUrl.ValidateFixedEntryUrl(
+                        setting.TwoStageReleaseDescriptorUrl,
+                        setting.AllowInsecureLoopbackHttp);
+                    TwoStageReleaseUrl.ValidateFixedResourceRootUrl(
+                        setting.TwoStageHostServerUrl,
+                        setting.AllowInsecureLoopbackHttp);
+                    TwoStageReleaseUrl.ValidateFixedResourceRootUrl(
+                        setting.TwoStageFallbackHostServerUrl,
+                        setting.AllowInsecureLoopbackHttp);
+                }
+                else
+                {
+                    ValidateTrustedUrl(setting.TwoStageReleaseDescriptorUrl, setting);
+                    ValidateTrustedUrl(setting.TwoStageHostServerUrl, setting);
+                    ValidateTrustedUrl(setting.TwoStageFallbackHostServerUrl, setting);
+                }
             }
         }
 
         private static void ValidateTrustedUrl(string value, UpdateSetting setting)
         {
-            if (!Uri.TryCreate(value, UriKind.Absolute, out Uri uri))
-            {
-                throw new InvalidOperationException($"Two-stage trusted URL is invalid: '{value}'.");
-            }
-
-            if (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            bool allowLoopback = setting != null && setting.AllowInsecureLoopbackHttp;
-
-            if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
-                !uri.IsLoopback || !allowLoopback)
-            {
-                throw new InvalidOperationException(
-                    $"Two-stage URL must use HTTPS. Loopback HTTP requires AllowInsecureLoopbackHttp: '{value}'.");
-            }
+            TwoStageReleaseUrl.ValidateTrustedUrl(
+                value,
+                setting != null && setting.AllowInsecureLoopbackHttp);
         }
 
         private static string NormalizeTrustedUrl(string value)
         {
-            return value.Trim().TrimEnd('/');
+            return TwoStageReleaseUrl.NormalizeLegacyRoot(value);
         }
 
         private static string CombineTrustedUrl(string root, string fileName)
         {
             string normalizedRoot = NormalizeTrustedUrl(root);
             ValidateTrustedUrl(normalizedRoot, _setting);
-            return normalizedRoot + "/" + Uri.EscapeDataString(fileName);
+            return TwoStageReleaseUrl.CombineLegacyFileUrl(normalizedRoot, fileName);
         }
 
         private static UpdateArtifactDescriptor FindArtifact(UpdateArtifactDescriptor[] artifacts, string name)
@@ -672,6 +840,50 @@ namespace Procedure
             {
                 _sessionCancellation?.Dispose();
                 _sessionCancellation = null;
+            }
+        }
+
+        /// <summary>
+        /// 受限接收入口响应，超过上限时立即停止 UnityWebRequest 的数据接收。
+        /// </summary>
+        private sealed class LimitedDownloadHandler : DownloadHandlerScript
+        {
+            private readonly int _maxBytes;
+            private readonly MemoryStream _buffer;
+
+            public LimitedDownloadHandler(int maxBytes)
+            {
+                _maxBytes = maxBytes;
+                _buffer = new MemoryStream(Math.Min(maxBytes, 4096));
+            }
+
+            public bool ExceededLimit { get; private set; }
+
+            protected override bool ReceiveData(byte[] data, int dataLength)
+            {
+                if (data == null || dataLength < 0 || dataLength > data.Length)
+                {
+                    ExceededLimit = true;
+                    return false;
+                }
+
+                if (_buffer.Length > _maxBytes - dataLength)
+                {
+                    ExceededLimit = true;
+                    return false;
+                }
+
+                if (dataLength > 0)
+                {
+                    _buffer.Write(data, 0, dataLength);
+                }
+
+                return true;
+            }
+
+            public byte[] GetReceivedBytes()
+            {
+                return _buffer.ToArray();
             }
         }
 

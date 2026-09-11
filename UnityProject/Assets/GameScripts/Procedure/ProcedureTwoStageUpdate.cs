@@ -362,6 +362,13 @@ namespace Procedure
 
         private void ValidateBootstrapAssetClassification()
         {
+            // 标签闭包校验针对真实构建产物；编辑器模拟模式不装载 DLL 资产（bootstrap 由已加载程序集提供），
+            // 模拟清单不能作为产物分类依据，故与后续装载流程一样跳过。
+            if (_resourceModule.PlayMode == EPlayMode.EditorSimulateMode)
+            {
+                return;
+            }
+
             string tag = Settings.UpdateSetting.BootstrapTag;
             AssetInfo[] taggedAssets = _resourceModule.GetAssetInfos(tag);
             HashSet<string> taggedAddresses = new HashSet<string>(StringComparer.Ordinal);
@@ -374,6 +381,13 @@ namespace Procedure
                         taggedAddresses.Add(asset.Address);
                     }
                 }
+            }
+
+            if (taggedAddresses.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"No asset carries the '{tag}' tag. Build/copy the bootstrap DLLs into '{Settings.UpdateSetting.BootstrapTextAssetPath}' " +
+                    "so the BootstrapDLL collector group can produce them.");
             }
 
             UpdateReleaseDescriptor release = TwoStageUpdateCoordinator.Release;
