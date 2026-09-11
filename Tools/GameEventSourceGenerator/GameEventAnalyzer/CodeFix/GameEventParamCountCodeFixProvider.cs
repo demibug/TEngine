@@ -83,10 +83,10 @@ public class GameEventParamCountCodeFixProvider : CodeFixProvider
             return document;
         }
 
-        // 获取方法符号
-        var symbolInfo = semanticModel.GetSymbolInfo(invocation, cancellationToken);
+        // 解析方法符号：EVENT002 的错误调用常伴随重载解析失败，经共用回退逻辑按方法名符号绑定。
+        var methodSymbol = AnalyzerHelper.ResolveInvokedMethodSymbol(semanticModel, invocation);
 
-        if (!(symbolInfo.Symbol is IMethodSymbol methodSymbol))
+        if (methodSymbol == null)
         {
             return document;
         }
@@ -103,15 +103,14 @@ public class GameEventParamCountCodeFixProvider : CodeFixProvider
         var secondArg = arguments[1].Expression; // 回调方法
 
         // 解析事件ID参数，获取接口名和方法名
-        if (!AnalyzerHelper.TryParseEventId(firstArg, semanticModel, out var interfaceName, out var methodName,
-                out var eventClassName))
+        if (!AnalyzerHelper.TryParseEventId(firstArg, semanticModel, out var eventIdInfo))
         {
             return document;
         }
 
         // 查找对应的接口
         var compilation = semanticModel.Compilation;
-        var interfaceSymbol = AnalyzerHelper.FindInterface(compilation, interfaceName, eventClassName);
+        var interfaceSymbol = AnalyzerHelper.FindInterface(compilation, eventIdInfo!);
 
         if (interfaceSymbol == null)
         {
@@ -119,7 +118,7 @@ public class GameEventParamCountCodeFixProvider : CodeFixProvider
         }
 
         // 查找对应的方法
-        var interfaceMethod = interfaceSymbol.GetMembers(methodName)
+        var interfaceMethod = interfaceSymbol.GetMembers(eventIdInfo!.MethodName)
             .OfType<IMethodSymbol>()
             .FirstOrDefault();
 

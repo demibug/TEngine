@@ -598,6 +598,8 @@ namespace TEngine
         public static void Shutdown()
         {
             _eventMgr.Init();
+            // 同步重置注册入口的一次性状态，保证 Shutdown 后可重新 Init。
+            GameEventHelper.OnEventSystemReset();
         }
     }
 }

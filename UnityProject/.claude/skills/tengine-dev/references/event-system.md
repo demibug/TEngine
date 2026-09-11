@@ -2,7 +2,7 @@
 
 > **适用场景**：GameEvent/AddUIEvent/GameEventMgr 使用、接口事件定义与发送、事件监听清理 | **关联文档**：[ui-lifecycle.md](ui-lifecycle.md)（AddUIEvent 自动清理）、[event-antipatterns.md](event-antipatterns.md)（避坑）、[naming-rules.md](naming-rules.md)（事件命名）
 >
-> **示意说明**：下文示例中的 `IGameEvent`/`ITrade`/`IBattleEvent`/`IPlayerEvent` 为按生成约定书写的示意接口；当前工程真实存在的 `[EventInterface]` 接口仅有 `ILoginUI`（生成 `ILoginUI_Event` 的事件 ID `ShowLoginUI`/`CloseLoginUI`，以及 `ILoginUI_Gen` 与 `EventCenter.LoginUI` 分组）。
+> **示意说明**：下文示例中的 `IGameEvent`/`ITrade`/`IBattleEvent`/`IPlayerEvent` 为按生成约定书写的示意接口；当前工程真实存在的 `[EventInterface]` 接口仅有 `ILoginUI`（生成 `ILoginUI_Event` 的事件 ID `ShowLoginUI`/`CloseLoginUI`、`ILoginUI_Gen` 包装类，以及程序集级 Registrar；`EventCenter` 分组 API 已废弃，见下文）。
 
 ## 架构概览
 
@@ -12,8 +12,9 @@ TEngine 事件系统由四个核心组件构成（其中两个为 Source Generat
 |------|------|------|
 | **GameEvent** | 全局静态门面 | 持有 `static readonly EventMgr _eventMgr`（另有公开属性 `GameEvent.EventMgr`），监听/移除/分发委托给 `_eventMgr.Dispatcher`，接口注册（`RegWrapInterface`）与获取（`GetInterface`）在 EventMgr 上 |
 | **GameEventMgr** | 局部作用域管理器 | 实现 `IMemory`，用于 UI 面板等需要随生命周期自动解绑的场景，只有 `AddEvent` + `Clear()` |
-| **GameEventHelper** | Source Generator 生成类 | 源码中无 .cs 文件，由 `[EventInterface]` 特性在编译时自动生成（仅当工程存在事件接口时），只提供 `Init()`，无 `RegisterListener<T>()` |
-| **EventCenter** | Source Generator 生成类 | 按事件组封装的静态监听入口（partial class，成员全为静态，内嵌 `AddEvent`/`RemoveEvent` 嵌套 partial 类，事件组类再嵌套其中），组名为接口名去掉 `I` 前缀（仅当首字符为 `I` 且第二个字符大写时才去前缀，否则保留原名） |
+| **GameEventHelper** | TEngine.Runtime 手写类（非生成物） | 事件接口注册唯一入口。`Init()` 启动阶段全量注册（失败清理并抛聚合异常）；`RegisterAssembly(Assembly)` 运行期注册动态加载的程序集（失败不影响全局监听）。两类入口都要求模块系统 Running 且必须在主线程调用 |
+| **EventAssemblyRegistrarAttribute / IEventAssemblyRegistrar** | TEngine.Runtime（生成器协作） | 程序集级注册标记 + 注册器接口。每个含 `[EventInterface]` 接口的程序集由 Source Generator 生成一个 Registrar 实现类，Registrar 内编译期直连 `new {接口}_Gen(dispatcher)` 完成注册；`GameEventHelper` 靠扫描程序集级特性找到 Registrar |
+| **EventCenter** | 已废弃 | 旧生成式分组监听封装。现仅保留 `GameLogic` 中的 `[Obsolete]` 兼容壳，不再生成分组 API，请改用 `{接口}_Event` + `GameEvent`，参数检查由分析器保障 |
 
 底层由 `EventMgr`（接口注册表，持有分发器）与 `EventDispatcher`（int 事件分发表）支撑，源码位于 `Assets/TEngine/Runtime/Core/GameEvent/`，一般无需直接使用。
 
@@ -25,7 +26,7 @@ TEngine 提供两种事件模式：**int/string 事件**（委托回调）和**�
 |------|----------------|---------|
 | 定义方式 | int 事件 ID / string（int ID 推荐来自生成类 `{接口名}_Event` 的 `public static readonly int` 字段） | 带 `[EventInterface]` 的接口 |
 | 发送 | `GameEvent.Send(int/string)` | `GameEvent.Get<ITrade>().OnTrade(...)` |
-| 监听 | `GameEvent.AddEventListener(int/string, callback)` | `AddUIEvent({接口名}_Event.{方法名}, ...)` 或 `EventCenter.AddEvent...`（接口实现类由生成器自动注册） |
+| 监听 | `GameEvent.AddEventListener(int/string, callback)` | `AddUIEvent({接口名}_Event.{方法名}, ...)`（接口实现类由生成器自动注册） |
 | 类型安全 | 无编译检查 | 编译期检查 |
 | 适用场景 | 简单通知、UI 内部 | 模块间通信、多参数 |
 
@@ -199,25 +200,26 @@ public partial class ITrade_Gen : ITrade
 GameEvent.Get<ITrade>().OnTradeComplete(itemId, count);
 ```
 
-**前提**：`GameEventHelper.Init()` 已在 `GameApp.Entrance` 中最先调用。
+**前提**：`GameEventHelper.Init()` 已在 `GameApp.Entrance` 中最先调用（须在模块系统 Running 且主线程执行，否则抛 `InvalidOperationException`）。
 
-> **注意**：`GameEventHelper` 是 Source Generator 自动生成的静态类，源码中不存在 `.cs` 文件，仅当工程存在 `[EventInterface]` 接口时才生成。它只提供 `Init()`：内部 `new {接口名}_Gen(GameEvent.EventMgr.GetDispatcher())`，由 `_Gen` 构造函数调用 `GameEvent.EventMgr.RegWrapInterface<T>(this)` 完成注册。不存在 `RegisterListener<T>()` 方法。
+> **注意**：`GameEventHelper` 是 `TEngine.Runtime` 中的手写固定类（`Assets/TEngine/Runtime/Core/GameEvent/GameEventHelper.cs`），不是生成物。它扫描每个已加载程序集的程序集级 `EventAssemblyRegistrarAttribute`，实例化对应 Registrar（Source Generator 为每个含 `[EventInterface]` 接口的程序集生成一个），由 Registrar 编译期直连 `new {接口}_Gen(dispatcher)` 完成注册（`_Gen` 构造器调用 `GameEvent.EventMgr.RegWrapInterface<T>(this)`）。
 >
-> **注册时机约束**：`RegWrapInterface` 仅在 `ModuleSystem.IsRunning` 时才真正注册（`EventMgr.cs`），否则静默跳过——这也是 `GameEventHelper.Init()` 必须在热更入口（此时 ModuleSystem 已 Running）中调用的原因；在非 Running 状态调用会导致 `GameEvent.Get<T>()` 永远返回 null。
+> **注册时机约束**：`RegWrapInterface` 仅在 `ModuleSystem.IsRunning` 时才真正注册（`EventMgr.cs`），`GameEventHelper` 入口会先校验运行态与主线程。事件接口可定义在**任何引用 TEngine.Runtime 的程序集**（热更的 GameLogic/GameProto、非热更模块、测试程序集等），注册由 `Init()` 自动覆盖调用时已加载的程序集；**之后动态加载的程序集需在加载完成后调用 `GameEventHelper.RegisterAssembly(assembly)`**（运行期禁止再次调用 `Init()`，失败仅抛异常且不影响已注册监听）。
+>
+> **一次性语义**：`Init()` 同一游戏会话只允许成功一次；`GameEvent.Shutdown()` 或新会话（`SubsystemRegistration`）后可重新 `Init()`。
 
-### EventCenter（生成器分组封装）
+### EventCenter（已废弃，兼容壳）
 
-Source Generator 还会生成 `EventCenter`（partial class，GameLogic 命名空间），按事件组提供静态监听/移除方法，组名为接口名去掉 `I` 前缀（如 `ILoginUI` -> `LoginUI`）：
+`EventCenter` 曾由 Source Generator 按事件组生成 `GameLogic.EventCenter.AddEvent.Xxx.Method(Action)` / `RemoveEvent.Xxx.Method(Action)` 分组封装（组名为接口名去掉 `I` 前缀）。**现已停止生成**，仅保留 `GameLogic/EventCenter.cs` 中的 `[Obsolete]` 兼容壳（防止旧代码编译期类型丢失），不再提供任何分组 API：
 
 ```csharp
-// 注册（内部 GameEvent.AddEventListener(ILoginUI_Event.ShowLoginUI, action)），参数签名与接口方法一致
+// 旧写法（现已废弃，编译报错提示迁移）
 EventCenter.AddEvent.LoginUI.ShowLoginUI(OnShowLoginUI);
 
-// 移除（内部 GameEvent.RemoveEventListener(...)）
-EventCenter.RemoveEvent.LoginUI.ShowLoginUI(OnShowLoginUI);
+// 新写法：{接口}_Event 静态 ID + GameEvent（参数类型检查由 GameEventAnalyzer EVENT001/EVENT002 保障）
+GameEvent.AddEventListener(ILoginUI_Event.ShowLoginUI, OnShowLoginUI);
+GameEvent.RemoveEventListener(ILoginUI_Event.ShowLoginUI, OnShowLoginUI);
 ```
-
-以工程现有接口 `ILoginUI`（`Assets/GameScripts/HotFix/GameLogic/IEvent/ILoginUI.cs`，方法 `ShowLoginUI`/`CloseLoginUI`）为例，生成器会生成 `EventCenter.AddEvent.LoginUI.ShowLoginUI(System.Action action)`，方法体为 `GameEvent.AddEventListener(ILoginUI_Event.ShowLoginUI, action)`。
 
 适合非 UI 类按接口维度管理监听，方法签名编译期检查。
 
@@ -273,7 +275,7 @@ public static void Entrance(object[] objects)
 // 正确：热更入口中最先调用（见 GameApp.Entrance）
 public static void Entrance(object[] objects)
 {
-    GameEventHelper.Init();
+    TEngine.GameEventHelper.Init();
     ...
 }
 ```
@@ -350,9 +352,8 @@ GameEvent.Shutdown();                               // 全局清除（仅游戏�
 // 错误：GameEvent 中不存在 RegisterListener<T>() 方法
 GameEvent.RegisterListener<ITrade>(implementation);
 
-// 正确：GameEventHelper.Init() 由 Source Generator 自动注册，无需手动调用 RegisterListener
-// 接口事件实现类由编译时自动生成和注册，只需确保 GameEventHelper.Init() 在 GameApp.Entrance 中最先调用
-GameEventHelper.Init();
+// 正确：GameEventHelper.Init() 扫描程序集级注册标记，Registrar 自动完成注册，无需手动调用 RegisterListener
+TEngine.GameEventHelper.Init();
 ```
 
 ---
@@ -361,11 +362,31 @@ GameEventHelper.Init();
 
 | 规则 | 说明 |
 |------|------|
-| ID 来源 | 接口事件 ID 由 `RuntimeId.ToRuntimeId` 从 1 自增分配（`++_currentRuntimeId`）；代码中没有保留 ID 区间，勿手写小整数事件 ID，避免与生成 ID 冲突 |
+| ID 来源 | 事件 ID = `RuntimeId.ToRuntimeId(长度前缀事件键)`，事件键 = `程序集完整身份 | 接口元数据全名 | 方法名`（长度前缀编码，程序集身份格式为 `名称|版本|PublicKeyToken`，形如 `16:GameLogic|1.0.0|18:GameLogic.ILoginUI11:ShowLoginUI`），杜绝跨命名空间/跨程序集同名接口碰撞；勿手写小整数事件 ID |
 | 命名 | `On` + 过去式动词 + 名词：`OnGoldChanged`、`OnBattleEnded` |
 | 接口命名 | `I` + 动词 + 名词：`ITrade`、`ILoginUI` |
 | 泛型参数 | int 事件最多 6 个，string 事件最多 5 个，GameEventMgr 最多 5 个，AddUIEvent 最多 4 个 |
 | 禁止 | 手写事件 ID 硬编码数字，应用生成类字段或 `RuntimeId.ToRuntimeId` |
+
+## 事件接口支持契约（跨程序集规则）
+
+`[EventInterface]` 接口可定义在**任何引用 TEngine.Runtime 的程序集**（热更/非热更/测试），生成器按接口实际命名空间生成 `{接口}_Event`/`{接口}_Gen`/程序集 Registrar，其余程序集无需任何初始化代码。但接口**形状受契约约束**（违规编译期报 `EVENT003`，生成器零产出）：
+
+| 允许 | 禁止（EVENT003） |
+|------|-----------------|
+| 顶层、非泛型、`public interface`（支持 partial 多声明，按符号去重） | 嵌套接口、泛型接口、非 public 接口 |
+| 无继承 | 继承其他接口（含默认接口实现） |
+| `void` 实例方法，0~5 个普通参数（对齐 GameEventMgr；底层 Send 支持到 6） | 非 void 返回、参数超 5 个、同名重载、泛型方法、`ref/out/in`、`params`、默认参数、指针/函数指针/`ref struct`（`Span<T>` 族）参数、默认接口实现、非 public 方法 |
+| 方法名为关键字时自动 `@` 转义 | 接口内的静态成员、属性、事件、常量、索引器、嵌套类型等其他成员 |
+
+`EventAssemblyRegistrarAttribute`/`IEventAssemblyRegistrar` 由 Source Generator 独占生成，**禁止手写 `[assembly: EventAssemblyRegistrar]`**（EVENT004 编译报错）；Registrar 为纯生成物（编译期直连 `new {接口}_Gen`），无业务代码。
+
+### 分析器覆盖范围（EVENT001/EVENT002）
+
+`GameEventAnalyzer` 对 `AddUIEvent`/`AddEventListener`/`RemoveEventListener` 三类调用做编译期参数检查（泛型参数数量、类型与接口方法一致；Remove 写错会导致静默移除失败，与 Add 同构检查），并提供 CodeFix 一键修复（同步改写回调方法签名，参数名为关键字时自动 `@` 转义）。两点边界：
+
+- handler 静态类型为 `System.Delegate` 的非泛型重载没有泛型参数可校验，分析器跳过不报错；
+- 分析器按方法名匹配（`AddUIEvent` 等），语义绑定 `_Event` 类 + 接口符号，跨程序集事件接口同样生效。
 
 ---
 

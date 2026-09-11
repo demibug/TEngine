@@ -17,6 +17,9 @@
         <Compile Include="../Analyzer/Extension/*.cs">
             <Link>Extension\%(RecursiveDir)%(FileName)%(Extension)</Link>
         </Compile>
+        <Compile Include="../Analyzer/Contract/*.cs">
+            <Link>Contract\%(RecursiveDir)%(FileName)%(Extension)</Link>
+        </Compile>
     </ItemGroup>
 
     <ItemGroup>

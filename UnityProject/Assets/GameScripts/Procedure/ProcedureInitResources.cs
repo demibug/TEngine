@@ -172,6 +172,39 @@ namespace Procedure
                         packageVersion,
                         TwoStageUpdateCoordinator.Release.ManifestSha256);
                 }
+                else
+                {
+                    // 编辑器模拟模式：InitializeAsync 完成并不会激活清单（YooAsset 的清单激活
+                    // 发生在 UpdatePackageManifestOperation），必须补一次标准激活流程，
+                    // 否则两阶段后续按 tag 查询资源会报 "Can not found active package manifest"。
+                    // 模拟版本来自模拟构建结果，与 release 的逻辑版本（PackageVersion 属性）解耦。
+                    RequestPackageVersionOperation versionOperation = _resourceModule.RequestPackageVersionAsync();
+                    await versionOperation.ToUniTask().AttachExternalCancellation(attempt.Token);
+                    if (!IsCurrentTwoStageAttempt(attempt))
+                    {
+                        throw new OperationCanceledException(attempt.Token);
+                    }
+
+                    if (versionOperation.Status != EOperationStatus.Succeed)
+                    {
+                        throw new InvalidOperationException(
+                            $"EditorSimulate request package version failed: {versionOperation.Error}");
+                    }
+
+                    UpdatePackageManifestOperation simulateManifestOperation =
+                        _resourceModule.UpdatePackageManifestAsync(versionOperation.PackageVersion);
+                    await simulateManifestOperation.ToUniTask().AttachExternalCancellation(attempt.Token);
+                    if (!IsCurrentTwoStageAttempt(attempt))
+                    {
+                        throw new OperationCanceledException(attempt.Token);
+                    }
+
+                    if (simulateManifestOperation.Status != EOperationStatus.Succeed)
+                    {
+                        throw new InvalidOperationException(
+                            $"EditorSimulate manifest activation failed: {simulateManifestOperation.Error}");
+                    }
+                }
 
                 if (!attempt.TrySucceed())
                 {

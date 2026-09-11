@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using EventContract;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -10,48 +11,52 @@ public static class AnalyzerHelper
 {
     /// <summary>
     /// 解析事件ID参数，提取接口名和方法名
-    /// <remarks>e.g.: ITestUI_Event.Test -> interfaceName="ITestUI", methodName="Test"</remarks>
+    /// <remarks>e.g.: ITestUI_Event.Test -> InterfaceShortName="ITestUI", MethodName="Test"；
+    /// 方法名使用 ValueText（去除 @ 转义），与接口符号成员名一致；同时保留 _Event 类语义符号供程序集定位。</remarks>
     /// </summary>
     public static bool TryParseEventId(ExpressionSyntax expression, SemanticModel semanticModel,
-        out string interfaceName, out string methodName, out string eventClassName)
+        out EventIdInfo? eventIdInfo)
     {
-        interfaceName = string.Empty;
-        methodName = string.Empty;
-        eventClassName = string.Empty;
+        eventIdInfo = null;
 
         // 处理 ITestUI_Event.Test 这种成员访问表达式
         if (expression is MemberAccessExpressionSyntax memberAccess)
         {
-            // 获取成员名（方法名） Test
-            methodName = memberAccess.Name.Identifier.Text;
+            // 获取成员名（方法名）Test（ValueText 去除 @ 转义）
+            var methodName = memberAccess.Name.Identifier.ValueText;
+            INamedTypeSymbol? typeSymbol = null;
+            var eventClassName = string.Empty;
 
-            // 获取类名 ITestUI_Event
             var symbolInfo = semanticModel.GetSymbolInfo(memberAccess.Expression);
-
-            if (symbolInfo.Symbol is INamedTypeSymbol typeSymbol)
+            if (symbolInfo.Symbol is INamedTypeSymbol namedTypeSymbol)
             {
-                eventClassName = typeSymbol.Name;
-
-                // 从 ITestUI_Event 推导出 ITestUI
-                if (eventClassName.EndsWith(Definition.EventClassNameEndsWith))
-                {
-                    interfaceName = eventClassName.Substring(0,
-                        eventClassName.Length - Definition.EventClassNameEndsWith.Length);
-                    return true;
-                }
+                typeSymbol = namedTypeSymbol;
+                eventClassName = namedTypeSymbol.Name;
+            }
+            else if (symbolInfo.Symbol is IErrorTypeSymbol errorTypeSymbol)
+            {
+                eventClassName = errorTypeSymbol.Name;
             }
             else if (memberAccess.Expression is IdentifierNameSyntax identifier)
             {
                 eventClassName = identifier.Identifier.Text;
-
-                // 从 ITestUI_Event 推导出 ITestUI
-                if (eventClassName.EndsWith(Definition.EventClassNameEndsWith))
-                {
-                    interfaceName = eventClassName.Substring(0,
-                        eventClassName.Length - Definition.EventClassNameEndsWith.Length);
-                    return true;
-                }
             }
+
+            if (string.IsNullOrEmpty(eventClassName) || !eventClassName.EndsWith(Definition.EventClassNameEndsWith))
+            {
+                return false;
+            }
+
+            var interfaceName = eventClassName.Substring(0,
+                eventClassName.Length - Definition.EventClassNameEndsWith.Length);
+            eventIdInfo = new EventIdInfo
+            {
+                EventClassName = eventClassName,
+                InterfaceShortName = interfaceName,
+                MethodName = methodName,
+                EventTypeSymbol = typeSymbol!
+            };
+            return true;
         }
 
         return false;
@@ -59,26 +64,62 @@ public static class AnalyzerHelper
 
     /// <summary>
     /// 查找对应的接口类型
-    /// <remarks>先尝试常见命名空间，再遍历所有语法树查找</remarks>
+    /// <remarks>主路径：依据 _Event 类符号的程序集归属 + 元数据全名定位（跨程序集事件接口、同名接口多程序集均可靠）；
+    /// 解析不到符号时回退：遍历所有语法树查找同名接口。</remarks>
     /// </summary>
     /// <param name="compilation">编译对象</param>
-    /// <param name="interfaceName">接口名称（如 ITestUI）</param>
-    /// <param name="eventClassName">事件类名称（如 ITestUI_Event）</param>
+    /// <param name="eventIdInfo">事件ID解析结果</param>
     /// <returns>找到的接口符号，未找到返回 null</returns>
-    public static INamedTypeSymbol? FindInterface(Compilation compilation, string interfaceName, string eventClassName)
+    public static INamedTypeSymbol? FindInterface(Compilation compilation, EventIdInfo eventIdInfo)
     {
-        foreach (var ns in Definition.CommonNamespaces)
-        {
-            var fullName = string.IsNullOrEmpty(ns) ? interfaceName : $"{ns}.{interfaceName}";
-            var symbol = compilation.GetTypeByMetadataName(fullName);
+        // 候选全名（短名 + 命名空间限定名），主路径与回退共用。
+        var possibleFullNames = new List<string> { eventIdInfo.InterfaceShortName };
 
-            if (symbol != null && symbol.TypeKind == TypeKind.Interface)
+        if (eventIdInfo.EventTypeSymbol != null)
+        {
+            // 主路径：处理器类与接口同命名空间且同程序集，用程序集限定查找，防止同名接口查错。
+            var ns = eventIdInfo.EventTypeSymbol.ContainingNamespace;
+            var nsText = ns.IsGlobalNamespace ? string.Empty : ns.ToDisplayString();
+
+            if (!string.IsNullOrEmpty(nsText))
             {
-                return symbol;
+                possibleFullNames.Insert(0, $"{nsText}.{eventIdInfo.InterfaceShortName}");
+            }
+
+            foreach (var fullName in possibleFullNames)
+            {
+                var symbol = eventIdInfo.EventTypeSymbol.ContainingAssembly.GetTypeByMetadataName(fullName);
+                if (symbol != null && symbol.TypeKind == TypeKind.Interface)
+                {
+                    return symbol;
+                }
             }
         }
 
-        // 遍历所有语法树查找接口
+        // 回退：遍历引用程序集（含当前编译）按候选全名查找（error symbol / 跨程序集场景兜底）。
+        var assembliesToSearch = new List<IAssemblySymbol>();
+
+        foreach (var reference in compilation.References)
+        {
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol referencedAssembly)
+            {
+                assembliesToSearch.Add(referencedAssembly);
+            }
+        }
+
+        foreach (var assembly in assembliesToSearch)
+        {
+            foreach (var fullName in possibleFullNames)
+            {
+                var symbol = assembly.GetTypeByMetadataName(fullName);
+                if (symbol != null && symbol.TypeKind == TypeKind.Interface)
+                {
+                    return symbol;
+                }
+            }
+        }
+
+        // 兜底：遍历所有语法树查找同名接口
         foreach (var syntaxTree in compilation.SyntaxTrees)
         {
             var root = syntaxTree.GetRoot();
@@ -86,7 +127,7 @@ public static class AnalyzerHelper
             // 查找接口声明
             var interfaces = root.DescendantNodes()
                 .OfType<InterfaceDeclarationSyntax>()
-                .Where(i => i.Identifier.Text == interfaceName);
+                .Where(i => i.Identifier.Text == eventIdInfo.InterfaceShortName);
 
             foreach (var interfaceDecl in interfaces)
             {
@@ -99,7 +140,7 @@ public static class AnalyzerHelper
 
                 if (namespaceName != null)
                 {
-                    var fullInterfaceName = $"{namespaceName}.{interfaceName}";
+                    var fullInterfaceName = $"{namespaceName}.{eventIdInfo.InterfaceShortName}";
                     var interfaceSymbol = compilation.GetTypeByMetadataName(fullInterfaceName);
 
                     if (interfaceSymbol != null && interfaceSymbol.TypeKind == TypeKind.Interface)
@@ -111,6 +152,40 @@ public static class AnalyzerHelper
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// 解析调用表达式实际引用的方法符号。
+    /// <remarks>参数类型/数量错误时重载解析会失败（GetSymbolInfo(invocation) 返回 null），
+    /// 而 EVENT001/EVENT002 恰恰要检测这类错误，因此回退到方法名符号绑定（泛型名/标识符/成员访问名）。
+    /// 分析器与 CodeFix 共用，保证诊断和修复看到同一个符号。</remarks>
+    /// </summary>
+    /// <param name="semanticModel">语义模型</param>
+    /// <param name="invocation">调用表达式</param>
+    /// <returns>解析到的方法符号，无法解析返回 null</returns>
+    public static IMethodSymbol? ResolveInvokedMethodSymbol(SemanticModel semanticModel,
+        InvocationExpressionSyntax invocation)
+    {
+        var methodSymbol = semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+        if (methodSymbol != null)
+        {
+            return methodSymbol;
+        }
+
+        switch (invocation.Expression)
+        {
+            case GenericNameSyntax genericName:
+                return semanticModel.GetSymbolInfo(genericName).Symbol as IMethodSymbol;
+
+            case IdentifierNameSyntax identifierName:
+                return semanticModel.GetSymbolInfo(identifierName).Symbol as IMethodSymbol;
+
+            case MemberAccessExpressionSyntax memberAccess when memberAccess.Name is GenericNameSyntax memberGenericName:
+                return semanticModel.GetSymbolInfo(memberGenericName).Symbol as IMethodSymbol;
+
+            default:
+                return null;
+        }
     }
 
     /// <summary>
@@ -169,13 +244,14 @@ public static class AnalyzerHelper
 
     /// <summary>
     /// 构建正确的方法参数列表语法
+    /// <remarks>参数名是 C# 关键字（如 event）时自动加 @ 转义，避免修复结果产生非法代码。</remarks>
     /// </summary>
     /// <param name="parameterInfos">参数信息列表</param>
     /// <returns>参数列表语法</returns>
     public static ParameterListSyntax BuildParameterList(List<(string TypeName, string ParamName)> parameterInfos)
     {
         var parameters = parameterInfos.Select(info =>
-            SyntaxFactory.Parameter(SyntaxFactory.Identifier(info.ParamName))
+            SyntaxFactory.Parameter(SyntaxFactory.Identifier(EventInterfaceContract.EscapeIdentifier(info.ParamName)))
                 .WithType(SyntaxFactory.ParseTypeName(info.TypeName)
                     .WithTrailingTrivia(SyntaxFactory.Space)));
 

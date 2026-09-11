@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Linq;
+using EventContract;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -48,7 +49,8 @@ public class GameEventAnalyzer : DiagnosticAnalyzer
     /// 返回此分析器支持的所有诊断规则
     /// </summary>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
-        ImmutableArray.Create(m_ruleTypeMismatch, m_ruleParamCountMismatch);
+        ImmutableArray.Create(m_ruleTypeMismatch, m_ruleParamCountMismatch,
+            EventInterfaceContract.RuleUnsupportedShape, EventInterfaceContract.RuleManualRegistrarAttribute);
 
     /// <summary>
     /// 初始化分析器，注册语法节点分析回调
@@ -62,6 +64,10 @@ public class GameEventAnalyzer : DiagnosticAnalyzer
         context.EnableConcurrentExecution();
         // 注册方法调用表达式的分析回调
         context.RegisterSyntaxNodeAction(AnalyzeInvocation, SyntaxKind.InvocationExpression);
+        // 注册事件接口形状检查（EVENT003）
+        context.RegisterSyntaxNodeAction(AnalyzeInterfaceDeclaration, SyntaxKind.InterfaceDeclaration);
+        // 注册程序集级事件注册标记检查（EVENT004，仅作用于手写代码）
+        context.RegisterSyntaxNodeAction(AnalyzeRegistrarAttribute, SyntaxKind.Attribute);
     }
 
     /// <summary>
@@ -73,16 +79,22 @@ public class GameEventAnalyzer : DiagnosticAnalyzer
     {
         var invocation = (InvocationExpressionSyntax)context.Node;
 
-        // 获取方法符号
-        var symbolInfo = context.SemanticModel.GetSymbolInfo(invocation);
-
-        if (!(symbolInfo.Symbol is IMethodSymbol methodSymbol))
+        // 解析方法符号：参数类型匹配失败时重载解析会失败（GetSymbolInfo(invocation) 返回 null），
+        // 而 EVENT001/EVENT002 恰恰要检测这种错误，因此经共用回退逻辑按方法名符号绑定。
+        var methodSymbol = AnalyzerHelper.ResolveInvokedMethodSymbol(context.SemanticModel, invocation);
+        if (methodSymbol == null)
         {
             return;
         }
 
         // 检查是否是 Definition 包含的事件监听调用方法
         if (!Definition.CheckMethodNameList.Contains(methodSymbol.Name))
+        {
+            return;
+        }
+
+        // Delegate 非泛型重载（handler 静态类型为 System.Delegate）没有泛型参数可校验，跳过避免误报。
+        if (methodSymbol.Parameters.Any(p => p.Type.SpecialType == SpecialType.System_Delegate))
         {
             return;
         }
@@ -101,14 +113,13 @@ public class GameEventAnalyzer : DiagnosticAnalyzer
         var firstArg = arguments[0].Expression;
 
         // 解析事件ID参数，获取接口名和方法名
-        if (!AnalyzerHelper.TryParseEventId(firstArg, context.SemanticModel, out var interfaceName, out var methodName,
-                out var eventClassName))
+        if (!AnalyzerHelper.TryParseEventId(firstArg, context.SemanticModel, out var eventIdInfo))
         {
             return;
         }
 
         // 查找对应的接口
-        var interfaceSymbol = AnalyzerHelper.FindInterface(context.Compilation, interfaceName, eventClassName);
+        var interfaceSymbol = AnalyzerHelper.FindInterface(context.Compilation, eventIdInfo!);
 
         if (interfaceSymbol == null)
         {
@@ -116,7 +127,7 @@ public class GameEventAnalyzer : DiagnosticAnalyzer
         }
 
         // 查找对应的方法
-        var interfaceMethod = interfaceSymbol.GetMembers(methodName)
+        var interfaceMethod = interfaceSymbol.GetMembers(eventIdInfo!.MethodName)
             .OfType<IMethodSymbol>()
             .FirstOrDefault();
 
@@ -135,8 +146,8 @@ public class GameEventAnalyzer : DiagnosticAnalyzer
                 m_ruleParamCountMismatch, // 诊断规则描述符
                 invocation.GetLocation(), // 错误位置
                 typeArguments.Length, // 调用的参数数量
-                interfaceName, // "ILoginUI"
-                methodName, // "Test"
+                eventIdInfo.InterfaceShortName, // "ILoginUI"
+                eventIdInfo.MethodName, // "Test"
                 parameterTypes.Count); // 原始方法参数数量
 
             context.ReportDiagnostic(diagnostic);
@@ -155,13 +166,86 @@ public class GameEventAnalyzer : DiagnosticAnalyzer
                     m_ruleTypeMismatch, // 诊断规则描述符
                     invocation.GetLocation(), // 错误位置
                     AnalyzerHelper.GetTypeName(actualType), // 实际的参数类型
-                    interfaceName, // "ILoginUI"
-                    methodName, // "Test"
+                    eventIdInfo.InterfaceShortName, // "ILoginUI"
+                    eventIdInfo.MethodName, // "Test"
                     AnalyzerHelper.GetTypeName(expectedType), // 期望的参数类型
                     i + 1); // 参数位置（从1开始）
 
                 context.ReportDiagnostic(diagnostic);
             }
+        }
+    }
+
+    /// <summary>
+    /// 事件接口形状检查（EVENT003）：不符合支持契约的接口编译期报错，配合生成器跳过，保证不产出坏代码。
+    /// </summary>
+    private void AnalyzeInterfaceDeclaration(SyntaxNodeAnalysisContext context)
+    {
+        var interfaceNode = (InterfaceDeclarationSyntax)context.Node;
+        var attributeType = context.Compilation.GetTypeByMetadataName(Definition.EventInterface);
+
+        if (attributeType == null)
+        {
+            return;
+        }
+
+        var symbol = context.SemanticModel.GetDeclaredSymbol(interfaceNode) as INamedTypeSymbol;
+        if (symbol == null)
+        {
+            return;
+        }
+
+        // 语义匹配 TEngine.EventInterfaceAttribute，其他库同名特性不触发。
+        var isEventInterface = symbol.GetAttributes().Any(a =>
+            a.AttributeClass != null && SymbolEqualityComparer.Default.Equals(a.AttributeClass, attributeType));
+
+        if (!isEventInterface)
+        {
+            return;
+        }
+
+        if (!EventInterfaceContract.TryValidate(symbol, out var reason))
+        {
+            var diagnostic = Diagnostic.Create(EventInterfaceContract.RuleUnsupportedShape,
+                interfaceNode.Identifier.GetLocation(), symbol.ToDisplayString(), reason);
+            context.ReportDiagnostic(diagnostic);
+        }
+    }
+
+    /// <summary>
+    /// 程序集级事件注册标记检查（EVENT004）：禁止手写 [assembly: EventAssemblyRegistrar]。
+    /// <remarks>自动生成代码被 ConfigureGeneratedCodeAnalysis(None) 跳过，此规则只会命中手写代码；
+    /// 属于代码库约束，预编译/动态程序集不受此规则约束。</remarks>
+    /// </summary>
+    private void AnalyzeRegistrarAttribute(SyntaxNodeAnalysisContext context)
+    {
+        var attribute = (AttributeSyntax)context.Node;
+
+        // 仅在程序集级特性上检查
+        if (!(attribute.Parent is AttributeListSyntax attributeList) ||
+            attributeList.Target?.Identifier.IsKind(SyntaxKind.AssemblyKeyword) != true)
+        {
+            return;
+        }
+
+        var attributeType = context.Compilation.GetTypeByMetadataName(Definition.EventAssemblyRegistrar);
+        if (attributeType == null)
+        {
+            return;
+        }
+
+        var symbolInfo = context.SemanticModel.GetSymbolInfo(attribute);
+        if (!(symbolInfo.Symbol is IMethodSymbol constructor))
+        {
+            return;
+        }
+
+        if (constructor.ContainingType != null &&
+            SymbolEqualityComparer.Default.Equals(constructor.ContainingType, attributeType))
+        {
+            var diagnostic = Diagnostic.Create(EventInterfaceContract.RuleManualRegistrarAttribute,
+                attribute.GetLocation());
+            context.ReportDiagnostic(diagnostic);
         }
     }
 }

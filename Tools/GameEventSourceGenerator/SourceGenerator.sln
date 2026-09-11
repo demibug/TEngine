@@ -7,6 +7,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceGenerator", "SourceGe
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameEventAnalyzer", "GameEventAnalyzer\GameEventAnalyzer.csproj", "{A207B9D6-FFE1-419E-B2BA-86D4DF6CC2DC}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SourceGenerator.Tests", "SourceGenerator.Tests\SourceGenerator.Tests.csproj", "{8C612A5D-03D7-41B7-B45C-36C3F351FC53}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameEventAnalyzer.Tests", "GameEventAnalyzer.Tests\GameEventAnalyzer.Tests.csproj", "{C6430C7A-A5C9-4BC1-8058-D614AC6E82DA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +37,14 @@ Global
 		{CA734AB9-F825-4DDA-BCB1-AD5FC464CAB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CA734AB9-F825-4DDA-BCB1-AD5FC464CAB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CA734AB9-F825-4DDA-BCB1-AD5FC464CAB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C612A5D-03D7-41B7-B45C-36C3F351FC53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C612A5D-03D7-41B7-B45C-36C3F351FC53}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C612A5D-03D7-41B7-B45C-36C3F351FC53}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C612A5D-03D7-41B7-B45C-36C3F351FC53}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6430C7A-A5C9-4BC1-8058-D614AC6E82DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6430C7A-A5C9-4BC1-8058-D614AC6E82DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6430C7A-A5C9-4BC1-8058-D614AC6E82DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6430C7A-A5C9-4BC1-8058-D614AC6E82DA}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A207B9D6-FFE1-419E-B2BA-86D4DF6CC2DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{A207B9D6-FFE1-419E-B2BA-86D4DF6CC2DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A207B9D6-FFE1-419E-B2BA-86D4DF6CC2DC}.Release|Any CPU.ActiveCfg = Release|Any CPU

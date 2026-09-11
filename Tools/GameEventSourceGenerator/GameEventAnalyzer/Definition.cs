@@ -75,10 +75,12 @@ public sealed class Definition
 
     /// <summary>
     /// 需要检测的方法名列表
+    /// <remarks>Add 与 Remove 成对检查：Remove 泛型参数写错会导致静默移除失败，与 Add 同构。
+    /// 非 UI 类监听建议经 GameEventMgr（AddEvent），其事件 ID 同样来自生成类字段。</remarks>
     /// </summary>
     public static readonly List<string> CheckMethodNameList =
     [
-        "AddUIEvent", "AddEventListener"
+        "AddUIEvent", "AddEventListener", "RemoveEventListener"
     ];
 
     /// <summary>
@@ -87,10 +89,12 @@ public sealed class Definition
     public const string EventClassNameEndsWith = "_Event";
 
     /// <summary>
-    /// 命名空间检测
+    /// TEngine.EventInterfaceAttribute 元数据全名（语义匹配用）。
     /// </summary>
-    public static readonly List<string> CommonNamespaces =
-    [
-        "GameLogic",
-    ];
+    public const string EventInterface = "TEngine.EventInterfaceAttribute";
+
+    /// <summary>
+    /// TEngine.EventAssemblyRegistrarAttribute 元数据全名（语义匹配用）。
+    /// </summary>
+    public const string EventAssemblyRegistrar = "TEngine.EventAssemblyRegistrarAttribute";
 }

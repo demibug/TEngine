@@ -85,7 +85,7 @@ public partial class GameApp
 - `Entrance` 参数类型是 `object[]`，不是 `Assembly[]`——`objects[0]` 才是 `List<Assembly>`
 - 可通过 `partial class GameApp` 拓展入口逻辑（如注册系统）
 - 同进程仅允许成功进入一次：`ProcedureLoadAssembly` 在反射 Invoke 前置位 `_entranceInvoked` 闸门，`Entrance` 抛错后本进程不能再次注入程序集，只能重启
-- `GameEventHelper.Init()` 必须最先调用：该类由 Source Generator 在编译时生成（仅当工程存在 `[EventInterface]` 接口时），源码中搜不到 `.cs` 定义属正常现象（生成器以编译好的 RoslynAnalyzer DLL 提供：`Assets/TEngine/Runtime/Core/GameEvent/SourceGenerator.dll`，meta 带 `RoslynAnalyzer` 标签；生成器源码在仓库根 `Tools/GameEventSourceGenerator/SourceGenerator/Generator/EventInterfaceGenerator.cs`，生成 `GameEventHelper.g.cs`），详见 event-system.md
+- `GameEventHelper.Init()` 必须最先调用：该类为 TEngine.Runtime 手写类（`Assets/TEngine/Runtime/Core/GameEvent/GameEventHelper.cs`），扫描已加载程序集的程序集级 `EventAssemblyRegistrarAttribute` 并实例化对应 Registrar 完成事件接口注册（Registrar 由 `Tools/GameEventSourceGenerator` 为每个含 `[EventInterface]` 接口的程序集生成，生成器以 `Assets/TEngine/Runtime/Core/GameEvent/SourceGenerator.dll` RoslynAnalyzer 形式交付），详见 event-system.md
 - `GameApp` 还声明 `ResetForNewSession()`（`[RuntimeInitializeOnLoadMethod(SubsystemRegistration)]`，重置静态状态以支持域重载）
 
 ---

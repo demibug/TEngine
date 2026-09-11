@@ -52,7 +52,14 @@ namespace TEngine
                 {
                     InterfaceWrap = callerWrap
                 };
-                _eventEntryMap.Add(typeof(T), entry);
+                var key = typeof(T);
+                if (_eventEntryMap.ContainsKey(key))
+                {
+                    Log.Warning($"事件接口 {key.FullName} 重复注册，已覆盖。");
+                }
+
+                // 幂等覆盖写入：支持 Init -> Shutdown -> Init 生命周期与运行期重复注册。
+                _eventEntryMap[key] = entry;
             }
         }
 

@@ -28,19 +28,43 @@ MonoBehaviour:
   LogicMainDllName: GameLogic.dll
   AssemblyTextAssetExtension: .bytes
   AssemblyTextAssetPath: AssetRaw/DLL
-  EnableTwoStageUpdate: 0
+  EnableTwoStageUpdate: 1
   TwoStageContractVersion: 1
-  BasePlayerId: ''
+  BasePlayerId: demo-v1
   Channel: default
   BootstrapAssemblyName: GameUpdater.dll
   BootstrapTextAssetPath: AssetRaw/Bootstrap/DLL
   BootstrapTag: BOOTSTRAP
-  TwoStageReleaseDescriptorUrl: ''
-  TwoStageHostServerUrl: ''
-  TwoStageFallbackHostServerUrl: ''
-  AllowInsecureLoopbackHttp: 0
+  TwoStageReleaseDescriptorUrl: http://127.0.0.1:8081
+  TwoStageHostServerUrl: http://127.0.0.1:8081
+  TwoStageFallbackHostServerUrl: http://127.0.0.1:8082
+  AllowInsecureLoopbackHttp: 1
   TwoStageNoProgressTimeoutSeconds: 60
-  EditorSimulateReleaseDescriptorJson: ''
+  EditorSimulateReleaseDescriptorJson: '{
+    "ContractVersion": 1,
+    "ReleaseId": "rel-20260911-001",
+    "BasePlayerId": "demo-v1",
+    "Platform": "Windows64",
+    "Channel": "default",
+    "PackageName": "DefaultPackage",
+    "PackageVersion": "1.0.0",
+    "ManifestId": "DefaultPackage_1.0.0.bytes",
+    "ManifestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "BootstrapAssembly": { "Name": "GameUpdater.dll", "Address": "GameUpdater.dll", "Sha256": "7ebbbe2763ba94909bba92a31e6b92152f117bd2bbe8572040745690e79f2d50" },
+    "BusinessAssemblies": [
+      { "Name": "GameProto.dll", "Address": "GameProto.dll", "Sha256": "26cbb955020e15d51601a87f1900a3e33791e88cacaa1dbc08731277ad30ab61" },
+      { "Name": "GameLogic.dll", "Address": "GameLogic.dll", "Sha256": "516982c059ab02bebb3b91935df5e3881b26064e8e0f119730d885bad2496c6a" }
+    ],
+    "MetadataAssemblies": [
+      { "Name": "mscorlib.dll", "Address": "mscorlib.dll", "Sha256": "4598c98d1ee1c9bdb972d5e833461fd5c0c40f8cd73560e93ad36050c8b7d54e" },
+      { "Name": "System.dll", "Address": "System.dll", "Sha256": "d139805b0c911b76c1b71ba70bc6572fc4003acc009f1ea7cb40a6bae7f11739" },
+      { "Name": "System.Core.dll", "Address": "System.Core.dll", "Sha256": "b9a12a348fe9907b36230b8bba7806998268bd54bdc4b72be7ff167ccca78111" },
+      { "Name": "TEngine.Runtime.dll", "Address": "TEngine.Runtime.dll", "Sha256": "ba23e4dd47004f77e081eae409ed5b7d19d3ce8a269379ba6f3d6e87512a51e5" },
+      { "Name": "UniTask.dll", "Address": "UniTask.dll", "Sha256": "78ac9d04760973d33d1bf13806a0a16c8c8c00d443e2f201112b8d402c558abb" },
+      { "Name": "YooAsset.dll", "Address": "YooAsset.dll", "Sha256": "30645d989945de9f81de3c0fca94a6a7b6861706ee56967bcb9e327f01f0bbe4" },
+      { "Name": "UnityEngine.CoreModule.dll", "Address": "UnityEngine.CoreModule.dll", "Sha256": "f25ba19b2b8626c2491776f00d4f9ffc6437eabd94dace8e2548afb668d8cdfe" }
+    ]
+  }'
   UpdateStyle: 1
   UpdateNotice: 1
   ResDownLoadPath: http://127.0.0.1:8081
