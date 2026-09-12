@@ -89,37 +89,19 @@ namespace Procedure
             }
             else
             {
-                switch (setting.TwoStageReleaseSourceMode)
-                {
-                    case TwoStageReleaseSourceMode.DirectDescriptor:
-                        json = await DownloadDescriptorAsync(
-                            setting.TwoStageReleaseDescriptorUrl,
-                            setting,
-                            cancellationToken,
-                            rejectRedirect: false);
-                        break;
-
-                    case TwoStageReleaseSourceMode.FixedEntry:
-                        UpdateReleaseEntry entry = await DownloadEntryAsync(
-                            setting.TwoStageReleaseDescriptorUrl,
-                            setting,
-                            cancellationToken);
-                        selectedReleaseId = entry.ReleaseId;
-                        string descriptorUrl = TwoStageReleaseUrl.BuildDescriptorUrl(
-                            setting.TwoStageReleaseDescriptorUrl,
-                            selectedReleaseId,
-                            setting.AllowInsecureLoopbackHttp);
-                        json = await DownloadDescriptorAsync(
-                            descriptorUrl,
-                            setting,
-                            cancellationToken,
-                            rejectRedirect: true);
-                        break;
-
-                    default:
-                        throw new InvalidOperationException(
-                            $"Two-stage release source mode '{(int)setting.TwoStageReleaseSourceMode}' is not supported.");
-                }
+                UpdateReleaseEntry entry = await DownloadEntryAsync(
+                    setting.TwoStageReleaseEntryUrl,
+                    setting,
+                    cancellationToken);
+                selectedReleaseId = entry.ReleaseId;
+                string descriptorUrl = TwoStageReleaseUrl.BuildDescriptorUrl(
+                    setting.TwoStageReleaseEntryUrl,
+                    selectedReleaseId,
+                    setting.AllowInsecureLoopbackHttp);
+                json = await DownloadDescriptorAsync(
+                    descriptorUrl,
+                    setting,
+                    cancellationToken);
             }
 
             UpdateReleaseDescriptor descriptor;
@@ -138,7 +120,6 @@ namespace Procedure
             }
 
             if (resourceModule.PlayMode != EPlayMode.EditorSimulateMode &&
-                setting.TwoStageReleaseSourceMode == TwoStageReleaseSourceMode.FixedEntry &&
                 !string.Equals(descriptor.ReleaseId, selectedReleaseId, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
@@ -176,22 +157,14 @@ namespace Procedure
             if (resourceModule.PlayMode == EPlayMode.HostPlayMode)
             {
                 // RemoteServices captures these strings during InitPackage. They are pinned here, before that call.
-                if (setting.TwoStageReleaseSourceMode == TwoStageReleaseSourceMode.FixedEntry)
-                {
-                    primaryHostUrl = TwoStageReleaseUrl.BuildReleaseRootUrl(
-                        setting.TwoStageHostServerUrl,
-                        descriptor.ReleaseId,
-                        setting.AllowInsecureLoopbackHttp);
-                    fallbackHostUrl = TwoStageReleaseUrl.BuildReleaseRootUrl(
-                        setting.TwoStageFallbackHostServerUrl,
-                        descriptor.ReleaseId,
-                        setting.AllowInsecureLoopbackHttp);
-                }
-                else
-                {
-                    primaryHostUrl = NormalizeTrustedUrl(setting.TwoStageHostServerUrl);
-                    fallbackHostUrl = NormalizeTrustedUrl(setting.TwoStageFallbackHostServerUrl);
-                }
+                primaryHostUrl = TwoStageReleaseUrl.BuildReleaseRootUrl(
+                    setting.TwoStageHostServerUrl,
+                    descriptor.ReleaseId,
+                    setting.AllowInsecureLoopbackHttp);
+                fallbackHostUrl = TwoStageReleaseUrl.BuildReleaseRootUrl(
+                    setting.TwoStageFallbackHostServerUrl,
+                    descriptor.ReleaseId,
+                    setting.AllowInsecureLoopbackHttp);
 
                 resourceModule.SetRemoteServicesUrl(primaryHostUrl, fallbackHostUrl);
             }
@@ -572,8 +545,7 @@ namespace Procedure
         private static async UniTask<string> DownloadDescriptorAsync(
             string url,
             UpdateSetting setting,
-            CancellationToken cancellationToken,
-            bool rejectRedirect)
+            CancellationToken cancellationToken)
         {
             byte[] bytes = await DownloadBytesAsync(
                 url,
@@ -581,13 +553,10 @@ namespace Procedure
                 cancellationToken,
                 MaxDescriptorBytes,
                 appendCacheBust: false,
-                rejectRedirect: rejectRedirect,
+                rejectRedirect: true,
                 responseName: "Release descriptor");
 
-            // 旧 DirectDescriptor 路径保持原有 UTF-8 容错解码；固定 descriptor 则使用严格文本校验。
-            string json = rejectRedirect
-                ? DecodeUtf8(bytes, "Release descriptor")
-                : Encoding.UTF8.GetString(bytes);
+            string json = DecodeUtf8(bytes, "Release descriptor");
             if (string.IsNullOrWhiteSpace(json))
             {
                 throw new InvalidOperationException("Release descriptor response is empty.");
@@ -695,12 +664,6 @@ namespace Procedure
                 throw new InvalidOperationException("UpdateSetting is missing.");
             }
 
-            if (!Enum.IsDefined(typeof(TwoStageReleaseSourceMode), setting.TwoStageReleaseSourceMode))
-            {
-                throw new InvalidOperationException(
-                    $"Two-stage release source mode '{(int)setting.TwoStageReleaseSourceMode}' is not supported.");
-            }
-
             if (!setting.EnableTwoStageUpdate)
             {
                 throw new InvalidOperationException("Two-stage update is disabled.");
@@ -760,24 +723,15 @@ namespace Procedure
 
             if (resourceModule.PlayMode == EPlayMode.HostPlayMode)
             {
-                if (setting.TwoStageReleaseSourceMode == TwoStageReleaseSourceMode.FixedEntry)
-                {
-                    TwoStageReleaseUrl.ValidateFixedEntryUrl(
-                        setting.TwoStageReleaseDescriptorUrl,
-                        setting.AllowInsecureLoopbackHttp);
-                    TwoStageReleaseUrl.ValidateFixedResourceRootUrl(
-                        setting.TwoStageHostServerUrl,
-                        setting.AllowInsecureLoopbackHttp);
-                    TwoStageReleaseUrl.ValidateFixedResourceRootUrl(
-                        setting.TwoStageFallbackHostServerUrl,
-                        setting.AllowInsecureLoopbackHttp);
-                }
-                else
-                {
-                    ValidateTrustedUrl(setting.TwoStageReleaseDescriptorUrl, setting);
-                    ValidateTrustedUrl(setting.TwoStageHostServerUrl, setting);
-                    ValidateTrustedUrl(setting.TwoStageFallbackHostServerUrl, setting);
-                }
+                TwoStageReleaseUrl.ValidateFixedEntryUrl(
+                    setting.TwoStageReleaseEntryUrl,
+                    setting.AllowInsecureLoopbackHttp);
+                TwoStageReleaseUrl.ValidateFixedResourceRootUrl(
+                    setting.TwoStageHostServerUrl,
+                    setting.AllowInsecureLoopbackHttp);
+                TwoStageReleaseUrl.ValidateFixedResourceRootUrl(
+                    setting.TwoStageFallbackHostServerUrl,
+                    setting.AllowInsecureLoopbackHttp);
             }
         }
 
@@ -788,16 +742,9 @@ namespace Procedure
                 setting != null && setting.AllowInsecureLoopbackHttp);
         }
 
-        private static string NormalizeTrustedUrl(string value)
-        {
-            return TwoStageReleaseUrl.NormalizeLegacyRoot(value);
-        }
-
         private static string CombineTrustedUrl(string root, string fileName)
         {
-            string normalizedRoot = NormalizeTrustedUrl(root);
-            ValidateTrustedUrl(normalizedRoot, _setting);
-            return TwoStageReleaseUrl.CombineLegacyFileUrl(normalizedRoot, fileName);
+            return TwoStageReleaseUrl.CombineFileUrl(root, fileName);
         }
 
         private static UpdateArtifactDescriptor FindArtifact(UpdateArtifactDescriptor[] artifacts, string name)

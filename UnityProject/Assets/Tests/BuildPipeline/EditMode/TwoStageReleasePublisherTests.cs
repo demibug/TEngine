@@ -548,7 +548,6 @@ namespace TEngine.BuildPipelineTests
         {
             private readonly UpdateSetting _setting;
             private readonly bool _enabled;
-            private readonly TwoStageReleaseSourceMode _sourceMode;
             private readonly int _contractVersion;
             private readonly string _basePlayerId;
             private readonly string _channel;
@@ -569,11 +568,10 @@ namespace TEngine.BuildPipelineTests
             {
                 _setting = setting;
                 _enabled = setting.EnableTwoStageUpdate;
-                _sourceMode = setting.TwoStageReleaseSourceMode;
                 _contractVersion = setting.TwoStageContractVersion;
                 _basePlayerId = setting.BasePlayerId;
                 _channel = setting.Channel;
-                _descriptorUrl = setting.TwoStageReleaseDescriptorUrl;
+                _descriptorUrl = setting.TwoStageReleaseEntryUrl;
                 _hostUrl = setting.TwoStageHostServerUrl;
                 _fallbackUrl = setting.TwoStageFallbackHostServerUrl;
                 _updateStyle = setting.UpdateStyle;
@@ -587,7 +585,6 @@ namespace TEngine.BuildPipelineTests
                 _metadataAssemblies = new List<string>(setting.AOTMetaAssemblies ?? new List<string>());
 
                 setting.EnableTwoStageUpdate = true;
-                setting.TwoStageReleaseSourceMode = TwoStageReleaseSourceMode.FixedEntry;
                 setting.TwoStageContractVersion = 1;
                 setting.UpdateStyle = UpdateStyle.Force;
                 setting.BasePlayerId = "publisher-player";
@@ -598,7 +595,7 @@ namespace TEngine.BuildPipelineTests
                 setting.AssemblyTextAssetPath = "AssetRaw/DLL";
                 setting.BootstrapTag = "BOOTSTRAP";
                 setting.AllowInsecureLoopbackHttp = false;
-                setting.TwoStageReleaseDescriptorUrl =
+                setting.TwoStageReleaseEntryUrl =
                     "https://example.invalid/publisher/publisher-player/Android/publisher-channel/DefaultPackage/current.json";
                 setting.TwoStageHostServerUrl =
                     "https://assets.example.invalid/publisher/publisher-player/Android/publisher-channel/DefaultPackage";
@@ -620,11 +617,10 @@ namespace TEngine.BuildPipelineTests
             public void Dispose()
             {
                 _setting.EnableTwoStageUpdate = _enabled;
-                _setting.TwoStageReleaseSourceMode = _sourceMode;
                 _setting.TwoStageContractVersion = _contractVersion;
                 _setting.BasePlayerId = _basePlayerId;
                 _setting.Channel = _channel;
-                _setting.TwoStageReleaseDescriptorUrl = _descriptorUrl;
+                _setting.TwoStageReleaseEntryUrl = _descriptorUrl;
                 _setting.TwoStageHostServerUrl = _hostUrl;
                 _setting.TwoStageFallbackHostServerUrl = _fallbackUrl;
                 _setting.UpdateStyle = _updateStyle;

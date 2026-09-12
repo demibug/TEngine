@@ -35,9 +35,9 @@ MonoBehaviour:
   BootstrapAssemblyName: GameUpdater.dll
   BootstrapTextAssetPath: AssetRaw/Bootstrap/DLL
   BootstrapTag: BOOTSTRAP
-  TwoStageReleaseDescriptorUrl: http://127.0.0.1:8081
-  TwoStageHostServerUrl: http://127.0.0.1:8081
-  TwoStageFallbackHostServerUrl: http://127.0.0.1:8082
+  TwoStageReleaseEntryUrl: http://127.0.0.1:8081/demo-v1/Windows64/default/DefaultPackage/current.json
+  TwoStageHostServerUrl: http://127.0.0.1:8081/demo-v1/Windows64/default/DefaultPackage
+  TwoStageFallbackHostServerUrl: http://127.0.0.1:8082/demo-v1/Windows64/default/DefaultPackage
   AllowInsecureLoopbackHttp: 1
   TwoStageNoProgressTimeoutSeconds: 60
   EditorSimulateReleaseDescriptorJson: '{

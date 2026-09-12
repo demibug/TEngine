@@ -227,7 +227,7 @@ clearOp.Completed += op => { /* 完成 → ProcedurePreload */ };
 ```
 
 - `GameUpdater/Entry.cs` 是第二阶段入口（`namespace GameUpdater`），只依赖 `TEngine.Runtime` 稳定契约，不引用业务代码
-- 关键设置：`BootstrapTextAssetPath = "AssetRaw/Bootstrap/DLL"`、`BootstrapTag = "BOOTSTRAP"`、`TwoStageReleaseDescriptorUrl`；资产中另有 `TwoStageContractVersion = 1`、`TwoStageHostServerUrl` / `TwoStageFallbackHostServerUrl`、`TwoStageNoProgressTimeoutSeconds = 60`、`EditorSimulateReleaseDescriptorJson` 等字段
+- 关键设置：`BootstrapTextAssetPath = "AssetRaw/Bootstrap/DLL"`、`BootstrapTag = "BOOTSTRAP"`、`TwoStageReleaseEntryUrl`（固定 `current.json` 地址）；资产中另有 `TwoStageContractVersion = 1`、`TwoStageHostServerUrl` / `TwoStageFallbackHostServerUrl`、`TwoStageNoProgressTimeoutSeconds = 60`、`EditorSimulateReleaseDescriptorJson` 等字段
 - 业务程序集顺序/列表必须与 release 描述符一致（逐项有序比对），否则 `ProcedureLoadAssembly` 抛异常拒绝进入；`BootstrapAssemblyName` 对应的 DLL 在业务名单加载阶段会被跳过（第一阶段已加载）
 - 主包侧会话状态由 `Procedure/TwoStageUpdateCoordinator.cs` 管理（IsPrepared / MarkResourcesReady / 入口 checkpoint）
 

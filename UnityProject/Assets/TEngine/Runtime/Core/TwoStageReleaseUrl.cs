@@ -15,8 +15,7 @@ namespace TEngine
         private const string EntryPathSuffix = "/" + EntryFileName;
 
         /// <summary>
-        /// 校验旧 DirectDescriptor 模式沿用的可信 URL规则。
-        /// 旧模式不额外限制查询参数、fragment 和用户信息，以保持历史配置行为。
+        /// 校验两阶段下载使用的可信 URL 协议。
         /// </summary>
         public static bool TryValidateTrustedUrl(
             string value,
@@ -163,22 +162,6 @@ namespace TEngine
             }
 
             return fixedEntryUrl.Trim() + "?ts=" + Uri.EscapeDataString(nonce);
-        }
-
-        /// <summary>
-        /// 旧 DirectDescriptor 模式的地址规范化，保持原有字符串拼接语义。
-        /// </summary>
-        public static string NormalizeLegacyRoot(string value)
-        {
-            return value.Trim().TrimEnd('/');
-        }
-
-        /// <summary>
-        /// 旧 DirectDescriptor 模式的资源文件拼接。
-        /// </summary>
-        public static string CombineLegacyFileUrl(string root, string fileName)
-        {
-            return NormalizeLegacyRoot(root) + "/" + Uri.EscapeDataString(fileName);
         }
 
         public static void ValidateTrustedUrl(string value, bool allowInsecureLoopbackHttp)

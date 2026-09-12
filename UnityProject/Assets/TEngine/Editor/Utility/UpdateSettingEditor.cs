@@ -35,12 +35,8 @@ namespace TEngine.Editor
             UpdateSetting updateSettingForHelp = (UpdateSetting)target;
             if (updateSettingForHelp != null)
             {
-                string modeHelp = updateSettingForHelp.TwoStageReleaseSourceMode ==
-                                   TwoStageReleaseSourceMode.FixedEntry
-                    ? "FixedEntry：descriptor 地址字段填写固定 /current.json；主备资源根填写身份目录根，运行时会追加 /releases/{ReleaseId}。"
-                    : "DirectDescriptor：descriptor 地址字段填写完整 TwoStageRelease_{ReleaseId}.json；主备资源根填写当前 release 资源目录。";
                 EditorGUILayout.HelpBox(
-                    modeHelp + " 固定入口只接受 HTTPS，开发时可显式允许 loopback HTTP；入口不会携带资源地址或本地路径。",
+                    "固定入口地址填写 /current.json，主备资源地址填写身份目录根，运行时会追加 /releases/{ReleaseId}。地址只接受 HTTPS，开发时可显式允许 loopback HTTP。",
                     MessageType.Info);
             }
 

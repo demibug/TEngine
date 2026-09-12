@@ -34,7 +34,10 @@ public static class TEngineSettingsProvider
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("BootstrapAssemblyName"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("BootstrapTextAssetPath"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("BootstrapTag"));
-                EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageReleaseDescriptorUrl"));
+                EditorGUILayout.HelpBox(
+                    "客户端先访问固定的 current.json 获取 ReleaseId，再访问 releases/{ReleaseId} 下的 descriptor 和资源。发布新版本时只需在完整上传 release 后切换 current.json。",
+                    MessageType.Info);
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageReleaseEntryUrl"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageHostServerUrl"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("TwoStageFallbackHostServerUrl"));
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("AllowInsecureLoopbackHttp"));

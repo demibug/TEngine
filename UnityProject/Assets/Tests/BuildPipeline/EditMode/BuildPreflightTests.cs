@@ -12,6 +12,26 @@ namespace TEngine.BuildPipelineTests
     public sealed class BuildPreflightTests
     {
         private const string SomeScene = "Assets/Scenes/main.unity";
+        private bool _twoStageEnabled;
+
+        [SetUp]
+        public void SetUp()
+        {
+            // 默认关闭两阶段更新，避免真实项目配置干扰与本功能无关的校验用例；需要两阶段的用例用 TwoStageSettingScope 显式开启。
+            UpdateSetting setting = Settings.UpdateSetting;
+            _twoStageEnabled = setting != null && setting.EnableTwoStageUpdate;
+            if (setting != null)
+                setting.EnableTwoStageUpdate = false;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            // 无条件恢复真实项目的原值，异常路径也不能让设置残留。
+            UpdateSetting setting = Settings.UpdateSetting;
+            if (setting != null)
+                setting.EnableTwoStageUpdate = _twoStageEnabled;
+        }
 
         private static List<string> OneScene()
         {
@@ -195,6 +215,22 @@ namespace TEngine.BuildPipelineTests
         }
 
         [Test]
+        public void TwoStageNonEntryUrl_IsRejected()
+        {
+            using (new TwoStageSettingScope(Settings.UpdateSetting))
+            {
+                Settings.UpdateSetting.TwoStageReleaseEntryUrl =
+                    "https://example.invalid/releases/release-123/TwoStageRelease_release-123.json";
+                BuildConfig config = CreateValidConfig();
+                config.ReleaseId = "release-123";
+
+                var errors = BuildPreflight.Validate(config, false, BuildTarget.Android, true, OneScene);
+
+                Assert.IsTrue(errors.Any(error => error.Contains("current.json")), string.Join("\n", errors));
+            }
+        }
+
+        [Test]
         public void TwoStageOutputRoot_IsolatedByCompatibilityCoordinates()
         {
             using (new TwoStageSettingScope(Settings.UpdateSetting))
@@ -224,14 +260,14 @@ namespace TEngine.BuildPipelineTests
                 _enabled = setting.EnableTwoStageUpdate;
                 _basePlayerId = setting.BasePlayerId;
                 _channel = setting.Channel;
-                _descriptorUrl = setting.TwoStageReleaseDescriptorUrl;
+                _descriptorUrl = setting.TwoStageReleaseEntryUrl;
                 _hostUrl = setting.TwoStageHostServerUrl;
                 _fallbackUrl = setting.TwoStageFallbackHostServerUrl;
 
                 setting.EnableTwoStageUpdate = true;
                 setting.BasePlayerId = "player-test";
                 setting.Channel = "channel-test";
-                setting.TwoStageReleaseDescriptorUrl = "https://example.invalid/release.json";
+                setting.TwoStageReleaseEntryUrl = "https://example.invalid/current.json";
                 setting.TwoStageHostServerUrl = "https://example.invalid/assets";
                 setting.TwoStageFallbackHostServerUrl = "https://fallback.example.invalid/assets";
             }
@@ -241,7 +277,7 @@ namespace TEngine.BuildPipelineTests
                 _setting.EnableTwoStageUpdate = _enabled;
                 _setting.BasePlayerId = _basePlayerId;
                 _setting.Channel = _channel;
-                _setting.TwoStageReleaseDescriptorUrl = _descriptorUrl;
+                _setting.TwoStageReleaseEntryUrl = _descriptorUrl;
                 _setting.TwoStageHostServerUrl = _hostUrl;
                 _setting.TwoStageFallbackHostServerUrl = _fallbackUrl;
             }

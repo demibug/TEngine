@@ -144,22 +144,12 @@ namespace TEngine
             if (setting == null || !setting.EnableTwoStageUpdate)
                 return errors;
 
-            if (!Enum.IsDefined(typeof(TwoStageReleaseSourceMode), setting.TwoStageReleaseSourceMode))
-                errors.Add($"两阶段 release 来源模式无效: {(int)setting.TwoStageReleaseSourceMode}");
-
             if (!hybridClrAvailable)
                 errors.Add("两阶段更新已开启，但 HybridCLR 宏未启用");
             if (!IsSupportedTwoStageTarget(config.BuildTarget))
                 errors.Add($"两阶段更新首版不支持构建目标: {config.BuildTarget}");
-            if (setting.TwoStageReleaseSourceMode == TwoStageReleaseSourceMode.FixedEntry)
-            {
-                if (!UpdateReleaseEntryValidator.IsValidReleaseId(config.ReleaseId))
-                    errors.Add("固定入口模式的 ReleaseId 必须是 1～128 个 ASCII 字母、数字、短横线或下划线");
-            }
-            else if (!IsSafePathSegment(config.ReleaseId))
-            {
-                errors.Add("两阶段 ReleaseId 必须是安全的单一目录段");
-            }
+            if (!UpdateReleaseEntryValidator.IsValidReleaseId(config.ReleaseId))
+                errors.Add("两阶段 ReleaseId 必须是 1～128 个 ASCII 字母、数字、短横线或下划线");
             if (setting.UpdateStyle != UpdateStyle.Force)
                 errors.Add("两阶段更新首版要求 UpdateStyle.Force");
             if (setting.TwoStageContractVersion <= 0)
@@ -189,24 +179,12 @@ namespace TEngine
             ValidateUniqueNames(errors, setting.AOTMetaAssemblies, "AOTMetaAssemblies");
             if (setting.AOTMetaAssemblies == null || setting.AOTMetaAssemblies.Count == 0)
                 errors.Add("两阶段 Bootstrap 必须包含完整的 AOT metadata 名单");
-            if (setting.TwoStageReleaseSourceMode == TwoStageReleaseSourceMode.FixedEntry)
-            {
-                ValidateFixedEntryUrl(errors, setting.TwoStageReleaseDescriptorUrl,
-                    setting.AllowInsecureLoopbackHttp, "固定入口");
-                ValidateFixedResourceRootUrl(errors, setting.TwoStageHostServerUrl,
-                    setting.AllowInsecureLoopbackHttp, "primary host");
-                ValidateFixedResourceRootUrl(errors, setting.TwoStageFallbackHostServerUrl,
-                    setting.AllowInsecureLoopbackHttp, "fallback host");
-            }
-            else
-            {
-                ValidateTrustedUrl(errors, setting.TwoStageReleaseDescriptorUrl,
-                    setting.AllowInsecureLoopbackHttp, "descriptor");
-                ValidateTrustedUrl(errors, setting.TwoStageHostServerUrl,
-                    setting.AllowInsecureLoopbackHttp, "primary host");
-                ValidateTrustedUrl(errors, setting.TwoStageFallbackHostServerUrl,
-                    setting.AllowInsecureLoopbackHttp, "fallback host");
-            }
+            ValidateFixedEntryUrl(errors, setting.TwoStageReleaseEntryUrl,
+                setting.AllowInsecureLoopbackHttp, "固定入口");
+            ValidateFixedResourceRootUrl(errors, setting.TwoStageHostServerUrl,
+                setting.AllowInsecureLoopbackHttp, "primary host");
+            ValidateFixedResourceRootUrl(errors, setting.TwoStageFallbackHostServerUrl,
+                setting.AllowInsecureLoopbackHttp, "fallback host");
             ValidateResourceDriver(errors);
             try
             {
@@ -279,12 +257,6 @@ namespace TEngine
                 if (string.IsNullOrWhiteSpace(name) || !seen.Add(name))
                     errors.Add($"{field} 包含空值或重复项: '{name}'");
             }
-        }
-
-        private static void ValidateTrustedUrl(List<string> errors, string value, bool allowLoopbackHttp, string label)
-        {
-            if (!TwoStageReleaseUrl.TryValidateTrustedUrl(value, allowLoopbackHttp, out string error))
-                errors.Add($"两阶段 {label} {error}");
         }
 
         private static void ValidateFixedEntryUrl(

@@ -111,15 +111,6 @@ namespace TEngine
             if (!snapshot.TwoStageEnabled)
                 errors.Add("本地固定入口发布要求启用两阶段更新。");
 
-            if (!Enum.IsDefined(typeof(TwoStageReleaseSourceMode), snapshot.SourceMode))
-            {
-                errors.Add($"两阶段 release 来源模式无效：{(int)snapshot.SourceMode}。");
-            }
-            else if (snapshot.SourceMode != TwoStageReleaseSourceMode.FixedEntry)
-            {
-                errors.Add("本地固定入口发布要求选择 FixedEntry 模式。");
-            }
-
             if (snapshot.Config == null)
             {
                 errors.Add("构建配置为空。");
@@ -141,31 +132,28 @@ namespace TEngine
             if (snapshot.ContractVersion <= 0)
                 errors.Add("两阶段契约版本必须大于 0。");
 
-            if (snapshot.SourceMode == TwoStageReleaseSourceMode.FixedEntry)
+            if (!TwoStageReleaseUrl.TryValidateFixedEntryUrl(
+                    snapshot.FixedEntryUrl,
+                    snapshot.AllowInsecureLoopbackHttp,
+                    out string entryError))
             {
-                if (!TwoStageReleaseUrl.TryValidateFixedEntryUrl(
-                        snapshot.FixedEntryUrl,
-                        snapshot.AllowInsecureLoopbackHttp,
-                        out string entryError))
-                {
-                    errors.Add($"固定入口 URL 无效：{entryError}");
-                }
+                errors.Add($"固定入口 URL 无效：{entryError}");
+            }
 
-                if (!TwoStageReleaseUrl.TryValidateFixedResourceRootUrl(
-                        snapshot.PrimaryHostUrl,
-                        snapshot.AllowInsecureLoopbackHttp,
-                        out string primaryError))
-                {
-                    errors.Add($"primary host URL 无效：{primaryError}");
-                }
+            if (!TwoStageReleaseUrl.TryValidateFixedResourceRootUrl(
+                    snapshot.PrimaryHostUrl,
+                    snapshot.AllowInsecureLoopbackHttp,
+                    out string primaryError))
+            {
+                errors.Add($"primary host URL 无效：{primaryError}");
+            }
 
-                if (!TwoStageReleaseUrl.TryValidateFixedResourceRootUrl(
-                        snapshot.FallbackHostUrl,
-                        snapshot.AllowInsecureLoopbackHttp,
-                        out string fallbackError))
-                {
-                    errors.Add($"fallback host URL 无效：{fallbackError}");
-                }
+            if (!TwoStageReleaseUrl.TryValidateFixedResourceRootUrl(
+                    snapshot.FallbackHostUrl,
+                    snapshot.AllowInsecureLoopbackHttp,
+                    out string fallbackError))
+            {
+                errors.Add($"fallback host URL 无效：{fallbackError}");
             }
 
             if (errors.Count == 0)

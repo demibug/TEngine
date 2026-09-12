@@ -18,6 +18,7 @@ namespace TEngine.BuildPipelineTests
     {
         private List<string> _calls;
         private BuildStageImpl _impl;
+        private bool _twoStageEnabled;
 
         [SetUp]
         public void SetUp()
@@ -33,6 +34,21 @@ namespace TEngine.BuildPipelineTests
                 ProcessMinimalPackage = (config, result) => _calls.Add("Minimal"),
                 BuildPlayer = (target, group, output) => { _calls.Add($"Player:{target}:{output}"); return PlayerStageOutcome.Succeed(output); },
             };
+
+            // 本 fixture 只验证阶段编排，临时关闭真实项目的两阶段更新，避免全局配置改变预检与 Player 后复核结果。
+            UpdateSetting setting = Settings.UpdateSetting;
+            _twoStageEnabled = setting != null && setting.EnableTwoStageUpdate;
+            if (setting != null)
+                setting.EnableTwoStageUpdate = false;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            // 无条件恢复真实项目的原值，异常路径也不能让设置残留。
+            UpdateSetting setting = Settings.UpdateSetting;
+            if (setting != null)
+                setting.EnableTwoStageUpdate = _twoStageEnabled;
         }
 
         private static BuildConfig CreateValidConfig()

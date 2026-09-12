@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace TEngine
 {
@@ -47,22 +48,6 @@ namespace TEngine
         StreamingAssets,
     }
 
-    /// <summary>
-    /// 两阶段更新 descriptor 的来源模式。
-    /// </summary>
-    public enum TwoStageReleaseSourceMode
-    {
-        /// <summary>
-        /// 直接把 TwoStageReleaseDescriptorUrl 当作完整 descriptor 地址，兼容旧配置。
-        /// </summary>
-        DirectDescriptor = 0,
-
-        /// <summary>
-        /// 把 TwoStageReleaseDescriptorUrl 当作固定 current.json 入口地址。
-        /// </summary>
-        FixedEntry = 1,
-    }
-    
     [CreateAssetMenu(menuName = "TEngine/UpdateSetting", fileName = "UpdateSetting")]
     public class UpdateSetting : ScriptableObject
     {
@@ -122,16 +107,14 @@ namespace TEngine
 
         public string BootstrapTag = "BOOTSTRAP";
 
-        [Tooltip("选择 DirectDescriptor 时填写完整 descriptor URL；选择 FixedEntry 时填写以 /current.json 结尾的固定入口 URL。")]
-        public TwoStageReleaseSourceMode TwoStageReleaseSourceMode = TwoStageReleaseSourceMode.DirectDescriptor;
+        [FormerlySerializedAs("TwoStageReleaseDescriptorUrl")]
+        [Tooltip("固定发布入口的 current.json 地址。客户端先读取 ReleaseId，再访问对应的不可变 release 目录。")]
+        public string TwoStageReleaseEntryUrl = string.Empty;
 
-        [Tooltip("DirectDescriptor：完整的 TwoStageRelease_{ReleaseId}.json 地址；FixedEntry：固定发布目录中的 current.json 地址。")]
-        public string TwoStageReleaseDescriptorUrl = string.Empty;
-
-        [Tooltip("DirectDescriptor：当前 release 的资源目录；FixedEntry：基础包/平台/渠道/资源包的固定根目录，客户端会追加 /releases/{ReleaseId}。descriptor 不能覆盖该地址。")]
+        [Tooltip("主资源身份根目录。客户端会追加 /releases/{ReleaseId}，descriptor 不能覆盖该地址。")]
         public string TwoStageHostServerUrl = string.Empty;
 
-        [Tooltip("DirectDescriptor：当前 release 的备用资源目录；FixedEntry：同一身份的备用固定根目录，客户端会追加 /releases/{ReleaseId}。descriptor 不能覆盖该地址。")]
+        [Tooltip("备用资源身份根目录。客户端会追加 /releases/{ReleaseId}，descriptor 不能覆盖该地址。")]
         public string TwoStageFallbackHostServerUrl = string.Empty;
 
         [Tooltip("仅开发环境使用：显式允许入口和资源地址采用 loopback HTTP；正式环境应使用 HTTPS。")]

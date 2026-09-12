@@ -1,7 +1,6 @@
 using System;
 using NUnit.Framework;
 using TEngine;
-using UnityEngine;
 
 namespace TEngine.TwoStageHotUpdateTests
 {
@@ -10,20 +9,6 @@ namespace TEngine.TwoStageHotUpdateTests
     /// </summary>
     public sealed class TwoStageReleaseEntryUrlTests
     {
-        [Test]
-        public void NewUpdateSetting_DefaultsToDirectDescriptor()
-        {
-            UpdateSetting setting = ScriptableObject.CreateInstance<UpdateSetting>();
-            try
-            {
-                Assert.AreEqual(TwoStageReleaseSourceMode.DirectDescriptor, setting.TwoStageReleaseSourceMode);
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(setting);
-            }
-        }
-
         [Test]
         public void EntryJson_ValidUnknownField_PassesValidation()
         {
@@ -157,13 +142,5 @@ namespace TEngine.TwoStageHotUpdateTests
                 "http://127.0.0.1:8081/assets/", true, out _));
         }
 
-        [Test]
-        public void DirectUrl_LegacyQueryAndFragmentRemainAllowed()
-        {
-            Assert.IsTrue(TwoStageReleaseUrl.TryValidateTrustedUrl(
-                "https://example.invalid/release.json?cache=1#fragment",
-                false,
-                out string error), error);
-        }
     }
 }

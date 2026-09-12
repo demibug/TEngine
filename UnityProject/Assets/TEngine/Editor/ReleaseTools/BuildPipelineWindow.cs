@@ -428,7 +428,7 @@ namespace TEngine
                 EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.HelpBox(
-                    "启用后要求 UpdateSetting 开启两阶段更新并选择 FixedEntry；构建和 Player 阶段全部成功后才会复制并提交 current.json。\n" +
+                    "启用后要求 UpdateSetting 开启两阶段更新并配置固定入口；构建和 Player 阶段全部成功后才会复制并提交 current.json。\n" +
                     "发布器不会修改 UpdateSetting，也不会上传远程服务器。",
                     MessageType.Info);
             }

@@ -20,7 +20,6 @@ namespace TEngine
             BuildConfig config,
             string publishRoot,
             bool twoStageEnabled,
-            TwoStageReleaseSourceMode sourceMode,
             int contractVersion,
             string basePlayerId,
             string platform,
@@ -37,7 +36,6 @@ namespace TEngine
             _config = config;
             PublishRoot = publishRoot;
             TwoStageEnabled = twoStageEnabled;
-            SourceMode = sourceMode;
             ContractVersion = contractVersion;
             BasePlayerId = basePlayerId;
             Platform = platform;
@@ -59,7 +57,6 @@ namespace TEngine
         public BuildConfig BuildConfig => Config;
         public string PublishRoot { get; }
         public bool TwoStageEnabled { get; }
-        public TwoStageReleaseSourceMode SourceMode { get; }
         public int ContractVersion { get; }
         public string BasePlayerId { get; }
         public string Platform { get; }
@@ -96,16 +93,13 @@ namespace TEngine
                 TwoStageBuildAndPublish.CloneBuildConfig(config),
                 publishRoot,
                 setting != null && setting.EnableTwoStageUpdate,
-                setting == null
-                    ? TwoStageReleaseSourceMode.DirectDescriptor
-                    : setting.TwoStageReleaseSourceMode,
                 setting?.TwoStageContractVersion ?? 0,
                 setting?.BasePlayerId,
                 platform,
                 setting?.Channel,
                 ReleaseTools.PackageName,
                 setting?.BootstrapAssemblyName,
-                setting?.TwoStageReleaseDescriptorUrl,
+                setting?.TwoStageReleaseEntryUrl,
                 setting?.TwoStageHostServerUrl,
                 setting?.TwoStageFallbackHostServerUrl,
                 setting != null && setting.AllowInsecureLoopbackHttp,
